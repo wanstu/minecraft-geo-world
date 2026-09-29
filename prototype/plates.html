@@ -15,12 +15,13 @@
 <a class="nav-item" href="generator.html">世界总览</a><a class="nav-item active" href="plates.html"><i class="dot"></i>板块构造</a>
 <div class="nav-item">地形与海盆</div><div class="nav-item">风场 / 洋流</div><div class="nav-item">气候 / 季风</div><div class="nav-item">水文</div><div class="nav-item">生态区</div></div>
 <div class="section"><h3>本次 Lab</h3><div class="kv"><span>Seed</span><span>731894205</span></div><div class="kv"><span>宏观网格</span><span>640 × 400</span></div>
-<div class="kv"><span>板块数</span><span>18</span></div><div class="kv"><span>模型</span><span>Voronoi v0</span></div></div></aside>
+<div class="kv"><span>板块数</span><span>18</span></div><div class="kv"><span>模型</span><span>Warped Voronoi v1</span></div></div></aside>
 <main class="main">
 <div class="toolbar"><div class="title">板块与大陆骨架实验</div><div class="badge">Seed → Plate → Boundary → Elevation</div></div>
 <div class="note"><strong>注意：</strong>当前是算法实验，不是最终世界效果。这里故意把“板块”和“大陆地壳”简化得很粗，用于验证边界分类与构造地貌因果链。</div>
 <div class="lab-grid">
-<div class="lab-card"><header><strong>板块分区</strong><small>Plate ID</small></header><img src="generated/plates.png" alt="plates"></div>
+<div class="lab-card"><header><strong>原始 Voronoi 对照</strong><small>未自然化</small></header><img src="generated/plates-raw.png" alt="raw plates"></div>
+<div class="lab-card"><header><strong>自然化板块分区</strong><small>平滑 Domain Warp</small></header><img src="generated/plates.png" alt="plates"></div>
 <div class="lab-card"><header><strong>地壳类型</strong><small>大陆 / 海洋</small></header><img src="generated/crust.png" alt="crust"></div>
 <div class="lab-card"><header><strong>板块边界</strong><small>红=汇聚 · 蓝=张裂 · 黄=转换</small></header><img src="generated/boundaries.png" alt="boundaries"></div>
 <div class="lab-card"><header><strong>地壳 + 构造边界</strong><small>检查大陆是否跨板块</small></header><img src="generated/tectonics.png" alt="tectonics"></div>
@@ -32,6 +33,7 @@
 </div></main>
 <aside class="inspector"><div class="section"><h3>Phase 1 判断标准</h3>
 <div class="card"><div class="card-title">因果可解释</div><p>主要抬升必须来自板块汇聚，而不是纯噪声。</p></div>
+<div class="card"><div class="card-title">边界自然化</div><p>板块查询坐标经过低频平滑 Domain Warp，再进行 Voronoi 归属；保留连续板块，同时降低笔直几何边界感。</p></div>
 <div class="card"><div class="card-title">大陆 ≠ 板块</div><p>已拆分地壳场和板块场；大陆可以横跨多个板块，板块也不再等价于海岸线。</p></div>
 <div class="card"><div class="card-title">海洋地壳年龄</div><p>洋中脊附近最年轻，远离洋中脊逐渐变老；海洋-海洋碰撞时优先让更老的一侧俯冲。</p></div>
 <div class="card"><div class="card-title">构造影响带</div><p>边界只作为构造源，真正高程由向周围衰减的影响带控制，不再是一格宽的线。</p></div>

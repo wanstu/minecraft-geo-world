@@ -218,3 +218,46 @@ Elevation Field
 - Transform Fault：窄且弱
 
 后续会把带宽和幅度从固定常量升级为由相对板块速度、地壳厚度、地壳年龄等决定。
+
+
+---
+
+## D-012：板块自然化采用连续坐标扭曲，不做逐 Cell 随机扰动
+
+状态：已实现第一版
+
+原始 Voronoi 的优点是：
+
+- 板块连续
+- 拓扑简单
+- 计算便宜
+- 易于解释
+
+缺点是边界过于笔直、几何感明显。
+
+V1 自然化方案：
+
+```text
+World Coordinate
+      ↓
+Low-frequency Smooth Domain Warp
+      ↓
+Warped Coordinate
+      ↓
+Nearest Plate Seed
+```
+
+不采用：
+
+```text
+每个 Cell 独立随机修改 plate id
+```
+
+原因是后者容易产生：
+
+- 孤立 Cell
+- 板块碎片
+- 锯齿边界
+- 不稳定的构造带
+
+原始 `RawPlateID` 保留用于调试与算法比较，实际构造计算使用自然化后的 `PlateID`。

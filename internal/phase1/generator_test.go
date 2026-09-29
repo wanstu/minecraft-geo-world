@@ -94,3 +94,20 @@ func TestTectonicInfluenceHasWidth(t *testing.T) {
 		t.Fatalf("influence did not expand beyond boundary sources: sources=%d influenced=%d", sourceCount, influencedCount)
 	}
 }
+
+func TestPlateWarpChangesBoundaries(t *testing.T) {
+	w := Generate(testConfig())
+	changed := 0
+	for i := range w.PlateID {
+		if w.PlateID[i] != w.RawPlateID[i] {
+			changed++
+		}
+	}
+	ratio := float64(changed) / float64(len(w.PlateID))
+	if ratio < 0.01 {
+		t.Fatalf("plate warp changed too little: %.3f", ratio)
+	}
+	if ratio > 0.35 {
+		t.Fatalf("plate warp changed too much: %.3f", ratio)
+	}
+}

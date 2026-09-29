@@ -8,12 +8,13 @@
 
 **Phase 1 — 板块与大陆骨架**
 
-当前子阶段：**Phase 1.3 — 板块边界自然化（准备开始）**
+当前子阶段：**Phase 1.4 — 地壳与构造参数深化（准备开始）**
 
 ## 当前稳定基线
 
 最近提交：
 
+- `4cee4af` — model ocean crust age and tectonic influence bands
 - `4f31402` — record geoworld status decisions and roadmap
 - `f3f0ba0` — classify tectonic landform interactions
 - `fc6acf4` — decouple crust field from tectonic plates
@@ -34,51 +35,59 @@
   - 东西最终进入 Infinite Storm Ocean。
   - 南北最终进入 Infinite Frozen Ocean。
 - GeoWorld 负责长期气候，不负责实时四季 / 天气。
-- 世界生成参数只在创建新世界时生效，并写入世界存档；已有世界只读，避免新区块割裂。
+- 世界生成参数只在创建新世界时生效，并写入世界存档；已有世界只读。
 
 ### Phase 1.1 — 最小构造链路
 
-- Seed 确定性生成板块。
-- 每个板块具有中心和运动速度向量。
-- 板块边界分类：
-  - convergent
-  - divergent
-  - transform
-- 大陆 / 海洋地壳已从板块归属中拆离。
-- 一个大陆可以跨多个板块。
-- 一个板块可以同时拥有大陆和海洋地壳。
-- 目标海洋面积按实际 Cell 面积控制；当前测试为 68.00%。
-- 已有构造地貌：
-  - Collision Orogen
-  - Volcanic Arc
-  - Trench
-  - Island Arc
-  - Mid-Ocean Ridge
-  - Continental Rift
-  - Transform Fault
+状态：完成
+
+- Seed → 板块中心和速度
+- 汇聚 / 张裂 / 转换边界
+- 大陆 / 海洋地壳与板块解耦
+- 海洋面积按实际 Cell 控制
+- 初步构造地貌分类
 
 ### Phase 1.2 — 地壳年龄与构造影响带
 
-状态：**完成**
+状态：完成
 
-已完成：
+- 海洋地壳年龄场
+- 洋中脊年轻、远离后逐渐变老
+- 海洋-海洋汇聚时较老一侧优先俯冲
+- 海沟侧 / 岛弧侧区分
+- 大陆火山弧 / 海沟区分
+- 构造影响从一格边界扩展为有宽度的带
+- 海洋地壳老化导致海盆逐渐加深
+- 自动测试覆盖确定性、海洋面积、年龄范围、影响带宽度
 
-- 海洋地壳年龄场。
-- 海洋-海洋汇聚的俯冲侧判定。
-- 较老海洋地壳优先俯冲。
-- 较年轻上覆海洋板块形成岛弧。
-- 大陆-海洋汇聚区分海沟侧与大陆火山弧侧。
-- 构造边界从“一格线”扩展为有宽度的影响带。
-- 山系、火山弧、海沟、洋中脊、裂谷使用不同宽度和影响幅度。
-- 海洋地壳随年龄增加发生基础海盆加深。
-- 加入自动测试：
-  - Seed 可复现
-  - 海洋面积目标
-  - 海洋年龄范围
-  - 构造影响带确实扩展到边界之外
+### Phase 1.3 — 板块边界自然化
 
-当前输出图层：
+状态：**完成第一版**
 
+实现：
+
+- 保留原始 Voronoi 作为可解释拓扑骨架。
+- 在查询板块归属前对坐标做低频平滑 Domain Warp。
+- 实际板块边界出现弯曲与不规则变化。
+- 不使用逐 Cell 随机抖动，避免盐胡椒碎片。
+- 保留 `plates-raw.png` 与 `plates.png` 对照。
+- 自动测试限制 warp 必须产生明显变化，但不能重写过多 Cell。
+
+## 当前实验参数
+
+默认 Lab：
+
+- Seed：731894205
+- Grid：640 × 400
+- Plate Count：18
+- Ocean Area：68%
+- 当前测试 Seed 的 Plate Warp 变化比例：6.21%
+- Ocean Age：0.000 ～ 0.908
+- Tectonic Influence：覆盖约 16.41% Cell
+
+当前输出：
+
+- `plates-raw.png`
 - `plates.png`
 - `crust.png`
 - `boundaries.png`
@@ -89,49 +98,24 @@
 - `tectonic-influence.png`
 - `elevation.png`
 
-## 当前实验参数
-
-默认 Lab：
-
-- Seed：731894205
-- Grid：640 × 400
-- Plate Count：18
-- Ocean Area：68%
-
-## 下一步：Phase 1.3 — 板块边界自然化
+## 下一步：Phase 1.4 — 地壳与构造参数深化
 
 目标：
 
-1. 降低标准 Voronoi 的直线 / 多边形感。
-2. 板块仍保持稳定、连续、可确定性复现。
-3. 边界自然化不能破坏板块拓扑关系。
-4. 构造地貌继续沿自然化后的边界生成。
-5. 比较多种方法：
-   - 扰动距离场
-   - domain warp
-   - plate growth / region growth
-   - 混合方法
+1. 大陆地壳厚度场。
+2. 板块相对运动速度进入“构造强度”。
+3. 碰撞越强，山系 / 海沟 / 裂谷影响越明显。
+4. 海洋地壳年龄参与俯冲强度。
+5. 构造影响带宽度不再完全是固定常量。
+6. 给 Generator 增加 crust thickness / tectonic intensity 图层。
 
-验收：
+## Phase 1.5 — 基础高程场
 
-- 视觉上不再明显像几何 Voronoi。
-- 不产生大量孤岛 Cell 或锯齿碎片。
-- 相同 Seed 完全一致。
-- 性能仍能支撑 1024² 甚至更高宏观网格。
+计划：
 
-## Phase 1 后续
-
-### Phase 1.4 — 地壳与构造参数深化
-
-- 大陆地壳厚度
-- 海洋地壳年龄进一步校准
-- 构造强度与相对板块速度绑定
-- 海沟 / 山系宽度与碰撞强度绑定
-
-### Phase 1.5 — 基础高程场
-
-- 大陆内部
+- 大陆内部基础高程
 - 大陆架
+- 大陆坡
 - 海盆
 - 高原
 - 山系
@@ -140,7 +124,7 @@
 - 洋中脊
 - 裂谷
 
-### Phase 1.6 — Phase 1 验收
+## Phase 1.6 — Phase 1 验收
 
 - 大陆轮廓合理。
 - 山系与构造有因果关系。

@@ -51,6 +51,7 @@ type Config struct {
 type World struct {
 	Config            Config
 	Plates            []Plate
+	RawPlateID        []int
 	PlateID           []int
 	Crust             []CrustType
 	LandPotential     []float64

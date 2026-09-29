@@ -31,10 +31,14 @@ func main() {
 	}
 
 	oceanCells := 0
+	warpedCells := 0
 	minAge := 1.0
 	maxAge := 0.0
 	influenced := 0
 	for i, c := range world.Crust {
+		if world.RawPlateID[i] != world.PlateID[i] {
+			warpedCells++
+		}
 		if c == phase1.Oceanic {
 			oceanCells++
 			if world.OceanAge[i] < minAge {
@@ -50,11 +54,12 @@ func main() {
 	}
 	oceanPct := float64(oceanCells) / float64(len(world.Crust)) * 100
 	influencePct := float64(influenced) / float64(len(world.Crust)) * 100
+	warpPct := float64(warpedCells) / float64(len(world.Crust)) * 100
 
 	fmt.Printf("GeoWorld Phase 1 Lab\n")
 	fmt.Printf("seed=%d grid=%dx%d plates=%d ocean-area=%.2f%%\n",
 		cfg.Seed, cfg.Width, cfg.Height, len(world.Plates), oceanPct)
-	fmt.Printf("ocean-age=%.3f..%.3f tectonic-influence=%.2f%% cells\n",
-		minAge, maxAge, influencePct)
+	fmt.Printf("plate-warp=%.2f%% cells ocean-age=%.3f..%.3f tectonic-influence=%.2f%% cells\n",
+		warpPct, minAge, maxAge, influencePct)
 	fmt.Printf("output=%s\n", *out)
 }

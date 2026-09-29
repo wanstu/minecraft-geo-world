@@ -54,6 +54,7 @@ func Generate(cfg Config) *World {
 	w := &World{
 		Config:            cfg,
 		Plates:            plates,
+		RawPlateID:        make([]int, n),
 		PlateID:           make([]int, n),
 		Crust:             make([]CrustType, n),
 		LandPotential:     make([]float64, n),
@@ -66,7 +67,11 @@ func Generate(cfg Config) *World {
 
 	for y := 0; y < cfg.Height; y++ {
 		for x := 0; x < cfg.Width; x++ {
-			w.PlateID[w.index(x, y)] = nearestPlate(float64(x), float64(y), plates)
+			i := w.index(x, y)
+			fx, fy := float64(x), float64(y)
+			w.RawPlateID[i] = nearestPlate(fx, fy, plates)
+			wx, wy := warpedPlatePoint(fx, fy, cfg)
+			w.PlateID[i] = nearestPlate(wx, wy, plates)
 		}
 	}
 
@@ -91,6 +96,32 @@ func nearestPlate(x, y float64, plates []Plate) int {
 		}
 	}
 	return best
+}
+
+// warpedPlatePoint 对“查询坐标”做平滑低频扭曲，再执行最近板块中心查询。
+// 它保留 Voronoi 的连续大区块优势，同时降低笔直边界和规则多边形感。
+// 这里故意不使用逐 Cell 随机抖动，避免板块边缘出现盐胡椒碎片。
+func warpedPlatePoint(x, y float64, cfg Config) (float64, float64) {
+	w := float64(cfg.Width)
+	h := float64(cfg.Height)
+	minSize := math.Min(w, h)
+	amp := minSize * 0.032
+
+	seedPhaseA := float64((cfg.Seed%10007)+10007) / 10007 * math.Pi * 2
+	seedPhaseB := float64((cfg.Seed%7919)+7919) / 7919 * math.Pi * 2
+
+	x1 := x / w * math.Pi * 2
+	y1 := y / h * math.Pi * 2
+	diag := (x + y) / minSize * math.Pi
+
+	dx := math.Sin(y1*2.15+seedPhaseA)*0.58 +
+		math.Sin(diag*1.37+seedPhaseB)*0.27 +
+		math.Cos(x1*0.83-y1*0.71+seedPhaseA*0.5)*0.15
+	dy := math.Cos(x1*1.85+seedPhaseB)*0.56 +
+		math.Sin(diag*1.19-seedPhaseA)*0.29 +
+		math.Sin(y1*0.91-x1*0.63+seedPhaseB*0.5)*0.15
+
+	return x + dx*amp, y + dy*amp
 }
 
 func (w *World) generateCrust(r *rand.Rand) {

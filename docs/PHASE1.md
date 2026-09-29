@@ -158,3 +158,30 @@ Seed
 - `ocean-age.png`
 - `subduction.png`
 - `tectonic-influence.png`
+
+
+## Phase 1.3 完成记录
+
+第一版板块边界自然化使用低频平滑 Domain Warp。
+
+同时保留：
+
+- `RawPlateID`：标准最近中心 Voronoi。
+- `PlateID`：经过坐标扭曲后的实际板块归属。
+
+新增：
+
+- `plates-raw.png`：原始 Voronoi 对照。
+- `plates.png`：实际自然化板块。
+
+算法原则：
+
+- 扭曲必须连续。
+- 不能逐 Cell 加随机 plate id。
+- 不能为了“自然”制造大量孤立板块碎片。
+- 扭曲只改变板块边界形状，不改变 Seed 可复现性。
+
+自动测试要求：
+
+- naturalized plate map 必须相对 raw map 有明显变化。
+- 改变比例不能过大，避免整个板块拓扑被 warp 重写。

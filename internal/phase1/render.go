@@ -17,6 +17,9 @@ func RenderAll(w *World, outDir string) error {
 		name string
 		fn   func(x, y int) color.RGBA
 	}{
+		{"plates-raw.png", func(x, y int) color.RGBA {
+			return palette(w.RawPlateID[w.index(x, y)])
+		}},
 		{"plates.png", func(x, y int) color.RGBA {
 			return palette(w.PlateID[w.index(x, y)])
 		}},
