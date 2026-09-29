@@ -31,9 +31,10 @@ Seed
 - 每个板块有：
   - ID
   - seed point
-  - crust type: continental / oceanic
   - velocity vector
 - Cell 通过最近板块中心归属板块
+- 大陆 / 海洋地壳由独立的平滑“大陆势场”生成，并按目标海洋面积阈值切分
+- 大陆势场在地图外围施加海洋偏置，给风暴洋 / 冰冻洋保留缓冲
 - 相邻 Cell 属于不同板块时形成边界
 - 根据两侧板块相对速度在边界法线方向的投影判断：
   - convergent
@@ -47,8 +48,9 @@ Seed
 `geoworld-lab` 输出：
 
 - `plates.png`：板块 ID 分区
-- `crust.png`：大陆 / 海洋地壳
+- `crust.png`：独立大陆 / 海洋地壳场
 - `boundaries.png`：三类板块边界
+- `tectonics.png`：地壳与板块边界叠加，用于检查大陆是否跨板块
 - `elevation.png`：基于地壳类型和边界抬升的粗略高程倾向
 
 ## 下一步算法改进
@@ -71,4 +73,4 @@ Seed
 - 一个板块可以同时包含海洋和大陆地壳。
 - 板块边界决定主要构造地貌，但不会直接等价于海岸线。
 
-当前 Lab 将 crust type 简化到 plate level，只用于快速验证流程，后续必须拆开。
+当前 Lab 已把 crust field 从 plate field 中拆开。下一步需要继续细化：大陆地壳年龄 / 厚度、板块边界两侧地壳组合，以及俯冲方向。

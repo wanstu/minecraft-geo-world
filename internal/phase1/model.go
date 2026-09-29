@@ -25,7 +25,6 @@ type Plate struct {
 	ID       int
 	Center   Vec2
 	Velocity Vec2
-	Crust    CrustType
 }
 
 type Config struct {
@@ -37,9 +36,11 @@ type Config struct {
 }
 
 type World struct {
-	Config    Config
-	Plates    []Plate
-	PlateID   []int
-	Boundary  []BoundaryType
-	Elevation []float64
+	Config        Config
+	Plates        []Plate
+	PlateID       []int
+	Crust         []CrustType
+	LandPotential []float64
+	Boundary      []BoundaryType
+	Elevation     []float64
 }

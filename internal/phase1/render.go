@@ -19,8 +19,7 @@ func RenderAll(w *World, outDir string) error {
 		return err
 	}
 	if err := render(filepath.Join(outDir, "crust.png"), w.Config.Width, w.Config.Height, func(x, y int) color.RGBA {
-		p := w.Plates[w.PlateID[y*w.Config.Width+x]]
-		if p.Crust == Continental {
+		if w.Crust[y*w.Config.Width+x] == Continental {
 			return color.RGBA{92, 130, 78, 255}
 		}
 		return color.RGBA{31, 76, 99, 255}
@@ -39,6 +38,25 @@ func RenderAll(w *World, outDir string) error {
 			return color.RGBA{235, 193, 82, 255}
 		default:
 			return dim(base)
+		}
+	}); err != nil {
+		return err
+	}
+	if err := render(filepath.Join(outDir, "tectonics.png"), w.Config.Width, w.Config.Height, func(x, y int) color.RGBA {
+		i := y*w.Config.Width + x
+		base := color.RGBA{33, 75, 98, 255}
+		if w.Crust[i] == Continental {
+			base = color.RGBA{83, 123, 75, 255}
+		}
+		switch w.Boundary[i] {
+		case Convergent:
+			return color.RGBA{232, 92, 77, 255}
+		case Divergent:
+			return color.RGBA{84, 173, 226, 255}
+		case Transform:
+			return color.RGBA{235, 193, 82, 255}
+		default:
+			return base
 		}
 	}); err != nil {
 		return err

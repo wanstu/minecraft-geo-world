@@ -13,7 +13,7 @@ func main() {
 	width := flag.Int("width", 640, "macro grid width")
 	height := flag.Int("height", 400, "macro grid height")
 	plates := flag.Int("plates", 18, "plate count")
-	ocean := flag.Float64("ocean", 0.68, "oceanic plate fraction")
+	ocean := flag.Float64("ocean", 0.68, "target ocean area fraction")
 	out := flag.String("out", "prototype/generated", "output directory")
 	flag.Parse()
 
@@ -29,15 +29,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	continental := 0
-	for _, p := range world.Plates {
-		if p.Crust == phase1.Continental {
-			continental++
+	oceanCells := 0
+	for _, c := range world.Crust {
+		if c == phase1.Oceanic {
+			oceanCells++
 		}
 	}
+	oceanPct := float64(oceanCells) / float64(len(world.Crust)) * 100
 
 	fmt.Printf("GeoWorld Phase 1 Lab\n")
-	fmt.Printf("seed=%d grid=%dx%d plates=%d continental=%d oceanic=%d\n",
-		cfg.Seed, cfg.Width, cfg.Height, len(world.Plates), continental, len(world.Plates)-continental)
+	fmt.Printf("seed=%d grid=%dx%d plates=%d ocean-area=%.2f%%\n",
+		cfg.Seed, cfg.Width, cfg.Height, len(world.Plates), oceanPct)
 	fmt.Printf("output=%s\n", *out)
 }
