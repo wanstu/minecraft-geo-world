@@ -14,11 +14,11 @@
 
 最近提交：
 
+- `ec4149e` — add phase1 multi-seed acceptance baselines
+- `d8a369c` — build macro coastal and elevation terrain
+- `b53169a` — derive tectonic intensity from crust and plate motion
 - `3f85f67` — show complete phase1 lab maps
 - `8e672b1` — naturalize plate boundaries with smooth domain warp
-- `4cee4af` — model ocean crust age and tectonic influence bands
-- `4f31402` — record geoworld status decisions and roadmap
-- `f3f0ba0` — classify tectonic landform interactions
 
 ## 已完成
 
