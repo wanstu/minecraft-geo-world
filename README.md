@@ -62,6 +62,7 @@ GeoWorld 只在中央有限区域生成完整地理世界：
 - `docs/ROADMAP.md`：V1 分阶段路线。
 - `docs/PHASE1.md`：板块 / 大陆 / 宏观高程实验记录。
 - `docs/PHASE2.md`：气候骨架实验记录。
+- `docs/PHASE3.md`：季风与水文实验记录。
 - `docs/ARCHITECTURE.md`：整体架构。
 - `docs/SAMPLING.md`：连续世界坐标采样与 Chunk 无缝原则。
 - `docs/PRODUCT.md`：产品边界。
@@ -83,5 +84,6 @@ Windows 可直接双击：
 - `prototype/plates.html`
 - `prototype/acceptance.html`：Phase 1 多 Seed 静态验收
 - `prototype/climate.html`：Phase 2 气候骨架实验
+- `prototype/monsoon.html`：Phase 3 季风 / 季节性实验
 
 所有 CSS 与生成图片均使用相对路径，可通过 `file://` 直接加载。

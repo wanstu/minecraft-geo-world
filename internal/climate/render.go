@@ -69,6 +69,23 @@ func RenderAll(m *Model, outDir string) error {
 		{"precipitation.png", func(i int) color.RGBA {
 			return precipitationColor(m.AnnualPrecipMM[i])
 		}},
+		{"seasonal-amplitude.png", func(i int) color.RGBA {
+			v := clamp(m.SeasonalAmplitudeC[i]/24, 0, 1)
+			return lerpColor(color.RGBA{75, 111, 158, 255}, color.RGBA{219, 133, 72, 255}, v)
+		}},
+		{"summer-temperature.png", func(i int) color.RGBA {
+			return temperatureColor(m.SummerTempC[i])
+		}},
+		{"winter-temperature.png", func(i int) color.RGBA {
+			return temperatureColor(m.WinterTempC[i])
+		}},
+		{"monsoon-index.png", func(i int) color.RGBA {
+			if !m.LandMask[i] {
+				return color.RGBA{35, 59, 72, 255}
+			}
+			v := clamp(m.MonsoonIndex[i], 0, 1)
+			return lerpColor(color.RGBA{75, 73, 65, 255}, color.RGBA{79, 181, 204, 255}, v)
+		}},
 	}
 
 	for _, r := range renderers {
@@ -79,7 +96,13 @@ func RenderAll(m *Model, outDir string) error {
 	if err := renderWind(filepath.Join(outDir, "wind.png"), m); err != nil {
 		return err
 	}
-	return renderOceanCurrent(filepath.Join(outDir, "ocean-current.png"), m)
+	if err := renderOceanCurrent(filepath.Join(outDir, "ocean-current.png"), m); err != nil {
+		return err
+	}
+	if err := renderMonsoonWind(filepath.Join(outDir, "summer-monsoon-wind.png"), m, true); err != nil {
+		return err
+	}
+	return renderMonsoonWind(filepath.Join(outDir, "winter-monsoon-wind.png"), m, false)
 }
 
 func temperatureColor(tempC float64) color.RGBA {
@@ -296,4 +319,58 @@ func precipitationColor(mm float64) color.RGBA {
 	default:
 		return lerpColor(color.RGBA{60, 133, 181, 255}, color.RGBA{75, 77, 157, 255}, clamp((mm-3000)/3000, 0, 1))
 	}
+}
+
+func renderMonsoonWind(path string, m *Model, summer bool) error {
+	img := image.NewRGBA(image.Rect(0, 0, m.Width, m.Height))
+	for y := 0; y < m.Height; y++ {
+		for x := 0; x < m.Width; x++ {
+			i := y*m.Width + x
+			if !m.LandMask[i] {
+				img.SetRGBA(x, y, color.RGBA{30, 49, 61, 255})
+				continue
+			}
+			v := clamp(m.MonsoonIndex[i], 0, 1)
+			img.SetRGBA(x, y, lerpColor(
+				color.RGBA{54, 55, 52, 255},
+				color.RGBA{64, 137, 158, 255},
+				v,
+			))
+		}
+	}
+
+	step := maxInt(18, minInt(m.Width, m.Height)/16)
+	arrow := color.RGBA{240, 246, 247, 240}
+	for y := step / 2; y < m.Height; y += step {
+		for x := step / 2; x < m.Width; x += step {
+			i := y*m.Width + x
+			if !m.LandMask[i] || m.MonsoonIndex[i] < 0.08 {
+				continue
+			}
+
+			wx, wz := m.SummerWindX[i], m.SummerWindZ[i]
+			if !summer {
+				wx, wz = m.WinterWindX[i], m.WinterWindZ[i]
+			}
+			mag := math.Hypot(wx, wz)
+			if mag < 1e-6 {
+				continue
+			}
+			dx, dz := wx/mag, wz/mag
+			length := float64(step) * 0.36 * clamp(mag, 0.3, 1.4)
+			x1 := int(math.Round(float64(x) + dx*length))
+			y1 := int(math.Round(float64(y) + dz*length))
+			drawLine(img, x, y, x1, y1, arrow)
+
+			angle := math.Atan2(dz, dx)
+			headLen := math.Max(3, float64(step)*0.12)
+			for _, offset := range []float64{0.55, -0.55} {
+				hx := int(math.Round(float64(x1) - math.Cos(angle+offset)*headLen))
+				hy := int(math.Round(float64(y1) - math.Sin(angle+offset)*headLen))
+				drawLine(img, x1, y1, hx, hy, arrow)
+			}
+		}
+	}
+
+	return writePNG(path, img)
 }

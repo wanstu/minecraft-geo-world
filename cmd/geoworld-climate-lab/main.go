@@ -56,6 +56,11 @@ func main() {
 	dryLand, wetLand := 0, 0
 	var tropicalLandPrecip, temperateLandPrecip, polarLandPrecip float64
 	var tropicalLandN, temperateLandN, polarLandN int
+	minSeasonality := math.Inf(1)
+	maxSeasonality := math.Inf(-1)
+	maxMonsoon := 0.0
+	monsoonSum := 0.0
+	monsoonN := 0
 	landSum, oceanSum := 0.0, 0.0
 	landN, oceanN := 0, 0
 	for i, temp := range model.AnnualMeanTempC {
@@ -77,6 +82,19 @@ func main() {
 		}
 		if wind > maxWind {
 			maxWind = wind
+		}
+		if model.SeasonalAmplitudeC[i] < minSeasonality {
+			minSeasonality = model.SeasonalAmplitudeC[i]
+		}
+		if model.SeasonalAmplitudeC[i] > maxSeasonality {
+			maxSeasonality = model.SeasonalAmplitudeC[i]
+		}
+		if model.MonsoonIndex[i] > 0 {
+			monsoonSum += model.MonsoonIndex[i]
+			monsoonN++
+			if model.MonsoonIndex[i] > maxMonsoon {
+				maxMonsoon = model.MonsoonIndex[i]
+			}
 		}
 		if model.OceanTempCorrectionC[i] < minCorrection {
 			minCorrection = model.OceanTempCorrectionC[i]
@@ -140,7 +158,7 @@ func main() {
 		}
 	}
 
-	fmt.Printf("GeoWorld Phase 2.5 Climate Lab\n")
+	fmt.Printf("GeoWorld Phase 3.1 Climate/Monsoon Lab\n")
 	fmt.Printf("seed=%d grid=%dx%d latitude=±%.1f°\n", *seed, *width, *height, model.Config.MaxLatitudeDeg)
 	fmt.Printf("annual-temp=%.2f..%.2f C land-avg=%.2f C ocean-avg=%.2f C\n",
 		minTemp, maxTemp, landSum/float64(landN), oceanSum/float64(oceanN))
@@ -161,6 +179,12 @@ func main() {
 		safeAvg(tropicalLandPrecip, tropicalLandN),
 		safeAvg(temperateLandPrecip, temperateLandN),
 		safeAvg(polarLandPrecip, polarLandN))
+	avgMonsoon := 0.0
+	if monsoonN > 0 {
+		avgMonsoon = monsoonSum / float64(monsoonN)
+	}
+	fmt.Printf("seasonal-amplitude=%.2f..%.2f C monsoon-index avg=%.3f max=%.3f cells=%d\n",
+		minSeasonality, maxSeasonality, avgMonsoon, maxMonsoon, monsoonN)
 	fmt.Printf("output=%s\n", *out)
 }
 

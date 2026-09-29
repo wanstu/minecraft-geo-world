@@ -587,3 +587,119 @@ func TestClimateSeedSweepDoesNotCollapsePrecipitation(t *testing.T) {
 		}
 	}
 }
+
+func TestLandSeasonalityExceedsOceanAtSameLatitude(t *testing.T) {
+	input := Input{
+		Width:     4,
+		Height:    5,
+		Elevation: make([]float64, 20),
+		LandMask:  make([]bool, 20),
+	}
+	// Row 1 is about 41°N. Keep ocean at x=0 and land inland.
+	for x := 1; x < 4; x++ {
+		input.LandMask[1*input.Width+x] = true
+		input.Elevation[1*input.Width+x] = 0.5
+	}
+	m, err := Generate(input, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	oceanAmp := m.SeasonalAmplitudeC[1*input.Width+0]
+	landAmp := m.SeasonalAmplitudeC[1*input.Width+2]
+	if !(landAmp > oceanAmp) {
+		t.Fatalf("land seasonality should exceed ocean at same latitude: land=%.2f ocean=%.2f", landAmp, oceanAmp)
+	}
+}
+
+func TestSummerTemperatureExceedsWinterTemperature(t *testing.T) {
+	input := Input{
+		Width:     4,
+		Height:    5,
+		Elevation: make([]float64, 20),
+		LandMask:  make([]bool, 20),
+	}
+	for i := range input.LandMask {
+		input.LandMask[i] = i%4 >= 2
+		input.Elevation[i] = 0.55
+	}
+	m, err := Generate(input, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range m.SummerTempC {
+		if !(m.SummerTempC[i] > m.WinterTempC[i]) {
+			t.Fatalf("cell %d summer %.2f not warmer than winter %.2f", i, m.SummerTempC[i], m.WinterTempC[i])
+		}
+	}
+}
+
+func TestMonsoonIndexTargetsLowMidLatitudeLand(t *testing.T) {
+	cfg := normalizeConfig(Config{})
+	m := &Model{
+		Config:              cfg,
+		Width:               3,
+		Height:              3,
+		LandMask:            []bool{false, true, true, false, true, true, false, true, true},
+		LatitudeDeg:         []float64{20, 20, 20, 65, 65, 65, 0, 0, 0},
+		AdjustedAnnualTempC: make([]float64, 9),
+		OceanDistanceCells:  []float64{0, 1, 2, 0, 1, 2, 0, 1, 2},
+		WindX:               make([]float64, 9),
+		WindZ:               make([]float64, 9),
+		SeasonalAmplitudeC:  make([]float64, 9),
+		SummerTempC:         make([]float64, 9),
+		WinterTempC:         make([]float64, 9),
+		MonsoonIndex:        make([]float64, 9),
+		SummerWindX:         make([]float64, 9),
+		SummerWindZ:         make([]float64, 9),
+		WinterWindX:         make([]float64, 9),
+		WinterWindZ:         make([]float64, 9),
+	}
+	m.computeSeasonalStates()
+
+	if m.MonsoonIndex[1] <= 0 {
+		t.Fatalf("expected subtropical land monsoon signal, got %.3f", m.MonsoonIndex[1])
+	}
+	if m.MonsoonIndex[4] > 0.05 {
+		t.Fatalf("high-latitude monsoon signal too strong: %.3f", m.MonsoonIndex[4])
+	}
+	if m.MonsoonIndex[0] != 0 {
+		t.Fatalf("ocean cell must not receive land monsoon index: %.3f", m.MonsoonIndex[0])
+	}
+}
+
+func TestMonsoonSummerWindOnshoreWinterWindOffshore(t *testing.T) {
+	cfg := normalizeConfig(Config{MonsoonWindStrength: 1})
+	m := &Model{
+		Config:              cfg,
+		Width:               5,
+		Height:              1,
+		LandMask:            []bool{false, true, true, true, true},
+		LatitudeDeg:         []float64{20, 20, 20, 20, 20},
+		AdjustedAnnualTempC: []float64{20, 20, 20, 20, 20},
+		OceanDistanceCells:  []float64{0, 1, 2, 3, 4},
+		WindX:               make([]float64, 5),
+		WindZ:               make([]float64, 5),
+		SeasonalAmplitudeC:  make([]float64, 5),
+		SummerTempC:         make([]float64, 5),
+		WinterTempC:         make([]float64, 5),
+		MonsoonIndex:        make([]float64, 5),
+		SummerWindX:         make([]float64, 5),
+		SummerWindZ:         make([]float64, 5),
+		WinterWindX:         make([]float64, 5),
+		WinterWindZ:         make([]float64, 5),
+	}
+	m.computeSeasonalStates()
+
+	i := 2
+	if m.MonsoonIndex[i] <= 0 {
+		t.Fatalf("expected monsoon at inland test cell")
+	}
+	if !(m.SummerWindX[i] > 0) {
+		t.Fatalf("summer monsoon should point inland (+X), got %.3f", m.SummerWindX[i])
+	}
+	if !(m.WinterWindX[i] < 0) {
+		t.Fatalf("winter monsoon should point seaward (-X), got %.3f", m.WinterWindX[i])
+	}
+}

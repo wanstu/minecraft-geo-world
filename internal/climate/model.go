@@ -19,6 +19,11 @@ type Config struct {
 	MoistureDiffusion         float64
 	OrographicRainStrength    float64
 	PrecipitationScaleMM      float64
+	LandSeasonalityBaseC      float64
+	LandSeasonalityLatitudeC  float64
+	OceanSeasonalityBaseC     float64
+	OceanSeasonalityLatitudeC float64
+	MonsoonWindStrength       float64
 }
 
 type Input struct {
@@ -49,4 +54,12 @@ type Model struct {
 	Moisture             []float64
 	OrographicLift       []float64
 	AnnualPrecipMM       []float64
+	SeasonalAmplitudeC   []float64
+	SummerTempC          []float64
+	WinterTempC          []float64
+	MonsoonIndex         []float64
+	SummerWindX          []float64
+	SummerWindZ          []float64
+	WinterWindX          []float64
+	WinterWindZ          []float64
 }

@@ -49,6 +49,14 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		Moisture:             make([]float64, n),
 		OrographicLift:       make([]float64, n),
 		AnnualPrecipMM:       make([]float64, n),
+		SeasonalAmplitudeC:   make([]float64, n),
+		SummerTempC:          make([]float64, n),
+		WinterTempC:          make([]float64, n),
+		MonsoonIndex:         make([]float64, n),
+		SummerWindX:          make([]float64, n),
+		SummerWindZ:          make([]float64, n),
+		WinterWindX:          make([]float64, n),
+		WinterWindZ:          make([]float64, n),
 	}
 
 	maxLatRad := cfg.MaxLatitudeDeg * math.Pi / 180
@@ -94,6 +102,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	m.computeSurfaceCurrents()
 	m.transportSeaSurfaceHeat()
 	m.applyOceanTemperatureInfluence()
+	m.computeSeasonalStates()
 	m.computeMoistureAndPrecipitation()
 
 	return m, nil
@@ -150,6 +159,21 @@ func normalizeConfig(cfg Config) Config {
 	}
 	if cfg.PrecipitationScaleMM <= 0 {
 		cfg.PrecipitationScaleMM = 40000
+	}
+	if cfg.LandSeasonalityBaseC <= 0 {
+		cfg.LandSeasonalityBaseC = 3.5
+	}
+	if cfg.LandSeasonalityLatitudeC <= 0 {
+		cfg.LandSeasonalityLatitudeC = 15
+	}
+	if cfg.OceanSeasonalityBaseC <= 0 {
+		cfg.OceanSeasonalityBaseC = 1.5
+	}
+	if cfg.OceanSeasonalityLatitudeC <= 0 {
+		cfg.OceanSeasonalityLatitudeC = 5
+	}
+	if cfg.MonsoonWindStrength <= 0 {
+		cfg.MonsoonWindStrength = 0.95
 	}
 	return cfg
 }
@@ -614,4 +638,89 @@ func neighborAverage(values []float64, width, height, x, z int) float64 {
 		return values[z*width+x]
 	}
 	return sum / float64(count)
+}
+
+func (m *Model) computeSeasonalStates() {
+	for z := 0; z < m.Height; z++ {
+		for x := 0; x < m.Width; x++ {
+			i := z*m.Width + x
+			absLat := math.Abs(m.LatitudeDeg[i])
+			latFactor := math.Sin(absLat * math.Pi / 180)
+
+			oceanAmplitude := m.Config.OceanSeasonalityBaseC +
+				m.Config.OceanSeasonalityLatitudeC*latFactor
+
+			amplitude := oceanAmplitude
+			monsoon := 0.0
+
+			if m.LandMask[i] {
+				distance := m.OceanDistanceCells[i]
+				continentality := 1 - math.Exp(-distance/28.0)
+				landBase := m.Config.LandSeasonalityBaseC +
+					m.Config.LandSeasonalityLatitudeC*latFactor
+				amplitude = landBase * (0.72 + 0.72*continentality)
+
+				thermalContrast := math.Max(0, amplitude-oceanAmplitude)
+				latWeight := smoothstep(5, 14, absLat) *
+					(1 - smoothstep(38, 52, absLat))
+				oceanAccess := math.Exp(-distance / 95.0)
+				monsoon = clamp((thermalContrast/11.0)*latWeight*(0.45+0.55*oceanAccess), 0, 1)
+			}
+
+			m.SeasonalAmplitudeC[i] = amplitude
+			m.SummerTempC[i] = m.AdjustedAnnualTempC[i] + amplitude
+			m.WinterTempC[i] = m.AdjustedAnnualTempC[i] - amplitude
+			m.MonsoonIndex[i] = monsoon
+
+			m.SummerWindX[i] = m.WindX[i]
+			m.SummerWindZ[i] = m.WindZ[i]
+			m.WinterWindX[i] = m.WindX[i]
+			m.WinterWindZ[i] = m.WindZ[i]
+
+			if !m.LandMask[i] || monsoon <= 0 {
+				continue
+			}
+
+			dx, dz := m.oceanDistanceGradient(x, z)
+			mag := math.Hypot(dx, dz)
+			if mag < 1e-6 {
+				continue
+			}
+			dx /= mag
+			dz /= mag
+
+			anomaly := monsoon * m.Config.MonsoonWindStrength
+
+			// Distance-to-ocean increases inland, so +gradient points from sea
+			// toward the continental interior. Local summer strengthens onshore
+			// flow; local winter reverses toward the sea.
+			m.SummerWindX[i] += dx * anomaly
+			m.SummerWindZ[i] += dz * anomaly
+			m.WinterWindX[i] -= dx * anomaly
+			m.WinterWindZ[i] -= dz * anomaly
+		}
+	}
+}
+
+func (m *Model) oceanDistanceGradient(x, z int) (dx, dz float64) {
+	i := z*m.Width + x
+	left := m.OceanDistanceCells[i]
+	right := m.OceanDistanceCells[i]
+	up := m.OceanDistanceCells[i]
+	down := m.OceanDistanceCells[i]
+
+	if x > 0 {
+		left = m.OceanDistanceCells[i-1]
+	}
+	if x+1 < m.Width {
+		right = m.OceanDistanceCells[i+1]
+	}
+	if z > 0 {
+		up = m.OceanDistanceCells[i-m.Width]
+	}
+	if z+1 < m.Height {
+		down = m.OceanDistanceCells[i+m.Width]
+	}
+
+	return (right - left) * 0.5, (down - up) * 0.5
 }

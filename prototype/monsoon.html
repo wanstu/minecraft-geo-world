@@ -1,0 +1,44 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GeoWorld · 季风实验</title><link rel="stylesheet" href="assets/common.css">
+<style>
+.lab-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:max-content;align-content:start;gap:14px;padding:16px;overflow:auto}
+.lab-card{min-width:0;background:#0f171e;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.lab-card header{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
+.lab-card header small{color:var(--muted)}.lab-card img{width:100%;height:auto;aspect-ratio:8/5;object-fit:contain;display:block;image-rendering:pixelated;background:#091016}
+.note{margin:16px;padding:12px;border:1px solid #61522d;background:#261f12;border-radius:8px;color:#e4d29a;font-size:13px;line-height:1.6}
+@media(max-width:900px){.lab-grid{grid-template-columns:1fr}}
+</style></head><body>
+<div class="app"><header class="topbar"><a class="brand" href="index.html"><span>Geo</span>World Generator</a>
+<div class="badge">Phase 3.1 Lab</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
+<div class="shell">
+<aside class="sidebar"><div class="section"><h3>世界模型</h3>
+<a class="nav-item" href="generator.html">世界总览</a>
+<a class="nav-item" href="plates.html">板块构造</a>
+<div class="nav-item">地形与海盆</div>
+<a class="nav-item" href="climate.html">气候骨架</a>
+<a class="nav-item active" href="monsoon.html"><i class="dot"></i>季风 / 季节性</a>
+<div class="nav-item">水文</div><div class="nav-item">生态区</div></div>
+<div class="section"><h3>本次 Lab</h3>
+<div class="kv"><span>Seed</span><span>731894205</span></div>
+<div class="kv"><span>宏观网格</span><span>640 × 400</span></div>
+<div class="kv"><span>季节温差</span><span>1.52 ～ 20.90°C</span></div>
+<div class="kv"><span>最大季风指数</span><span>0.865</span></div>
+</div></aside>
+<main class="main">
+<div class="toolbar"><div class="title">Phase 3.1 · 夏 / 冬代表态与季风驱动力</div><div class="badge">Land–Sea Thermal Contrast → Monsoon</div></div>
+<div class="note"><strong>这里不是游戏内动态四季。</strong> GeoWorld 只用“当地暖季 / 冷季”两个代表态计算长期季节性。北半球与南半球各自的暖季都统一显示为 Summer，避免把月份硬编码进世界模型。</div>
+<div class="lab-grid">
+<div class="lab-card"><header><strong>① 季节温差</strong><small>陆地内部通常大于海洋</small></header><img src="generated/climate/seasonal-amplitude.png" alt="seasonal amplitude"></div>
+<div class="lab-card"><header><strong>② 当地暖季温度</strong><small>Annual + seasonal amplitude</small></header><img src="generated/climate/summer-temperature.png" alt="summer temperature"></div>
+<div class="lab-card"><header><strong>③ 当地冷季温度</strong><small>Annual - seasonal amplitude</small></header><img src="generated/climate/winter-temperature.png" alt="winter temperature"></div>
+<div class="lab-card"><header><strong>④ 季风指数</strong><small>陆海热力差 + 纬度 + 海洋可达性</small></header><img src="generated/climate/monsoon-index.png" alt="monsoon index"></div>
+<div class="lab-card"><header><strong>⑤ 暖季季风</strong><small>热大陆吸引海洋空气向陆</small></header><img src="generated/climate/summer-monsoon-wind.png" alt="summer monsoon wind"></div>
+<div class="lab-card"><header><strong>⑥ 冷季季风</strong><small>冷大陆高压推动空气离陆</small></header><img src="generated/climate/winter-monsoon-wind.png" alt="winter monsoon wind"></div>
+</div></main>
+<aside class="inspector"><div class="section"><h3>这一步在解决什么？</h3>
+<div class="card"><div class="card-title">陆地比海洋更容易冷热</div><p>同纬度下，大陆尤其内陆地区拥有更大的暖季 / 冷季温差；海洋热容量大，季节温差较小。</p></div>
+<div class="card"><div class="card-title">季风不是随机标签</div><p>只有低中纬陆地、陆海热力差明显并且仍能受到海洋影响时，Monsoon Index 才会增强。</p></div>
+<div class="card"><div class="card-title">暖季向陆，冷季离陆</div><p>季风异常叠加在已有盛行风上，而不是完全替换全球环流背景。</p></div>
+<div class="card"><div class="card-title">下一步</div><p>分别用暖季风场和冷季风场输送水汽，生成暖季降水、冷季降水和降水季节性。</p></div>
+</div></aside>
+</div></div></body></html>

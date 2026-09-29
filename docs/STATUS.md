@@ -8,17 +8,17 @@
 
 **Phase 3 — 季风与水文**
 
-当前子阶段：**Phase 3.1 — 夏 / 冬代表态与季风指数（准备开始）**
+当前子阶段：**Phase 3.2 — 季节性降水（准备开始）**
 
 ## 当前稳定基线
 
 最近提交：
 
-- `ec4149e` — add phase1 multi-seed acceptance baselines
-- `d8a369c` — build macro coastal and elevation terrain
-- `b53169a` — derive tectonic intensity from crust and plate motion
-- `3f85f67` — show complete phase1 lab maps
-- `8e672b1` — naturalize plate boundaries with smooth domain warp
+- `59e9d32` — add moisture transport precipitation and rain shadow
+- `879cd5a` — propagate ocean thermal anomalies onto land
+- `f73c13a` — add wind driven surface currents and SST transport
+- `6877c54` — add phase2 temperature pressure and wind climate model
+- `97796a5` — close phase1 with hard ocean buffer and audit
 
 ## 已完成
 
@@ -330,3 +330,26 @@ Latitude
 Phase 2 第一版正式完成。
 
 下一步：**Phase 3.1 — Summer/Winter Representative States + Monsoon Index**。
+
+
+## Phase 3.1 — 暖季 / 冷季代表态与季风指数
+
+状态：**完成第一版**
+
+已实现：
+
+- 陆地 / 海洋不同的季节温差。
+- 大陆性随离海距离增强。
+- 暖季 / 冷季代表温度。
+- Monsoon Index。
+- 暖季向陆季风异常。
+- 冷季离陆季风异常。
+- 季风异常叠加现有盛行风，不替换全球环流。
+
+当前测试 Seed：
+
+- Seasonal Amplitude：1.52 ～ 20.90°C
+- Monsoon Index：最大 0.865
+- 有效季风 Cell：60637
+
+下一步：**Phase 3.2 — Warm / Cold Season Precipitation + Rainfall Seasonality**。
