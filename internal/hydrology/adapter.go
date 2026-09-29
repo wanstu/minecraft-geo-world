@@ -24,5 +24,7 @@ func InputFromWorld(world *phase1.World, climateModel *climate.Model) Input {
 		LandMask:            land,
 		AnnualPrecipMM:      append([]float64(nil), precip...),
 		RainfallSeasonality: append([]float64(nil), climateModel.RainfallSeasonality...),
+		WarmSeasonPrecipMM:  append([]float64(nil), climateModel.WarmSeasonPrecipMM...),
+		ColdSeasonPrecipMM:  append([]float64(nil), climateModel.ColdSeasonPrecipMM...),
 	}
 }

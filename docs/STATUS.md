@@ -6,14 +6,15 @@
 
 ## 当前阶段
 
-**Phase 3 — 季风与水文**
+**Phase 4 — 侵蚀、Relief 与地貌细化**
 
-当前子阶段：**Phase 3.4 — 河网等级与湖泊连通（准备开始）**
+当前子阶段：**Phase 4.1 — 侵蚀驱动力与河谷切割（准备开始）**
 
 ## 当前稳定基线
 
 最近提交：
 
+- `bbf3890` — add hydrology basins runoff and river network
 - `aca7269` — add seasonal precipitation and monsoon rainfall
 - `aa94199` — add seasonal thermal contrast and monsoon winds
 - `59e9d32` — add moisture transport precipitation and rain shadow
@@ -425,3 +426,44 @@ Phase 2 第一版正式完成。
 - 湿地候选：1.59%
 
 下一步：**Phase 3.4 — River Hierarchy / Lake Connectivity / Phase 3 Acceptance**。
+
+
+## Phase 3.4 — 河流等级、季节河与显式湖泊
+
+状态：**完成第一版**
+
+已实现：
+
+- Strahler River Order。
+- 主河 / 支流层级。
+- 暖季 / 冷季径流分别汇流。
+- PerennialRiverPotential。
+- SeasonalRiverPotential。
+- 显式 LakeID。
+- Lake Surface / MaxDepth。
+- SpillOutlet。
+- 湖泊所属 Basin 与入流水量。
+- SpillOutlet 明确为“潜在溢流口”，不代表湖一定外流。
+
+12 Seed 最终水文审计：
+
+- 河流：1.68% ～ 3.15% 陆地
+- 主要河流流域：6 ～ 38
+- 最高 Strahler Order：2 ～ 3
+- 季节河占优：12.9% ～ 39.6% 河流 Cell
+- 显式湖泊：2 ～ 7
+- 最大湖泊：76 ～ 318 宏观 Cell
+- 最大湖深：0.080 ～ 0.145 normalized
+
+当前 640 × 400 Seed 731894205：
+
+- RiverOrder 最大：3
+- Order >= 3：128 Cell
+- 季节河倾向占优：861 Cell
+- 常流河倾向占优：838 Cell
+- 显式湖泊：14
+- 最大湖泊：222 Cell
+
+Phase 3 第一版正式完成。
+
+下一步：**Phase 4.1 — Erosion Driver / Valley Incision / Relief**。

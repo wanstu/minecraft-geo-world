@@ -481,3 +481,40 @@ OriginalElevation = FilledElevation
 否则会永久抹平湖盆、内流洼地和未来可形成湖泊的地貌。
 
 LakePotential 应从 FillDepth 与水量供应继续推导，而不是把 Priority Flood 结果直接当最终地形。
+
+
+---
+
+## D-020：Lake SpillOutlet 是潜在溢流口，不等于实际常年出流
+
+状态：已确定
+
+Priority Flood 为每个封闭洼地建立“达到某个水位后可以从哪里溢出”的拓扑。
+
+因此 Lake 中保存：
+
+```text
+SpillOutlet
+```
+
+而不是语义更强的：
+
+```text
+PermanentOutlet
+```
+
+当前水文阶段尚未完整计算：
+
+- 湖面蒸发。
+- 地下渗透。
+- 土壤蓄水。
+- 长期入流 / 出流平衡。
+
+所以不能仅因为存在 SpillOutlet，就断言这个湖实际会持续外流。
+
+未来水量平衡可以在不修改排水拓扑的情况下分类：
+
+- Exorheic / 外流湖。
+- Endorheic / 内流湖。
+- Seasonal / 季节湖。
+- Saline tendency / 盐湖倾向。

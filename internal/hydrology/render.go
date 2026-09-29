@@ -69,6 +69,33 @@ func RenderAll(m *Model, outDir string) error {
 			v := clamp(m.WetlandPotential[i], 0, 1)
 			return lerpColor(color.RGBA{75, 71, 57, 255}, color.RGBA{79, 159, 113, 255}, v)
 		}},
+		{"river-order.png", func(i int) color.RGBA {
+			if !m.LandMask[i] {
+				return color.RGBA{28, 52, 68, 255}
+			}
+			order := m.RiverOrder[i]
+			if order == 0 {
+				return color.RGBA{57, 61, 56, 255}
+			}
+			v := clamp(float64(order-1)/5, 0, 1)
+			return lerpColor(color.RGBA{89, 175, 215, 255}, color.RGBA{31, 83, 174, 255}, v)
+		}},
+		{"river-seasonality.png", func(i int) color.RGBA {
+			if !m.LandMask[i] {
+				return color.RGBA{28, 52, 68, 255}
+			}
+			if m.RiverStrength[i] <= 0 {
+				return color.RGBA{57, 61, 56, 255}
+			}
+			p := m.PerennialRiverPotential[i]
+			q := m.SeasonalRiverPotential[i]
+			total := p + q
+			if total <= 1e-9 {
+				return color.RGBA{76, 92, 96, 255}
+			}
+			seasonal := clamp(q/total, 0, 1)
+			return lerpColor(color.RGBA{61, 148, 208, 255}, color.RGBA{211, 146, 65, 255}, seasonal)
+		}},
 	}
 
 	for _, r := range renderers {
@@ -79,7 +106,10 @@ func RenderAll(m *Model, outDir string) error {
 	if err := renderFlow(filepath.Join(outDir, "flow-direction.png"), m); err != nil {
 		return err
 	}
-	return renderRivers(filepath.Join(outDir, "rivers.png"), m)
+	if err := renderRivers(filepath.Join(outDir, "rivers.png"), m); err != nil {
+		return err
+	}
+	return renderLakes(filepath.Join(outDir, "lakes.png"), m)
 }
 
 func renderScalar(path string, width, height int, fn func(i int) color.RGBA) error {
@@ -262,4 +292,39 @@ func absInt(v int) int {
 		return -v
 	}
 	return v
+}
+
+func renderLakes(path string, m *Model) error {
+	img := image.NewRGBA(image.Rect(0, 0, m.Width, m.Height))
+	for z := 0; z < m.Height; z++ {
+		for x := 0; x < m.Width; x++ {
+			i := z*m.Width + x
+			if !m.LandMask[i] {
+				img.SetRGBA(x, z, color.RGBA{28, 55, 72, 255})
+				continue
+			}
+			e := clamp((m.OriginalElevation[i]-m.Config.SeaLevelNormalized)/(1-m.Config.SeaLevelNormalized), 0, 1)
+			base := lerpColor(color.RGBA{61, 85, 58, 255}, color.RGBA{173, 159, 122, 255}, e)
+			if m.LakeID[i] > 0 {
+				base = color.RGBA{66, 154, 207, 255}
+			}
+			img.SetRGBA(x, z, base)
+		}
+	}
+
+	outletColor := color.RGBA{244, 228, 140, 255}
+	for _, lake := range m.Lakes {
+		if lake.SpillOutlet < 0 || lake.SpillOutlet >= len(m.LakeID) {
+			continue
+		}
+		x, z := lake.SpillOutlet%m.Width, lake.SpillOutlet/m.Width
+		img.SetRGBA(x, z, outletColor)
+		for _, d := range [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+			nx, nz := x+d[0], z+d[1]
+			if nx >= 0 && nx < m.Width && nz >= 0 && nz < m.Height {
+				img.SetRGBA(nx, nz, outletColor)
+			}
+		}
+	}
+	return writePNG(path, img)
 }

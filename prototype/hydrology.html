@@ -9,7 +9,7 @@
 @media(max-width:900px){.lab-grid{grid-template-columns:1fr}}
 </style></head><body>
 <div class="app"><header class="topbar"><a class="brand" href="index.html"><span>Geo</span>World Generator</a>
-<div class="badge">Phase 3.3 Lab</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
+<div class="badge">Phase 3.4 Lab</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
 <div class="shell">
 <aside class="sidebar"><div class="section"><h3>世界模型</h3>
 <a class="nav-item" href="generator.html">世界总览</a>
@@ -27,7 +27,7 @@
 <div class="kv"><span>河流 Cell</span><span>2.07%</span></div>
 </div></aside>
 <main class="main">
-<div class="toolbar"><div class="title">Phase 3.3 · 流域与河网骨架</div><div class="badge">Elevation + Rainfall → Drainage → Rivers</div></div>
+<div class="toolbar"><div class="title">Phase 3.4 · 河流等级、季节河与显式湖泊</div><div class="badge">Drainage → River Hierarchy / Seasonality / Lakes</div></div>
 <div class="note"><strong>当前仍是宏观水文。</strong> 蓝色河网表示未来河谷 / 河道的骨架位置，不是 Minecraft 方块宽度。填洼只用于建立稳定排水方向，原始洼地深度会保留下来作为湖泊候选，而不是被永久抹平。</div>
 <div class="lab-grid">
 <div class="lab-card"><header><strong>① 水文填洼高程</strong><small>保证每个陆地 Cell 有稳定出口</small></header><img src="generated/hydrology/filled-elevation.png" alt="filled elevation"></div>
@@ -39,13 +39,20 @@
 <div class="lab-card"><header><strong>⑦ 河网</strong><small>高汇流量路径提取</small></header><img src="generated/hydrology/rivers.png" alt="rivers"></div>
 <div class="lab-card"><header><strong>⑧ 湖泊候选</strong><small>填洼深度 + 水量供应</small></header><img src="generated/hydrology/lake-potential.png" alt="lake potential"></div>
 <div class="lab-card"><header><strong>⑨ 湿地候选</strong><small>低坡度 + 高汇流 + 较稳定水分</small></header><img src="generated/hydrology/wetland-potential.png" alt="wetland potential"></div>
+<div class="lab-card"><header><strong>⑩ 河流等级</strong><small>Strahler Order：主河 / 支流层级</small></header><img src="generated/hydrology/river-order.png" alt="river order"></div>
+<div class="lab-card"><header><strong>⑪ 常流 / 季节河倾向</strong><small>蓝=常流倾向 · 黄=季节河倾向</small></header><img src="generated/hydrology/river-seasonality.png" alt="river seasonality"></div>
+<div class="lab-card"><header><strong>⑫ 显式湖泊</strong><small>蓝=LakeID · 黄=潜在溢流口</small></header><img src="generated/hydrology/lakes.png" alt="explicit lakes"></div>
 </div></main>
 <aside class="inspector"><div class="section"><h3>当前结果</h3>
 <div class="metric"><strong>62</strong><small>主要河流流域</small></div>
-<div class="row"><div class="metric"><strong>2.07%</strong><small>河流陆地占比</small></div><div class="metric"><strong>1.74%</strong><small>湖泊候选</small></div></div>
+<div class="row"><div class="metric"><strong>3</strong><small>最高河流等级</small></div><div class="metric"><strong>14</strong><small>显式湖泊</small></div></div>
+<div class="row"><div class="metric"><strong>2.07%</strong><small>河流陆地占比</small></div><div class="metric"><strong>222</strong><small>最大湖泊 Cell</small></div></div>
 <div class="card"><div class="card-title">为什么要先填洼？</div><p>原始宏观高程会存在数值洼地。Priority Flood 只建立“能从哪里溢出去”的水文表面，避免 Flow Direction 出现死循环。</p></div>
 <div class="card"><div class="card-title">湖泊没有被填没</div><p>FilledElevation 用于排水计算；OriginalElevation 和 FillDepth 仍保留。FillDepth 越大且水量越足，越可能在后续成为实际湖泊。</p></div>
 <div class="card"><div class="card-title">河流不是随机线</div><p>河网来自降水产生的径流沿真实高程流向逐级汇聚。干旱区若没有足够径流，不会仅因为“地图需要河”而强行生成。</p></div>
-<div class="card"><div class="card-title">下一步</div><p>加入河流等级、主要支流、湖泊连通与出水口，再做 Phase 3 水文验收。</p></div>
+<div class="card"><div class="card-title">河流现在有等级</div><p>Strahler Order 用真实汇流拓扑计算：两条同级支流汇合才提升一级，因此后续河谷宽度可以跟河流层级走。</p></div>
+<div class="card"><div class="card-title">季节河不是标签</div><p>暖季和冷季径流沿同一河网分别汇流；枯水季仍有足够水量时偏常流，季节反差大时偏季节河。</p></div>
+<div class="card"><div class="card-title">黄色点只是 Spill Outlet</div><p>它表示湖盆达到溢流水位时最可能从哪里出水，不代表这个湖一定全年外流。后续可按水量平衡区分外流湖、内流湖和季节湖。</p></div>
+<div class="card"><div class="card-title">下一步</div><p>Phase 3 收口后进入 Phase 4：用河网、降水、坡度和地形年龄做侵蚀，形成河谷、丘陵、山麓与最终连续地形。</p></div>
 </div></aside>
 </div></div></body></html>

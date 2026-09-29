@@ -43,6 +43,12 @@ func main() {
 	var riverPct, fillPct, lakePct, wetlandPct stat
 	var basinsPerK, majorBasins stat
 	var maxFill stat
+	var maxRiverOrder stat
+	var order3Pct stat
+	var seasonalDominantPct stat
+	var explicitLakes stat
+	var largestLakeCells stat
+	var maxLakeDepth stat
 
 	for n := 0; n < *count; n++ {
 		seed := int64(4000 + n*7213)
@@ -63,6 +69,9 @@ func main() {
 		}
 
 		landN, riverN, fillN, lakeN, wetlandN := 0, 0, 0, 0, 0
+		order3N := 0
+		seasonalDominantN := 0
+		thisMaxOrder := uint8(0)
 		thisMaxFill := 0.0
 		basinMaxAccum := map[int]float64{}
 
@@ -73,6 +82,15 @@ func main() {
 			landN++
 			if model.RiverStrength[i] > 0 {
 				riverN++
+				if model.RiverOrder[i] > thisMaxOrder {
+					thisMaxOrder = model.RiverOrder[i]
+				}
+				if model.RiverOrder[i] >= 3 {
+					order3N++
+				}
+				if model.SeasonalRiverPotential[i] > model.PerennialRiverPotential[i] {
+					seasonalDominantN++
+				}
 			}
 			if model.FillDepth[i] > 1e-6 {
 				fillN++
@@ -105,6 +123,20 @@ func main() {
 		wetlands := percent(wetlandN, landN)
 		bpk := float64(model.BasinCount) / float64(landN) * 1000
 
+		largestLake := 0
+		thisMaxLakeDepth := 0.0
+		for _, lake := range model.Lakes {
+			if lake.CellCount > largestLake {
+				largestLake = lake.CellCount
+			}
+			if lake.MaxDepth > thisMaxLakeDepth {
+				thisMaxLakeDepth = lake.MaxDepth
+			}
+		}
+
+		order3 := percent(order3N, riverN)
+		seasonalDominant := percent(seasonalDominantN, riverN)
+
 		riverPct.add(river)
 		fillPct.add(filled)
 		lakePct.add(lakes)
@@ -112,12 +144,19 @@ func main() {
 		basinsPerK.add(bpk)
 		majorBasins.add(float64(major))
 		maxFill.add(thisMaxFill)
+		maxRiverOrder.add(float64(thisMaxOrder))
+		order3Pct.add(order3)
+		seasonalDominantPct.add(seasonalDominant)
+		explicitLakes.add(float64(len(model.Lakes)))
+		largestLakeCells.add(float64(largestLake))
+		maxLakeDepth.add(thisMaxLakeDepth)
 
-		fmt.Printf("seed=%d river=%.2f%% fill=%.2f%% lake=%.2f%% wetland=%.2f%% basins=%d major=%d max-fill=%.3f\n",
-			seed, river, filled, lakes, wetlands, model.BasinCount, major, thisMaxFill)
+		fmt.Printf("seed=%d river=%.2f%% fill=%.2f%% basins=%d major=%d order=%d order3=%.1f%% seasonal=%.1f%% lakes=%d largest=%d max-depth=%.3f\n",
+			seed, river, filled, model.BasinCount, major, thisMaxOrder, order3, seasonalDominant,
+			len(model.Lakes), largestLake, thisMaxLakeDepth)
 	}
 
-	fmt.Printf("\nGeoWorld Phase 3.3 Hydrology Audit: seeds=%d grid=%dx%d\n", *count, *width, *height)
+	fmt.Printf("\nGeoWorld Phase 3.4 Hydrology Audit: seeds=%d grid=%dx%d\n", *count, *width, *height)
 	printStat("river land %", riverPct)
 	printStat("filled land %", fillPct)
 	printStat("lake candidate land %", lakePct)
@@ -125,6 +164,12 @@ func main() {
 	printStat("basins per 1000 land cells", basinsPerK)
 	printStat("major river basins", majorBasins)
 	printStat("max normalized fill depth", maxFill)
+	printStat("max Strahler river order", maxRiverOrder)
+	printStat("order >=3 river cells %", order3Pct)
+	printStat("seasonal-dominant river cells %", seasonalDominantPct)
+	printStat("explicit lakes", explicitLakes)
+	printStat("largest lake cells", largestLakeCells)
+	printStat("max explicit lake depth", maxLakeDepth)
 }
 
 func percent(n, total int) float64 {

@@ -43,22 +43,39 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		return nil, errors.New("hydrology: input field sizes do not match dimensions")
 	}
 
+	warmPrecip := input.WarmSeasonPrecipMM
+	coldPrecip := input.ColdSeasonPrecipMM
+	if len(warmPrecip) != n || len(coldPrecip) != n {
+		warmPrecip = make([]float64, n)
+		coldPrecip = make([]float64, n)
+		for i, annual := range input.AnnualPrecipMM {
+			warmPrecip[i] = annual * 0.5
+			coldPrecip[i] = annual * 0.5
+		}
+	}
+
 	cfg = normalizeConfig(cfg)
 	m := &Model{
-		Config:            cfg,
-		Width:             input.Width,
-		Height:            input.Height,
-		LandMask:          append([]bool(nil), input.LandMask...),
-		OriginalElevation: append([]float64(nil), input.Elevation...),
-		FilledElevation:   make([]float64, n),
-		FillDepth:         make([]float64, n),
-		FlowTo:            make([]int, n),
-		LocalRunoffMM:     make([]float64, n),
-		FlowAccumulation:  make([]float64, n),
-		BasinID:           make([]int, n),
-		RiverStrength:     make([]float64, n),
-		LakePotential:     make([]float64, n),
-		WetlandPotential:  make([]float64, n),
+		Config:                  cfg,
+		Width:                   input.Width,
+		Height:                  input.Height,
+		LandMask:                append([]bool(nil), input.LandMask...),
+		OriginalElevation:       append([]float64(nil), input.Elevation...),
+		FilledElevation:         make([]float64, n),
+		FillDepth:               make([]float64, n),
+		FlowTo:                  make([]int, n),
+		LocalRunoffMM:           make([]float64, n),
+		FlowAccumulation:        make([]float64, n),
+		WarmFlowAccumulation:    make([]float64, n),
+		ColdFlowAccumulation:    make([]float64, n),
+		BasinID:                 make([]int, n),
+		RiverStrength:           make([]float64, n),
+		RiverOrder:              make([]uint8, n),
+		PerennialRiverPotential: make([]float64, n),
+		SeasonalRiverPotential:  make([]float64, n),
+		LakePotential:           make([]float64, n),
+		WetlandPotential:        make([]float64, n),
+		LakeID:                  make([]int, n),
 	}
 	for i := range m.FlowTo {
 		m.FlowTo[i] = -1
@@ -71,6 +88,9 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	m.assignBasins()
 	m.classifyWaterFeatures(input.RainfallSeasonality)
 	m.countMajorBasins()
+	m.computeSeasonalFlow(warmPrecip, coldPrecip, input.RainfallSeasonality)
+	m.computeRiverOrder()
+	m.identifyLakes()
 
 	return m, nil
 }
@@ -102,6 +122,12 @@ func normalizeConfig(cfg Config) Config {
 	}
 	if cfg.WetlandAccumulationScale <= 0 {
 		cfg.WetlandAccumulationScale = 12000
+	}
+	if cfg.LakePotentialThreshold <= 0 || cfg.LakePotentialThreshold >= 1 {
+		cfg.LakePotentialThreshold = 0.35
+	}
+	if cfg.MinLakeCells <= 0 {
+		cfg.MinLakeCells = 2
 	}
 	return cfg
 }
@@ -240,20 +266,30 @@ func (m *Model) computeFlowDirection(parent []int) {
 }
 
 func (m *Model) computeRunoff(precip, seasonality []float64) {
-	for i := range m.LocalRunoffMM {
-		if !m.LandMask[i] {
-			continue
-		}
-		effective := math.Max(0, precip[i]-m.Config.RunoffLossMM)
-		coefficient := m.Config.BaseRunoffCoefficient +
-			m.Config.SeasonalityRunoffBoost*clamp(seasonality[i], 0, 1)
-		coefficient = clamp(coefficient, 0.05, 0.95)
-		m.LocalRunoffMM[i] = effective * coefficient
-		m.FlowAccumulation[i] = m.LocalRunoffMM[i]
-	}
+	local := m.runoffField(precip, seasonality, m.Config.RunoffLossMM)
+	copy(m.LocalRunoffMM, local)
 }
 
 func (m *Model) computeAccumulation() {
+	m.FlowAccumulation = m.accumulateField(m.LocalRunoffMM)
+}
+
+func (m *Model) runoffField(precip, seasonality []float64, lossMM float64) []float64 {
+	local := make([]float64, len(m.FlowTo))
+	for i := range local {
+		if !m.LandMask[i] {
+			continue
+		}
+		effective := math.Max(0, precip[i]-lossMM)
+		coefficient := m.Config.BaseRunoffCoefficient +
+			m.Config.SeasonalityRunoffBoost*clamp(seasonality[i], 0, 1)
+		coefficient = clamp(coefficient, 0.05, 0.95)
+		local[i] = effective * coefficient
+	}
+	return local
+}
+
+func (m *Model) sortedLandOrder() []int {
 	order := make([]int, 0, len(m.FlowTo))
 	for i := range m.FlowTo {
 		if m.LandMask[i] {
@@ -267,12 +303,43 @@ func (m *Model) computeAccumulation() {
 		}
 		return m.FilledElevation[ia] > m.FilledElevation[ib]
 	})
+	return order
+}
 
-	for _, i := range order {
+func (m *Model) accumulateField(local []float64) []float64 {
+	acc := append([]float64(nil), local...)
+	for _, i := range m.sortedLandOrder() {
 		to := m.FlowTo[i]
-		if to >= 0 && to < len(m.FlowAccumulation) && m.LandMask[to] {
-			m.FlowAccumulation[to] += m.FlowAccumulation[i]
+		if to >= 0 && to < len(acc) && m.LandMask[to] {
+			acc[to] += acc[i]
 		}
+	}
+	return acc
+}
+
+func (m *Model) computeSeasonalFlow(warmPrecip, coldPrecip, seasonality []float64) {
+	warmLocal := m.runoffField(warmPrecip, seasonality, m.Config.RunoffLossMM*0.5)
+	coldLocal := m.runoffField(coldPrecip, seasonality, m.Config.RunoffLossMM*0.5)
+	m.WarmFlowAccumulation = m.accumulateField(warmLocal)
+	m.ColdFlowAccumulation = m.accumulateField(coldLocal)
+
+	for i := range m.RiverStrength {
+		if !m.LandMask[i] || m.RiverStrength[i] <= 0 {
+			continue
+		}
+		warm := m.WarmFlowAccumulation[i]
+		cold := m.ColdFlowAccumulation[i]
+		high := math.Max(warm, cold)
+		low := math.Min(warm, cold)
+		balance := 0.0
+		if high > 0 {
+			balance = clamp(low/(high+1), 0, 1)
+		}
+
+		m.PerennialRiverPotential[i] = m.RiverStrength[i] * math.Sqrt(balance)
+		m.SeasonalRiverPotential[i] = m.RiverStrength[i] *
+			(1 - balance) *
+			clamp(seasonality[i], 0, 1)
 	}
 }
 
@@ -448,4 +515,137 @@ func (m *Model) countMajorBasins() {
 		}
 	}
 	m.MajorBasinCount = count
+}
+
+func (m *Model) computeRiverOrder() {
+	order := m.sortedLandOrder()
+	maxUpstream := make([]uint8, len(m.FlowTo))
+	maxCount := make([]uint8, len(m.FlowTo))
+
+	for i := range m.RiverOrder {
+		if m.RiverStrength[i] > 0 {
+			m.RiverOrder[i] = 1
+		}
+	}
+
+	for _, i := range order {
+		if m.RiverStrength[i] <= 0 {
+			continue
+		}
+		ord := m.RiverOrder[i]
+		if ord == 0 {
+			ord = 1
+			m.RiverOrder[i] = ord
+		}
+
+		to := m.FlowTo[i]
+		if to < 0 || to >= len(m.FlowTo) || m.RiverStrength[to] <= 0 {
+			continue
+		}
+
+		switch {
+		case ord > maxUpstream[to]:
+			maxUpstream[to] = ord
+			maxCount[to] = 1
+		case ord == maxUpstream[to]:
+			if maxCount[to] < 255 {
+				maxCount[to]++
+			}
+		}
+
+		nextOrder := maxUpstream[to]
+		if maxCount[to] >= 2 && nextOrder < 255 {
+			nextOrder++
+		}
+		if nextOrder > m.RiverOrder[to] {
+			m.RiverOrder[to] = nextOrder
+		}
+	}
+}
+
+func (m *Model) identifyLakes() {
+	n := len(m.LakePotential)
+	candidate := make([]bool, n)
+	visited := make([]bool, n)
+	for i := range candidate {
+		candidate[i] = m.LandMask[i] &&
+			m.FillDepth[i] > 0 &&
+			m.LakePotential[i] >= m.Config.LakePotentialThreshold
+	}
+
+	nextID := 1
+	for start := 0; start < n; start++ {
+		if !candidate[start] || visited[start] {
+			continue
+		}
+
+		queue := []int{start}
+		visited[start] = true
+		component := make([]int, 0, 8)
+
+		for head := 0; head < len(queue); head++ {
+			i := queue[head]
+			component = append(component, i)
+			x, z := i%m.Width, i/m.Width
+			for _, d := range d8Directions {
+				nx, nz := x+d.dx, z+d.dz
+				if nx < 0 || nx >= m.Width || nz < 0 || nz >= m.Height {
+					continue
+				}
+				ni := nz*m.Width + nx
+				if candidate[ni] && !visited[ni] {
+					visited[ni] = true
+					queue = append(queue, ni)
+				}
+			}
+		}
+
+		if len(component) < m.Config.MinLakeCells {
+			continue
+		}
+
+		id := nextID
+		nextID++
+		surface := math.Inf(1)
+		maxDepth := 0.0
+		maxAccum := 0.0
+		basin := 0
+		for _, i := range component {
+			m.LakeID[i] = id
+			if m.FilledElevation[i] < surface {
+				surface = m.FilledElevation[i]
+			}
+			if m.FillDepth[i] > maxDepth {
+				maxDepth = m.FillDepth[i]
+			}
+			if m.FlowAccumulation[i] > maxAccum {
+				maxAccum = m.FlowAccumulation[i]
+				basin = m.BasinID[i]
+			}
+		}
+
+		outlet := -1
+		outletLevel := math.Inf(1)
+		for _, i := range component {
+			to := m.FlowTo[i]
+			if to >= 0 && to < n && m.LakeID[to] == id {
+				continue
+			}
+			level := m.FilledElevation[i]
+			if level < outletLevel {
+				outletLevel = level
+				outlet = i
+			}
+		}
+
+		m.Lakes = append(m.Lakes, Lake{
+			ID:                 id,
+			CellCount:          len(component),
+			SurfaceElevation:   surface,
+			MaxDepth:           maxDepth,
+			SpillOutlet:        outlet,
+			BasinID:            basin,
+			InflowAccumulation: maxAccum,
+		})
+	}
 }

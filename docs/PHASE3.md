@@ -490,13 +490,194 @@ Max normalized fill depth     0.080 .. 0.145
 - `lake-potential.png`
 - `wetland-potential.png`
 
-## 下一步 — Phase 3.4
+## Phase 3.4 — 河流等级、季节河与显式湖泊
 
-河网与湖泊深化：
+状态：**完成第一版**
 
-- 河流等级 / Strahler Order。
-- 主河 / 支流区分。
-- 湖泊连通。
-- LakeID / Spill / Outlet。
-- 季节河倾向。
-- Phase 3 多 Seed 最终验收。
+### Strahler River Order
+
+河流不再只有 RiverStrength。
+
+新增：
+
+- RiverOrder
+
+规则：
+
+- 源头河流为 1 级。
+- 不同等级支流汇合时，下游继承较高等级。
+- 两条同级支流汇合时，下游等级 +1。
+
+因此主河 / 支流层级来自真实汇流拓扑，不是按宽度随机分类。
+
+当前 12 Seed / 240 × 150 审计：
+
+```text
+Max Strahler Order            2 .. 3
+Order >=3 river cells         0 .. 7.31%
+```
+
+当前 640 × 400 Seed 731894205：
+
+- 最高 RiverOrder = 3。
+- Order >= 3 的河流 Cell = 128。
+
+### 常流河 / 季节河倾向
+
+暖季与冷季降水分别经过同一 FlowTo 汇流：
+
+```text
+WarmSeasonPrecip
+→ WarmFlowAccumulation
+
+ColdSeasonPrecip
+→ ColdFlowAccumulation
+```
+
+新增：
+
+- PerennialRiverPotential
+- SeasonalRiverPotential
+
+判定不是 bool。
+
+两季流量越均衡：
+
+- PerennialRiverPotential 越高。
+
+两季流量反差越大，并且 RainfallSeasonality 越高：
+
+- SeasonalRiverPotential 越高。
+
+12 Seed 审计：
+
+```text
+Seasonal-dominant river cells 12.9% .. 39.6%
+```
+
+当前 640 × 400 测试 Seed：
+
+- 季节河倾向占优：861 Cell。
+- 常流河倾向占优：838 Cell。
+
+### 显式湖泊
+
+LakePotential 已进一步聚合成连续 Lake：
+
+- LakeID
+- CellCount
+- SurfaceElevation
+- MaxDepth
+- SpillOutlet
+- BasinID
+- InflowAccumulation
+
+相邻且满足阈值的湖泊候选 Cell 会形成同一个 LakeID。
+
+当前 12 Seed / 240 × 150：
+
+```text
+Explicit lakes                 2 .. 7
+Largest lake cells            76 .. 318
+Max explicit lake depth       0.080 .. 0.145
+```
+
+当前 640 × 400 Seed：
+
+- 显式湖泊：14。
+- 最大湖泊：222 个宏观 Cell。
+- 最大湖深：0.1254 normalized。
+
+### SpillOutlet 语义
+
+`SpillOutlet` 是：
+
+> 湖面达到溢流水位时的潜在溢流口。
+
+它不代表湖一定全年有水流出。
+
+未来加入：
+
+- 蒸发。
+- 土壤 / 地下渗透。
+- 湖泊水量平衡。
+
+后可以继续区分：
+
+- 外流湖。
+- 内流湖。
+- 盐湖。
+- 季节湖。
+
+Priority Flood 仍只负责建立潜在排水拓扑，不强迫所有湖实际外流。
+
+### 12 Seed 最终水文审计
+
+240 × 150：
+
+```text
+River land %                    1.675 .. 3.151
+Filled land %                   3.073 .. 9.688
+Lake candidate land %           1.137 .. 6.424
+Wetland candidate land %        0.833 .. 4.436
+Major river basins              6 .. 38
+Max normalized fill depth       0.080 .. 0.145
+Max Strahler river order        2 .. 3
+Order >=3 river cells %         0 .. 7.308
+Seasonal-dominant river cells % 12.871 .. 39.615
+Explicit lakes                  2 .. 7
+Largest lake cells              76 .. 318
+Max explicit lake depth         0.080 .. 0.145
+```
+
+### 自动护栏
+
+新增多 Seed 回归验证：
+
+- RiverOrder 不能为 0 的河流 Cell。
+- 最大 Strahler 等级不得异常爆炸。
+- 季节河占优比例保持合理范围。
+- 显式湖泊数量不能为 0 或异常泛滥。
+- Lake SpillOutlet 必须有效并指向湖区外。
+- 最大湖泊面积存在上限护栏。
+
+### 当前可视化
+
+`prototype/hydrology.html`
+
+新增：
+
+- `river-order.png`
+- `river-seasonality.png`
+- `lakes.png`
+
+## Phase 3 最终状态
+
+**Phase 3 第一版完成。**
+
+GeoWorld 当前已经可以从：
+
+```text
+宏观高程
++ 气候
++ 季风
++ 降水季节性
+↓
+径流
+↓
+流域
+↓
+河网
+↓
+河流等级
+↓
+常流 / 季节河倾向
+↓
+湖泊 / 湿地候选
+```
+
+稳定生成长期水文骨架。
+
+下一阶段进入：
+
+**Phase 4 — 侵蚀、Relief 与地貌细化。**

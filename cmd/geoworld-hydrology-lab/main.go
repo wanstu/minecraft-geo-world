@@ -46,6 +46,10 @@ func main() {
 	maxAccum := 0.0
 	runoffSum := 0.0
 	riverStrengthSum := 0.0
+	maxRiverOrder := uint8(0)
+	order3Plus := 0
+	seasonalDominant := 0
+	perennialDominant := 0
 
 	for i := range model.LandMask {
 		if !model.LandMask[i] {
@@ -65,6 +69,17 @@ func main() {
 		if model.RiverStrength[i] > 0 {
 			riverN++
 			riverStrengthSum += model.RiverStrength[i]
+			if model.RiverOrder[i] > maxRiverOrder {
+				maxRiverOrder = model.RiverOrder[i]
+			}
+			if model.RiverOrder[i] >= 3 {
+				order3Plus++
+			}
+			if model.SeasonalRiverPotential[i] > model.PerennialRiverPotential[i] {
+				seasonalDominant++
+			} else {
+				perennialDominant++
+			}
 		}
 		if model.LakePotential[i] >= 0.35 {
 			lakeN++
@@ -83,7 +98,7 @@ func main() {
 		avgRunoff = runoffSum / float64(landN)
 	}
 
-	fmt.Printf("GeoWorld Phase 3.3 Hydrology Lab\n")
+	fmt.Printf("GeoWorld Phase 3.4 Hydrology Lab\n")
 	fmt.Printf("seed=%d grid=%dx%d basins=%d major-basins=%d\n", *seed, *width, *height, model.BasinCount, model.MajorBasinCount)
 	fmt.Printf("runoff land-avg=%.1f mm river-threshold=%.1f max-accum=%.1f\n",
 		avgRunoff, model.RiverThreshold, maxAccum)
@@ -91,8 +106,22 @@ func main() {
 		riverN, percent(riverN, landN), avgRiverStrength)
 	fmt.Printf("filled-depressions=%d (%.2f%% land) max-fill-depth=%.4f\n",
 		filledN, percent(filledN, landN), maxFill)
+	largestLake := 0
+	maxLakeDepth := 0.0
+	for _, lake := range model.Lakes {
+		if lake.CellCount > largestLake {
+			largestLake = lake.CellCount
+		}
+		if lake.MaxDepth > maxLakeDepth {
+			maxLakeDepth = lake.MaxDepth
+		}
+	}
 	fmt.Printf("lake-candidates=%d (%.2f%% land) wetland-candidates=%d (%.2f%% land)\n",
 		lakeN, percent(lakeN, landN), wetlandN, percent(wetlandN, landN))
+	fmt.Printf("river-order max=%d order>=3-cells=%d seasonal-dominant=%d perennial-dominant=%d\n",
+		maxRiverOrder, order3Plus, seasonalDominant, perennialDominant)
+	fmt.Printf("explicit-lakes=%d largest=%d cells max-depth=%.4f\n",
+		len(model.Lakes), largestLake, maxLakeDepth)
 	fmt.Printf("output=%s\n", *out)
 
 	if math.IsNaN(maxAccum) || math.IsInf(maxAccum, 0) {
