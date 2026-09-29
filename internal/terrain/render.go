@@ -31,6 +31,8 @@ func RenderAll(m *Model, outDir string, cfg RenderConfig) error {
 	finalImg := image.NewRGBA(image.Rect(0, 0, cfg.WidthPx, cfg.HeightPx))
 	detailImg := image.NewRGBA(image.Rect(0, 0, cfg.WidthPx, cfg.HeightPx))
 	valleyImg := image.NewRGBA(image.Rect(0, 0, cfg.WidthPx, cfg.HeightPx))
+	depositionImg := image.NewRGBA(image.Rect(0, 0, cfg.WidthPx, cfg.HeightPx))
+	canyonImg := image.NewRGBA(image.Rect(0, 0, cfg.WidthPx, cfg.HeightPx))
 
 	maxDetail := math.Max(
 		m.Config.MountainAmplitude,
@@ -58,6 +60,21 @@ func RenderAll(m *Model, outDir string, cfg RenderConfig) error {
 			}
 			valleyImg.SetRGBA(px, py,
 				lerpColor(color.RGBA{55, 60, 57, 255}, color.RGBA{54, 153, 210, 255}, valleyNorm))
+
+			depositionNorm := 0.0
+			maxDepositLift := m.Config.DepositionLift + m.Config.AlluvialFanLift
+			if maxDepositLift > 0 {
+				depositionNorm = clamp(s.DepositionLift/maxDepositLift, 0, 1)
+			}
+			depositionImg.SetRGBA(px, py,
+				lerpColor(color.RGBA{55, 60, 57, 255}, color.RGBA{214, 173, 90, 255}, depositionNorm))
+
+			canyonNorm := 0.0
+			if m.Config.CanyonExtraDepth > 0 {
+				canyonNorm = clamp(s.CanyonCarve/m.Config.CanyonExtraDepth, 0, 1)
+			}
+			canyonImg.SetRGBA(px, py,
+				lerpColor(color.RGBA{55, 60, 57, 255}, color.RGBA{177, 92, 76, 255}, canyonNorm))
 		}
 	}
 
@@ -67,7 +84,13 @@ func RenderAll(m *Model, outDir string, cfg RenderConfig) error {
 	if err := writePNG(filepath.Join(outDir, "regional-detail.png"), detailImg); err != nil {
 		return err
 	}
-	return writePNG(filepath.Join(outDir, "valley-carve.png"), valleyImg)
+	if err := writePNG(filepath.Join(outDir, "valley-carve.png"), valleyImg); err != nil {
+		return err
+	}
+	if err := writePNG(filepath.Join(outDir, "deposition-lift.png"), depositionImg); err != nil {
+		return err
+	}
+	return writePNG(filepath.Join(outDir, "canyon-carve.png"), canyonImg)
 }
 
 func elevationColor(v float64) color.RGBA {

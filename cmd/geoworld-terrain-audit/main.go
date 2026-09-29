@@ -8,6 +8,7 @@ import (
 
 	"geoworld/internal/climate"
 	"geoworld/internal/erosion"
+	"geoworld/internal/geomorph"
 	"geoworld/internal/hydrology"
 	"geoworld/internal/landform"
 	"geoworld/internal/phase1"
@@ -76,7 +77,11 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		m, err := terrain.Generate(terrain.InputFromModels(e, l), terrain.Config{
+		g, err := geomorph.Generate(geomorph.InputFromModels(h, e, l), geomorph.Config{})
+		if err != nil {
+			panic(err)
+		}
+		m, err := terrain.Generate(terrain.InputFromModels(e, l, g), terrain.Config{
 			Seed:           seed,
 			CellSizeBlocks: *cellSize,
 		})
@@ -134,7 +139,7 @@ func main() {
 			jump, slope)
 	}
 
-	fmt.Printf("\nGeoWorld Phase 4.3 Terrain Audit: seeds=%d grid=%dx%d cell=%.0f blocks\n",
+	fmt.Printf("\nGeoWorld Phase 4 Terrain Audit: seeds=%d grid=%dx%d cell=%.0f blocks\n",
 		*count, *width, *height, *cellSize)
 	printStat("minimum height", minHeight)
 	printStat("maximum height", maxHeight)

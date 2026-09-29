@@ -23,6 +23,12 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		{"mountain weight", input.MountainWeight},
 		{"plateau weight", input.PlateauWeight},
 		{"valley weight", input.ValleyWeight},
+		{"floodplain weight", input.FloodplainWeight},
+		{"alluvial plain weight", input.AlluvialPlainWeight},
+		{"alluvial fan weight", input.AlluvialFanWeight},
+		{"canyon weight", input.CanyonWeight},
+		{"valley floor width", input.ValleyFloorWidth},
+		{"deposition potential", input.DepositionPotential},
 	} {
 		if len(field.data) != n {
 			return nil, errors.New("terrain: " + field.name + " size does not match dimensions")
@@ -59,16 +65,46 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	if err != nil {
 		return nil, err
 	}
+	floodplain, err := scalarGrid(input.Width, input.Height, cfg, input.FloodplainWeight)
+	if err != nil {
+		return nil, err
+	}
+	alluvialPlain, err := scalarGrid(input.Width, input.Height, cfg, input.AlluvialPlainWeight)
+	if err != nil {
+		return nil, err
+	}
+	alluvialFan, err := scalarGrid(input.Width, input.Height, cfg, input.AlluvialFanWeight)
+	if err != nil {
+		return nil, err
+	}
+	canyon, err := scalarGrid(input.Width, input.Height, cfg, input.CanyonWeight)
+	if err != nil {
+		return nil, err
+	}
+	valleyFloor, err := scalarGrid(input.Width, input.Height, cfg, input.ValleyFloorWidth)
+	if err != nil {
+		return nil, err
+	}
+	deposition, err := scalarGrid(input.Width, input.Height, cfg, input.DepositionPotential)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Model{
-		Config:             cfg,
-		BaseElevation:      base,
-		RollingPlainWeight: plain,
-		HillWeight:         hill,
-		FoothillWeight:     foothill,
-		MountainWeight:     mountain,
-		PlateauWeight:      plateau,
-		ValleyWeight:       valley,
+		Config:              cfg,
+		BaseElevation:       base,
+		RollingPlainWeight:  plain,
+		HillWeight:          hill,
+		FoothillWeight:      foothill,
+		MountainWeight:      mountain,
+		PlateauWeight:       plateau,
+		ValleyWeight:        valley,
+		FloodplainWeight:    floodplain,
+		AlluvialPlainWeight: alluvialPlain,
+		AlluvialFanWeight:   alluvialFan,
+		CanyonWeight:        canyon,
+		ValleyFloorWidth:    valleyFloor,
+		DepositionPotential: deposition,
 	}, nil
 }
 
@@ -93,6 +129,15 @@ func normalizeConfig(cfg Config) Config {
 	}
 	if cfg.ValleyDepth <= 0 {
 		cfg.ValleyDepth = 0.007
+	}
+	if cfg.DepositionLift <= 0 {
+		cfg.DepositionLift = 0.0035
+	}
+	if cfg.AlluvialFanLift <= 0 {
+		cfg.AlluvialFanLift = 0.0045
+	}
+	if cfg.CanyonExtraDepth <= 0 {
+		cfg.CanyonExtraDepth = 0.006
 	}
 	return cfg
 }
@@ -120,6 +165,12 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	mountain := clamp01(m.MountainWeight.SampleCubicBSpline(worldX, worldZ))
 	plateau := clamp01(m.PlateauWeight.SampleCubicBSpline(worldX, worldZ))
 	valley := clamp01(m.ValleyWeight.SampleCubicBSpline(worldX, worldZ))
+	floodplain := clamp01(m.FloodplainWeight.SampleCubicBSpline(worldX, worldZ))
+	alluvialPlain := clamp01(m.AlluvialPlainWeight.SampleCubicBSpline(worldX, worldZ))
+	alluvialFan := clamp01(m.AlluvialFanWeight.SampleCubicBSpline(worldX, worldZ))
+	canyon := clamp01(m.CanyonWeight.SampleCubicBSpline(worldX, worldZ))
+	valleyFloor := clamp01(m.ValleyFloorWidth.SampleCubicBSpline(worldX, worldZ))
+	deposition := clamp01(m.DepositionPotential.SampleCubicBSpline(worldX, worldZ))
 
 	// These noises are global world-coordinate functions. Chunk coordinates do
 	// not enter the calculation, so neighbouring chunks cannot get different
@@ -137,25 +188,52 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			mountain*mountainDetail +
 			plateau*plateauDetail
 
+	// Broad depositional lowlands should be smoother than surrounding terrain.
+	// This does not decide where plains exist; it only refines already-derived
+	// floodplain / alluvial / valley-floor fields.
+	flatness := clamp(
+		0.48*floodplain+
+			0.36*alluvialPlain+
+			0.34*valleyFloor,
+		0,
+		0.88,
+	)
+	regionalDetail *= 1 - 0.62*flatness
+	regionalDetail *= 1 - 0.28*alluvialFan
+
 	// Valleys are broad overlays, not one-block river cuts. Stronger valley
-	// influence both lowers the regional surface and damps high-frequency relief.
+	// influence lowers the regional surface. Canyon tendency adds a narrower,
+	// stronger incision on top of the existing valley geometry.
 	valleyMod := 0.82 + 0.18*(0.5+0.5*valueNoise(m.Config.Seed+607, worldX, worldZ, 1800))
 	valleyCarve := valley * m.Config.ValleyDepth * valleyMod
-	regionalDetail *= 1 - 0.45*valley
+	canyonCarve := canyon * m.Config.CanyonExtraDepth
 
-	final := boundedAdd(base, regionalDetail-valleyCarve)
+	// Deposition fills a small amount of accommodation space. Alluvial fans add
+	// a slightly stronger convex accumulation at mountain exits.
+	depositionLift := deposition*m.Config.DepositionLift +
+		alluvialFan*m.Config.AlluvialFanLift
+
+	final := boundedAdd(base, regionalDetail+depositionLift-valleyCarve-canyonCarve)
 
 	return Sample{
-		BaseElevation:      base,
-		RollingPlainWeight: plain,
-		HillWeight:         hill,
-		FoothillWeight:     foothill,
-		MountainWeight:     mountain,
-		PlateauWeight:      plateau,
-		ValleyWeight:       valley,
-		RegionalDetail:     regionalDetail,
-		ValleyCarve:        valleyCarve,
-		FinalHeight:        final,
+		BaseElevation:       base,
+		RollingPlainWeight:  plain,
+		HillWeight:          hill,
+		FoothillWeight:      foothill,
+		MountainWeight:      mountain,
+		PlateauWeight:       plateau,
+		ValleyWeight:        valley,
+		FloodplainWeight:    floodplain,
+		AlluvialPlainWeight: alluvialPlain,
+		AlluvialFanWeight:   alluvialFan,
+		CanyonWeight:        canyon,
+		ValleyFloorWidth:    valleyFloor,
+		DepositionPotential: deposition,
+		RegionalDetail:      regionalDetail,
+		DepositionLift:      depositionLift,
+		ValleyCarve:         valleyCarve,
+		CanyonCarve:         canyonCarve,
+		FinalHeight:         final,
 	}
 }
 

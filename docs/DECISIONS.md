@@ -649,3 +649,81 @@ Regional Detail 也必须：
 - 只读取绝对世界坐标 + Seed。
 - 不能读取 Chunk-local 随机状态。
 - 振幅受连续 LandformWeight 控制。
+
+
+---
+
+## D-024：河漫滩、冲积扇与峡谷必须来自水文因果，不保证每个 Seed 都出现
+
+状态：已实现第一版
+
+GeoWorld 不采用：
+
+```text
+random point
+→ generate canyon / alluvial fan
+```
+
+这些地貌必须从已经存在的河流和地形背景推导。
+
+### 河漫滩 / 宽谷底
+
+主要条件：
+
+```text
+真实河流
++ 高汇流量
++ 低坡度
++ 低 Relief
+→ Floodplain / Wide Valley Floor
+```
+
+### 冲积扇
+
+核心触发条件：
+
+```text
+upstream mountain / steep memory
++ river
++ abrupt slope reduction
++ sediment supply
+→ Alluvial Fan Core
+→ downstream directional spreading
+```
+
+冲积扇的展开方向必须来自实际 FlowTo，而不是随机角度。
+
+### 峡谷
+
+主要条件：
+
+```text
+river
++ high accumulation
++ high Relief
++ steep slope
++ existing incision
+→ Canyon
+```
+
+峡谷必须叠加在已有河谷因果链上，不能独立挖槽。
+
+### 世界多样性
+
+不要求每个 Seed 必须包含：
+
+- 强峡谷。
+- 强冲积扇。
+- 同样数量的特殊地貌。
+
+某个世界完全可以：
+
+- 山地较少，因此冲积扇很弱。
+- 河流多为平缓大河，因此峡谷很少。
+
+验收只要求：
+
+1. 特殊地貌不会大面积泛滥。
+2. 固定多 Seed 验收批次中相关机制不能整体失效。
+3. 各字段保持连续、确定、可解释。
+4. 接入最终 Terrain 后不得破坏 Chunk / Macro Grid 连续性。

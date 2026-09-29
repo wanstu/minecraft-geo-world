@@ -8,6 +8,7 @@ import (
 
 	"geoworld/internal/climate"
 	"geoworld/internal/erosion"
+	"geoworld/internal/geomorph"
 	"geoworld/internal/hydrology"
 	"geoworld/internal/landform"
 	"geoworld/internal/phase1"
@@ -45,7 +46,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	m, err := terrain.Generate(terrain.InputFromModels(e, l), terrain.Config{
+	g, err := geomorph.Generate(geomorph.InputFromModels(h, e, l), geomorph.Config{})
+	if err != nil {
+		log.Fatal(err)
+	}
+	m, err := terrain.Generate(terrain.InputFromModels(e, l, g), terrain.Config{
 		Seed:           *seed,
 		CellSizeBlocks: *cellSize,
 	})
@@ -82,7 +87,7 @@ func main() {
 	chunkJump := auditChunkSeams(m, worldWidth, worldHeight)
 	macroSlopeMismatch := auditMacroSlopes(m, worldWidth, worldHeight, *cellSize)
 
-	fmt.Printf("GeoWorld Phase 4.3 Regional Terrain Lab\n")
+	fmt.Printf("GeoWorld Phase 4 Integrated Terrain Lab\n")
 	fmt.Printf("seed=%d grid=%dx%d cell-size=%.0f blocks world≈%.0fx%.0f blocks\n",
 		*seed, *width, *height, *cellSize, worldWidth, worldHeight)
 	fmt.Printf("height min=%.5f avg=%.5f max=%.5f\n", minH, sumH/float64(samples), maxH)

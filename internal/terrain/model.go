@@ -15,6 +15,10 @@ type Config struct {
 	MountainAmplitude float64
 	PlateauAmplitude  float64
 	ValleyDepth       float64
+
+	DepositionLift   float64
+	AlluvialFanLift  float64
+	CanyonExtraDepth float64
 }
 
 type Input struct {
@@ -29,6 +33,13 @@ type Input struct {
 	MountainWeight     []float64
 	PlateauWeight      []float64
 	ValleyWeight       []float64
+
+	FloodplainWeight    []float64
+	AlluvialPlainWeight []float64
+	AlluvialFanWeight   []float64
+	CanyonWeight        []float64
+	ValleyFloorWidth    []float64
+	DepositionPotential []float64
 }
 
 type Model struct {
@@ -42,6 +53,13 @@ type Model struct {
 	MountainWeight     sampling.ScalarGrid
 	PlateauWeight      sampling.ScalarGrid
 	ValleyWeight       sampling.ScalarGrid
+
+	FloodplainWeight    sampling.ScalarGrid
+	AlluvialPlainWeight sampling.ScalarGrid
+	AlluvialFanWeight   sampling.ScalarGrid
+	CanyonWeight        sampling.ScalarGrid
+	ValleyFloorWidth    sampling.ScalarGrid
+	DepositionPotential sampling.ScalarGrid
 }
 
 type Sample struct {
@@ -54,7 +72,16 @@ type Sample struct {
 	PlateauWeight      float64
 	ValleyWeight       float64
 
+	FloodplainWeight    float64
+	AlluvialPlainWeight float64
+	AlluvialFanWeight   float64
+	CanyonWeight        float64
+	ValleyFloorWidth    float64
+	DepositionPotential float64
+
 	RegionalDetail float64
+	DepositionLift float64
 	ValleyCarve    float64
+	CanyonCarve    float64
 	FinalHeight    float64
 }

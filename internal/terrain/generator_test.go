@@ -8,15 +8,21 @@ import (
 func uniformInput(width, height int, base float64) Input {
 	n := width * height
 	in := Input{
-		Width:              width,
-		Height:             height,
-		BaseElevation:      make([]float64, n),
-		RollingPlainWeight: make([]float64, n),
-		HillWeight:         make([]float64, n),
-		FoothillWeight:     make([]float64, n),
-		MountainWeight:     make([]float64, n),
-		PlateauWeight:      make([]float64, n),
-		ValleyWeight:       make([]float64, n),
+		Width:               width,
+		Height:              height,
+		BaseElevation:       make([]float64, n),
+		RollingPlainWeight:  make([]float64, n),
+		HillWeight:          make([]float64, n),
+		FoothillWeight:      make([]float64, n),
+		MountainWeight:      make([]float64, n),
+		PlateauWeight:       make([]float64, n),
+		ValleyWeight:        make([]float64, n),
+		FloodplainWeight:    make([]float64, n),
+		AlluvialPlainWeight: make([]float64, n),
+		AlluvialFanWeight:   make([]float64, n),
+		CanyonWeight:        make([]float64, n),
+		ValleyFloorWidth:    make([]float64, n),
+		DepositionPotential: make([]float64, n),
 	}
 	for i := range in.BaseElevation {
 		in.BaseElevation[i] = base
@@ -300,6 +306,125 @@ func TestBoundedAddAvoidsNewHardSaturation(t *testing.T) {
 		}
 		if tc.base > 0 && tc.delta < 0 && got <= 0 {
 			t.Fatalf("negative detail hard-saturated: base=%.3f delta=%.3f got=%.12f", tc.base, tc.delta, got)
+		}
+	}
+}
+
+func TestDepositionalLowlandDampsRegionalDetail(t *testing.T) {
+	base := uniformInput(8, 8, 0.66)
+	flat := uniformInput(8, 8, 0.66)
+	for i := range flat.BaseElevation {
+		flat.FloodplainWeight[i] = 0.9
+		flat.AlluvialPlainWeight[i] = 0.8
+		flat.ValleyFloorWidth[i] = 0.8
+	}
+
+	cfg := Config{Seed: 31415, CellSizeBlocks: 128}
+	a, err := Generate(base, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := Generate(flat, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !(detailStdDev(b) < detailStdDev(a)*0.75) {
+		t.Fatalf("depositional lowland did not flatten detail enough: base=%.6f flat=%.6f",
+			detailStdDev(a), detailStdDev(b))
+	}
+}
+
+func TestAlluvialFanAddsSmallDepositionLift(t *testing.T) {
+	base := uniformInput(7, 7, 0.63)
+	fan := uniformInput(7, 7, 0.63)
+	for i := range fan.BaseElevation {
+		fan.AlluvialFanWeight[i] = 1
+		fan.DepositionPotential[i] = 0.55
+	}
+
+	cfg := Config{Seed: 2718, CellSizeBlocks: 128}
+	a, err := Generate(base, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := Generate(fan, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x, z := 333.0, 281.0
+	sa := a.Sample(x, z)
+	sb := b.Sample(x, z)
+
+	if sb.DepositionLift <= 0 {
+		t.Fatal("alluvial fan did not create deposition lift")
+	}
+	if !(sb.FinalHeight > sa.FinalHeight) {
+		t.Fatalf("alluvial fan did not raise surface: base=%.6f fan=%.6f", sa.FinalHeight, sb.FinalHeight)
+	}
+	if sb.DepositionLift > 0.01 {
+		t.Fatalf("alluvial fan lift too large: %.6f", sb.DepositionLift)
+	}
+}
+
+func TestCanyonAddsExtraIncision(t *testing.T) {
+	base := uniformInput(7, 7, 0.70)
+	canyon := uniformInput(7, 7, 0.70)
+	for i := range base.ValleyWeight {
+		base.ValleyWeight[i] = 0.8
+		canyon.ValleyWeight[i] = 0.8
+		canyon.CanyonWeight[i] = 1
+	}
+
+	cfg := Config{Seed: 1618, CellSizeBlocks: 128}
+	a, err := Generate(base, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := Generate(canyon, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x, z := 301.5, 289.25
+	sa := a.Sample(x, z)
+	sb := b.Sample(x, z)
+
+	if sb.CanyonCarve <= 0 {
+		t.Fatal("canyon did not add extra incision")
+	}
+	if !(sb.FinalHeight < sa.FinalHeight) {
+		t.Fatalf("canyon did not deepen valley: normal=%.6f canyon=%.6f", sa.FinalHeight, sb.FinalHeight)
+	}
+}
+
+func TestGeomorphFieldsRemainSeamlessAcrossChunkBoundary(t *testing.T) {
+	in := uniformInput(8, 7, 0.65)
+	for i := range in.BaseElevation {
+		f := float64(i%7) / 6
+		in.FloodplainWeight[i] = f
+		in.AlluvialPlainWeight[i] = 1 - f
+		in.AlluvialFanWeight[i] = 0.45 * f
+		in.CanyonWeight[i] = 0.35 * (1 - f)
+		in.ValleyFloorWidth[i] = 0.7 * f
+		in.DepositionPotential[i] = 0.5 * f
+	}
+
+	m, err := Generate(in, Config{Seed: 9090, CellSizeBlocks: 128})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	z := 277.3
+	for x := 16.0; x <= 512; x += 16 {
+		eps := 1e-5
+		before := m.SampleNormalized(x-eps, z)
+		at := m.SampleNormalized(x, z)
+		after := m.SampleNormalized(x+eps, z)
+		if math.Abs(before-at) > 1e-7 || math.Abs(after-at) > 1e-7 {
+			t.Fatalf("geomorph introduced chunk seam at x=%.0f: %.12f %.12f %.12f",
+				x, before, at, after)
 		}
 	}
 }

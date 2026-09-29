@@ -6,14 +6,16 @@
 
 ## 当前阶段
 
-**Phase 4 — 侵蚀、Relief 与地貌细化**
+**Phase 5 — 生态区与 Minecraft 映射**
 
-当前子阶段：**Phase 4.4 — 沉积型地貌 / 河谷横断面 / Phase 4 验收（准备开始）**
+当前子阶段：**Phase 5.1 — 生态区分类模型（准备开始）**
 
 ## 当前稳定基线
 
 最近提交：
 
+- `151df07` — simplify generator prototype navigation and explanations
+- `5b7a1e0` — add continuous regional terrain sampling
 - `6545409` — add continuous landform weights and scale aware terrain context
 - `d626e6a` — add erosion drivers valley incision and relief
 - `8340ed4` — add river hierarchy seasonal flow and explicit lakes
@@ -599,4 +601,90 @@ ErodedElevation
 
 多 Seed Terrain Audit 已加入失败护栏。
 
-下一步：**Phase 4.4 — Floodplain / Alluvial Fan / Canyon / Valley Profile / Phase 4 Acceptance**。
+Phase 4.4 已完成，Phase 4 第一版正式收口。
+
+
+## Phase 4.4 — 河谷横断面与沉积型地貌
+
+状态：**完成第一版**
+
+新增：
+
+- `internal/geomorph`
+- `cmd/geoworld-geomorph-lab`
+- `cmd/geoworld-geomorph-audit`
+- `prototype/geomorph.html`
+
+连续字段：
+
+- FloodplainWeight
+- AlluvialPlainWeight
+- AlluvialFanCore
+- AlluvialFanWeight
+- CanyonWeight
+- ValleyFloorWidth
+- DepositionPotential
+- SedimentSupply
+- SlopeDrop
+- UpstreamSteepMemory
+- UpstreamMountainMemory
+
+真实因果关系：
+
+```text
+大河 + 平缓低地
+→ 河漫滩 / 宽谷底
+
+低坡 + 低 Relief + 长期汇流
+→ 冲积平原
+
+上游山地 + 上游陡坡
++ 河流出山口后明显变缓
++ 上游侵蚀物源
+→ 山前冲积扇
+
+强河流 + 高 Relief + 较陡坡度
+→ 峡谷
+```
+
+正式 640 × 400 多 Seed 审计：
+
+- 河漫滩：0.175% ～ 0.311% 陆地
+- 冲积平原：1.141% ～ 1.923%
+- 明显冲积扇：0 ～ 0.062%
+- 明显峡谷：0 ～ 0.013%
+- 宽谷底：0.146% ～ 0.280%
+- 明显沉积区：0.098% ～ 0.150%
+
+允许单个世界没有明显冲积扇 / 峡谷，不为凑数量强行生成。
+
+Phase 4.4 已接入最终 Terrain：
+
+- 河漫滩 / 冲积平原 / 宽谷底会降低局部粗糙度。
+- 冲积扇产生轻微沉积抬升。
+- 峡谷在已有河谷基础上额外下切。
+- 新增 `deposition-lift.png` 与 `canyon-carve.png`。
+
+接入后连续性复验仍通过：
+
+- Chunk epsilon jump：约 1e-7
+- Macro slope mismatch：约 1e-6
+
+## Phase 4 总结
+
+状态：**完成第一版**
+
+当前地形因果链：
+
+```text
+Tectonics
++ Climate
++ Hydrology
+→ Erosion
+→ Relief
+→ Landform Weights
+→ Fluvial / Depositional Geomorphology
+→ Continuous Terrain H(worldX, worldZ)
+```
+
+下一步：**Phase 5.1 — Climate / Hydrology / Terrain → Eco Region 分类**。

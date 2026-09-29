@@ -710,15 +710,267 @@ Macro Boundary slope mismatch
 - Phase 4.1 `eroded-elevation.png`
 - Phase 4.2 `dominant-landform.png`
 
-## 下一步 — Phase 4.4
+## Phase 4.4 — 河谷横断面与沉积型地貌
 
-补充侵蚀之后的沉积型地貌和河谷横断面：
+状态：**完成第一版**
 
-- Floodplain / 河漫滩。
-- Alluvial Plain / 冲积平原。
-- Alluvial Fan / 山前冲积扇。
-- Canyon tendency / 峡谷倾向。
-- Valley floor width / 谷底宽度。
-- 河口与低地沉积倾向。
+新增模块：
 
-Phase 4.4 完成后进行 Phase 4 总体验收。
+- `internal/geomorph`
+- `cmd/geoworld-geomorph-lab`
+- `cmd/geoworld-geomorph-audit`
+- `prototype/geomorph.html`
+
+新增连续字段：
+
+- FloodplainWeight
+- AlluvialPlainWeight
+- AlluvialFanCore
+- AlluvialFanWeight
+- CanyonWeight
+- ValleyFloorWidth
+- DepositionPotential
+- SedimentSupply
+- SlopeDrop
+- UpstreamSteepMemory
+- UpstreamMountainMemory
+
+### 河漫滩
+
+河漫滩主要由：
+
+```text
+大河 / 高汇流量
++ ValleyWeight
++ 低坡度
++ 低 Relief
++ 湿润 / 常流倾向
+→ FloodplainWeight
+```
+
+湖泊区域会抑制河漫滩判定，避免整片湖面被当成河谷平地。
+
+### 冲积平原
+
+冲积平原要求更大尺度的低坡、低 Relief 平地：
+
+```text
+Rolling Plain
++ Floodplain
++ Wetland
++ 高汇流量
++ 极低坡度
++ 低 Relief
+→ AlluvialPlainWeight
+```
+
+它不是“河边一格地形”，而是大河长期作用下的区域低地倾向。
+
+### 冲积扇
+
+冲积扇不能只看“山脚”或者随机画扇形。
+
+第一版采用：
+
+```text
+上游陡峭河段
++ 上游山地记忆
++ 明显坡度突然变缓
++ 有持续河流
++ 上游侵蚀物源
+→ AlluvialFanCore
+→ 沿下游方向向两侧展开
+→ AlluvialFanWeight
+```
+
+为了识别“刚从山里出来”的河流，沿 FlowTo 向下游传播：
+
+- UpstreamSteepMemory
+- UpstreamMountainMemory
+
+并逐步衰减。
+
+因此山口下游即使已经连续经过几格缓坡，也不会立刻忘掉上游山区背景。
+
+冲积扇展开方向来自真实下游方向：
+
+- 前方范围逐渐扩宽。
+- 横向按距离衰减。
+- 只在低坡、较低 Relief 的可沉积地形保留。
+- 湖区显著抑制。
+
+### 峡谷
+
+峡谷倾向来自：
+
+```text
+强河流
++ 高汇流量
++ 高 Relief
++ 较陡坡度
++ 已存在 ValleyIncision
+→ CanyonWeight
+```
+
+它不是独立随机生成的沟。
+
+只有已经存在真实河网和河谷切割条件的地方，才可能继续形成峡谷。
+
+### 谷底宽度
+
+ValleyFloorWidth 主要由：
+
+- ValleyWeight
+- 汇流量
+- FloodplainWeight
+- 低坡度
+
+共同增宽。
+
+CanyonWeight 会显著压窄谷底。
+
+因此：
+
+```text
+平缓大河 → 宽谷底
+陡峭峡谷 → 窄谷底
+```
+
+### 沉积潜力
+
+DepositionPotential 来自：
+
+- FloodplainWeight
+- AlluvialPlainWeight
+- AlluvialFanWeight
+- SedimentSupply
+
+它只表示“适合沉积多少”的连续倾向，不代表已经模拟真实沉积厚度或地质年代。
+
+### 接入最终地形
+
+Phase 4.4 字段已经接入 `internal/terrain`。
+
+最终 Regional Terrain 现在包括：
+
+```text
+Macro / Eroded Elevation
++ Landform-controlled Regional Detail
++ small Deposition Lift
+- Valley Carve
+- Canyon Extra Carve
+→ H(worldX, worldZ)
+```
+
+具体效果：
+
+- Floodplain / Alluvial Plain：抑制局部粗糙度，使低地更平缓。
+- ValleyFloorWidth：宽谷底进一步降低细节振幅。
+- Alluvial Fan：轻微堆积抬升，并适度变平缓。
+- Canyon：在已有 Valley Carve 基础上额外下切。
+- DepositionPotential：只产生很小的填平 / 堆积，不重写宏观高程。
+
+新调试图：
+
+- `prototype/generated/terrain/deposition-lift.png`
+- `prototype/generated/terrain/canyon-carve.png`
+
+### 正式尺寸多 Seed 审计
+
+640 × 400，4 个固定验收 Seed：
+
+```text
+Floodplain >= 0.35
+0.175% .. 0.311% land
+
+Alluvial Plain >= 0.30
+1.141% .. 1.923% land
+
+Alluvial Fan >= 0.20
+0.000% .. 0.062% land
+
+Canyon >= 0.30
+0.000% .. 0.013% land
+
+Wide Valley Floor >= 0.45
+0.146% .. 0.280% land
+
+Deposition >= 0.20
+0.098% .. 0.150% land
+```
+
+最大权重：
+
+```text
+Floodplain       0.780 .. 0.824
+Alluvial Plain   0.892 .. 0.918
+Alluvial Fan     0.187 .. 0.359
+Canyon           0.286 .. 0.514
+Valley Floor     0.727 .. 0.784
+Deposition       0.302 .. 0.318
+```
+
+重要结论：
+
+> 不要求每个 Seed 都必须出现强冲积扇或强峡谷。
+
+这些属于特殊局部地貌。
+
+允许某些世界：
+
+- 没有明显大峡谷。
+- 没有强山前冲积扇。
+
+但固定多 Seed 验收批次中，相关机制不能整体消失。
+
+### 自动护栏
+
+Geomorph Audit 会直接失败，如果：
+
+- 河漫滩大面积泛滥。
+- 冲积平原覆盖异常过大。
+- 宽谷底或沉积区异常铺满大陆。
+- 固定多 Seed 批次中冲积扇机制彻底消失。
+- 固定多 Seed 批次中峡谷机制彻底消失。
+- 任一标准化字段超出 0..1。
+
+### Phase 4 最终连续性复验
+
+接入 Phase 4.4 后，正式 640 × 400 Terrain Audit 仍保持：
+
+```text
+Chunk Boundary epsilon jump
+≈ 1.3e-7 .. 1.5e-7
+
+Macro Boundary slope mismatch
+≈ 2.3e-6 .. 4.4e-6
+```
+
+说明新增沉积 / 峡谷字段没有破坏：
+
+- Minecraft Chunk 连续性。
+- Macro Grid 边界平滑性。
+- 世界坐标确定性。
+
+## Phase 4 结论
+
+Phase 4 第一版正式完成。
+
+当前因果链已经形成：
+
+```text
+Tectonics
++ Climate
++ Hydrology
+→ Erosion
+→ Relief
+→ Plain / Hill / Foothill / Mountain / Plateau
+→ Valley / Floodplain / Alluvial Plain / Fan / Canyon
+→ Continuous Regional Terrain
+```
+
+丘陵、河谷、峡谷和冲积地貌都不由独立随机噪声决定。
+
+下一阶段进入：
+
+**Phase 5 — 生态区与 Minecraft 映射**。
