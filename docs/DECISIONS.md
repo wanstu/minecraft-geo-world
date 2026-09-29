@@ -289,3 +289,33 @@ Landform Width + Elevation Amplitude
 
 - Feature 决定“是什么”。
 - Intensity 决定“有多强”。
+
+
+---
+
+## D-014：基础海陆高程与构造影响必须分层
+
+状态：已实现第一版
+
+不能把“大陆架、深海盆地”和“山脉、海沟”混成一个公式直接生成。
+
+GeoWorld 采用：
+
+```text
+Base Geography
+  ├─ Coast Distance
+  ├─ Continental Crust Thickness
+  └─ Ocean Crust Age
+          ↓
+     Base Elevation
+          +
+Tectonic Influence
+          ↓
+   Final Macro Elevation
+```
+
+原因：
+
+- 大陆架 / 大陆坡主要是大陆边缘几何，不应依赖是否正好有板块边界。
+- 山脉 / 海沟属于构造异常，应叠加在基础地形之上。
+- 后续气候、水文和 Minecraft 细化可以分别读取 BaseElevation、TectonicInfluence 和最终 Elevation。

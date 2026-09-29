@@ -243,3 +243,93 @@ Feature Type
 
 - Continental crust thickness 必须存在明显变化范围。
 - Tectonic intensity 必须在 0..1 内并存在明显强弱差异。
+
+
+## Phase 1.5 完成记录
+
+### 海岸距离场
+
+新增 `CoastDistance`：
+
+- 大陆 Cell：正值。
+- 海洋 Cell：负值。
+- 海岸两侧 Cell：0。
+- 距离单位为宏观 Grid Cell。
+
+这成为大陆内部程度、陆架、陆坡、海盆等地貌的统一空间依据。
+
+### 基础高程与构造高程分层
+
+高程不再直接从“大陆 / 海洋 + 构造”一步得到，而拆成：
+
+```text
+Crust + Coast Distance + Crust Thickness + Ocean Age
+        ↓
+Base Elevation
+        +
+Tectonic Influence
+        +
+Small Local Roughness
+        ↓
+Final Macro Elevation
+```
+
+这样以后气候、水文可以明确区分“长期地形骨架”和“构造异常”。
+
+### 海洋剖面
+
+当前宏观海洋剖面：
+
+- 0～6 Cell：Continental Shelf，大陆架，缓慢加深。
+- 6～18 Cell：Continental Slope，大陆坡，快速加深。
+- >18 Cell：Ocean Basin，深海盆地。
+- 深海盆地继续叠加海洋地壳年龄导致的冷却下沉。
+
+### 宏观地形分区
+
+新增 `MacroTerrain` 与 `TerrainZone`。
+
+当前可识别：
+
+- ContinentalInterior
+- ContinentalCoast
+- ContinentalShelf
+- ContinentalSlope
+- OceanBasin
+- MountainBelt
+- Plateau
+- TrenchZone
+- IslandArcZone
+- MidOceanRidgeZone
+- RiftValleyZone
+
+### 高原修正
+
+初版仅凭“内陆 + 厚地壳”会造成大量高原，测试 Seed 一度达到全图 15.34%。
+
+已经修正为：
+
+```text
+厚大陆地壳
++ 远离海岸
++ 明显广域构造抬升
+→ Plateau
+```
+
+修正后当前测试 Seed 高原占比约 0.43%。
+
+### 自动测试
+
+新增验证：
+
+- CoastDistance 大陆 / 海洋符号正确。
+- 同时存在大陆海岸与海洋海岸 Cell。
+- 海洋基础高程满足：Shelf > Slope > Basin。
+- 主要宏观地形区实际存在。
+- 新字段仍保持同 Seed 确定性。
+
+### 新增图层
+
+- `coast-distance.png`
+- `base-elevation.png`
+- `terrain-zones.png`

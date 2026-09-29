@@ -29,6 +29,16 @@ func RenderAll(w *World, outDir string) error {
 			}
 			return color.RGBA{31, 76, 99, 255}
 		}},
+		{"coast-distance.png", func(x, y int) color.RGBA {
+			i := w.index(x, y)
+			d := w.CoastDistance[i]
+			if d >= 0 {
+				t := clamp(d/36, 0, 1)
+				return lerpColor(color.RGBA{204, 219, 166, 255}, color.RGBA{69, 104, 58, 255}, t)
+			}
+			t := clamp((-d)/42, 0, 1)
+			return lerpColor(color.RGBA{105, 196, 210, 255}, color.RGBA{15, 42, 86, 255}, t)
+		}},
 		{"crust-thickness.png", func(x, y int) color.RGBA {
 			i := w.index(x, y)
 			if w.Crust[i] == Oceanic {
@@ -36,6 +46,12 @@ func RenderAll(w *World, outDir string) error {
 			}
 			t := clamp((w.CrustThickness[i]-0.44)/(0.88-0.44), 0, 1)
 			return lerpColor(color.RGBA{110, 118, 77, 255}, color.RGBA{231, 204, 128, 255}, t)
+		}},
+		{"base-elevation.png", func(x, y int) color.RGBA {
+			return elevationColor(w.BaseElevation[w.index(x, y)])
+		}},
+		{"terrain-zones.png", func(x, y int) color.RGBA {
+			return terrainColor(w.TerrainZone[w.index(x, y)])
 		}},
 		{"boundaries.png", func(x, y int) color.RGBA {
 			i := w.index(x, y)
@@ -121,18 +137,7 @@ func RenderAll(w *World, outDir string) error {
 			return lerpColor(color.RGBA{40, 45, 51, 255}, color.RGBA{55, 114, 214, 255}, t)
 		}},
 		{"elevation.png", func(x, y int) color.RGBA {
-			v := w.Elevation[w.index(x, y)]
-			if v < 0.5 {
-				t := uint8(40 + v*170)
-				return color.RGBA{18, 58 + t/3, 92 + t/2, 255}
-			}
-			t := (v - 0.5) * 2
-			return color.RGBA{
-				uint8(70 + t*155),
-				uint8(112 + t*120),
-				uint8(67 + t*155),
-				255,
-			}
+			return elevationColor(w.Elevation[w.index(x, y)])
 		}},
 	}
 
@@ -166,6 +171,48 @@ func featureColor(feature TectonicFeature, crust CrustType) color.RGBA {
 		}
 		return color.RGBA{18, 42, 56, 255}
 	}
+}
+
+func terrainColor(t MacroTerrain) color.RGBA {
+	switch t {
+	case ContinentalInterior:
+		return color.RGBA{95, 139, 76, 255}
+	case ContinentalCoast:
+		return color.RGBA{151, 166, 91, 255}
+	case ContinentalShelf:
+		return color.RGBA{72, 158, 176, 255}
+	case ContinentalSlope:
+		return color.RGBA{38, 102, 145, 255}
+	case OceanBasin:
+		return color.RGBA{20, 55, 105, 255}
+	case MountainBelt:
+		return color.RGBA{163, 128, 82, 255}
+	case Plateau:
+		return color.RGBA{139, 146, 82, 255}
+	case TrenchZone:
+		return color.RGBA{32, 36, 92, 255}
+	case IslandArcZone:
+		return color.RGBA{204, 92, 139, 255}
+	case MidOceanRidgeZone:
+		return color.RGBA{75, 193, 213, 255}
+	case RiftValleyZone:
+		return color.RGBA{206, 171, 70, 255}
+	default:
+		return color.RGBA{60, 60, 60, 255}
+	}
+}
+
+func elevationColor(v float64) color.RGBA {
+	v = clamp(v, 0, 1)
+	if v < 0.5 {
+		t := clamp(v/0.5, 0, 1)
+		return lerpColor(color.RGBA{9, 29, 71, 255}, color.RGBA{74, 167, 191, 255}, t)
+	}
+	t := clamp((v-0.5)/0.5, 0, 1)
+	if t < 0.65 {
+		return lerpColor(color.RGBA{77, 128, 70, 255}, color.RGBA{177, 159, 99, 255}, t/0.65)
+	}
+	return lerpColor(color.RGBA{177, 159, 99, 255}, color.RGBA{239, 239, 231, 255}, (t-0.65)/0.35)
 }
 
 func render(path string, w, h int, fn func(x, y int) color.RGBA) error {

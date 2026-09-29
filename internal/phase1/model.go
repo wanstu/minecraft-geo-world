@@ -29,6 +29,23 @@ const (
 	TransformFault
 )
 
+type MacroTerrain uint8
+
+const (
+	TerrainUnknown MacroTerrain = iota
+	ContinentalInterior
+	ContinentalCoast
+	ContinentalShelf
+	ContinentalSlope
+	OceanBasin
+	MountainBelt
+	Plateau
+	TrenchZone
+	IslandArcZone
+	MidOceanRidgeZone
+	RiftValleyZone
+)
+
 type Vec2 struct {
 	X float64
 	Y float64
@@ -55,6 +72,9 @@ type World struct {
 	PlateID           []int
 	Crust             []CrustType
 	CrustThickness    []float64
+	CoastDistance     []float64
+	BaseElevation     []float64
+	TerrainZone       []MacroTerrain
 	LandPotential     []float64
 	Boundary          []BoundaryType
 	BoundaryStrength  []float64
@@ -62,5 +82,6 @@ type World struct {
 	Feature           []TectonicFeature
 	TectonicIntensity []float64
 	TectonicInfluence []float64
+	InfluenceFeature  []TectonicFeature
 	Elevation         []float64
 }

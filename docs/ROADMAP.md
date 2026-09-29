@@ -57,7 +57,7 @@
 
 ### Phase 1.5 — 基础高程场
 
-状态：**当前**
+状态：**完成第一版**
 
 输出：
 
@@ -71,6 +71,10 @@
 - Island Arc
 - Mid-Ocean Ridge
 - Rift Valley
+
+### Phase 1.6 — Phase 1 验收
+
+状态：**当前**
 
 ### Phase 1 验收
 

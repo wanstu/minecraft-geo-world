@@ -23,7 +23,10 @@
 <div class="lab-card"><header><strong>原始 Voronoi 对照</strong><small>未自然化</small></header><img src="generated/plates-raw.png" alt="raw plates"></div>
 <div class="lab-card"><header><strong>自然化板块分区</strong><small>平滑 Domain Warp</small></header><img src="generated/plates.png" alt="plates"></div>
 <div class="lab-card"><header><strong>地壳类型</strong><small>大陆 / 海洋</small></header><img src="generated/crust.png" alt="crust"></div>
+<div class="lab-card"><header><strong>海岸距离</strong><small>陆地向内变深绿 · 海洋向外变深蓝</small></header><img src="generated/coast-distance.png" alt="coast distance"></div>
 <div class="lab-card"><header><strong>大陆地壳厚度</strong><small>浅色=较厚 · 深色=较薄</small></header><img src="generated/crust-thickness.png" alt="crust thickness"></div>
+<div class="lab-card"><header><strong>无构造基础高程</strong><small>先形成大陆架 / 大陆坡 / 海盆</small></header><img src="generated/base-elevation.png" alt="base elevation"></div>
+<div class="lab-card"><header><strong>宏观地形分区</strong><small>大陆 / 海岸 / 陆架 / 陆坡 / 海盆 / 构造地貌</small></header><img src="generated/terrain-zones.png" alt="terrain zones"></div>
 <div class="lab-card"><header><strong>板块边界</strong><small>红=汇聚 · 蓝=张裂 · 黄=转换</small></header><img src="generated/boundaries.png" alt="boundaries"></div>
 <div class="lab-card"><header><strong>地壳 + 构造边界</strong><small>检查大陆是否跨板块</small></header><img src="generated/tectonics.png" alt="tectonics"></div>
 <div class="lab-card"><header><strong>构造地貌类型</strong><small>碰撞山系 / 火山弧 / 海沟 / 岛弧 / 洋中脊 / 裂谷</small></header><img src="generated/features.png" alt="features"></div>
@@ -31,13 +34,14 @@
 <div class="lab-card"><header><strong>俯冲两侧</strong><small>蓝=海沟 · 橙=大陆火山弧 · 粉=岛弧</small></header><img src="generated/subduction.png" alt="subduction"></div>
 <div class="lab-card"><header><strong>构造强度</strong><small>由相对速度 / 地壳厚度 / 海洋年龄共同决定</small></header><img src="generated/tectonic-intensity.png" alt="tectonic intensity"></div>
 <div class="lab-card"><header><strong>构造影响带</strong><small>暖色=抬升 · 蓝色=下沉</small></header><img src="generated/tectonic-influence.png" alt="tectonic influence"></div>
-<div class="lab-card"><header><strong>粗略高程倾向</strong><small>构造带已有实际宽度</small></header><img src="generated/elevation.png" alt="elevation"></div>
+<div class="lab-card"><header><strong>宏观最终高程</strong><small>基础海陆地形 + 构造影响 + 少量粗糙度</small></header><img src="generated/elevation.png" alt="elevation"></div>
 </div></main>
 <aside class="inspector"><div class="section"><h3>Phase 1 判断标准</h3>
 <div class="card"><div class="card-title">因果可解释</div><p>主要抬升必须来自板块汇聚，而不是纯噪声。</p></div>
 <div class="card"><div class="card-title">边界自然化</div><p>板块查询坐标经过低频平滑 Domain Warp，再进行 Voronoi 归属；保留连续板块，同时降低笔直几何边界感。</p></div>
 <div class="card"><div class="card-title">大陆 ≠ 板块</div><p>已拆分地壳场和板块场；大陆可以横跨多个板块，板块也不再等价于海岸线。</p></div>
 <div class="card"><div class="card-title">海洋地壳年龄</div><p>洋中脊附近最年轻，远离洋中脊逐渐变老；海洋-海洋碰撞时优先让更老的一侧俯冲。</p></div>
+<div class="card"><div class="card-title">海岸到深海是连续地形</div><p>海洋不再从海岸直接跳到深海：先经过大陆架，再经大陆坡进入深海盆地。</p></div>
 <div class="card"><div class="card-title">构造强弱不再固定</div><p>板块相对运动越强，构造作用通常越强；大陆地壳厚度和海洋地壳年龄会进一步修正强度。</p></div>
 <div class="card"><div class="card-title">构造影响带</div><p>边界只作为构造源，真正高程由向周围衰减的影响带控制，不再是一格宽的线。</p></div>
 <div class="card"><div class="card-title">噪声降级</div><p>噪声只用于局部细节，不决定宏观海陆位置。</p></div></div></aside>

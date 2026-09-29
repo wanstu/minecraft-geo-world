@@ -8,7 +8,7 @@
 
 **Phase 1 — 板块与大陆骨架**
 
-当前子阶段：**Phase 1.5 — 基础高程场（准备开始）**
+当前子阶段：**Phase 1.6 — Phase 1 验收（当前）**
 
 ## 当前稳定基线
 
@@ -98,6 +98,9 @@
 - `plates.png`
 - `crust.png`
 - `crust-thickness.png`
+- `coast-distance.png`
+- `base-elevation.png`
+- `terrain-zones.png`
 - `boundaries.png`
 - `tectonics.png`
 - `features.png`
@@ -107,22 +110,51 @@
 - `tectonic-influence.png`
 - `elevation.png`
 
-## 下一步：Phase 1.5 — 基础高程场
+## Phase 1.5 — 基础高程场
 
-目标：
+状态：**完成第一版**
 
-- 大陆内部基础高程
-- 大陆架
-- 大陆坡
-- 海盆
-- 高原
-- 山系
-- 海沟
-- 岛弧
-- 洋中脊
-- 裂谷
+已实现：
 
-这一阶段完成后，Phase 1 的输出才会从“构造倾向图”变成真正可供后续气候、水文和 Minecraft 地形细化使用的宏观高程场。
+- 有符号海岸距离场：大陆为正、海洋为负。
+- 大陆内部基础高程随海岸距离与大陆地壳厚度变化。
+- 海洋基础高程明确分为大陆架 → 大陆坡 → 深海盆地。
+- 深海盆地继续受海洋地壳年龄控制。
+- 基础高程与构造影响分层：先有海陆地形，再叠加山系 / 海沟 / 裂谷等构造。
+- 构造影响记录主导 Feature，用于宏观地形分类。
+- 宏观地形分类：
+  - Continental Interior
+  - Continental Coast
+  - Continental Shelf
+  - Continental Slope
+  - Ocean Basin
+  - Mountain Belt
+  - Plateau
+  - Trench
+  - Island Arc
+  - Mid-Ocean Ridge
+  - Rift Valley
+- 高原判定已收紧为“厚地壳 + 广域构造抬升”，避免把普通大陆内部误判成高原。
+- 新增自动测试：海岸距离正负号、大陆架/大陆坡/海盆高程顺序、核心地形分区存在性。
+
+当前测试 Seed：
+
+- Elevation：0.127 ～ 0.915
+- Continental Shelf：3.27%
+- Continental Slope：5.66%
+- Ocean Basin：55.28%
+- Mountain Belt：1.48%
+- Plateau：0.43%
+- Trench：0.31%
+- Island Arc：0.10%
+- Mid-Ocean Ridge：3.37%
+- Rift Valley：3.86%
+
+新增输出：
+
+- `coast-distance.png`
+- `base-elevation.png`
+- `terrain-zones.png`
 
 ## Phase 1.6 — Phase 1 验收
 

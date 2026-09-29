@@ -32,13 +32,13 @@ func main() {
 
 	oceanCells := 0
 	warpedCells := 0
-	minAge := 1.0
-	maxAge := 0.0
-	minCrustThickness := 1.0
-	maxCrustThickness := 0.0
-	minTectonicIntensity := 1.0
-	maxTectonicIntensity := 0.0
 	influenced := 0
+	minAge, maxAge := 1.0, 0.0
+	minCrustThickness, maxCrustThickness := 1.0, 0.0
+	minTectonicIntensity, maxTectonicIntensity := 1.0, 0.0
+	minElevation, maxElevation := 1.0, 0.0
+	zoneCounts := map[phase1.MacroTerrain]int{}
+
 	for i, c := range world.Crust {
 		if world.RawPlateID[i] != world.PlateID[i] {
 			warpedCells++
@@ -71,10 +71,19 @@ func main() {
 		if math.Abs(world.TectonicInfluence[i]) > 0.005 {
 			influenced++
 		}
+		if world.Elevation[i] < minElevation {
+			minElevation = world.Elevation[i]
+		}
+		if world.Elevation[i] > maxElevation {
+			maxElevation = world.Elevation[i]
+		}
+		zoneCounts[world.TerrainZone[i]]++
 	}
-	oceanPct := float64(oceanCells) / float64(len(world.Crust)) * 100
-	influencePct := float64(influenced) / float64(len(world.Crust)) * 100
-	warpPct := float64(warpedCells) / float64(len(world.Crust)) * 100
+
+	total := float64(len(world.Crust))
+	oceanPct := float64(oceanCells) / total * 100
+	influencePct := float64(influenced) / total * 100
+	warpPct := float64(warpedCells) / total * 100
 
 	fmt.Printf("GeoWorld Phase 1 Lab\n")
 	fmt.Printf("seed=%d grid=%dx%d plates=%d ocean-area=%.2f%%\n",
@@ -83,5 +92,19 @@ func main() {
 		warpPct, minAge, maxAge, influencePct)
 	fmt.Printf("continental-thickness=%.3f..%.3f tectonic-intensity=%.3f..%.3f\n",
 		minCrustThickness, maxCrustThickness, minTectonicIntensity, maxTectonicIntensity)
+	fmt.Printf("elevation=%.3f..%.3f shelf=%.2f%% slope=%.2f%% basin=%.2f%% mountain=%.2f%% plateau=%.2f%%\n",
+		minElevation, maxElevation,
+		float64(zoneCounts[phase1.ContinentalShelf])/total*100,
+		float64(zoneCounts[phase1.ContinentalSlope])/total*100,
+		float64(zoneCounts[phase1.OceanBasin])/total*100,
+		float64(zoneCounts[phase1.MountainBelt])/total*100,
+		float64(zoneCounts[phase1.Plateau])/total*100,
+	)
+	fmt.Printf("trench=%.2f%% island-arc=%.2f%% ridge=%.2f%% rift=%.2f%%\n",
+		float64(zoneCounts[phase1.TrenchZone])/total*100,
+		float64(zoneCounts[phase1.IslandArcZone])/total*100,
+		float64(zoneCounts[phase1.MidOceanRidgeZone])/total*100,
+		float64(zoneCounts[phase1.RiftValleyZone])/total*100,
+	)
 	fmt.Printf("output=%s\n", *out)
 }

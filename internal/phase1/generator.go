@@ -58,6 +58,9 @@ func Generate(cfg Config) *World {
 		PlateID:           make([]int, n),
 		Crust:             make([]CrustType, n),
 		CrustThickness:    make([]float64, n),
+		CoastDistance:     make([]float64, n),
+		BaseElevation:     make([]float64, n),
+		TerrainZone:       make([]MacroTerrain, n),
 		LandPotential:     make([]float64, n),
 		Boundary:          make([]BoundaryType, n),
 		BoundaryStrength:  make([]float64, n),
@@ -65,6 +68,7 @@ func Generate(cfg Config) *World {
 		Feature:           make([]TectonicFeature, n),
 		TectonicIntensity: make([]float64, n),
 		TectonicInfluence: make([]float64, n),
+		InfluenceFeature:  make([]TectonicFeature, n),
 		Elevation:         make([]float64, n),
 	}
 
@@ -79,11 +83,14 @@ func Generate(cfg Config) *World {
 	}
 
 	w.generateCrust(r)
+	w.computeCoastDistance()
 	w.computeCrustThickness()
 	w.classifyBoundaries()
 	w.computeOceanAge()
 	w.classifyFeatures()
 	w.computeTectonicInfluence()
+	w.computeBaseElevation()
+	w.classifyMacroTerrain()
 	w.computeElevation()
 	return w
 }
@@ -102,9 +109,8 @@ func nearestPlate(x, y float64, plates []Plate) int {
 	return best
 }
 
-// warpedPlatePoint 对“查询坐标”做平滑低频扭曲，再执行最近板块中心查询。
-// 它保留 Voronoi 的连续大区块优势，同时降低笔直边界和规则多边形感。
-// 这里故意不使用逐 Cell 随机抖动，避免板块边缘出现盐胡椒碎片。
+// warpedPlatePoint 对查询坐标做低频连续扭曲，再进行最近板块中心归属。
+// 这样保留连续板块，同时降低标准 Voronoi 的直线和规则多边形感。
 func warpedPlatePoint(x, y float64, cfg Config) (float64, float64) {
 	w := float64(cfg.Width)
 	h := float64(cfg.Height)
@@ -163,6 +169,7 @@ func (w *World) generateCrust(r *rand.Rand) {
 			potential += math.Cos(fy*0.037-float64(w.Config.Seed%271)) * 0.08
 			potential += math.Sin((fx+fy)*0.019) * 0.05
 
+			// 主地理区外围强制偏向海洋，为未来风暴洋 / 冰冻洋留缓冲。
 			dxEdge := math.Min(fx, width-1-fx) / width
 			dyEdge := math.Min(fy, height-1-fy) / height
 			edge := math.Min(dxEdge, dyEdge)
@@ -189,30 +196,27 @@ func (w *World) generateCrust(r *rand.Rand) {
 	}
 }
 
-func (w *World) computeCrustThickness() {
+// computeCoastDistance 计算到最近海岸的有符号 Cell 距离。
+// 大陆为正，海洋为负；海岸两侧的边界 Cell 为 0。
+func (w *World) computeCoastDistance() {
 	const unvisited = -1
-	dist := make([]int, len(w.CrustThickness))
+	dist := make([]int, len(w.CoastDistance))
 	for i := range dist {
 		dist[i] = unvisited
 	}
 
-	queue := make([]cellPoint, 0, len(dist)/8)
 	dirs := [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+	queue := make([]cellPoint, 0, len(dist)/6)
 
-	// 海岸线上的大陆 Cell 作为大陆地壳厚度的“薄边缘”。
 	for y := 0; y < w.Config.Height; y++ {
 		for x := 0; x < w.Config.Width; x++ {
 			i := w.index(x, y)
-			if w.Crust[i] != Continental {
-				w.CrustThickness[i] = 0.18
-				continue
-			}
 			for _, d := range dirs {
 				nx, ny := x+d[0], y+d[1]
 				if !w.inside(nx, ny) {
 					continue
 				}
-				if w.Crust[w.index(nx, ny)] == Oceanic {
+				if w.Crust[w.index(nx, ny)] != w.Crust[i] {
 					dist[i] = 0
 					queue = append(queue, cellPoint{X: x, Y: y})
 					break
@@ -232,7 +236,7 @@ func (w *World) computeCrustThickness() {
 				continue
 			}
 			ni := w.index(nx, ny)
-			if w.Crust[ni] != Continental || dist[ni] != unvisited {
+			if w.Crust[ni] != w.Crust[pi] || dist[ni] != unvisited {
 				continue
 			}
 			dist[ni] = dist[pi] + 1
@@ -240,17 +244,30 @@ func (w *World) computeCrustThickness() {
 		}
 	}
 
+	for i := range w.CoastDistance {
+		d := dist[i]
+		if d < 0 {
+			d = maxInt(w.Config.Width, w.Config.Height)
+		}
+		if w.Crust[i] == Continental {
+			w.CoastDistance[i] = float64(d)
+		} else {
+			w.CoastDistance[i] = -float64(d)
+		}
+	}
+}
+
+func (w *World) computeCrustThickness() {
 	for y := 0; y < w.Config.Height; y++ {
 		for x := 0; x < w.Config.Width; x++ {
 			i := w.index(x, y)
 			if w.Crust[i] != Continental {
+				w.CrustThickness[i] = 0.18
 				continue
 			}
-			d := dist[i]
-			if d < 0 {
-				d = 24
-			}
-			interior := 1 - math.Exp(-float64(d)/18.0)
+
+			d := math.Max(0, w.CoastDistance[i])
+			interior := 1 - math.Exp(-d/18.0)
 			lowFreq := math.Sin(float64(x)*0.021+float64(w.Config.Seed%421))*0.025 +
 				math.Cos(float64(y)*0.019-float64(w.Config.Seed%353))*0.02
 			w.CrustThickness[i] = clamp(0.48+interior*0.34+lowFreq, 0.44, 0.88)
@@ -278,8 +295,9 @@ func (w *World) classifyBoundaries() {
 				if bID == aID {
 					continue
 				}
+
 				boundary, strength := boundaryKinematics(w.Plates[aID], w.Plates[bID])
-				if featurePriorityForBoundary(boundary) > featurePriorityForBoundary(best) ||
+				if boundaryPriority(boundary) > boundaryPriority(best) ||
 					(boundary == best && strength > bestStrength) {
 					best = boundary
 					bestStrength = strength
@@ -308,7 +326,6 @@ func (w *World) computeOceanAge() {
 		queue = append(queue, cellPoint{X: x, Y: y})
 	}
 
-	// 真正的年龄源首先来自海洋-海洋张裂边界（洋中脊）。
 	for y := 0; y < w.Config.Height; y++ {
 		for x := 0; x < w.Config.Width; x++ {
 			i := w.index(x, y)
@@ -332,8 +349,6 @@ func (w *World) computeOceanAge() {
 		}
 	}
 
-	// 极端 Seed 可能没有海洋-海洋张裂边界；退化时用海洋板块边缘作为年轻地壳源，
-	// 保证年龄场仍然连续可用，而不是整张图失效。
 	if len(queue) == 0 {
 		for y := 0; y < w.Config.Height; y++ {
 			for x := 0; x < w.Config.Width; x++ {
@@ -377,11 +392,9 @@ func (w *World) computeOceanAge() {
 			continue
 		}
 		if dist[i] < 0 {
-			// 与年龄源不连通的小海盆，给一个中等偏老的稳定值。
 			w.OceanAge[i] = 0.65
 			continue
 		}
-		// 距洋中脊越远越老；指数曲线避免最远处全部挤在 1.0。
 		w.OceanAge[i] = clamp(1-math.Exp(-float64(dist[i])/scale), 0, 1)
 	}
 }
@@ -420,6 +433,7 @@ func (w *World) classifyFeatures() {
 					w.CrustThickness[i], w.CrustThickness[ni],
 					w.OceanAge[i], w.OceanAge[ni],
 				)
+
 				if featurePriority(feature) > featurePriority(best) ||
 					(feature == best && intensity > bestIntensity) {
 					best = feature
@@ -467,7 +481,7 @@ func boundaryKinematics(a, b Plate) (BoundaryType, float64) {
 	}
 }
 
-func featurePriorityForBoundary(b BoundaryType) int {
+func boundaryPriority(b BoundaryType) int {
 	switch b {
 	case Convergent:
 		return 3
@@ -491,8 +505,6 @@ func classifyFeature(local, other CrustType, localAge, otherAge float64, localPl
 		case local == Oceanic && other == Continental:
 			return Trench
 		default:
-			// 海洋-海洋汇聚：较老、较冷的一侧优先俯冲形成海沟，
-			// 较年轻的上覆板块一侧形成岛弧。年龄接近时用 plate ID 稳定打破平局。
 			localSubducts := localAge > otherAge+0.015 ||
 				(math.Abs(localAge-otherAge) <= 0.015 && localPlate > otherPlate)
 			if localSubducts {
@@ -541,6 +553,8 @@ func tectonicFeatureIntensity(feature TectonicFeature, boundaryStrength, localTh
 func (w *World) computeTectonicInfluence() {
 	uplift := make([]float64, len(w.TectonicInfluence))
 	subsidence := make([]float64, len(w.TectonicInfluence))
+	upliftFeature := make([]TectonicFeature, len(w.TectonicInfluence))
+	subsidenceFeature := make([]TectonicFeature, len(w.TectonicInfluence))
 
 	for y := 0; y < w.Config.Height; y++ {
 		for x := 0; x < w.Config.Width; x++ {
@@ -566,13 +580,16 @@ func (w *World) computeTectonicInfluence() {
 					if !featureAppliesToCrust(feature, w.Crust[ti]) {
 						continue
 					}
+
 					falloff := 1 - d/float64(radius)
 					effect := amplitude * falloff * falloff
 					if effect > 0 && effect > uplift[ti] {
 						uplift[ti] = effect
+						upliftFeature[ti] = feature
 					}
 					if effect < 0 && effect < subsidence[ti] {
 						subsidence[ti] = effect
+						subsidenceFeature[ti] = feature
 					}
 				}
 			}
@@ -581,6 +598,11 @@ func (w *World) computeTectonicInfluence() {
 
 	for i := range w.TectonicInfluence {
 		w.TectonicInfluence[i] = clamp(uplift[i]+subsidence[i], -0.38, 0.45)
+		if math.Abs(uplift[i]) >= math.Abs(subsidence[i]) {
+			w.InfluenceFeature[i] = upliftFeature[i]
+		} else {
+			w.InfluenceFeature[i] = subsidenceFeature[i]
+		}
 	}
 }
 
@@ -626,26 +648,6 @@ func featureAppliesToCrust(feature TectonicFeature, crust CrustType) bool {
 	}
 }
 
-func strongerBoundary(a, b BoundaryType) BoundaryType {
-	if a == Convergent || b == Convergent {
-		return Convergent
-	}
-	if a == Divergent || b == Divergent {
-		return Divergent
-	}
-	if a == Transform || b == Transform {
-		return Transform
-	}
-	return NoBoundary
-}
-
-func strongerFeature(a, b TectonicFeature) TectonicFeature {
-	if featurePriority(b) > featurePriority(a) {
-		return b
-	}
-	return a
-}
-
 func featurePriority(f TectonicFeature) int {
 	switch f {
 	case CollisionOrogen:
@@ -667,24 +669,96 @@ func featurePriority(f TectonicFeature) int {
 	}
 }
 
-func (w *World) computeElevation() {
+func (w *World) computeBaseElevation() {
 	for y := 0; y < w.Config.Height; y++ {
 		for x := 0; x < w.Config.Width; x++ {
 			i := w.index(x, y)
 
-			// 大陆地壳越厚，长期平均基底略高；海洋地壳则随年龄增长冷却下沉。
-			base := 0.58 + clamp((w.CrustThickness[i]-0.44)/(0.88-0.44), 0, 1)*0.10
-			if w.Crust[i] == Oceanic {
-				// 年轻海洋地壳较热、海底较高；老地壳冷却收缩后海盆更深。
-				base = 0.31 - w.OceanAge[i]*0.10
+			if w.Crust[i] == Continental {
+				d := math.Max(0, w.CoastDistance[i])
+				thickness := clamp((w.CrustThickness[i]-0.44)/(0.88-0.44), 0, 1)
+				interior := 1 - math.Exp(-d/22.0)
+				w.BaseElevation[i] = clamp(0.535+thickness*0.075+interior*0.035, 0.525, 0.66)
+				continue
 			}
 
-			base += w.TectonicInfluence[i]
+			d := math.Max(0, -w.CoastDistance[i])
+			switch {
+			case d <= 6:
+				// 大陆架：浅海缓慢下降。
+				t := d / 6
+				w.BaseElevation[i] = 0.485 - t*0.045
+			case d <= 18:
+				// 大陆坡：从浅海快速进入深海。
+				t := (d - 6) / 12
+				w.BaseElevation[i] = 0.44 - t*0.15
+			default:
+				// 深海盆地：距离海岸越远、地壳越老，平均海底越深。
+				deep := 1 - math.Exp(-(d-18)/28.0)
+				w.BaseElevation[i] = 0.29 - deep*0.045 - w.OceanAge[i]*0.045
+			}
+			w.BaseElevation[i] = clamp(w.BaseElevation[i], 0.16, 0.495)
+		}
+	}
+}
 
-			// 只提供局部粗糙度，不允许噪声重新决定大陆 / 山系位置。
+func (w *World) classifyMacroTerrain() {
+	for i := range w.TerrainZone {
+		influence := w.TectonicInfluence[i]
+		feature := w.InfluenceFeature[i]
+
+		if w.Crust[i] == Continental {
+			switch {
+			case feature == ContinentalRift && influence < -0.02:
+				w.TerrainZone[i] = RiftValleyZone
+			case (feature == CollisionOrogen || feature == VolcanicArc) && influence > 0.10:
+				w.TerrainZone[i] = MountainBelt
+			case w.CoastDistance[i] >= 18 && w.CrustThickness[i] >= 0.76 && influence > 0.035:
+				// 高原不是“普通大陆内部”的同义词；要求厚地壳并存在广域构造抬升。
+				w.TerrainZone[i] = Plateau
+			case w.CoastDistance[i] <= 3:
+				w.TerrainZone[i] = ContinentalCoast
+			default:
+				w.TerrainZone[i] = ContinentalInterior
+			}
+			continue
+		}
+
+		switch {
+		case feature == Trench && influence < -0.025:
+			w.TerrainZone[i] = TrenchZone
+		case feature == IslandArc && influence > 0.025:
+			w.TerrainZone[i] = IslandArcZone
+		case feature == MidOceanRidge && influence > 0.02:
+			w.TerrainZone[i] = MidOceanRidgeZone
+		default:
+			d := math.Max(0, -w.CoastDistance[i])
+			switch {
+			case d <= 6:
+				w.TerrainZone[i] = ContinentalShelf
+			case d <= 18:
+				w.TerrainZone[i] = ContinentalSlope
+			default:
+				w.TerrainZone[i] = OceanBasin
+			}
+		}
+	}
+}
+
+func (w *World) computeElevation() {
+	for y := 0; y < w.Config.Height; y++ {
+		for x := 0; x < w.Config.Width; x++ {
+			i := w.index(x, y)
+			base := w.BaseElevation[i] + w.TectonicInfluence[i]
+
+			// 只提供局部粗糙度，不允许噪声重新决定宏观海陆和构造位置。
 			n := math.Sin(float64(x)*0.071+float64(w.Config.Seed%997)) *
 				math.Cos(float64(y)*0.083-float64(w.Config.Seed%313))
-			base += n * 0.03
+			roughness := 0.018
+			if w.Crust[i] == Oceanic {
+				roughness = 0.012
+			}
+			base += n * roughness
 
 			w.Elevation[i] = clamp(base, 0, 1)
 		}
