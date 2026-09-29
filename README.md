@@ -63,3 +63,21 @@ GeoWorld 只在中央有限区域生成完整地理世界：
 - `docs/PHASE1.md`：当前板块 / 大陆算法实验细节。
 - `docs/ARCHITECTURE.md`：整体架构。
 - `docs/PRODUCT.md`：产品边界。
+
+
+## 查看静态原型
+
+原型不需要启动 Web 服务，也不依赖 Node。
+
+Windows 可直接双击：
+
+`open-prototype.cmd`
+
+或直接打开：
+
+- `prototype/index.html`
+- `prototype/generator.html`
+- `prototype/runtime.html`
+- `prototype/plates.html`
+
+所有 CSS 与生成图片均使用相对路径，可通过 `file://` 直接加载。
