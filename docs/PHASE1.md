@@ -387,3 +387,38 @@ Final Macro Elevation
 - Final Elevation
 
 因此这不是最终 Minecraft Runtime 的目标内存占用。
+
+
+### 多 Seed 静态视觉验收
+
+新增：
+
+`prototype/acceptance.html`
+
+当前样本：
+
+- Seed 1
+- Seed 42
+- Seed 2026
+- Seed 731894205
+
+每个样本保留四张核心图：
+
+- crust.png
+- tectonic-influence.png
+- terrain-zones.png
+- elevation.png
+
+当前 480 × 300 验收样本的最终高程顶格比例：
+
+- Seed 1：0.424%
+- Seed 42：0.048%
+- Seed 2026：0.927%
+- Seed 731894205：0%
+
+新增自动护栏：
+
+- Elevation >= 0.999 的 Cell 不允许超过全图 3%。
+- TectonicIntensity >= 0.999 的构造源 Cell 不允许超过 20%。
+
+这些阈值目前只是防止算法失控，不代表最终地貌调参目标。

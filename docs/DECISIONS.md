@@ -319,3 +319,109 @@ Tectonic Influence
 - 大陆架 / 大陆坡主要是大陆边缘几何，不应依赖是否正好有板块边界。
 - 山脉 / 海沟属于构造异常，应叠加在基础地形之上。
 - 后续气候、水文和 Minecraft 细化可以分别读取 BaseElevation、TectonicInfluence 和最终 Elevation。
+
+
+---
+
+## D-015：丘陵属于 Relief / 侵蚀结果，不属于宏观随机噪声
+
+状态：已确定
+
+GeoWorld 不采用：
+
+```text
+noise > threshold → hills
+```
+
+丘陵应来自中等尺度起伏：
+
+```text
+Tectonic Background
++ Distance to Mountain Belt
++ River Incision
++ Precipitation
++ Terrain Age
++ Erosion Resistance Approximation
+        ↓
+Relief
+        ↓
+Hills / Foothills / Valleys / Rolling Plains
+```
+
+因此 Phase 1 只建立宏观高程骨架。
+
+最终丘陵放到气候与水文之后的侵蚀 / Relief 阶段生成。
+
+Elevation 与 Relief 必须分离：
+
+- Elevation：这里整体有多高。
+- Relief：周围一定尺度内起伏有多强。
+
+高海拔 + 低 Relief 可以是高原；中等海拔 + 中 Relief 才可能是丘陵。
+
+---
+
+## D-016：Minecraft Chunk 不是地形数学边界
+
+状态：已确定
+
+最终地形必须定义为连续世界坐标函数：
+
+```text
+height = H(worldX, worldZ)
+```
+
+Chunk 只负责采样其覆盖的世界坐标。
+
+禁止：
+
+```text
+generateChunk(cx, cz) → 独立随机地形
+```
+
+原因：
+
+- 独立 Chunk 生成容易产生接缝。
+- 世界坐标采样天然保证相邻 Chunk 使用同一函数。
+- 相同坐标无论从哪个 Chunk 请求，都得到相同结果。
+
+最终高度建议分层：
+
+```text
+BaseElevation
++ TectonicRelief
++ ErosionRelief
++ RegionalDetail
++ LocalDetail
+= H(worldX, worldZ)
+```
+
+宏观 Grid 只是采样点，不是方块高度台阶。
+
+从宏观场到 Minecraft 坐标时必须使用连续插值；初期可采用双线性，正式方案优先考虑受限 Hermite / 单调 cubic 等不会产生明显 overshoot 的平滑方法。
+
+---
+
+## D-017：地貌边界使用连续权重混合
+
+状态：已确定
+
+平原、丘陵、山麓、山地等不能按分类边界直接切换地形函数。
+
+应使用连续权重：
+
+```text
+Terrain =
+  Plain * plainWeight
++ Hills * hillsWeight
++ Mountain * mountainWeight
+```
+
+权重随位置连续变化且总和归一化。
+
+这样可以避免：
+
+- 群系墙
+- 地形突然变陡
+- 宏观 Cell 边缘台阶
+- Chunk 边界视觉割裂

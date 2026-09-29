@@ -271,6 +271,9 @@ func TestMultipleSeedsPhase1Invariants(t *testing.T) {
 		w := Generate(cfg)
 
 		ocean := 0
+		saturatedElevation := 0
+		saturatedIntensity := 0
+		featureCells := 0
 		for i, crust := range w.Crust {
 			if crust == Oceanic {
 				ocean++
@@ -280,6 +283,26 @@ func TestMultipleSeedsPhase1Invariants(t *testing.T) {
 			}
 			if w.Elevation[i] < 0 || w.Elevation[i] > 1 {
 				t.Fatalf("seed %d elevation out of range at %d: %.3f", seed, i, w.Elevation[i])
+			}
+			if w.Elevation[i] >= 0.999 {
+				saturatedElevation++
+			}
+			if w.Feature[i] != NoFeature {
+				featureCells++
+				if w.TectonicIntensity[i] >= 0.999 {
+					saturatedIntensity++
+				}
+			}
+		}
+
+		elevationSatRatio := float64(saturatedElevation) / float64(len(w.Elevation))
+		if elevationSatRatio > 0.03 {
+			t.Fatalf("seed %d has too much saturated elevation: %.3f%%", seed, elevationSatRatio*100)
+		}
+		if featureCells > 0 {
+			intensitySatRatio := float64(saturatedIntensity) / float64(featureCells)
+			if intensitySatRatio > 0.20 {
+				t.Fatalf("seed %d has too much saturated tectonic intensity: %.3f%%", seed, intensitySatRatio*100)
 			}
 		}
 

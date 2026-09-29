@@ -62,6 +62,7 @@ GeoWorld 只在中央有限区域生成完整地理世界：
 - `docs/ROADMAP.md`：V1 分阶段路线。
 - `docs/PHASE1.md`：当前板块 / 大陆算法实验细节。
 - `docs/ARCHITECTURE.md`：整体架构。
+- `docs/SAMPLING.md`：连续世界坐标采样与 Chunk 无缝原则。
 - `docs/PRODUCT.md`：产品边界。
 
 
@@ -79,5 +80,6 @@ Windows 可直接双击：
 - `prototype/generator.html`
 - `prototype/runtime.html`
 - `prototype/plates.html`
+- `prototype/acceptance.html`：Phase 1 多 Seed 静态验收
 
 所有 CSS 与生成图片均使用相对路径，可通过 `file://` 直接加载。

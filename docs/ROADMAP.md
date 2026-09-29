@@ -13,76 +13,37 @@
 - 页面原型
 - 初始核心数据结构
 
-## Phase 1 — 大陆与板块
+## Phase 1 — 大陆、板块与宏观高程
 
 状态：**进行中**
 
 ### Phase 1.1 — 最小构造链路
-
 状态：**完成**
-
-- Seed → 板块
-- 板块运动向量
-- 汇聚 / 张裂 / 转换边界
-- 大陆 / 海洋地壳独立于板块
-- 构造地貌初步分类
-- 粗略高程
-- PNG 可视化 Lab
 
 ### Phase 1.2 — 地壳年龄与构造影响带
-
 状态：**完成**
 
-- 海洋地壳年龄
-- 海洋-海洋俯冲方向
-- 海沟 / 岛弧两侧差异
-- 有宽度的造山 / 裂谷 / 洋中脊影响带
-
 ### Phase 1.3 — 板块边界自然化
-
 状态：**完成第一版**
-
-- 去除明显 Voronoi 多边形感
-- 更自然的边界形状
 
 ### Phase 1.4 — 地壳与构造参数深化
-
 状态：**完成第一版**
-
-- 大陆地壳厚度
-- 板块相对运动强度
-- 海洋地壳年龄
-- Tectonic Intensity
-- 动态构造带宽度 / 幅度
 
 ### Phase 1.5 — 基础高程场
-
 状态：**完成第一版**
 
-输出：
-
-- Continental Interior
-- Continental Shelf
-- Continental Slope
-- Ocean Basin
-- Collision Mountain Belt
-- Plateau
-- Trench
-- Island Arc
-- Mid-Ocean Ridge
-- Rift Valley
-
 ### Phase 1.6 — Phase 1 验收
-
 状态：**当前**
 
-### Phase 1 验收
+验收重点：
 
 - 大陆不是随机噪声斑块。
 - 大陆和板块不等价。
-- 主要山脉、海沟、裂谷有明确构造成因。
+- 山系、海沟、裂谷有明确构造成因。
 - 主大陆与外围海洋留有缓冲。
 - 同 Seed / 同配置完全可复现。
+- 多 Seed 结果具有差异，但不出现系统性异常。
+- 宏观高程可以作为后续气候模型稳定输入。
 
 ## Phase 2 — 气候骨架
 
@@ -91,18 +52,21 @@
 输入：
 
 - 纬度
-- 海拔
+- 宏观海拔
 - 海陆分布
-- 盛行风
+- 海洋距离
+- 大尺度日照差异
 
-输出：
+主要输出：
 
 - Temperature
-- Pressure / Wind
+- Pressure
+- Prevailing Wind
+- Sea Surface Temperature
 - Ocean Current
 - Precipitation
 
-先追求大尺度正确，不追求真实气象 CFD。
+目标是大尺度合理，不做完整气象 CFD。
 
 ## Phase 3 — 季风与水文
 
@@ -118,8 +82,45 @@
 - 流域
 - 河流
 - 湖泊
+- 湿地倾向
 
-## Phase 4 — 生态与 Minecraft 映射
+输出稳定的长期水文骨架。
+
+## Phase 4 — 侵蚀、Relief 与地貌细化
+
+状态：未开始
+
+这一阶段才正式形成：
+
+- 丘陵
+- 山麓
+- 河谷
+- 峡谷
+- 起伏平原
+- 台地
+- 冲积平原
+- 山前冲积扇
+
+核心字段：
+
+- Elevation：整体海拔
+- Relief：区域起伏强度
+- Erosion：侵蚀结果
+
+丘陵不由独立随机噪声决定，而由：
+
+```text
+构造背景
++ 距主山系距离
++ 河流切割
++ 降水
++ 地形年龄
++ 岩性 / 抗侵蚀近似
+→ Relief
+→ 丘陵 / 山麓 / 河谷等
+```
+
+## Phase 5 — 生态与 Minecraft 地貌映射
 
 状态：未开始
 
@@ -130,8 +131,11 @@
 - Minecraft Biome
 - Surface Material
 - Vegetation Profile
+- Terrain Profile
 
-## Phase 5 — Generator MVP
+Biome 表示长期生态，不直接代表瞬时天气。
+
+## Phase 6 — Generator MVP
 
 状态：未开始
 
@@ -141,11 +145,12 @@
 - 参数配置
 - 分阶段生成
 - 图层查看
-- 导出世界模型
+- 多 Seed 对比
+- 导出 World Model
 - 导出 PNG / Heightmap
 - Minecraft 世界预生成
 
-## Phase 6 — Runtime MVP
+## Phase 7 — Runtime MVP
 
 状态：未开始
 
@@ -156,10 +161,29 @@
 - 创建世界时可选 GeoWorld
 - 保存世界级 GeoWorld 配置
 - 加载同一 World Model
-- 按 Chunk 生成
+- 按世界坐标连续采样地形
+- 按 Chunk 放置方块
 - Infinite Storm Ocean
 - Infinite Frozen Ocean
 - GeoWorld API
+
+## 最终地形连续性原则
+
+最终 Minecraft 地形不以 Chunk 为生成数学边界。
+
+```text
+height = H(worldX, worldZ)
+```
+
+Chunk 只负责查询该函数覆盖的 16×16 世界坐标。
+
+地形建议分为：
+
+1. Macro Terrain：大陆、山系、海盆。
+2. Regional Terrain：丘陵、山麓、支脉、河谷。
+3. Local Terrain：小尺度粗糙度、岩壁、沟壑。
+
+不同地貌之间使用连续权重混合，不允许硬切换。
 
 ## 暂不进入 V1
 

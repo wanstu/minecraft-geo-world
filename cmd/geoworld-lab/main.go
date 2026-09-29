@@ -38,6 +38,9 @@ func main() {
 	minTectonicIntensity, maxTectonicIntensity := 1.0, 0.0
 	minElevation, maxElevation := 1.0, 0.0
 	zoneCounts := map[phase1.MacroTerrain]int{}
+	saturatedElevation := 0
+	saturatedTectonics := 0
+	tectonicCells := 0
 
 	for i, c := range world.Crust {
 		if world.RawPlateID[i] != world.PlateID[i] {
@@ -52,6 +55,10 @@ func main() {
 			}
 		}
 		if world.Feature[i] != phase1.NoFeature {
+			tectonicCells++
+			if world.TectonicIntensity[i] >= 0.999 {
+				saturatedTectonics++
+			}
 			if world.TectonicIntensity[i] < minTectonicIntensity {
 				minTectonicIntensity = world.TectonicIntensity[i]
 			}
@@ -76,6 +83,9 @@ func main() {
 		}
 		if world.Elevation[i] > maxElevation {
 			maxElevation = world.Elevation[i]
+		}
+		if world.Elevation[i] >= 0.999 {
+			saturatedElevation++
 		}
 		zoneCounts[world.TerrainZone[i]]++
 	}
@@ -105,6 +115,14 @@ func main() {
 		float64(zoneCounts[phase1.IslandArcZone])/total*100,
 		float64(zoneCounts[phase1.MidOceanRidgeZone])/total*100,
 		float64(zoneCounts[phase1.RiftValleyZone])/total*100,
+	)
+	tectonicSatPct := 0.0
+	if tectonicCells > 0 {
+		tectonicSatPct = float64(saturatedTectonics) / float64(tectonicCells) * 100
+	}
+	fmt.Printf("saturation elevation=%.3f%% tectonic-intensity=%.3f%% feature-cells\n",
+		float64(saturatedElevation)/total*100,
+		tectonicSatPct,
 	)
 	fmt.Printf("output=%s\n", *out)
 }
