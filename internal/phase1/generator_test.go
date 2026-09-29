@@ -311,14 +311,14 @@ func TestMultipleSeedsPhase1Invariants(t *testing.T) {
 			t.Fatalf("seed %d ocean fraction %.4f, want %.4f", seed, gotOcean, cfg.OceanFraction)
 		}
 
-		for x := 0; x < cfg.Width; x++ {
-			if w.Crust[w.index(x, 0)] != Oceanic || w.Crust[w.index(x, cfg.Height-1)] != Oceanic {
-				t.Fatalf("seed %d has land touching north/south simulation edge", seed)
-			}
-		}
+		buffer := edgeOceanBufferCells(w.Config)
 		for y := 0; y < cfg.Height; y++ {
-			if w.Crust[w.index(0, y)] != Oceanic || w.Crust[w.index(cfg.Width-1, y)] != Oceanic {
-				t.Fatalf("seed %d has land touching east/west simulation edge", seed)
+			for x := 0; x < cfg.Width; x++ {
+				if x < buffer || y < buffer || x >= cfg.Width-buffer || y >= cfg.Height-buffer {
+					if w.Crust[w.index(x, y)] != Oceanic {
+						t.Fatalf("seed %d has land inside %d-cell edge ocean buffer at %d,%d", seed, buffer, x, y)
+					}
+				}
 			}
 		}
 	}

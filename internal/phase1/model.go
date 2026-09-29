@@ -58,11 +58,12 @@ type Plate struct {
 }
 
 type Config struct {
-	Seed          int64
-	Width         int
-	Height        int
-	PlateCount    int
-	OceanFraction float64
+	Seed                    int64
+	Width                   int
+	Height                  int
+	PlateCount              int
+	OceanFraction           float64
+	EdgeOceanBufferFraction float64
 }
 
 type World struct {

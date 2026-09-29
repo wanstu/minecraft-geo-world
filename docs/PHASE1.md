@@ -422,3 +422,33 @@ Final Macro Elevation
 - TectonicIntensity >= 0.999 的构造源 Cell 不允许超过 20%。
 
 这些阈值目前只是防止算法失控，不代表最终地貌调参目标。
+
+
+### Phase 1 最终收口
+
+新增 `cmd/geoworld-audit` 批量验收。
+
+64 Seed / 320 × 200 宏观网格结果：
+
+```text
+land edge buffer cells   min 8.000   avg 17.438   max 40.000
+mountain %               2.097       5.761        8.930
+plateau %                0.000       0.747        1.697
+trench %                 1.202       2.333        3.891
+ridge %                  2.830       6.675       10.984
+rift %                   1.134       4.091        7.587
+elevation saturation %   0.000       0.223        0.869
+tectonic saturation %    0.000       2.062        8.855
+```
+
+审计期间发现一个 Seed 的大陆会触碰模拟区边界。
+
+修复方式：
+
+- 新增 `EdgeOceanBufferFraction`。
+- 默认 4% 的最短边尺寸作为硬海洋缓冲区。
+- 大陆候选只允许出现在缓冲区内侧。
+- 仍按全图 Cell 数精确选取大陆数量，所以目标海洋覆盖率保持不变。
+- 软海洋偏置继续保留，用于避免大陆沿 guard band 形成矩形切边。
+
+Phase 1 至此正式完成。

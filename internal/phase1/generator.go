@@ -30,6 +30,9 @@ func Generate(cfg Config) *World {
 	if cfg.OceanFraction <= 0 || cfg.OceanFraction >= 1 {
 		cfg.OceanFraction = 0.68
 	}
+	if cfg.EdgeOceanBufferFraction <= 0 || cfg.EdgeOceanBufferFraction >= 0.20 {
+		cfg.EdgeOceanBufferFraction = 0.04
+	}
 
 	r := rand.New(rand.NewPCG(uint64(cfg.Seed), uint64(cfg.Seed)^0x9e3779b97f4a7c15))
 	plates := make([]Plate, cfg.PlateCount)
@@ -135,6 +138,11 @@ func warpedPlatePoint(x, y float64, cfg Config) (float64, float64) {
 }
 
 func (w *World) generateCrust(r *rand.Rand) {
+	type landCandidate struct {
+		index     int
+		potential float64
+	}
+
 	seedCount := maxInt(4, w.Config.PlateCount/3)
 	seeds := make([]continentSeed, seedCount)
 	width := float64(w.Config.Width)
@@ -154,6 +162,9 @@ func (w *World) generateCrust(r *rand.Rand) {
 		}
 	}
 
+	bufferCells := edgeOceanBufferCells(w.Config)
+	candidates := make([]landCandidate, 0, w.Config.Width*w.Config.Height)
+
 	for y := 0; y < w.Config.Height; y++ {
 		for x := 0; x < w.Config.Width; x++ {
 			fx, fy := float64(x), float64(y)
@@ -169,7 +180,8 @@ func (w *World) generateCrust(r *rand.Rand) {
 			potential += math.Cos(fy*0.037-float64(w.Config.Seed%271)) * 0.08
 			potential += math.Sin((fx+fy)*0.019) * 0.05
 
-			// 主地理区外围强制偏向海洋，为未来风暴洋 / 冰冻洋留缓冲。
+			// 即使硬缓冲区已经保证外围是海洋，靠近缓冲区的区域仍给予
+			// 连续海洋偏置，避免大陆像被矩形刀切断一样贴着 guard band 生长。
 			dxEdge := math.Min(fx, width-1-fx) / width
 			dyEdge := math.Min(fy, height-1-fy) / height
 			edge := math.Min(dxEdge, dyEdge)
@@ -177,23 +189,39 @@ func (w *World) generateCrust(r *rand.Rand) {
 				potential -= (0.12 - edge) * 8.0
 			}
 
-			w.LandPotential[w.index(x, y)] = potential
-		}
-	}
-
-	values := append([]float64(nil), w.LandPotential...)
-	sort.Float64s(values)
-	landCount := int(math.Round(float64(len(values)) * (1 - w.Config.OceanFraction)))
-	landCount = clampInt(landCount, 1, len(values)-1)
-	threshold := values[len(values)-landCount]
-
-	for i, p := range w.LandPotential {
-		if p >= threshold {
-			w.Crust[i] = Continental
-		} else {
+			i := w.index(x, y)
+			w.LandPotential[i] = potential
 			w.Crust[i] = Oceanic
+
+			if x >= bufferCells && y >= bufferCells &&
+				x < w.Config.Width-bufferCells &&
+				y < w.Config.Height-bufferCells {
+				candidates = append(candidates, landCandidate{index: i, potential: potential})
+			}
 		}
 	}
+
+	landCount := int(math.Round(float64(len(w.Crust)) * (1 - w.Config.OceanFraction)))
+	landCount = clampInt(landCount, 1, len(candidates))
+
+	// 只从 guard band 内侧挑选恰好 landCount 个大陆 Cell。
+	// 这样外围海洋缓冲是硬约束，同时全图海洋覆盖率仍能精确命中目标。
+	sort.Slice(candidates, func(i, j int) bool {
+		if candidates[i].potential == candidates[j].potential {
+			return candidates[i].index < candidates[j].index
+		}
+		return candidates[i].potential > candidates[j].potential
+	})
+
+	for i := 0; i < landCount; i++ {
+		w.Crust[candidates[i].index] = Continental
+	}
+}
+
+func edgeOceanBufferCells(cfg Config) int {
+	minSize := minInt(cfg.Width, cfg.Height)
+	cells := int(math.Round(float64(minSize) * cfg.EdgeOceanBufferFraction))
+	return clampInt(cells, 2, maxInt(2, minSize/5))
 }
 
 // computeCoastDistance 计算到最近海岸的有符号 Cell 距离。
@@ -791,6 +819,13 @@ func clampInt(v, lo, hi int) int {
 		return hi
 	}
 	return v
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func maxInt(a, b int) int {
