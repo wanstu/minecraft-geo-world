@@ -3,6 +3,8 @@ package climate
 import (
 	"errors"
 	"math"
+
+	"geoworld/internal/world"
 )
 
 func Generate(input Input, cfg Config) (*Model, error) {
@@ -138,7 +140,7 @@ func normalizeConfig(cfg Config) Config {
 		cfg.ElevationCurvePower = 1.70
 	}
 	if cfg.SeaLevelNormalized <= 0 || cfg.SeaLevelNormalized >= 1 {
-		cfg.SeaLevelNormalized = 0.5
+		cfg.SeaLevelNormalized = world.DefaultSeaLevelNormalized
 	}
 	if cfg.OceanCurrentDeflectionDeg <= 0 || cfg.OceanCurrentDeflectionDeg > 60 {
 		cfg.OceanCurrentDeflectionDeg = 25

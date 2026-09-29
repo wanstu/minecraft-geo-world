@@ -1,5 +1,7 @@
 package phase1
 
+import "geoworld/internal/world"
+
 type CrustType uint8
 
 const (
@@ -58,15 +60,18 @@ type Plate struct {
 }
 
 type Config struct {
-	Seed                    int64
-	Width                   int
-	Height                  int
-	PlateCount              int
+	Seed       int64
+	Width      int
+	Height     int
+	PlateCount int
+	// OceanFraction currently controls oceanic crust area, not inundated ocean area.
 	OceanFraction           float64
 	EdgeOceanBufferFraction float64
 }
 
 type World struct {
+	// Surface is derived from elevation and ocean connectivity, never crust type.
+	Surface           *world.Surface
 	Config            Config
 	Plates            []Plate
 	RawPlateID        []int

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"math"
 	"sort"
+
+	"geoworld/internal/world"
 )
 
 type floodItem struct {
@@ -97,7 +99,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 
 func normalizeConfig(cfg Config) Config {
 	if cfg.SeaLevelNormalized <= 0 || cfg.SeaLevelNormalized >= 1 {
-		cfg.SeaLevelNormalized = 0.5
+		cfg.SeaLevelNormalized = world.DefaultSeaLevelNormalized
 	}
 	if cfg.FillEpsilon <= 0 || cfg.FillEpsilon > 0.01 {
 		cfg.FillEpsilon = 1e-5

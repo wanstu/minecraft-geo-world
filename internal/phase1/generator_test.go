@@ -35,7 +35,7 @@ func TestGenerateDeterministic(t *testing.T) {
 	}
 }
 
-func TestOceanAreaMatchesTarget(t *testing.T) {
+func TestOceanicCrustAreaMatchesTarget(t *testing.T) {
 	cfg := testConfig()
 	w := Generate(cfg)
 	ocean := 0

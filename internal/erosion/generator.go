@@ -3,6 +3,8 @@ package erosion
 import (
 	"errors"
 	"math"
+
+	"geoworld/internal/world"
 )
 
 func Generate(input Input, cfg Config) (*Model, error) {
@@ -60,7 +62,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 
 func normalizeConfig(cfg Config, width, height int) Config {
 	if cfg.SeaLevelNormalized <= 0 || cfg.SeaLevelNormalized >= 1 {
-		cfg.SeaLevelNormalized = 0.5
+		cfg.SeaLevelNormalized = world.DefaultSeaLevelNormalized
 	}
 	if cfg.ReferencePrecipMM <= 0 {
 		cfg.ReferencePrecipMM = 1800

@@ -46,7 +46,7 @@ GeoWorld 只在中央有限区域生成完整地理世界：
 
 ## 当前阶段
 
-当前 Core 的板块、气候、水文、侵蚀、连续地形、生态与 Minecraft 生成 Profile 已完成算法第一版。正在进入 Phase 6：统一世界尺度与海陆语义，补齐最终地形/水体/生态一致性，建立真实生成和保存/重开入口。首次单 Loader 游戏验证提前到完整 UI 和批量导出之前。
+当前 Core 的板块、气候、水文、侵蚀、连续地形、生态与 Minecraft 生成 Profile 已完成算法第一版。Phase 6.1a 已完成坐标契约与宏观海陆语义分离；接下来迁移旧算法的空间尺度，补齐最终地形/水体/生态一致性，再建立真实生成和保存/重开入口。首次单 Loader 游戏验证提前到完整 UI 和批量导出之前。
 
 原型入口：
 
@@ -98,3 +98,13 @@ Windows 可直接双击：
 - `prototype/mcprofile.html`：Minecraft 群系家族 / 地形形态 / 地表 / 植被 Profile
 
 所有 CSS 与生成图片均使用相对路径，可通过 `file://` 直接加载。
+
+## 当前算法验收
+
+```text
+go test ./... -count=1
+go run ./cmd/geoworld-mcprofile-audit -count 4
+go run ./cmd/geoworld-consistency-audit
+```
+
+一致性审计会区分已通过的宏观约束与仍待实现的最终海岸/河床约束。当前加上 -strict-final 应失败，原因和指标见 docs/PHASE6.md。prototype/generated 是先前实验的静态快照；本轮未批量覆盖历史图片，当前输出以审计为准。

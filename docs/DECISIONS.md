@@ -881,7 +881,7 @@ Alluvial Plain
 
 ## D-030：地壳、实际海陆与水体必须分离
 
-状态：已确定，Phase 6.1a 开始实现
+状态：宏观第一版已实现并接入；最终连续海岸/水体尚待 6.2
 
 Continental/Oceanic 是构造基底；LandMask 是某一地形阶段的实际非海洋范围；湖泊/河流另有水体身份。不能由 crust == Continental 重建 LandMask。
 
@@ -891,7 +891,7 @@ Phase 1 的 OceanFraction 当前控制 Oceanic 地壳面积。修正后须分别
 
 ## D-031：世界范围与计算精度分离
 
-状态：已确定，Phase 6.1 开始实现
+状态：GridGeometry 与旧采样器校验已实现；旧算法参数迁移待 6.1b
 
 世界范围与原点使用 Minecraft blocks；网格 Width/Height 表示节点数。节点间距 = 范围长度 / (节点数 - 1)。物理米制海拔、归一化地形控制值和 Minecraft Y 必须显式转换，不混用。
 

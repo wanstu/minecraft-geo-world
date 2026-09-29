@@ -14,7 +14,7 @@ func main() {
 	width := flag.Int("width", 640, "macro grid width")
 	height := flag.Int("height", 400, "macro grid height")
 	plates := flag.Int("plates", 18, "plate count")
-	ocean := flag.Float64("ocean", 0.68, "target ocean area fraction")
+	ocean := flag.Float64("ocean", 0.68, "target oceanic crust fraction (actual ocean is measured separately)")
 	out := flag.String("out", "prototype/generated", "output directory")
 	flag.Parse()
 
@@ -31,6 +31,12 @@ func main() {
 	}
 
 	oceanCells := 0
+	actualOceanCells := 0
+	for _, land := range world.Surface.LandMask {
+		if !land {
+			actualOceanCells++
+		}
+	}
 	warpedCells := 0
 	influenced := 0
 	minAge, maxAge := 1.0, 0.0
@@ -96,8 +102,9 @@ func main() {
 	warpPct := float64(warpedCells) / total * 100
 
 	fmt.Printf("GeoWorld Phase 1 Lab\n")
-	fmt.Printf("seed=%d grid=%dx%d plates=%d ocean-area=%.2f%%\n",
+	fmt.Printf("seed=%d grid=%dx%d plates=%d oceanic-crust=%.2f%%\n",
 		cfg.Seed, cfg.Width, cfg.Height, len(world.Plates), oceanPct)
+	fmt.Printf("actual-macro-ocean=%.2f%%\n", float64(actualOceanCells)/total*100)
 	fmt.Printf("plate-warp=%.2f%% cells ocean-age=%.3f..%.3f tectonic-influence=%.2f%% cells\n",
 		warpPct, minAge, maxAge, influencePct)
 	fmt.Printf("continental-thickness=%.3f..%.3f tectonic-intensity=%.3f..%.3f\n",

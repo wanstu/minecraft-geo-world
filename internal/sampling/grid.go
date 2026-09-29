@@ -3,6 +3,8 @@ package sampling
 import (
 	"errors"
 	"math"
+
+	"geoworld/internal/world"
 )
 
 // ScalarGrid represents a continuous scalar field backed by a regular macro grid.
@@ -24,24 +26,35 @@ type ScalarGrid struct {
 }
 
 func NewScalarGrid(width, height int, cellSize, originX, originZ float64, values []float64) (ScalarGrid, error) {
-	if width < 2 || height < 2 {
-		return ScalarGrid{}, errors.New("sampling: grid must be at least 2x2")
+	return NewScalarGridWithGeometry(world.GridGeometry{
+		Width: width, Height: height, OriginX: originX, OriginZ: originZ,
+		SpanXBlocks: float64(width-1) * cellSize, SpanZBlocks: float64(height-1) * cellSize,
+	}, values)
+}
+
+// NewScalarGridWithGeometry binds a physical extent to sampling resolution.
+// This legacy sampler intentionally rejects anisotropic spacing.
+func NewScalarGridWithGeometry(geometry world.GridGeometry, values []float64) (ScalarGrid, error) {
+	cellSize, err := geometry.SquareCellSize()
+	if err != nil {
+		return ScalarGrid{}, err
 	}
-	if cellSize <= 0 {
-		return ScalarGrid{}, errors.New("sampling: cell size must be positive")
+	n, err := world.NodeCount(geometry.Width, geometry.Height)
+	if err != nil {
+		return ScalarGrid{}, err
 	}
-	if len(values) != width*height {
+	if len(values) != n {
 		return ScalarGrid{}, errors.New("sampling: value count does not match grid dimensions")
 	}
-
-	copyValues := append([]float64(nil), values...)
+	for _, value := range values {
+		if math.IsNaN(value) || math.IsInf(value, 0) {
+			return ScalarGrid{}, errors.New("sampling: values must be finite")
+		}
+	}
 	return ScalarGrid{
-		Width:    width,
-		Height:   height,
-		CellSize: cellSize,
-		OriginX:  originX,
-		OriginZ:  originZ,
-		Values:   copyValues,
+		Width: geometry.Width, Height: geometry.Height, CellSize: cellSize,
+		OriginX: geometry.OriginX, OriginZ: geometry.OriginZ,
+		Values: append([]float64(nil), values...),
 	}, nil
 }
 

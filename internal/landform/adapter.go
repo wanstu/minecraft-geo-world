@@ -6,11 +6,7 @@ import (
 )
 
 func InputFromWorld(world *phase1.World, erosionModel *erosion.Model) Input {
-	n := world.Config.Width * world.Config.Height
-	land := make([]bool, n)
-	for i, crust := range world.Crust {
-		land[i] = crust == phase1.Continental
-	}
+	land := append([]bool(nil), erosionModel.LandMask...)
 
 	return Input{
 		Width:           world.Config.Width,

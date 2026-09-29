@@ -4,6 +4,8 @@ import (
 	"errors"
 	"math"
 	"sort"
+
+	"geoworld/internal/world"
 )
 
 func Generate(input Input, cfg Config) (*Model, error) {
@@ -72,7 +74,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 
 func normalizeConfig(cfg Config) Config {
 	if cfg.SeaLevelNormalized <= 0 || cfg.SeaLevelNormalized >= 1 {
-		cfg.SeaLevelNormalized = 0.5
+		cfg.SeaLevelNormalized = world.DefaultSeaLevelNormalized
 	}
 	if cfg.AccumulationScale <= 0 {
 		cfg.AccumulationScale = 8

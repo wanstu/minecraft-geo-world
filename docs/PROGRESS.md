@@ -795,3 +795,14 @@ Phase 5.1 后续目标：**Eco Region → Minecraft Biome / Surface / Vegetation
 Phase 5 完成第一版。
 
 下一步：**Phase 6.1 — 把当前算法模块串成正式 Generator Core / World Model，并开始真实参数驱动生成。**
+
+---
+
+## 2026-09-29 — 评审后基线与 Phase 6.1a
+
+- 4a5f685：Phase 5.2 及调整后的路线正式提交。
+- 开发分支：agent/world-model-foundation。
+- 完成统一坐标契约、宏观海陆连通判定与全链路共享；详见 PHASE6.md 的当前结果。
+- 全量测试、4 Seed Profile、2 Seed 宏观一致性审计通过。
+- 最终连续海岸和河网逆坡仍未解决，未将其标成已完成。
+- 下一步：6.1b 旧空间参数迁移。

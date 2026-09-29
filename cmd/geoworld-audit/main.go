@@ -38,7 +38,7 @@ func main() {
 	width := flag.Int("width", 320, "macro grid width")
 	height := flag.Int("height", 200, "macro grid height")
 	plates := flag.Int("plates", 18, "plate count")
-	ocean := flag.Float64("ocean", 0.68, "target ocean fraction")
+	ocean := flag.Float64("ocean", 0.68, "target oceanic crust fraction")
 	flag.Parse()
 
 	var edgeBuffer rangeStat
@@ -111,7 +111,7 @@ func main() {
 	}
 
 	fmt.Printf("GeoWorld Phase 1 audit: seeds=%d grid=%dx%d\n", *count, *width, *height)
-	printStat("land edge buffer cells", edgeBuffer)
+	printStat("continental crust edge buffer cells", edgeBuffer)
 	printStat("mountain %%", mountains)
 	printStat("plateau %%", plateau)
 	printStat("trench %%", trench)

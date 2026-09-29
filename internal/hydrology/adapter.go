@@ -7,10 +7,7 @@ import (
 
 func InputFromWorld(world *phase1.World, climateModel *climate.Model) Input {
 	n := world.Config.Width * world.Config.Height
-	land := make([]bool, n)
-	for i, crust := range world.Crust {
-		land[i] = crust == phase1.Continental
-	}
+	land := append([]bool(nil), climateModel.LandMask...)
 
 	precip := climateModel.SeasonalAnnualPrecipMM
 	if len(precip) != n {

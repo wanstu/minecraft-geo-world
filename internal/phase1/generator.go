@@ -4,6 +4,8 @@ import (
 	"math"
 	"math/rand/v2"
 	"sort"
+
+	"geoworld/internal/world"
 )
 
 type continentSeed struct {
@@ -95,6 +97,13 @@ func Generate(cfg Config) *World {
 	w.computeBaseElevation()
 	w.classifyMacroTerrain()
 	w.computeElevation()
+	// All downstream stages share this macro surface. Final continuous terrain
+	// requires a separate coastline/water reconciliation in Phase 6.2.
+	surface, err := world.ClassifySurface(cfg.Width, cfg.Height, w.Elevation, world.DefaultSeaLevelNormalized)
+	if err != nil {
+		panic(err) // Generate's legacy API cannot return errors; generated heights must satisfy this contract.
+	}
+	w.Surface = surface
 	return w
 }
 
