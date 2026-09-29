@@ -41,6 +41,10 @@ func main() {
 	maxPressure := math.Inf(-1)
 	minWind := math.Inf(1)
 	maxWind := math.Inf(-1)
+	minSST := math.Inf(1)
+	maxSST := math.Inf(-1)
+	minCurrent := math.Inf(1)
+	maxCurrent := math.Inf(-1)
 	landSum, oceanSum := 0.0, 0.0
 	landN, oceanN := 0, 0
 	for i, temp := range model.AnnualMeanTempC {
@@ -69,10 +73,23 @@ func main() {
 		} else {
 			oceanSum += temp
 			oceanN++
+			if model.SeaSurfaceTempC[i] < minSST {
+				minSST = model.SeaSurfaceTempC[i]
+			}
+			if model.SeaSurfaceTempC[i] > maxSST {
+				maxSST = model.SeaSurfaceTempC[i]
+			}
+			current := math.Hypot(model.CurrentX[i], model.CurrentZ[i])
+			if current < minCurrent {
+				minCurrent = current
+			}
+			if current > maxCurrent {
+				maxCurrent = current
+			}
 		}
 	}
 
-	fmt.Printf("GeoWorld Phase 2.2 Climate Lab\n")
+	fmt.Printf("GeoWorld Phase 2.3 Climate Lab\n")
 	fmt.Printf("seed=%d grid=%dx%d latitude=±%.1f°\n", *seed, *width, *height, model.Config.MaxLatitudeDeg)
 	fmt.Printf("annual-temp=%.2f..%.2f C land-avg=%.2f C ocean-avg=%.2f C\n",
 		minTemp, maxTemp, landSum/float64(landN), oceanSum/float64(oceanN))
@@ -80,5 +97,7 @@ func main() {
 		model.Config.EquatorTempC, model.Config.PolarTempC, model.Config.LapseRateCPerKm, model.Config.MaxLandElevationM)
 	fmt.Printf("pressure-index=%.3f..%.3f wind-magnitude=%.3f..%.3f\n",
 		minPressure, maxPressure, minWind, maxWind)
+	fmt.Printf("sst=%.2f..%.2f C current-magnitude=%.3f..%.3f\n",
+		minSST, maxSST, minCurrent, maxCurrent)
 	fmt.Printf("output=%s\n", *out)
 }

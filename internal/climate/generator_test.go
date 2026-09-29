@@ -190,3 +190,110 @@ func TestWindTransitionsAreContinuous(t *testing.T) {
 		}
 	}
 }
+
+func TestSurfaceCurrentCoriolisDeflectsOppositeByHemisphere(t *testing.T) {
+	cfg := normalizeConfig(Config{})
+	nx, nz := surfaceCurrentFromWind(1, 0, 45, cfg)
+	sx, sz := surfaceCurrentFromWind(1, 0, -45, cfg)
+
+	if !(nx > 0 && nz > 0) {
+		t.Fatalf("NH current should deflect right/down in x-z coordinates: %.3f %.3f", nx, nz)
+	}
+	if !(sx > 0 && sz < 0) {
+		t.Fatalf("SH current should deflect left/up in x-z coordinates: %.3f %.3f", sx, sz)
+	}
+	if math.Abs(nx-sx) > 1e-12 || math.Abs(nz+sz) > 1e-12 {
+		t.Fatalf("hemisphere current deflection is not mirrored")
+	}
+}
+
+func TestLandCellsHaveNoOceanCurrent(t *testing.T) {
+	input := Input{
+		Width:     4,
+		Height:    4,
+		Elevation: make([]float64, 16),
+		LandMask: []bool{
+			false, false, false, false,
+			false, true, true, false,
+			false, true, true, false,
+			false, false, false, false,
+		},
+	}
+	m, err := Generate(input, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, land := range input.LandMask {
+		if land && (m.CurrentX[i] != 0 || m.CurrentZ[i] != 0) {
+			t.Fatalf("land cell %d has ocean current %.4f %.4f", i, m.CurrentX[i], m.CurrentZ[i])
+		}
+	}
+}
+
+func TestCoastRemovesOnshoreCurrentComponent(t *testing.T) {
+	input := Input{
+		Width:     5,
+		Height:    5,
+		Elevation: make([]float64, 25),
+		LandMask:  make([]bool, 25),
+	}
+	// East-side wall. Row 1 is ~41°N and has a westerly background,
+	// so without coastal blocking the current has a strong +X component.
+	for y := 0; y < input.Height; y++ {
+		input.LandMask[y*input.Width+3] = true
+		input.LandMask[y*input.Width+4] = true
+	}
+
+	m, err := Generate(input, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	i := 1*input.Width + 2
+	if m.CurrentX[i] > 1e-9 {
+		t.Fatalf("coastal current still points into east-side land: x=%.6f z=%.6f", m.CurrentX[i], m.CurrentZ[i])
+	}
+}
+
+func TestSeaSurfaceTemperatureStaysBounded(t *testing.T) {
+	input := Input{
+		Width:     12,
+		Height:    12,
+		Elevation: make([]float64, 144),
+		LandMask:  make([]bool, 144),
+	}
+	m, err := Generate(input, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i, temp := range m.SeaSurfaceTempC {
+		if temp < -1.800001 || temp > 30.000001 {
+			t.Fatalf("SST out of bounds at %d: %.4f", i, temp)
+		}
+	}
+}
+
+func TestSeaSurfaceTransportChangesLatitudeBaseline(t *testing.T) {
+	input := Input{
+		Width:     24,
+		Height:    24,
+		Elevation: make([]float64, 576),
+		LandMask:  make([]bool, 576),
+	}
+	m, err := Generate(input, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	changed := 0
+	for i, temp := range m.SeaSurfaceTempC {
+		baseline := clamp(m.LatitudeBaseTempC[i]+1.2, -1.8, 30)
+		if math.Abs(temp-baseline) > 1e-3 {
+			changed++
+		}
+	}
+	if changed == 0 {
+		t.Fatal("surface current transport did not modify SST anywhere")
+	}
+}

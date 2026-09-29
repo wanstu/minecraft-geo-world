@@ -8,7 +8,7 @@
 
 **Phase 2 — 气候骨架**
 
-当前子阶段：**Phase 2.3 — 海表温度与表层洋流（准备开始）**
+当前子阶段：**Phase 2.4 — 海洋对陆地温度修正（准备开始）**
 
 ## 当前稳定基线
 
@@ -262,3 +262,25 @@ Latitude
 - Wind Magnitude：0.048 ～ 0.956
 
 下一步：**Phase 2.3 — Sea Surface Temperature + Wind-driven Ocean Current**。
+
+
+## Phase 2.3 — 海表温度与表层洋流
+
+状态：**完成第一版**
+
+已实现：
+
+- SST 纬度背景。
+- 海水冻结点下限。
+- 风驱表层流。
+- 南北半球 Coriolis 相反偏转。
+- 海岸阻挡与沿岸偏转。
+- SST 平流 / 扩散 / 背景松弛。
+- 陆地洋流严格为 0。
+
+当前测试 Seed：
+
+- SST：-1.80°C ～ 29.14°C
+- Current Magnitude：0.001 ～ 0.593
+
+下一步：**Phase 2.4 — Ocean-to-Land Temperature Correction**。

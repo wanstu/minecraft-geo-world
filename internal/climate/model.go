@@ -1,12 +1,17 @@
 package climate
 
 type Config struct {
-	MaxLatitudeDeg     float64
-	EquatorTempC       float64
-	PolarTempC         float64
-	LapseRateCPerKm    float64
-	MaxLandElevationM  float64
-	SeaLevelNormalized float64
+	MaxLatitudeDeg            float64
+	EquatorTempC              float64
+	PolarTempC                float64
+	LapseRateCPerKm           float64
+	MaxLandElevationM         float64
+	SeaLevelNormalized        float64
+	OceanCurrentDeflectionDeg float64
+	OceanCurrentWindScale     float64
+	SSTTransportIterations    int
+	SSTAdvection              float64
+	SSTDiffusion              float64
 }
 
 type Input struct {
@@ -20,6 +25,7 @@ type Model struct {
 	Config            Config
 	Width             int
 	Height            int
+	LandMask          []bool
 	LatitudeDeg       []float64
 	LatitudeBaseTempC []float64
 	LandElevationM    []float64
@@ -27,4 +33,7 @@ type Model struct {
 	PressureIndex     []float64
 	WindX             []float64
 	WindZ             []float64
+	SeaSurfaceTempC   []float64
+	CurrentX          []float64
+	CurrentZ          []float64
 }

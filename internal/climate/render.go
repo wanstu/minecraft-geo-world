@@ -39,6 +39,12 @@ func RenderAll(m *Model, outDir string) error {
 		{"pressure.png", func(i int) color.RGBA {
 			return pressureColor(m.PressureIndex[i])
 		}},
+		{"sst.png", func(i int) color.RGBA {
+			if m.LandMask[i] {
+				return color.RGBA{58, 64, 59, 255}
+			}
+			return temperatureColor(m.SeaSurfaceTempC[i])
+		}},
 	}
 
 	for _, r := range renderers {
@@ -46,7 +52,10 @@ func RenderAll(m *Model, outDir string) error {
 			return err
 		}
 	}
-	return renderWind(filepath.Join(outDir, "wind.png"), m)
+	if err := renderWind(filepath.Join(outDir, "wind.png"), m); err != nil {
+		return err
+	}
+	return renderOceanCurrent(filepath.Join(outDir, "ocean-current.png"), m)
 }
 
 func temperatureColor(tempC float64) color.RGBA {
@@ -198,4 +207,54 @@ func absInt(v int) int {
 		return -v
 	}
 	return v
+}
+
+func renderOceanCurrent(path string, m *Model) error {
+	img := image.NewRGBA(image.Rect(0, 0, m.Width, m.Height))
+	for y := 0; y < m.Height; y++ {
+		for x := 0; x < m.Width; x++ {
+			i := y*m.Width + x
+			if m.LandMask[i] {
+				img.SetRGBA(x, y, color.RGBA{45, 49, 44, 255})
+				continue
+			}
+			bg := temperatureColor(m.SeaSurfaceTempC[i])
+			img.SetRGBA(x, y, color.RGBA{
+				R: uint8(float64(bg.R) * 0.58),
+				G: uint8(float64(bg.G) * 0.58),
+				B: uint8(float64(bg.B) * 0.58),
+				A: 255,
+			})
+		}
+	}
+
+	step := maxInt(18, minInt(m.Width, m.Height)/16)
+	arrow := color.RGBA{238, 246, 248, 238}
+	for y := step / 2; y < m.Height; y += step {
+		for x := step / 2; x < m.Width; x += step {
+			i := y*m.Width + x
+			if m.LandMask[i] {
+				continue
+			}
+			cx, cz := m.CurrentX[i], m.CurrentZ[i]
+			mag := math.Hypot(cx, cz)
+			if mag < 1e-5 {
+				continue
+			}
+			dx, dz := cx/mag, cz/mag
+			length := float64(step) * 0.38 * clamp(mag, 0.25, 1)
+			x1 := int(math.Round(float64(x) + dx*length))
+			y1 := int(math.Round(float64(y) + dz*length))
+			drawLine(img, x, y, x1, y1, arrow)
+
+			angle := math.Atan2(dz, dx)
+			headLen := math.Max(3, float64(step)*0.12)
+			for _, offset := range []float64{0.55, -0.55} {
+				hx := int(math.Round(float64(x1) - math.Cos(angle+offset)*headLen))
+				hy := int(math.Round(float64(y1) - math.Sin(angle+offset)*headLen))
+				drawLine(img, x1, y1, hx, hy, arrow)
+			}
+		}
+	}
+	return writePNG(path, img)
 }

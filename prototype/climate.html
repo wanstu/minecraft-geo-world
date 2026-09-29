@@ -9,7 +9,7 @@
 @media(max-width:900px){.lab-grid{grid-template-columns:1fr}}
 </style></head><body>
 <div class="app"><header class="topbar"><a class="brand" href="index.html"><span>Geo</span>World Generator</a>
-<div class="badge">Phase 2.2 Lab</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
+<div class="badge">Phase 2.3 Lab</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
 <div class="shell">
 <aside class="sidebar"><div class="section"><h3>世界模型</h3>
 <a class="nav-item" href="generator.html">世界总览</a>
@@ -27,7 +27,7 @@
 <div class="kv"><span>直减率</span><span>6.5°C / km</span></div>
 </div></aside>
 <main class="main">
-<div class="toolbar"><div class="title">Phase 2.2 · 基础温度与全球环流</div><div class="badge">Latitude + Elevation → Temperature → Pressure / Wind</div></div>
+<div class="toolbar"><div class="title">Phase 2.3 · 温度、全球环流与表层洋流</div><div class="badge">Temperature → Pressure / Wind → SST / Ocean Current</div></div>
 <div class="note"><strong>当前只看温度骨架。</strong> 还没有加入洋流、季风、降水或实时天气。海洋格子的温度按海平面处理，不会因为海底很深而被错误降温。</div>
 <div class="lab-grid">
 <div class="lab-card"><header><strong>① 纬度</strong><small>北 → 赤道 → 南</small></header><img src="generated/climate/latitude.png" alt="latitude"></div>
@@ -36,6 +36,8 @@
 <div class="lab-card"><header><strong>④ 年平均温度</strong><small>纬度 + 陆地海拔</small></header><img src="generated/climate/temperature-annual.png" alt="annual temperature"></div>
 <div class="lab-card"><header><strong>⑤ 理想化气压带</strong><small>赤道低压 / 副热带高压 / 副极地低压 / 极地高压</small></header><img src="generated/climate/pressure.png" alt="pressure"></div>
 <div class="lab-card"><header><strong>⑥ 盛行风</strong><small>信风 / 西风带 / 极地东风</small></header><img src="generated/climate/wind.png" alt="wind"></div>
+<div class="lab-card"><header><strong>⑦ 海表温度 SST</strong><small>纬度基准 + 洋流热量输送</small></header><img src="generated/climate/sst.png" alt="sea surface temperature"></div>
+<div class="lab-card"><header><strong>⑧ 表层洋流</strong><small>风驱 + Coriolis + 海岸阻挡</small></header><img src="generated/climate/ocean-current.png" alt="ocean current"></div>
 </div></main>
 <aside class="inspector"><div class="section"><h3>当前结果</h3>
 <div class="metric"><strong>-37.84°C</strong><small>当前最低年均温</small></div>
@@ -43,6 +45,7 @@
 <div class="card"><div class="card-title">为什么高山更冷？</div><p>陆地按约 6.5°C / km 的垂直递减率降温。高纬高山会同时受到纬度和海拔两重降温。</p></div>
 <div class="card"><div class="card-title">为什么海沟不会变成超低温？</div><p>气候层使用海平面空气温度，海底深度只属于海洋地形，不作为空气海拔扣温。</p></div>
 <div class="card"><div class="card-title">全球环流已加入</div><p>当前已有赤道低压、副热带高压、副极地低压、极地高压，以及连续过渡的信风、西风带和极地东风。</p></div>
-<div class="card"><div class="card-title">下一步</div><p>建立海表温度和风驱表层洋流，让暖流 / 寒流开始反过来修正沿海温度。</p></div>
+<div class="card"><div class="card-title">表层洋流已加入</div><p>当前洋流由盛行风驱动，按半球进行 Coriolis 偏转；近岸会去除指向陆地的分量，转成沿岸流趋势。</p></div>
+<div class="card"><div class="card-title">下一步</div><p>让暖流 / 寒流通过海岸距离影响邻近陆地温度，再进入降水与雨影。</p></div>
 </div></aside>
 </div></div></body></html>

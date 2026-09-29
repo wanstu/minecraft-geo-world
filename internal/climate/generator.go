@@ -19,6 +19,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		Config:            cfg,
 		Width:             input.Width,
 		Height:            input.Height,
+		LandMask:          append([]bool(nil), input.LandMask...),
 		LatitudeDeg:       make([]float64, n),
 		LatitudeBaseTempC: make([]float64, n),
 		LandElevationM:    make([]float64, n),
@@ -26,6 +27,9 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		PressureIndex:     make([]float64, n),
 		WindX:             make([]float64, n),
 		WindZ:             make([]float64, n),
+		SeaSurfaceTempC:   make([]float64, n),
+		CurrentX:          make([]float64, n),
+		CurrentZ:          make([]float64, n),
 	}
 
 	maxLatRad := cfg.MaxLatitudeDeg * math.Pi / 180
@@ -67,6 +71,10 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		}
 	}
 
+	m.initializeOceanSurface()
+	m.computeSurfaceCurrents()
+	m.transportSeaSurfaceHeat()
+
 	return m, nil
 }
 
@@ -88,6 +96,21 @@ func normalizeConfig(cfg Config) Config {
 	}
 	if cfg.SeaLevelNormalized <= 0 || cfg.SeaLevelNormalized >= 1 {
 		cfg.SeaLevelNormalized = 0.5
+	}
+	if cfg.OceanCurrentDeflectionDeg <= 0 || cfg.OceanCurrentDeflectionDeg > 60 {
+		cfg.OceanCurrentDeflectionDeg = 25
+	}
+	if cfg.OceanCurrentWindScale <= 0 {
+		cfg.OceanCurrentWindScale = 0.62
+	}
+	if cfg.SSTTransportIterations <= 0 {
+		cfg.SSTTransportIterations = 24
+	}
+	if cfg.SSTAdvection <= 0 || cfg.SSTAdvection >= 0.5 {
+		cfg.SSTAdvection = 0.14
+	}
+	if cfg.SSTDiffusion <= 0 || cfg.SSTDiffusion >= 0.3 {
+		cfg.SSTDiffusion = 0.06
 	}
 	return cfg
 }
@@ -158,4 +181,160 @@ func smoothstep(edge0, edge1, x float64) float64 {
 
 func lerp(a, b, t float64) float64 {
 	return a + (b-a)*t
+}
+
+func (m *Model) initializeOceanSurface() {
+	for i := range m.SeaSurfaceTempC {
+		if m.LandMask[i] {
+			m.SeaSurfaceTempC[i] = 0
+			continue
+		}
+		// Ocean surface is slightly more thermally buffered than the idealized
+		// sea-level air field. Clamp at approximate seawater freezing.
+		m.SeaSurfaceTempC[i] = clamp(m.LatitudeBaseTempC[i]+1.2, -1.8, 30)
+	}
+}
+
+func (m *Model) computeSurfaceCurrents() {
+	for i := range m.CurrentX {
+		if m.LandMask[i] {
+			m.CurrentX[i] = 0
+			m.CurrentZ[i] = 0
+			continue
+		}
+		m.CurrentX[i], m.CurrentZ[i] = surfaceCurrentFromWind(
+			m.WindX[i],
+			m.WindZ[i],
+			m.LatitudeDeg[i],
+			m.Config,
+		)
+	}
+
+	// Remove the component that points directly into adjacent land.
+	// The remaining vector naturally tends to run along the coastline.
+	for y := 0; y < m.Height; y++ {
+		for x := 0; x < m.Width; x++ {
+			i := y*m.Width + x
+			if m.LandMask[i] {
+				continue
+			}
+
+			nx, nz := 0.0, 0.0
+			if x+1 < m.Width && m.LandMask[i+1] {
+				nx += 1
+			}
+			if x > 0 && m.LandMask[i-1] {
+				nx -= 1
+			}
+			if y+1 < m.Height && m.LandMask[i+m.Width] {
+				nz += 1
+			}
+			if y > 0 && m.LandMask[i-m.Width] {
+				nz -= 1
+			}
+
+			norm := math.Hypot(nx, nz)
+			if norm == 0 {
+				continue
+			}
+			nx /= norm
+			nz /= norm
+
+			dot := m.CurrentX[i]*nx + m.CurrentZ[i]*nz
+			if dot > 0 {
+				m.CurrentX[i] -= dot * nx
+				m.CurrentZ[i] -= dot * nz
+			}
+		}
+	}
+}
+
+func surfaceCurrentFromWind(windX, windZ, latitudeDeg float64, cfg Config) (float64, float64) {
+	if math.Abs(latitudeDeg) < 0.25 {
+		return windX * cfg.OceanCurrentWindScale, windZ * cfg.OceanCurrentWindScale
+	}
+
+	sign := 1.0
+	if latitudeDeg < 0 {
+		sign = -1
+	}
+	angle := cfg.OceanCurrentDeflectionDeg * math.Pi / 180 * sign
+	cosA, sinA := math.Cos(angle), math.Sin(angle)
+
+	x := windX*cosA - windZ*sinA
+	z := windX*sinA + windZ*cosA
+	return x * cfg.OceanCurrentWindScale, z * cfg.OceanCurrentWindScale
+}
+
+func (m *Model) transportSeaSurfaceHeat() {
+	prev := append([]float64(nil), m.SeaSurfaceTempC...)
+	next := make([]float64, len(prev))
+
+	const relaxation = 0.04
+	selfWeight := 1 - m.Config.SSTAdvection - m.Config.SSTDiffusion - relaxation
+	if selfWeight < 0.2 {
+		selfWeight = 0.2
+	}
+
+	dirs := [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+
+	for iter := 0; iter < m.Config.SSTTransportIterations; iter++ {
+		copy(next, prev)
+
+		for y := 0; y < m.Height; y++ {
+			for x := 0; x < m.Width; x++ {
+				i := y*m.Width + x
+				if m.LandMask[i] {
+					next[i] = 0
+					continue
+				}
+
+				self := prev[i]
+				advected := self
+
+				mag := math.Hypot(m.CurrentX[i], m.CurrentZ[i])
+				if mag > 1e-6 {
+					ux := m.CurrentX[i] / mag
+					uz := m.CurrentZ[i] / mag
+					sx := x - int(math.Round(ux))
+					sz := y - int(math.Round(uz))
+					if sx >= 0 && sx < m.Width && sz >= 0 && sz < m.Height {
+						si := sz*m.Width + sx
+						if !m.LandMask[si] {
+							advected = prev[si]
+						}
+					}
+				}
+
+				sum, count := 0.0, 0
+				for _, d := range dirs {
+					nx, nz := x+d[0], y+d[1]
+					if nx < 0 || nx >= m.Width || nz < 0 || nz >= m.Height {
+						continue
+					}
+					ni := nz*m.Width + nx
+					if m.LandMask[ni] {
+						continue
+					}
+					sum += prev[ni]
+					count++
+				}
+				diffused := self
+				if count > 0 {
+					diffused = sum / float64(count)
+				}
+
+				baseline := clamp(m.LatitudeBaseTempC[i]+1.2, -1.8, 30)
+				value := self*selfWeight +
+					advected*m.Config.SSTAdvection +
+					diffused*m.Config.SSTDiffusion +
+					baseline*relaxation
+
+				next[i] = clamp(value, -1.8, 30)
+			}
+		}
+		prev, next = next, prev
+	}
+
+	copy(m.SeaSurfaceTempC, prev)
 }
