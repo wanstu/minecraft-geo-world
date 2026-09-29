@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 
 	"geoworld/internal/phase1"
 )
@@ -30,15 +31,30 @@ func main() {
 	}
 
 	oceanCells := 0
-	for _, c := range world.Crust {
+	minAge := 1.0
+	maxAge := 0.0
+	influenced := 0
+	for i, c := range world.Crust {
 		if c == phase1.Oceanic {
 			oceanCells++
+			if world.OceanAge[i] < minAge {
+				minAge = world.OceanAge[i]
+			}
+			if world.OceanAge[i] > maxAge {
+				maxAge = world.OceanAge[i]
+			}
+		}
+		if math.Abs(world.TectonicInfluence[i]) > 0.005 {
+			influenced++
 		}
 	}
 	oceanPct := float64(oceanCells) / float64(len(world.Crust)) * 100
+	influencePct := float64(influenced) / float64(len(world.Crust)) * 100
 
 	fmt.Printf("GeoWorld Phase 1 Lab\n")
 	fmt.Printf("seed=%d grid=%dx%d plates=%d ocean-area=%.2f%%\n",
 		cfg.Seed, cfg.Width, cfg.Height, len(world.Plates), oceanPct)
+	fmt.Printf("ocean-age=%.3f..%.3f tectonic-influence=%.2f%% cells\n",
+		minAge, maxAge, influencePct)
 	fmt.Printf("output=%s\n", *out)
 }

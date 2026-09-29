@@ -166,7 +166,7 @@ elevation / trench / ridge / volcanism
 
 ## D-010：海洋地壳年龄决定海洋俯冲倾向
 
-状态：计划实现
+状态：已实现
 
 洋中脊生成年轻海洋地壳。
 
@@ -183,3 +183,38 @@ elevation / trench / ridge / volcanism
 - 海沟侧
 - 岛弧侧
 - 俯冲方向
+
+
+---
+
+## D-011：构造边界是“源”，地貌必须形成有宽度的影响带
+
+状态：已实现第一版
+
+不再直接把边界 Cell 当成山脉 / 海沟本身。
+
+流程：
+
+```text
+Plate Boundary
+      ↓
+Tectonic Feature Source
+      ↓
+Distance Falloff
+      ↓
+Tectonic Influence Band
+      ↓
+Elevation Field
+```
+
+不同构造类型使用不同半径和幅度：
+
+- Collision Orogen：宽、强抬升
+- Volcanic Arc：中等宽度抬升
+- Island Arc：海洋侧局部抬升
+- Trench：窄而强的下沉
+- Mid-Ocean Ridge：较宽弱抬升
+- Continental Rift：较宽下沉
+- Transform Fault：窄且弱
+
+后续会把带宽和幅度从固定常量升级为由相对板块速度、地壳厚度、地壳年龄等决定。

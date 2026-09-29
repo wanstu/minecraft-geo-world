@@ -23,7 +23,7 @@ const (
 	CollisionOrogen
 	VolcanicArc
 	Trench
-	OceanicSubduction
+	IslandArc
 	MidOceanRidge
 	ContinentalRift
 	TransformFault
@@ -49,12 +49,14 @@ type Config struct {
 }
 
 type World struct {
-	Config        Config
-	Plates        []Plate
-	PlateID       []int
-	Crust         []CrustType
-	LandPotential []float64
-	Boundary      []BoundaryType
-	Feature       []TectonicFeature
-	Elevation     []float64
+	Config            Config
+	Plates            []Plate
+	PlateID           []int
+	Crust             []CrustType
+	LandPotential     []float64
+	Boundary          []BoundaryType
+	OceanAge          []float64
+	Feature           []TectonicFeature
+	TectonicInfluence []float64
+	Elevation         []float64
 }

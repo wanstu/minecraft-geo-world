@@ -12,6 +12,11 @@ type continentSeed struct {
 	Weight float64
 }
 
+type cellPoint struct {
+	X int
+	Y int
+}
+
 func Generate(cfg Config) *World {
 	if cfg.Width <= 0 {
 		cfg.Width = 320
@@ -47,14 +52,16 @@ func Generate(cfg Config) *World {
 
 	n := cfg.Width * cfg.Height
 	w := &World{
-		Config:        cfg,
-		Plates:        plates,
-		PlateID:       make([]int, n),
-		Crust:         make([]CrustType, n),
-		LandPotential: make([]float64, n),
-		Boundary:      make([]BoundaryType, n),
-		Feature:       make([]TectonicFeature, n),
-		Elevation:     make([]float64, n),
+		Config:            cfg,
+		Plates:            plates,
+		PlateID:           make([]int, n),
+		Crust:             make([]CrustType, n),
+		LandPotential:     make([]float64, n),
+		Boundary:          make([]BoundaryType, n),
+		OceanAge:          make([]float64, n),
+		Feature:           make([]TectonicFeature, n),
+		TectonicInfluence: make([]float64, n),
+		Elevation:         make([]float64, n),
 	}
 
 	for y := 0; y < cfg.Height; y++ {
@@ -64,7 +71,10 @@ func Generate(cfg Config) *World {
 	}
 
 	w.generateCrust(r)
-	w.classifyTectonics()
+	w.classifyBoundaries()
+	w.computeOceanAge()
+	w.classifyFeatures()
+	w.computeTectonicInfluence()
 	w.computeElevation()
 	return w
 }
@@ -144,19 +154,139 @@ func (w *World) generateCrust(r *rand.Rand) {
 	}
 }
 
-func (w *World) classifyTectonics() {
+func (w *World) classifyBoundaries() {
 	dirs := [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
 
 	for y := 0; y < w.Config.Height; y++ {
 		for x := 0; x < w.Config.Width; x++ {
 			i := w.index(x, y)
 			aID := w.PlateID[i]
-			bestBoundary := NoBoundary
-			bestFeature := NoFeature
+			best := NoBoundary
 
 			for _, d := range dirs {
 				nx, ny := x+d[0], y+d[1]
-				if nx < 0 || ny < 0 || nx >= w.Config.Width || ny >= w.Config.Height {
+				if !w.inside(nx, ny) {
+					continue
+				}
+				ni := w.index(nx, ny)
+				bID := w.PlateID[ni]
+				if bID == aID {
+					continue
+				}
+				best = strongerBoundary(best, classifyBoundary(w.Plates[aID], w.Plates[bID]))
+			}
+			w.Boundary[i] = best
+		}
+	}
+}
+
+func (w *World) computeOceanAge() {
+	const unvisited = -1
+	dist := make([]int, len(w.OceanAge))
+	for i := range dist {
+		dist[i] = unvisited
+	}
+
+	queue := make([]cellPoint, 0, len(dist)/8)
+	addSeed := func(x, y int) {
+		i := w.index(x, y)
+		if w.Crust[i] != Oceanic || dist[i] == 0 {
+			return
+		}
+		dist[i] = 0
+		queue = append(queue, cellPoint{X: x, Y: y})
+	}
+
+	// 真正的年龄源首先来自海洋-海洋张裂边界（洋中脊）。
+	for y := 0; y < w.Config.Height; y++ {
+		for x := 0; x < w.Config.Width; x++ {
+			i := w.index(x, y)
+			if w.Crust[i] != Oceanic {
+				continue
+			}
+			for _, d := range [][2]int{{1, 0}, {0, 1}, {-1, 0}, {0, -1}} {
+				nx, ny := x+d[0], y+d[1]
+				if !w.inside(nx, ny) {
+					continue
+				}
+				ni := w.index(nx, ny)
+				if w.Crust[ni] != Oceanic || w.PlateID[ni] == w.PlateID[i] {
+					continue
+				}
+				if classifyBoundary(w.Plates[w.PlateID[i]], w.Plates[w.PlateID[ni]]) == Divergent {
+					addSeed(x, y)
+					break
+				}
+			}
+		}
+	}
+
+	// 极端 Seed 可能没有海洋-海洋张裂边界；退化时用海洋板块边缘作为年轻地壳源，
+	// 保证年龄场仍然连续可用，而不是整张图失效。
+	if len(queue) == 0 {
+		for y := 0; y < w.Config.Height; y++ {
+			for x := 0; x < w.Config.Width; x++ {
+				i := w.index(x, y)
+				if w.Crust[i] == Oceanic && w.Boundary[i] != NoBoundary {
+					addSeed(x, y)
+				}
+			}
+		}
+	}
+
+	head := 0
+	maxDist := 0
+	dirs := [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+	for head < len(queue) {
+		p := queue[head]
+		head++
+		pi := w.index(p.X, p.Y)
+
+		for _, d := range dirs {
+			nx, ny := p.X+d[0], p.Y+d[1]
+			if !w.inside(nx, ny) {
+				continue
+			}
+			ni := w.index(nx, ny)
+			if w.Crust[ni] != Oceanic || dist[ni] != unvisited {
+				continue
+			}
+			dist[ni] = dist[pi] + 1
+			if dist[ni] > maxDist {
+				maxDist = dist[ni]
+			}
+			queue = append(queue, cellPoint{X: nx, Y: ny})
+		}
+	}
+
+	scale := math.Max(12, float64(maxDist)*0.42)
+	for i := range w.OceanAge {
+		if w.Crust[i] != Oceanic {
+			w.OceanAge[i] = 0
+			continue
+		}
+		if dist[i] < 0 {
+			// 与年龄源不连通的小海盆，给一个中等偏老的稳定值。
+			w.OceanAge[i] = 0.65
+			continue
+		}
+		// 距洋中脊越远越老；指数曲线避免最远处全部挤在 1.0。
+		w.OceanAge[i] = clamp(1-math.Exp(-float64(dist[i])/scale), 0, 1)
+	}
+}
+
+func (w *World) classifyFeatures() {
+	dirs := [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+
+	for y := 0; y < w.Config.Height; y++ {
+		for x := 0; x < w.Config.Width; x++ {
+			i := w.index(x, y)
+			aID := w.PlateID[i]
+			best := NoFeature
+
+			for _, d := range dirs {
+				nx, ny := x+d[0], y+d[1]
+				if !w.inside(nx, ny) {
 					continue
 				}
 				ni := w.index(nx, ny)
@@ -166,14 +296,15 @@ func (w *World) classifyTectonics() {
 				}
 
 				boundary := classifyBoundary(w.Plates[aID], w.Plates[bID])
-				feature := classifyFeature(w.Crust[i], w.Crust[ni], boundary)
-
-				bestBoundary = strongerBoundary(bestBoundary, boundary)
-				bestFeature = strongerFeature(bestFeature, feature)
+				feature := classifyFeature(
+					w.Crust[i], w.Crust[ni],
+					w.OceanAge[i], w.OceanAge[ni],
+					aID, bID,
+					boundary,
+				)
+				best = strongerFeature(best, feature)
 			}
-
-			w.Boundary[i] = bestBoundary
-			w.Feature[i] = bestFeature
+			w.Feature[i] = best
 		}
 	}
 }
@@ -199,7 +330,7 @@ func classifyBoundary(a, b Plate) BoundaryType {
 	}
 }
 
-func classifyFeature(local, other CrustType, boundary BoundaryType) TectonicFeature {
+func classifyFeature(local, other CrustType, localAge, otherAge float64, localPlate, otherPlate int, boundary BoundaryType) TectonicFeature {
 	switch boundary {
 	case Convergent:
 		switch {
@@ -210,7 +341,14 @@ func classifyFeature(local, other CrustType, boundary BoundaryType) TectonicFeat
 		case local == Oceanic && other == Continental:
 			return Trench
 		default:
-			return OceanicSubduction
+			// 海洋-海洋汇聚：较老、较冷的一侧优先俯冲形成海沟，
+			// 较年轻的上覆板块一侧形成岛弧。年龄接近时用 plate ID 稳定打破平局。
+			localSubducts := localAge > otherAge+0.015 ||
+				(math.Abs(localAge-otherAge) <= 0.015 && localPlate > otherPlate)
+			if localSubducts {
+				return Trench
+			}
+			return IslandArc
 		}
 	case Divergent:
 		if local == Continental || other == Continental {
@@ -221,6 +359,83 @@ func classifyFeature(local, other CrustType, boundary BoundaryType) TectonicFeat
 		return TransformFault
 	default:
 		return NoFeature
+	}
+}
+
+func (w *World) computeTectonicInfluence() {
+	uplift := make([]float64, len(w.TectonicInfluence))
+	subsidence := make([]float64, len(w.TectonicInfluence))
+
+	for y := 0; y < w.Config.Height; y++ {
+		for x := 0; x < w.Config.Width; x++ {
+			i := w.index(x, y)
+			feature := w.Feature[i]
+			radius, amplitude := featureBand(feature)
+			if radius == 0 || amplitude == 0 {
+				continue
+			}
+
+			for dy := -radius; dy <= radius; dy++ {
+				for dx := -radius; dx <= radius; dx++ {
+					tx, ty := x+dx, y+dy
+					if !w.inside(tx, ty) {
+						continue
+					}
+					d := math.Hypot(float64(dx), float64(dy))
+					if d > float64(radius) {
+						continue
+					}
+					ti := w.index(tx, ty)
+					if !featureAppliesToCrust(feature, w.Crust[ti]) {
+						continue
+					}
+					falloff := 1 - d/float64(radius)
+					effect := amplitude * falloff * falloff
+					if effect > 0 && effect > uplift[ti] {
+						uplift[ti] = effect
+					}
+					if effect < 0 && effect < subsidence[ti] {
+						subsidence[ti] = effect
+					}
+				}
+			}
+		}
+	}
+
+	for i := range w.TectonicInfluence {
+		w.TectonicInfluence[i] = clamp(uplift[i]+subsidence[i], -0.38, 0.45)
+	}
+}
+
+func featureBand(feature TectonicFeature) (radius int, amplitude float64) {
+	switch feature {
+	case CollisionOrogen:
+		return 14, 0.34
+	case VolcanicArc:
+		return 9, 0.21
+	case IslandArc:
+		return 7, 0.18
+	case Trench:
+		return 6, -0.24
+	case MidOceanRidge:
+		return 8, 0.12
+	case ContinentalRift:
+		return 10, -0.13
+	case TransformFault:
+		return 4, -0.025
+	default:
+		return 0, 0
+	}
+}
+
+func featureAppliesToCrust(feature TectonicFeature, crust CrustType) bool {
+	switch feature {
+	case CollisionOrogen, VolcanicArc, ContinentalRift:
+		return crust == Continental
+	case IslandArc, Trench, MidOceanRidge:
+		return crust == Oceanic
+	default:
+		return true
 	}
 }
 
@@ -252,7 +467,7 @@ func featurePriority(f TectonicFeature) int {
 		return 7
 	case Trench:
 		return 6
-	case OceanicSubduction:
+	case IslandArc:
 		return 5
 	case ContinentalRift:
 		return 4
@@ -272,26 +487,13 @@ func (w *World) computeElevation() {
 
 			base := 0.66
 			if w.Crust[i] == Oceanic {
-				base = 0.25
+				// 年轻海洋地壳较热、海底较高；老地壳冷却收缩后海盆更深。
+				base = 0.31 - w.OceanAge[i]*0.10
 			}
 
-			switch w.Feature[i] {
-			case CollisionOrogen:
-				base += 0.30
-			case VolcanicArc:
-				base += 0.20
-			case Trench:
-				base -= 0.18
-			case OceanicSubduction:
-				base += 0.06
-			case MidOceanRidge:
-				base += 0.10
-			case ContinentalRift:
-				base -= 0.11
-			case TransformFault:
-				base += 0.02
-			}
+			base += w.TectonicInfluence[i]
 
+			// 只提供局部粗糙度，不允许噪声重新决定大陆 / 山系位置。
 			n := math.Sin(float64(x)*0.071+float64(w.Config.Seed%997)) *
 				math.Cos(float64(y)*0.083-float64(w.Config.Seed%313))
 			base += n * 0.03
@@ -303,6 +505,10 @@ func (w *World) computeElevation() {
 
 func (w *World) index(x, y int) int {
 	return y*w.Config.Width + x
+}
+
+func (w *World) inside(x, y int) bool {
+	return x >= 0 && y >= 0 && x < w.Config.Width && y < w.Config.Height
 }
 
 func clamp(v, lo, hi float64) float64 {
