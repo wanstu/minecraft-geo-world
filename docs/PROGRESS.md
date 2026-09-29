@@ -1,0 +1,797 @@
+# GeoWorld 历史进度档案
+
+2026-09-29 从原 STATUS.md 完整归档。下文的“当前/下一步”属于历史语境；最新入口是 STATUS.md。所有旧指标均保留，后续算法改变不得把这些历史数字当作当前输出。
+
+---
+
+# GeoWorld 项目状态
+
+> 本文件是项目进度的单一入口。每完成一个阶段性功能，应同步更新本文件。
+
+更新时间：2026-09-29
+
+## 当前阶段
+
+**Phase 5 — 生态区与 Minecraft 映射**
+
+当前子阶段：**Phase 6.1 — Generator Core / World Model 串联（准备开始）**
+
+## 当前稳定基线
+
+最近提交：
+
+- `d238299` — add fluvial depositional geomorphology
+- `151df07` — simplify generator prototype navigation and explanations
+- `5b7a1e0` — add continuous regional terrain sampling
+- `6545409` — add continuous landform weights and scale aware terrain context
+- `d626e6a` — add erosion drivers valley incision and relief
+- `8340ed4` — add river hierarchy seasonal flow and explicit lakes
+- `bbf3890` — add hydrology basins runoff and river network
+- `aca7269` — add seasonal precipitation and monsoon rainfall
+- `aa94199` — add seasonal thermal contrast and monsoon winds
+- `59e9d32` — add moisture transport precipitation and rain shadow
+- `879cd5a` — propagate ocean thermal anomalies onto land
+- `f73c13a` — add wind driven surface currents and SST transport
+- `6877c54` — add phase2 temperature pressure and wind climate model
+- `97796a5` — close phase1 with hard ocean buffer and audit
+
+## 已完成
+
+### 产品 / 架构
+
+- GeoWorld 定位为“地理世界生成引擎”，不是单一 Mod 或单一工具。
+- 双形态：
+  - GeoWorld Generator：游戏外生成、检查、预生成、导出。
+  - GeoWorld Runtime：Minecraft 游戏内按需生成。
+- Loader 通过 Adapter 隔离，未来可支持 NeoForge / Fabric / Forge。
+- V1 世界拓扑：
+  - Minecraft 坐标理论无限。
+  - 中央有限 GeoWorld 地理区。
+  - 东西最终进入 Infinite Storm Ocean。
+  - 南北最终进入 Infinite Frozen Ocean。
+- GeoWorld 负责长期气候，不负责实时四季 / 天气。
+- 世界生成参数只在创建新世界时生效，并写入世界存档；已有世界只读。
+
+### Phase 1.1 — 最小构造链路
+
+状态：完成
+
+- Seed → 板块中心和速度
+- 汇聚 / 张裂 / 转换边界
+- 大陆 / 海洋地壳与板块解耦
+- 海洋面积按实际 Cell 控制
+- 初步构造地貌分类
+
+### Phase 1.2 — 地壳年龄与构造影响带
+
+状态：完成
+
+- 海洋地壳年龄场
+- 洋中脊年轻、远离后逐渐变老
+- 海洋-海洋汇聚时较老一侧优先俯冲
+- 海沟侧 / 岛弧侧区分
+- 大陆火山弧 / 海沟区分
+- 构造影响从一格边界扩展为有宽度的带
+- 海洋地壳老化导致海盆逐渐加深
+- 自动测试覆盖确定性、海洋面积、年龄范围、影响带宽度
+
+### Phase 1.3 — 板块边界自然化
+
+状态：完成第一版
+
+- 保留原始 Voronoi 作为调试骨架。
+- 实际板块归属使用平滑 Domain Warp 后的查询坐标。
+- 板块边界变得弯曲和不规则。
+- 不做逐 Cell 随机抖动，避免碎片。
+- 当前测试 Seed Plate Warp 变化比例：6.21%。
+
+### Phase 1.4 — 地壳与构造参数深化
+
+状态：**完成第一版**
+
+已实现：
+
+1. 大陆地壳厚度场：大陆边缘较薄，内部逐渐增厚。
+2. 板块相对运动速度进入 Boundary Strength。
+3. Boundary Strength + 地壳厚度 + 海洋年龄共同形成 Tectonic Intensity。
+4. 强碰撞形成更高、更宽的山系；弱碰撞影响更小。
+5. 海沟、岛弧、裂谷、洋中脊的带宽与幅度不再完全固定。
+6. Generator 新增 `crust-thickness.png` 与 `tectonic-intensity.png`。
+7. 自动测试增加地壳厚度变化与构造强度变化检查。
+
+当前测试 Seed：
+
+- Ocean Area：68.00%
+- Ocean Age：0.000 ～ 0.908
+- Continental Thickness：0.440 ～ 0.825
+- Tectonic Intensity：0.089 ～ 0.920
+- Tectonic Influence：约 15.24% Cell
+
+## 当前输出
+
+- `plates-raw.png`
+- `plates.png`
+- `crust.png`
+- `crust-thickness.png`
+- `coast-distance.png`
+- `base-elevation.png`
+- `terrain-zones.png`
+- `boundaries.png`
+- `tectonics.png`
+- `features.png`
+- `ocean-age.png`
+- `subduction.png`
+- `tectonic-intensity.png`
+- `tectonic-influence.png`
+- `elevation.png`
+
+## Phase 1.5 — 基础高程场
+
+状态：**完成第一版**
+
+已实现：
+
+- 有符号海岸距离场：大陆为正、海洋为负。
+- 大陆内部基础高程随海岸距离与大陆地壳厚度变化。
+- 海洋基础高程明确分为大陆架 → 大陆坡 → 深海盆地。
+- 深海盆地继续受海洋地壳年龄控制。
+- 基础高程与构造影响分层：先有海陆地形，再叠加山系 / 海沟 / 裂谷等构造。
+- 构造影响记录主导 Feature，用于宏观地形分类。
+- 宏观地形分类：
+  - Continental Interior
+  - Continental Coast
+  - Continental Shelf
+  - Continental Slope
+  - Ocean Basin
+  - Mountain Belt
+  - Plateau
+  - Trench
+  - Island Arc
+  - Mid-Ocean Ridge
+  - Rift Valley
+- 高原判定已收紧为“厚地壳 + 广域构造抬升”，避免把普通大陆内部误判成高原。
+- 新增自动测试：海岸距离正负号、大陆架/大陆坡/海盆高程顺序、核心地形分区存在性。
+
+当前测试 Seed：
+
+- Elevation：0.127 ～ 0.915
+- Continental Shelf：3.27%
+- Continental Slope：5.66%
+- Ocean Basin：55.28%
+- Mountain Belt：1.48%
+- Plateau：0.43%
+- Trench：0.31%
+- Island Arc：0.10%
+- Mid-Ocean Ridge：3.37%
+- Rift Valley：3.86%
+
+新增输出：
+
+- `coast-distance.png`
+- `base-elevation.png`
+- `terrain-zones.png`
+
+## Phase 1.6 — Phase 1 验收
+
+状态：**完成**
+
+已完成第一轮自动验收：
+
+- 8 个固定 Seed 全部通过。
+- 所有 Seed 的海洋面积保持目标值。
+- 所有最终高程均无 NaN / Inf，且保持在 0..1。
+- 所有测试 Seed 的地图四条模拟边界均保持海洋，未出现大陆贴边。
+- 同 Seed 确定性测试继续通过。
+
+当前性能基线（Windows / i5-11260H，单次 benchtime=1x，仅作开发参考）：
+
+- 640 × 400：约 147 ms，约 66 MB 临时 / 模型分配。
+- 1024 × 640：约 375 ms，约 168 MB 临时 / 模型分配。
+
+注意：当前 Lab 同时保存大量调试字段和图层数据，最终 Runtime World Model 会单独设计紧凑存储，不能直接把这里的内存数字视为 Mod 常驻开销。
+
+新增多 Seed 静态视觉验收页：
+
+- `prototype/acceptance.html`
+- Seed：1 / 42 / 2026 / 731894205
+- 每个 Seed 只展示：海陆骨架、构造影响、宏观地形分区、最终高程。
+- 最终高程顶格占比最高约 0.927%，目前没有出现大面积高程饱和。
+- 已增加回归护栏：最终高程顶格比例不得超过 3%；构造源 Cell 的强度顶格比例不得超过 20%。
+
+连续采样基础：
+
+- 新增 `internal/sampling/ScalarGrid`。
+- 当前使用双线性插值。
+- 自动测试覆盖宏观 Cell 边界连续性与 Minecraft 16-block Chunk 边界连续性。
+- 未来可在同一抽象下升级受限 Hermite / 单调 cubic。
+
+最终收口：
+
+- 新增 `cmd/geoworld-audit`，可批量审计多 Seed。
+- 64 Seed 审计通过。
+- 最小大陆距模拟边界：8 个宏观 Cell。
+- 平均大陆边界缓冲：17.44 Cell。
+- 边界违规：0。
+- 山系占比：2.10% ～ 8.93%。
+- 高原占比：0 ～ 1.70%。
+- 海沟占比：1.20% ～ 3.89%。
+- 洋中脊占比：2.83% ～ 10.98%。
+- 裂谷占比：1.13% ～ 7.59%。
+- 最终高程顶格占比最大 0.869%。
+- 构造强度顶格比例最大 8.855%。
+- 外围海洋缓冲从“软偏置”升级成硬约束，并仍精确保持目标海洋面积。
+- `EdgeOceanBufferFraction` 已成为世界模型参数，默认 4%。
+
+Phase 1 正式完成。
+
+- 大陆轮廓合理。
+- 山系与构造有因果关系。
+- 海沟、岛弧、洋中脊位置合理。
+- 大陆不贴主世界外围。
+- 同 Seed / 配置完全可复现。
+
+## 下一阶段
+
+Phase 1 验收后进入：
+
+**Phase 2 — 气候骨架**
+
+纬度 → 基础温度 → 大尺度气压 / 盛行风 → 海温 → 洋流 → 降水。
+
+
+## Phase 2.1 — 纬度与基础温度
+
+状态：**完成第一版**
+
+第一步只建立稳定的年平均温度骨架：
+
+```text
+Latitude
++ Land Elevation
++ Ocean / Land distinction
+→ Annual Mean Temperature
+```
+
+暂不加入季风、洋流和降水；这些在后续子阶段逐层叠加。
+
+
+## Phase 2.2 — 理想化气压与盛行风
+
+状态：**完成第一版**
+
+已实现：
+
+- 赤道低压
+- 副热带高压
+- 副极地低压
+- 极地高压
+- 信风
+- 西风带
+- 极地东风
+- 30° / 60° 连续风带过渡
+- 南北半球镜像
+
+当前测试 Seed：
+
+- Pressure Index：0.223 ～ 0.792
+- Wind Magnitude：0.048 ～ 0.956
+
+下一步：**Phase 2.3 — Sea Surface Temperature + Wind-driven Ocean Current**。
+
+
+## Phase 2.3 — 海表温度与表层洋流
+
+状态：**完成第一版**
+
+已实现：
+
+- SST 纬度背景。
+- 海水冻结点下限。
+- 风驱表层流。
+- 南北半球 Coriolis 相反偏转。
+- 海岸阻挡与沿岸偏转。
+- SST 平流 / 扩散 / 背景松弛。
+- 陆地洋流严格为 0。
+
+当前测试 Seed：
+
+- SST：-1.80°C ～ 29.14°C
+- Current Magnitude：0.001 ～ 0.593
+
+下一步：**Phase 2.4 — Ocean-to-Land Temperature Correction**。
+
+
+## Phase 2.4 — 洋流对陆地温度修正
+
+状态：**完成第一版**
+
+已实现：
+
+- SST 相对同纬度基准的暖 / 寒异常。
+- 最近海洋异常向陆地传播。
+- 影响随离海距离指数衰减。
+- 原有海拔降温不会被直接覆盖。
+
+当前测试 Seed：
+
+- Ocean Temperature Correction：-0.391°C ～ +0.289°C
+
+下一步：**Phase 2.5 — Moisture Transport / Precipitation / Orographic Rain**。
+
+
+## Phase 2.5 — 长期水汽与降水骨架
+
+状态：**完成第一版**
+
+已实现：
+
+- SST 控制海洋蒸发潜力。
+- 盛行风平流水汽。
+- 邻域扩散。
+- 网格尺寸自适应水汽迭代。
+- 弱陆地蒸散再循环近似。
+- 低压抬升增雨。
+- 山地迎风坡地形雨。
+- 水汽消耗形成背风雨影。
+- 初步年降水 mm。
+
+16 Seed 审计：
+
+- 陆地平均降水：734 ～ 1528 mm
+- <250 mm 干旱陆地：22.7% ～ 59.7%
+- >1500 mm 湿润陆地：14.0% ～ 38.1%
+- 6000 mm 顶格区域：最多 1.27%
+
+Phase 2 第一版正式完成。
+
+下一步：**Phase 3.1 — Summer/Winter Representative States + Monsoon Index**。
+
+
+## Phase 3.1 — 暖季 / 冷季代表态与季风指数
+
+状态：**完成第一版**
+
+已实现：
+
+- 陆地 / 海洋不同的季节温差。
+- 大陆性随离海距离增强。
+- 暖季 / 冷季代表温度。
+- Monsoon Index。
+- 暖季向陆季风异常。
+- 冷季离陆季风异常。
+- 季风异常叠加现有盛行风，不替换全球环流。
+
+当前测试 Seed：
+
+- Seasonal Amplitude：1.52 ～ 20.90°C
+- Monsoon Index：最大 0.865
+- 有效季风 Cell：60637
+
+下一步：**Phase 3.2 — Warm / Cold Season Precipitation + Rainfall Seasonality**。
+
+
+## Phase 3.2 — 季节性降水
+
+状态：**完成第一版**
+
+已实现：
+
+- 年平均 / 暖季 / 冷季共用同一套水汽求解器。
+- 暖季降水。
+- 冷季降水。
+- 季节年降水。
+- Rainfall Seasonality。
+- Monsoon Rain Ratio。
+- 季节温度对水汽的弱耦合。
+- 季节水汽向长期背景态回归，避免冷季数值清零。
+
+12 Seed 审计：
+
+- Seasonal Annual / Phase2 Annual：0.93 ～ 1.16
+- 弱季风暖 / 冷季比：1.27 ～ 1.92
+- 强季风暖 / 冷季比：1.68 ～ 28.19
+- 强季风陆地占比：11.2% ～ 23.6%
+
+下一步：**Phase 3.3 — Watershed / Flow Direction / Flow Accumulation / River Network**。
+
+
+## Phase 3.3 — 流域与河网骨架
+
+状态：**完成第一版**
+
+新增独立模块：
+
+- `internal/hydrology`
+- `cmd/geoworld-hydrology-lab`
+- `cmd/geoworld-hydrology-audit`
+- `prototype/hydrology.html`
+
+已实现：
+
+- Priority Flood 水文填洼。
+- Original / Filled Elevation 分离。
+- FillDepth。
+- D8 Flow Direction。
+- 降水驱动 Local Runoff。
+- Flow Accumulation。
+- BasinID。
+- MajorBasinCount。
+- RiverStrength。
+- LakePotential。
+- WetlandPotential。
+
+8 Seed 审计：
+
+- 河流：1.72% ～ 3.15% 陆地
+- 填洼：3.88% ～ 9.69%
+- 湖泊候选：2.09% ～ 6.42%
+- 湿地候选：1.33% ～ 4.21%
+- 主要河流流域：13 ～ 38
+- 最大归一化填洼深度：0.080 ～ 0.145
+
+当前 640 × 400 Seed 731894205：
+
+- 全部流域：1738
+- 主要流域：62
+- 河流：2.07%
+- 湖泊候选：1.74%
+- 湿地候选：1.59%
+
+下一步：**Phase 3.4 — River Hierarchy / Lake Connectivity / Phase 3 Acceptance**。
+
+
+## Phase 3.4 — 河流等级、季节河与显式湖泊
+
+状态：**完成第一版**
+
+已实现：
+
+- Strahler River Order。
+- 主河 / 支流层级。
+- 暖季 / 冷季径流分别汇流。
+- PerennialRiverPotential。
+- SeasonalRiverPotential。
+- 显式 LakeID。
+- Lake Surface / MaxDepth。
+- SpillOutlet。
+- 湖泊所属 Basin 与入流水量。
+- SpillOutlet 明确为“潜在溢流口”，不代表湖一定外流。
+
+12 Seed 最终水文审计：
+
+- 河流：1.68% ～ 3.15% 陆地
+- 主要河流流域：6 ～ 38
+- 最高 Strahler Order：2 ～ 3
+- 季节河占优：12.9% ～ 39.6% 河流 Cell
+- 显式湖泊：2 ～ 7
+- 最大湖泊：76 ～ 318 宏观 Cell
+- 最大湖深：0.080 ～ 0.145 normalized
+
+当前 640 × 400 Seed 731894205：
+
+- RiverOrder 最大：3
+- Order >= 3：128 Cell
+- 季节河倾向占优：861 Cell
+- 常流河倾向占优：838 Cell
+- 显式湖泊：14
+- 最大湖泊：222 Cell
+
+Phase 3 第一版正式完成。
+
+下一步：**Phase 4.1 — Erosion Driver / Valley Incision / Relief**。
+
+
+## Phase 4.1 — 侵蚀驱动力与河谷切割
+
+状态：**完成第一版**
+
+新增：
+
+- `internal/erosion`
+- `cmd/geoworld-erosion-lab`
+- `cmd/geoworld-erosion-audit`
+- `prototype/erosion.html`
+
+已实现：
+
+- Slope。
+- Wetness。
+- TectonicSupport。
+- TerrainMaturity proxy。
+- ErosionResistance proxy。
+- FluvialPower。
+- ValleyIncision。
+- HillslopeErosion。
+- TotalErosion。
+- ErodedElevation。
+- LocalRelief / ReliefIndex。
+
+当前 640 × 400 Seed：
+
+- 平均侵蚀：0.00074
+- 最大侵蚀：0.01962
+- 河谷切割影响：1.53% 陆地
+- 高 Relief：17.39% 陆地
+
+多 Seed 回归曾发现并修复：
+
+- 原始低海岸 Cell 被 erosion floor 错误抬高。
+
+当前保证：
+
+- 侵蚀只降低地形。
+- 海洋不变。
+- 低于 floor 的原始陆地保持原样。
+
+下一步：**Phase 4.2 — Hills / Foothills / Rolling Plains / Plateau continuous weights**。
+
+
+## Phase 4.2 — 丘陵 / 山麓 / 高原连续权重
+
+状态：**完成第一版**
+
+新增：
+
+- `internal/landform`
+- `cmd/geoworld-landform-lab`
+- `cmd/geoworld-landform-audit`
+- `prototype/landform.html`
+
+基础地貌连续权重：
+
+- RollingPlainWeight
+- HillWeight
+- FoothillWeight
+- MountainWeight
+- PlateauWeight
+
+额外 Overlay：
+
+- ValleyCore
+- ValleyWeight
+
+当前正式 640 × 400 多 Seed 审计：
+
+- 平原 dominant：62.80% ～ 65.64%
+- 丘陵：9.63% ～ 11.73%
+- 山麓：3.64% ～ 4.30%
+- 山地：18.20% ～ 21.13%
+- 高原：0.05% ～ 3.58%
+- 混合过渡带：11.53% ～ 16.45%
+- 强河谷 Overlay：0.64% ～ 0.84%
+
+尺度问题已修复：
+
+- 同 Seed 240×150 山地占比曾为 33.24%。
+- 640×400 为 14.96%。
+- Phase 4 空间核改为按网格尺度解析后，240×150 降至 12.42%。
+
+已新增完整流水线尺度回归测试，防止预览分辨率再次改变世界地貌比例。
+
+下一步：**Phase 4.3 — Regional Terrain Height / continuous sampling / chunk seam acceptance**。
+
+
+## Phase 4.3 — Regional Terrain 合成与连续采样
+
+状态：**完成第一版**
+
+新增：
+
+- `internal/terrain`
+- `cmd/geoworld-terrain-lab`
+- `cmd/geoworld-terrain-audit`
+- `prototype/terrain.html`
+- `ScalarGrid.SampleCubicBSpline`
+
+Regional Terrain：
+
+```text
+ErodedElevation
++ continuous Landform Weights
++ world-coordinate Regional Detail
+- Valley Carve
+→ H(worldX, worldZ)
+```
+
+正式测试 Seed 731894205：
+
+- Grid：640 × 400
+- Cell：128 blocks
+- 约 81.8k × 51.1k blocks
+- Height：0.14571 ～ 0.91951
+- Regional Detail：-0.03224 ～ +0.03088
+- Max Valley Carve：0.00454
+- Chunk epsilon jump：1.02e-7
+- Macro slope mismatch：5.36e-6
+
+已实现 smooth bounded height addition，避免 Regional Detail 把山顶硬 clamp 到 1.0。
+
+多 Seed Terrain Audit 已加入失败护栏。
+
+Phase 4.4 已完成，Phase 4 第一版正式收口。
+
+
+## Phase 4.4 — 河谷横断面与沉积型地貌
+
+状态：**完成第一版**
+
+新增：
+
+- `internal/geomorph`
+- `cmd/geoworld-geomorph-lab`
+- `cmd/geoworld-geomorph-audit`
+- `prototype/geomorph.html`
+
+连续字段：
+
+- FloodplainWeight
+- AlluvialPlainWeight
+- AlluvialFanCore
+- AlluvialFanWeight
+- CanyonWeight
+- ValleyFloorWidth
+- DepositionPotential
+- SedimentSupply
+- SlopeDrop
+- UpstreamSteepMemory
+- UpstreamMountainMemory
+
+真实因果关系：
+
+```text
+大河 + 平缓低地
+→ 河漫滩 / 宽谷底
+
+低坡 + 低 Relief + 长期汇流
+→ 冲积平原
+
+上游山地 + 上游陡坡
++ 河流出山口后明显变缓
++ 上游侵蚀物源
+→ 山前冲积扇
+
+强河流 + 高 Relief + 较陡坡度
+→ 峡谷
+```
+
+正式 640 × 400 多 Seed 审计：
+
+- 河漫滩：0.175% ～ 0.311% 陆地
+- 冲积平原：1.141% ～ 1.923%
+- 明显冲积扇：0 ～ 0.062%
+- 明显峡谷：0 ～ 0.013%
+- 宽谷底：0.146% ～ 0.280%
+- 明显沉积区：0.098% ～ 0.150%
+
+允许单个世界没有明显冲积扇 / 峡谷，不为凑数量强行生成。
+
+Phase 4.4 已接入最终 Terrain：
+
+- 河漫滩 / 冲积平原 / 宽谷底会降低局部粗糙度。
+- 冲积扇产生轻微沉积抬升。
+- 峡谷在已有河谷基础上额外下切。
+- 新增 `deposition-lift.png` 与 `canyon-carve.png`。
+
+接入后连续性复验仍通过：
+
+- Chunk epsilon jump：约 1e-7
+- Macro slope mismatch：约 1e-6
+
+## Phase 4 总结
+
+状态：**完成第一版**
+
+当前地形因果链：
+
+```text
+Tectonics
++ Climate
++ Hydrology
+→ Erosion
+→ Relief
+→ Landform Weights
+→ Fluvial / Depositional Geomorphology
+→ Continuous Terrain H(worldX, worldZ)
+```
+
+下一步：**Phase 5.1 — Climate / Hydrology / Terrain → Eco Region 分类**。
+
+## Phase 5.1 — 长期生态区分类
+
+状态：**完成第一版**
+
+新增：
+
+- `internal/ecology`
+- `cmd/geoworld-ecology-lab`
+- `cmd/geoworld-ecology-audit`
+- `prototype/ecology.html`
+- `docs/PHASE5.md`
+
+连续生态字段：
+
+- Moisture / Aridity
+- Tree / Grass / Shrub / Bare Ground
+- Snow
+- Soil Moisture
+- Vegetation Density
+- Wetland Ecology
+- Alpine Ecology
+
+有限 Eco Region：
+
+- Warm / Temperate / Cold / Frozen Ocean
+- Ice Sheet
+- Tundra
+- Alpine
+- Boreal / Temperate / Subtropical Forest
+- Temperate Grassland
+- Temperate / Hot Desert
+- Mediterranean Shrubland
+- Savanna
+- Tropical Monsoon Forest
+- Tropical Rainforest
+- Wetland
+
+Phase 5.1 接入真实世界时反向发现并修复 Phase 2 温度标尺问题：
+
+- normalized elevation 不再线性映射到 0..6000m。
+- 新增 ElevationCurvePower，默认 1.70。
+- 新增 LatitudeTempCurvePower，默认 3.50。
+- 中纬度不再被系统性算得过冷。
+
+正式 640×400 多 Seed 生态审计：
+
+- 冷地生态：约 5% ～ 17%
+- 森林：约 27% ～ 37%
+- 干旱生态：约 15% ～ 27%
+- 草原 / 灌丛：约 27% ～ 40%
+- 热带生态：约 39% ～ 46%
+- 低置信度：约 1.4% ～ 2.1%
+
+全量气候 / 季风 / 水文回归仍通过。
+
+Phase 5.1 后续目标：**Eco Region → Minecraft Biome / Surface / Vegetation Mapping**；已在 Phase 5.2 完成第一版。
+
+## Phase 5.2 — Minecraft 生成 Profile
+
+状态：**完成第一版**
+
+新增：
+
+- `internal/mcprofile`
+- `cmd/geoworld-mcprofile-lab`
+- `cmd/geoworld-mcprofile-audit`
+- `prototype/mcprofile.html`
+
+输出：
+
+- Biome Family
+- Terrain Variant
+- Surface Profile
+- Vegetation Profile
+- Profile Confidence
+
+重要边界：
+
+- Core 不绑定具体 Loader。
+- Core 不写死 Minecraft Registry ID。
+- Loader Adapter 后续负责 Vanilla / GeoWorld 自定义 / 第三方群系映射。
+
+正式 640×400 多 Seed 审计：
+
+- Unknown = 0
+- Profile confidence：0.692 ～ 0.755
+- 低置信度：0.09% ～ 0.24%
+- 平原类：54% ～ 70%
+- 丘陵 / 山麓：12% ～ 19%
+- 山地 / 高原：15% ～ 27%
+- 河流特殊地貌：1.7% ～ 2.6%
+- 森林植被：20% ～ 37%
+- 开放植被：25% ～ 44%
+- 荒漠稀疏植被：15% ～ 33%
+- 寒冷 / 高山稀疏植被：4% ～ 20%
+
+Phase 5 完成第一版。
+
+下一步：**Phase 6.1 — 把当前算法模块串成正式 Generator Core / World Model，并开始真实参数驱动生成。**

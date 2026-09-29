@@ -1,5 +1,7 @@
 # GeoWorld V1 Roadmap
 
+2026-09-29 调整：Phase 1–5 为算法第一版；跨阶段一致性和游戏验收单独列入 Phase 6。详见 [PHASE6.md](PHASE6.md)。
+
 ## Phase 0 — 原型与模型定义
 
 状态：**完成**
@@ -161,7 +163,7 @@
 
 ## Phase 5 — 生态与 Minecraft 地貌映射
 
-状态：**当前**
+状态：**算法第一版完成；基线收口**
 
 ### Phase 5.1 — 生态区分类
 状态：**完成第一版**
@@ -194,7 +196,7 @@
 - 先得到连续生态倾向，再映射到有限的 Eco Region 类别。
 
 ### Phase 5.2 — Minecraft Biome / Surface Mapping
-状态：**当前**
+状态：**完成第一版**
 
 输出：
 
@@ -207,37 +209,33 @@
 
 Biome 表示长期生态，不直接代表瞬时天气。
 
-## Phase 6 — Generator MVP
+## Phase 6 — 统一模型、最小 Generator 与提前游戏验证
 
-状态：未开始
+状态：**当前：6.0 收口 / 6.1a 即将开始**
 
-能力：
+| 子阶段 | 交付 | 状态 |
+|---|---|---|
+| 6.0 | Phase 5.2 提交、评审与进度保全 | 进行中 |
+| 6.1a | 世界范围/原点/节点尺度/海平面，地壳与实际宏观陆海分离 | 下一步 |
+| 6.1b | 构造/气候/坡度/水文空间参数迁移到统一尺度 | 未开始 |
+| 6.2 | GenerateWorld / WorldModel，以及最终海岸、河床、水面、生态一致性 | 未开始 |
+| 6.3 | 真实参数生成、基础查看、版本化保存与重开 | 未开始 |
+| 6.4 | Go 模型 -> Java 采样 -> 一个 Loader 的小范围真实世界 | 未开始 |
+| 6.5 | 扩展 UI、多 Seed 对比、PNG/Heightmap 与预生成 | 首次游戏验证之后 |
 
-- 新建世界模型
-- 参数配置
-- 分阶段生成
-- 图层查看
-- 多 Seed 对比
-- 导出 World Model
-- 导出 PNG / Heightmap
-- Minecraft 世界预生成
+最近里程碑：可生成、保存、重开并保持地形/水体/群系一致的最小世界模型。
+详细验收和依赖见 PHASE6.md；不能只把现有模块放进一个结构体就宣称完整模型验收通过。
 
 ## Phase 7 — Runtime MVP
 
-状态：未开始
+状态：未开始；最小接入验证已前移到 6.4。
 
-先选择一个 Loader 作为首个 Adapter，但架构不绑定 Loader。
-
-目标：
-
-- 创建世界时可选 GeoWorld
-- 保存世界级 GeoWorld 配置
-- 加载同一 World Model
-- 按世界坐标连续采样地形
-- 按 Chunk 放置方块
-- Infinite Storm Ocean
-- Infinite Frozen Ocean
-- GeoWorld API
+- 创建世界选择 GeoWorld，世界级配置随存档固定。
+- 明确游戏内创建宏观模型的方案；外部模型导入只是早期验证路径。
+- 完善按需 Chunk、地表/洞穴/结构/装饰兼容。
+- 完善 Infinite Storm Ocean / Infinite Frozen Ocean 与四角过渡。
+- GeoWorld API 与性能/缓存。
+- 首个 Loader 稳定后再扩展其它 Loader。
 
 ## 最终地形连续性原则
 

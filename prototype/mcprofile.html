@@ -1,0 +1,47 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GeoWorld · Minecraft 群系与地表</title><link rel="stylesheet" href="assets/common.css">
+<style>
+.lab-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:max-content;align-content:start;gap:14px;padding:16px;overflow:auto}
+.lab-card{min-width:0;background:#0f171e;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.lab-card header{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
+.lab-card header small{color:var(--muted)}.lab-card img{width:100%;height:auto;aspect-ratio:8/5;object-fit:contain;display:block;image-rendering:pixelated;background:#091016}
+@media(max-width:900px){.lab-grid{grid-template-columns:1fr}}
+</style></head><body>
+<div class="app"><header class="topbar"><a class="brand" href="index.html"><span>Geo</span>World Generator</a>
+<div class="badge">算法原型</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
+<div class="shell">
+<aside class="sidebar"><div class="section"><h3>世界生成流程</h3>
+<a class="nav-item" href="generator.html">世界总览</a>
+<a class="nav-item" href="plates.html">板块与大陆</a>
+<a class="nav-item" href="terrain-ocean.html">地形与海盆</a>
+<a class="nav-item" href="circulation.html">风场与洋流</a>
+<a class="nav-item" href="climate.html">气候与降水</a>
+<a class="nav-item" href="monsoon.html">季风与季节性</a>
+<a class="nav-item" href="hydrology.html">河流与湖泊</a>
+<a class="nav-item" href="erosion.html">侵蚀与地表起伏</a>
+<a class="nav-item" href="landform.html">平原 / 丘陵 / 山地</a>
+<a class="nav-item" href="geomorph.html">河谷与沉积地貌</a>
+<a class="nav-item" href="terrain.html">最终地形</a>
+<a class="nav-item" href="ecology.html">生态与群系</a>
+<a class="nav-item active" href="mcprofile.html">Minecraft 群系与地表</a>
+</div>
+<div class="section"><h3>这一页看什么</h3>
+<div class="prototype-hint">这里把“长期生态”转换成 Minecraft 需要的生成配置：地形形态、地表材料和植被类型。现在仍是 Core 语义，不绑定 NeoForge / Fabric / Forge，也还没有写死具体方块注册表。</div>
+</div></aside>
+<main class="main">
+<div class="toolbar"><div class="title">Minecraft 群系与地表</div><div class="badge">生态 + 地貌 → Minecraft 生成配置</div></div>
+<div class="page-intro"><strong>同一个生态区不应该只对应一种 Minecraft Biome。</strong> 例如温带森林位于平原、丘陵、河漫滩时，会保留相同的长期生态家族，但地形形态、土壤和植被生成配置可以不同。</div>
+<div class="lab-grid">
+<div class="lab-card"><header><strong>① 群系生态家族</strong><small>长期生态语义，不直接绑定某个 Loader 的注册表 ID</small></header><img src="generated/mcprofile/biome-family.png" alt="biome family"></div>
+<div class="lab-card"><header><strong>② 地形形态</strong><small>平原、丘陵、山麓、山地、高原、河漫滩等</small></header><img src="generated/mcprofile/terrain-variant.png" alt="terrain variant"></div>
+<div class="lab-card"><header><strong>③ 地表材料配置</strong><small>森林土、草土、沙砾、冲积土、湿泥、岩石、雪冰等</small></header><img src="generated/mcprofile/surface-profile.png" alt="surface profile"></div>
+<div class="lab-card"><header><strong>④ 植被配置</strong><small>针叶林、混交林、雨林、草原、稀树草原、灌丛、湿地等</small></header><img src="generated/mcprofile/vegetation-profile.png" alt="vegetation profile"></div>
+<div class="lab-card"><header><strong>⑤ 配置置信度</strong><small>越亮表示生态和地形信号越明确</small></header><img src="generated/mcprofile/profile-confidence.png" alt="profile confidence"></div>
+</div></main>
+<aside class="inspector"><div class="section"><h3>为什么要再分一层</h3>
+<div class="card"><div class="card-title">生态区 ≠ Minecraft Biome</div><p>“温带森林”描述长期生态，但 Minecraft 还需要知道这里是平地、丘陵、湿地还是山坡，以及表面铺什么、长什么植物。</p></div>
+<div class="card"><div class="card-title">Core 不绑定 Loader</div><p>这里输出稳定的语义 Profile。以后 NeoForge、Fabric、Forge Adapter 再决定映射成 Vanilla Biome、自定义 GeoWorld Biome 或第三方兼容群系。</p></div>
+<div class="card"><div class="card-title">特殊河流地貌不会丢</div><p>河漫滩、冲积平原、冲积扇和峡谷作为覆盖地貌优先保留，不会再次被普通“平原”权重盖掉。</p></div>
+<div class="card"><div class="card-title">下一阶段</div><p>Generator MVP 会把目前这些真实算法模块串成一个可创建世界模型、修改参数、生成和查看图层的正式应用。</p></div>
+</div></aside>
+</div></div><script src="assets/prototype.js"></script></body></html>

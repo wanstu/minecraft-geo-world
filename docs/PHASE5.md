@@ -296,7 +296,7 @@ Low confidence   1.4% .. 2.1%
 - 湿地生态
 - 高山生态
 
-## 下一步 — Phase 5.2
+## Phase 5.2 设计目标（已实现）
 
 将 Eco Region 与连续生态字段映射为 Minecraft World Generation Profile：
 
@@ -332,4 +332,100 @@ Temperate Forest
 → riparian / wet forest profile
 ```
 
-Phase 5.2 仍然不负责实时天气或动态四季。
+Phase 5.2 仍然不负责实时天气或动态四季；该设计目标已由下节的 Minecraft 生成 Profile 第一版实现。
+
+## Phase 5.2 — Minecraft 生成 Profile
+
+状态：**完成第一版**
+
+实现：
+
+- `internal/mcprofile`
+- `cmd/geoworld-mcprofile-lab`
+- `cmd/geoworld-mcprofile-audit`
+- `prototype/mcprofile.html`
+
+### 为什么不是直接写 minecraft:xxx
+
+Core 目前不绑定 NeoForge / Fabric / Forge 或具体 Minecraft 注册表版本。
+
+Phase 5.2 先输出稳定语义：
+
+```text
+Biome Family
+Terrain Variant
+Surface Profile
+Vegetation Profile
+Profile Confidence
+```
+
+Loader Adapter 未来再决定使用 Vanilla Biome、GeoWorld 自定义 Biome，或兼容第三方 Biome。
+
+### Terrain Variant
+
+同一个 Biome Family 可以继续细分为：
+
+- Plain / Rolling Plain
+- Hills / Foothills
+- Mountain / Plateau
+- Floodplain / Alluvial Plain / Alluvial Fan / Canyon
+- Ocean
+
+特殊河流地貌达到明确条件后优先保留，不再被普通 Rolling Plain 权重吞掉。
+
+### Surface Profile
+
+第一版包括森林土、Podzol、草土、干草地、灌丛土、沙 / 砾荒漠、冲积粉砂、湿泥、泥炭、岩石、雪冰和海床材料。
+
+### Vegetation Profile
+
+第一版包括针叶林、混交林、阔叶林、雨林、季风林、草原、灌丛、稀树草原、荒漠稀疏植被、湿地、高山 / 苔原稀疏植被等。
+
+### 正式 640 × 400 多 Seed 审计
+
+```text
+Unknown output            0
+Profile confidence        0.692 .. 0.755
+Low confidence < 0.30     0.09% .. 0.24%
+
+Plain terrain             54% .. 70%
+Hill / foothill           12% .. 19%
+Mountain / plateau        15% .. 27%
+Fluvial special terrain   1.7% .. 2.6%
+
+Forest surface            20% .. 37%
+Grass / shrub surface     26% .. 46%
+Arid surface              12% .. 28%
+Snow / alpine surface      4% .. 20%
+
+Forest vegetation         20% .. 37%
+Open vegetation           25% .. 44%
+Desert sparse             15% .. 33%
+Cold / sparse              4% .. 20%
+Wetland vegetation       0.08% .. 0.40%
+```
+
+审计要求 Unknown 必须为 0，且地形、表面和植被的大类不能整体塌缩。
+
+## Phase 5 总结
+
+当前完整链路：
+
+```text
+Seed
+→ Plates / Continents
+→ Terrain / Ocean Basins
+→ Wind / Ocean Currents
+→ Climate / Monsoon
+→ Hydrology
+→ Erosion / Relief
+→ Landform Weights
+→ Fluvial / Depositional Geomorphology
+→ Continuous Terrain
+→ Long-term Ecology
+→ Minecraft Generation Profile
+```
+
+Core 到这里已经可以为正式 Generator 应用提供完整、可解释的世界模型。
+
+下一步：**Phase 6 — Generator MVP**。

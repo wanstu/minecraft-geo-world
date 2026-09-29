@@ -829,3 +829,92 @@ Climate
 - 分离后未来可以替换 Minecraft Adapter，而不改核心生态模型。
 
 Eco Region 代表长期稳定生态，不代表实时天气或当前季节。
+
+---
+
+## D-028：Minecraft Core Profile 与 Loader Registry 分离
+
+状态：已实现第一版
+
+GeoWorld Core 不直接返回具体 Minecraft Registry ID。
+
+Core 返回：
+
+```text
+BiomeFamily
+TerrainVariant
+SurfaceProfile
+VegetationProfile
+```
+
+原因：
+
+1. Minecraft Registry ID 属于 Adapter / Loader 层。
+2. 同一个长期生态区需要根据地形和水文产生不同世界表现。
+3. 未来可以在不修改地理 / 生态核心的情况下使用 Vanilla Biome、GeoWorld 自定义 Biome 或第三方 Biome。
+4. Minecraft 版本变化不应迫使 Core 改写生态模型。
+
+---
+
+## D-029：特殊河流地貌在 Minecraft Profile 映射时必须保留
+
+状态：已实现第一版
+
+河漫滩、冲积平原、冲积扇和峡谷是前面水文 / 地貌阶段已经推导出的覆盖地貌。
+
+禁止重新把它们和普通平原直接竞争后抹掉。
+
+因此达到明确门槛后：
+
+```text
+Canyon
+Alluvial Fan
+Floodplain
+Alluvial Plain
+```
+
+优先成为 TerrainVariant。
+
+只有不存在明确覆盖地貌时，才由 Plain / Hill / Foothill / Mountain / Plateau 竞争基础 TerrainVariant。
+
+---
+
+## D-030：地壳、实际海陆与水体必须分离
+
+状态：已确定，Phase 6.1a 开始实现
+
+Continental/Oceanic 是构造基底；LandMask 是某一地形阶段的实际非海洋范围；湖泊/河流另有水体身份。不能由 crust == Continental 重建 LandMask。
+
+外海从有限模型边界的海平面淹水节点向内部连通。海平面以下但与外海隔绝的低地保留为封闭洼地，是否形成湖泊由水文决定。宏观阶段共享同一结果；最终连续地形还必须再次协调海岸与水体，不能把宏观修正当作全部修复。
+
+Phase 1 的 OceanFraction 当前控制 Oceanic 地壳面积。修正后须分别报告地壳面积比例与实际海洋比例；未来目标海洋面积需单独校准，不能继续声称二者恒等。
+
+## D-031：世界范围与计算精度分离
+
+状态：已确定，Phase 6.1 开始实现
+
+世界范围与原点使用 Minecraft blocks；网格 Width/Height 表示节点数。节点间距 = 范围长度 / (节点数 - 1)。物理米制海拔、归一化地形控制值和 Minecraft Y 必须显式转换，不混用。
+
+首版契约支持 X/Z 分别计算节点间距；现有只有一个 CellSize 的旧采样器必须通过校验或迁移后才能消费非等距网格。所有 Cells 参数逐项迁移，记录参考默认尺度；定义结构体本身不等于已经实现分辨率稳定性。
+
+## D-032：最终水文一致性是独立验收门槛
+
+状态：已确定，待 Phase 6.2 实现
+
+气候/水文使用宏观地形可以保留，但后续平滑与细节不能使最终河床、水面、湖面和生态相互冲突。需要明确河床纵剖面和水面约束，或最终地形上的水文校正。不可把 FilledElevation 直接覆盖真实地形，也不可隐藏逆向连线来通过审计。
+
+分类占比、内部置信度、Chunk epsilon 连续性分别只是对应机制的护栏，不能代替完整世界验收。
+
+## D-033：跨语言与游戏验证前移
+
+状态：已确定验证路径，尚未选择首个 Minecraft 版本/Loader
+
+先用现有 Go Generator 导出模型，由 Java 读取/采样并接一个 Loader 验证；暂不重写全部全球模拟。模型格式带版本、已解析配置、哈希/数值规则与 golden vectors。正式格式冻结前完成跨语言验证。
+
+游戏内自主生成宏观模型的策略保留为后续显式决定。完整 UI、多格式导出、批量世界预生成、多个 Loader 不作为首次游戏验证的前置条件。
+
+## D-034：进度入口与历史记录分开
+
+状态：已执行文档整理
+
+STATUS.md 只描述当前基线、进行中、未解决及下一步。原有逐阶段状态全文归档到 PROGRESS.md；PHASE 文档保存实现细节与实验。所有历史数字标注语境，不因算法变化被删除或当作当前结果。每个开发切片在验证后同步状态并提交。
