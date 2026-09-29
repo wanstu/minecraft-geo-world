@@ -86,6 +86,23 @@ func RenderAll(m *Model, outDir string) error {
 			v := clamp(m.MonsoonIndex[i], 0, 1)
 			return lerpColor(color.RGBA{75, 73, 65, 255}, color.RGBA{79, 181, 204, 255}, v)
 		}},
+		{"warm-season-precip.png", func(i int) color.RGBA {
+			return precipitationColor(m.WarmSeasonPrecipMM[i] * 2)
+		}},
+		{"cold-season-precip.png", func(i int) color.RGBA {
+			return precipitationColor(m.ColdSeasonPrecipMM[i] * 2)
+		}},
+		{"rainfall-seasonality.png", func(i int) color.RGBA {
+			v := clamp(m.RainfallSeasonality[i], 0, 1)
+			return lerpColor(color.RGBA{83, 88, 82, 255}, color.RGBA{210, 151, 67, 255}, v)
+		}},
+		{"monsoon-rain-ratio.png", func(i int) color.RGBA {
+			if !m.LandMask[i] {
+				return color.RGBA{34, 54, 65, 255}
+			}
+			v := clamp(m.MonsoonRainRatio[i], 0, 1)
+			return lerpColor(color.RGBA{65, 66, 60, 255}, color.RGBA{55, 155, 191, 255}, v)
+		}},
 	}
 
 	for _, r := range renderers {

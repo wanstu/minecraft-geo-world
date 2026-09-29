@@ -154,20 +154,145 @@ land colder
 - `summer-monsoon-wind.png`
 - `winter-monsoon-wind.png`
 
-## 下一步 — Phase 3.2
+## Phase 3.2 — 季节性降水
 
-分别使用暖季与冷季风场计算两套水汽输送：
+状态：**完成第一版**
+
+### 共用同一套水汽物理
+
+Phase 2 的年平均降水求解器已抽成通用函数。
+
+三套气候状态现在使用同一条链：
 
 ```text
-Warm-season Wind → Warm-season Moisture → Warm-season Precipitation
-Cold-season Wind → Cold-season Moisture → Cold-season Precipitation
+Temperature
++ Wind
++ Ocean Surface Temperature
++ Pressure
++ Orographic Lift
+→ Moisture Transport
+→ Precipitation
 ```
 
-然后得到：
+分别输入：
 
-- WarmSeasonPrecipitation
-- ColdSeasonPrecipitation
+- 年平均温度 / 盛行风
+- 暖季温度 / 暖季风
+- 冷季温度 / 冷季风
+
+因此季节降水不是简单对年降水乘系数。
+
+### 半年降水
+
+暖季 / 冷季代表态各按约半年折算：
+
+```text
+WarmSeasonPrecipMM = warm potential × 0.5
+ColdSeasonPrecipMM = cold potential × 0.5
+
+SeasonalAnnualPrecipMM
+= WarmSeasonPrecipMM
++ ColdSeasonPrecipMM
+```
+
+### 温度对水汽的季节耦合
+
+完整的暖 / 冷季温差仍保存在气候字段中。
+
+但降水水汽能力只吸收部分季节温度信号：
+
+- SeasonalMoistureTempCoupling = 0.35
+- SeasonalSeaSurfaceTempCoupling = 0.35
+
+这样避免普通非季风区因为冷季温度较低就被错误算成近乎无雨。
+
+### 长期背景水汽
+
+季节水汽不是每半年从 0 重置。
+
+默认：
+
+- SeasonalBackgroundMoistureBlend = 0.20
+
+即季节求解后保留一部分 Phase 2 年平均水汽背景。
+
+作用：
+
+- 防止强冬季离陆风把整个大陆水汽数值清空。
+- 仍允许强季风区形成明显雨季 / 旱季。
+- 保持季节年降水与 Phase 2 年降水处于同量级。
+
+### 输出字段
+
+新增：
+
+- WarmSeasonPrecipMM
+- ColdSeasonPrecipMM
+- SeasonalAnnualPrecipMM
 - RainfallSeasonality
 - MonsoonRainRatio
 
-这些仍是长期气候数据，不改变 Minecraft Biome 本身。
+其中：
+
+```text
+RainfallSeasonality
+= |warm - cold| / (warm + cold)
+```
+
+而 MonsoonRainRatio 只在：
+
+- 陆地
+- 暖季降水 > 冷季降水
+
+时，根据暖季降水盈余与 MonsoonIndex 计算。
+
+### 12 Seed 审计
+
+240 × 150 宏观网格：
+
+```text
+Seasonal annual / Phase2 annual   0.930 .. 1.164
+Rainfall seasonality avg          0.288 .. 0.677
+Monsoon rain ratio avg            0.156 .. 0.343
+Weak monsoon warm/cold ratio      1.265 .. 1.924
+Strong monsoon warm/cold ratio    1.683 .. 28.185
+Strong monsoon land area          11.2% .. 23.6%
+```
+
+原始版本曾出现强季风区暖 / 冷季比上百到上万倍。
+
+加入长期背景水汽后，数值塌缩已经消失。
+
+### 自动护栏
+
+多 Seed 自动测试要求：
+
+- SeasonalAnnual / Phase2 Annual 保持 0.60 ～ 1.60。
+- 平均 RainfallSeasonality 保持 0.10 ～ 0.85。
+- RainfallSeasonality = 1 的陆地不得超过 10%。
+- 弱季风暖 / 冷季平均比不得超过 3。
+- 强季风暖 / 冷季平均比不得超过 50。
+
+### 当前可视化
+
+`prototype/monsoon.html`
+
+新增：
+
+- `warm-season-precip.png`
+- `cold-season-precip.png`
+- `rainfall-seasonality.png`
+- `monsoon-rain-ratio.png`
+
+## 下一步 — Phase 3.3
+
+流域与河网：
+
+- 对陆地高程做水文填洼 / 出口处理。
+- 计算 Flow Direction。
+- 计算 Flow Accumulation。
+- 结合年降水与季节性估计 Runoff。
+- 提取主河流 / 支流。
+- 识别内流盆地、湖泊与湿地倾向。
+
+这些仍属于宏观世界模型，不直接在这一阶段生成 Minecraft 方块河道。

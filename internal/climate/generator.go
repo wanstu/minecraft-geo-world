@@ -29,34 +29,39 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		}
 	}
 	m := &Model{
-		Config:               cfg,
-		Width:                input.Width,
-		Height:               input.Height,
-		LandMask:             append([]bool(nil), input.LandMask...),
-		LatitudeDeg:          make([]float64, n),
-		LatitudeBaseTempC:    make([]float64, n),
-		LandElevationM:       make([]float64, n),
-		AnnualMeanTempC:      make([]float64, n),
-		PressureIndex:        make([]float64, n),
-		WindX:                make([]float64, n),
-		WindZ:                make([]float64, n),
-		SeaSurfaceTempC:      make([]float64, n),
-		CurrentX:             make([]float64, n),
-		CurrentZ:             make([]float64, n),
-		OceanDistanceCells:   make([]float64, n),
-		OceanTempCorrectionC: make([]float64, n),
-		AdjustedAnnualTempC:  make([]float64, n),
-		Moisture:             make([]float64, n),
-		OrographicLift:       make([]float64, n),
-		AnnualPrecipMM:       make([]float64, n),
-		SeasonalAmplitudeC:   make([]float64, n),
-		SummerTempC:          make([]float64, n),
-		WinterTempC:          make([]float64, n),
-		MonsoonIndex:         make([]float64, n),
-		SummerWindX:          make([]float64, n),
-		SummerWindZ:          make([]float64, n),
-		WinterWindX:          make([]float64, n),
-		WinterWindZ:          make([]float64, n),
+		Config:                 cfg,
+		Width:                  input.Width,
+		Height:                 input.Height,
+		LandMask:               append([]bool(nil), input.LandMask...),
+		LatitudeDeg:            make([]float64, n),
+		LatitudeBaseTempC:      make([]float64, n),
+		LandElevationM:         make([]float64, n),
+		AnnualMeanTempC:        make([]float64, n),
+		PressureIndex:          make([]float64, n),
+		WindX:                  make([]float64, n),
+		WindZ:                  make([]float64, n),
+		SeaSurfaceTempC:        make([]float64, n),
+		CurrentX:               make([]float64, n),
+		CurrentZ:               make([]float64, n),
+		OceanDistanceCells:     make([]float64, n),
+		OceanTempCorrectionC:   make([]float64, n),
+		AdjustedAnnualTempC:    make([]float64, n),
+		Moisture:               make([]float64, n),
+		OrographicLift:         make([]float64, n),
+		AnnualPrecipMM:         make([]float64, n),
+		SeasonalAmplitudeC:     make([]float64, n),
+		SummerTempC:            make([]float64, n),
+		WinterTempC:            make([]float64, n),
+		MonsoonIndex:           make([]float64, n),
+		SummerWindX:            make([]float64, n),
+		SummerWindZ:            make([]float64, n),
+		WinterWindX:            make([]float64, n),
+		WinterWindZ:            make([]float64, n),
+		WarmSeasonPrecipMM:     make([]float64, n),
+		ColdSeasonPrecipMM:     make([]float64, n),
+		SeasonalAnnualPrecipMM: make([]float64, n),
+		RainfallSeasonality:    make([]float64, n),
+		MonsoonRainRatio:       make([]float64, n),
 	}
 
 	maxLatRad := cfg.MaxLatitudeDeg * math.Pi / 180
@@ -104,6 +109,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	m.applyOceanTemperatureInfluence()
 	m.computeSeasonalStates()
 	m.computeMoistureAndPrecipitation()
+	m.computeSeasonalPrecipitation()
 
 	return m, nil
 }
@@ -173,7 +179,16 @@ func normalizeConfig(cfg Config) Config {
 		cfg.OceanSeasonalityLatitudeC = 5
 	}
 	if cfg.MonsoonWindStrength <= 0 {
-		cfg.MonsoonWindStrength = 0.95
+		cfg.MonsoonWindStrength = 0.75
+	}
+	if cfg.SeasonalMoistureTempCoupling <= 0 || cfg.SeasonalMoistureTempCoupling > 1 {
+		cfg.SeasonalMoistureTempCoupling = 0.35
+	}
+	if cfg.SeasonalSeaSurfaceTempCoupling <= 0 || cfg.SeasonalSeaSurfaceTempCoupling > 1 {
+		cfg.SeasonalSeaSurfaceTempCoupling = 0.35
+	}
+	if cfg.SeasonalBackgroundMoistureBlend <= 0 || cfg.SeasonalBackgroundMoistureBlend > 0.8 {
+		cfg.SeasonalBackgroundMoistureBlend = 0.20
 	}
 	return cfg
 }
@@ -476,28 +491,111 @@ func (m *Model) applyOceanTemperatureInfluence() {
 }
 
 func (m *Model) computeMoistureAndPrecipitation() {
-	n := m.Width * m.Height
-	prev := make([]float64, n)
-	next := make([]float64, n)
+	moisture, lift, precip := m.solveMoistureAndPrecipitation(
+		m.AdjustedAnnualTempC,
+		m.WindX,
+		m.WindZ,
+		m.SeaSurfaceTempC,
+		0,
+	)
+	copy(m.Moisture, moisture)
+	copy(m.OrographicLift, lift)
+	copy(m.AnnualPrecipMM, precip)
+}
 
-	// Start oceans with moisture according to SST. Land starts dry and is
-	// progressively moistened by advection/diffusion from ocean sources.
+func (m *Model) computeSeasonalPrecipitation() {
+	n := m.Width * m.Height
+	warmSST := make([]float64, n)
+	coldSST := make([]float64, n)
+	warmMoistureTemp := make([]float64, n)
+	coldMoistureTemp := make([]float64, n)
+
 	for i := 0; i < n; i++ {
-		if !m.LandMask[i] {
-			warmth := clamp((m.SeaSurfaceTempC[i]+1.8)/(30+1.8), 0, 1)
-			prev[i] = 0.35 + warmth*0.65
+		// Full warm/cold temperature fields remain available as climate outputs,
+		// but moisture capacity only follows part of that thermal swing. This
+		// prevents ordinary non-monsoon climates from becoming almost dry in the
+		// cold representative season solely because air temperature dropped.
+		warmMoistureTemp[i] = lerp(
+			m.AdjustedAnnualTempC[i],
+			m.SummerTempC[i],
+			m.Config.SeasonalMoistureTempCoupling,
+		)
+		coldMoistureTemp[i] = lerp(
+			m.AdjustedAnnualTempC[i],
+			m.WinterTempC[i],
+			m.Config.SeasonalMoistureTempCoupling,
+		)
+
+		if m.LandMask[i] {
+			continue
 		}
+		sstDelta := m.SeasonalAmplitudeC[i] * m.Config.SeasonalSeaSurfaceTempCoupling
+		warmSST[i] = clamp(m.SeaSurfaceTempC[i]+sstDelta, -1.8, 32)
+		coldSST[i] = clamp(m.SeaSurfaceTempC[i]-sstDelta, -1.8, 30)
 	}
 
-	for i := range m.OrographicLift {
-		m.OrographicLift[i] = m.computeOrographicLiftAt(i)
+	_, _, warmPotential := m.solveMoistureAndPrecipitation(
+		warmMoistureTemp,
+		m.SummerWindX,
+		m.SummerWindZ,
+		warmSST,
+		m.Config.SeasonalBackgroundMoistureBlend,
+	)
+	_, _, coldPotential := m.solveMoistureAndPrecipitation(
+		coldMoistureTemp,
+		m.WinterWindX,
+		m.WinterWindZ,
+		coldSST,
+		m.Config.SeasonalBackgroundMoistureBlend,
+	)
+
+	for i := 0; i < n; i++ {
+		// Each representative state stands for roughly half a year.
+		warm := warmPotential[i] * 0.5
+		cold := coldPotential[i] * 0.5
+		total := warm + cold
+
+		m.WarmSeasonPrecipMM[i] = warm
+		m.ColdSeasonPrecipMM[i] = cold
+		m.SeasonalAnnualPrecipMM[i] = total
+
+		denom := total + 1
+		m.RainfallSeasonality[i] = clamp(math.Abs(warm-cold)/denom, 0, 1)
+
+		if m.LandMask[i] && warm > cold {
+			warmExcessShare := (warm - cold) / denom
+			m.MonsoonRainRatio[i] = clamp(warmExcessShare*m.MonsoonIndex[i], 0, 1)
+		}
+	}
+}
+
+func (m *Model) solveMoistureAndPrecipitation(
+	tempC, windX, windZ, oceanSurfaceTemp []float64,
+	backgroundMoistureBlend float64,
+) (moisture, lift, precip []float64) {
+	n := m.Width * m.Height
+	if len(tempC) != n || len(windX) != n || len(windZ) != n || len(oceanSurfaceTemp) != n {
+		return make([]float64, n), make([]float64, n), make([]float64, n)
+	}
+
+	prev := make([]float64, n)
+	next := make([]float64, n)
+	lift = make([]float64, n)
+	precip = make([]float64, n)
+
+	for i := 0; i < n; i++ {
+		if !m.LandMask[i] {
+			warmth := clamp((oceanSurfaceTemp[i]+1.8)/(32+1.8), 0, 1)
+			prev[i] = 0.35 + warmth*0.65
+		}
+		lift[i] = m.computeOrographicLiftAt(i, windX, windZ)
 	}
 
 	for iter := 0; iter < m.Config.MoistureIterations; iter++ {
 		for z := 0; z < m.Height; z++ {
 			for x := 0; x < m.Width; x++ {
 				i := z*m.Width + x
-				wx, wz := m.WindX[i], m.WindZ[i]
+				wx, wz := windX[i], windZ[i]
 				mag := math.Hypot(wx, wz)
 
 				advected := prev[i]
@@ -507,22 +605,18 @@ func (m *Model) computeMoistureAndPrecipitation() {
 				}
 
 				diffused := neighborAverage(prev, m.Width, m.Height, x, z)
-
 				lowPressureLift := clamp((0.58-m.PressureIndex[i])/0.36, 0, 1)
-				rainout := 0.003 + lowPressureLift*0.008 +
-					m.OrographicLift[i]*0.10
+
+				rainout := 0.003 + lowPressureLift*0.008 + lift[i]*0.10
 				rainout = clamp(rainout, 0.002, 0.18)
 
 				oceanSource := 0.0
 				landRecycling := 0.0
 				if !m.LandMask[i] {
-					warmth := clamp((m.SeaSurfaceTempC[i]+1.8)/(30+1.8), 0, 1)
+					warmth := clamp((oceanSurfaceTemp[i]+1.8)/(32+1.8), 0, 1)
 					oceanSource = (0.20 + 0.35*warmth) * 0.10
 				} else {
-					// Placeholder for long-term evapotranspiration recycling.
-					// Later hydrology/ecology stages can replace this with soil-
-					// and vegetation-aware evaporation.
-					warmth := clamp((m.AdjustedAnnualTempC[i]+20)/40, 0, 1)
+					warmth := clamp((tempC[i]+20)/40, 0, 1)
 					recyclable := math.Min(prev[i], 0.8)
 					landRecycling = recyclable * (0.008 + 0.028*warmth)
 				}
@@ -543,23 +637,27 @@ func (m *Model) computeMoistureAndPrecipitation() {
 		prev, next = next, prev
 	}
 
-	copy(m.Moisture, prev)
+	moisture = append([]float64(nil), prev...)
+	if backgroundMoistureBlend > 0 && len(m.Moisture) == n {
+		blend := clamp(backgroundMoistureBlend, 0, 0.8)
+		for i := range moisture {
+			moisture[i] = lerp(moisture[i], m.Moisture[i], blend)
+		}
+	}
 
 	for i := 0; i < n; i++ {
 		lowPressureLift := clamp((0.58-m.PressureIndex[i])/0.36, 0, 1)
-		condensation := 0.018 +
-			lowPressureLift*0.045 +
-			m.OrographicLift[i]*0.30
+		condensation := 0.018 + lowPressureLift*0.045 + lift[i]*0.30
 
-		// Warm moist air can support more precipitation; very cold regions
-		// retain a minimum so polar snowfall is still possible.
-		tempFactor := clamp((m.AdjustedAnnualTempC[i]+25)/45, 0.05, 1)
-		rate := m.Moisture[i] * condensation * tempFactor
-		m.AnnualPrecipMM[i] = clamp(rate*m.Config.PrecipitationScaleMM, 0, 6000)
+		tempFactor := clamp((tempC[i]+25)/45, 0.05, 1)
+		rate := moisture[i] * condensation * tempFactor
+		precip[i] = clamp(rate*m.Config.PrecipitationScaleMM, 0, 6000)
 	}
+
+	return moisture, lift, precip
 }
 
-func (m *Model) computeOrographicLiftAt(i int) float64 {
+func (m *Model) computeOrographicLiftAt(i int, windX, windZ []float64) float64 {
 	x := i % m.Width
 	z := i / m.Width
 
@@ -584,7 +682,7 @@ func (m *Model) computeOrographicLiftAt(i int) float64 {
 	gradX := (right - left) / (2 * math.Max(1, m.Config.MaxLandElevationM))
 	gradZ := (down - up) / (2 * math.Max(1, m.Config.MaxLandElevationM))
 
-	wx, wz := m.WindX[i], m.WindZ[i]
+	wx, wz := windX[i], windZ[i]
 	mag := math.Hypot(wx, wz)
 	if mag < 1e-6 {
 		return 0

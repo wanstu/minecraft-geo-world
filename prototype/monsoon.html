@@ -9,7 +9,7 @@
 @media(max-width:900px){.lab-grid{grid-template-columns:1fr}}
 </style></head><body>
 <div class="app"><header class="topbar"><a class="brand" href="index.html"><span>Geo</span>World Generator</a>
-<div class="badge">Phase 3.1 Lab</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
+<div class="badge">Phase 3.2 Lab</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
 <div class="shell">
 <aside class="sidebar"><div class="section"><h3>世界模型</h3>
 <a class="nav-item" href="generator.html">世界总览</a>
@@ -25,7 +25,7 @@
 <div class="kv"><span>最大季风指数</span><span>0.865</span></div>
 </div></aside>
 <main class="main">
-<div class="toolbar"><div class="title">Phase 3.1 · 夏 / 冬代表态与季风驱动力</div><div class="badge">Land–Sea Thermal Contrast → Monsoon</div></div>
+<div class="toolbar"><div class="title">Phase 3.2 · 季风驱动的暖 / 冷季降水</div><div class="badge">Thermal Contrast → Seasonal Wind → Seasonal Rainfall</div></div>
 <div class="note"><strong>这里不是游戏内动态四季。</strong> GeoWorld 只用“当地暖季 / 冷季”两个代表态计算长期季节性。北半球与南半球各自的暖季都统一显示为 Summer，避免把月份硬编码进世界模型。</div>
 <div class="lab-grid">
 <div class="lab-card"><header><strong>① 季节温差</strong><small>陆地内部通常大于海洋</small></header><img src="generated/climate/seasonal-amplitude.png" alt="seasonal amplitude"></div>
@@ -34,11 +34,17 @@
 <div class="lab-card"><header><strong>④ 季风指数</strong><small>陆海热力差 + 纬度 + 海洋可达性</small></header><img src="generated/climate/monsoon-index.png" alt="monsoon index"></div>
 <div class="lab-card"><header><strong>⑤ 暖季季风</strong><small>热大陆吸引海洋空气向陆</small></header><img src="generated/climate/summer-monsoon-wind.png" alt="summer monsoon wind"></div>
 <div class="lab-card"><header><strong>⑥ 冷季季风</strong><small>冷大陆高压推动空气离陆</small></header><img src="generated/climate/winter-monsoon-wind.png" alt="winter monsoon wind"></div>
+<div class="lab-card"><header><strong>⑦ 暖季降水</strong><small>暖季风场 + 暖季水汽输送</small></header><img src="generated/climate/warm-season-precip.png" alt="warm season precipitation"></div>
+<div class="lab-card"><header><strong>⑧ 冷季降水</strong><small>冷季风场 + 冷季水汽输送</small></header><img src="generated/climate/cold-season-precip.png" alt="cold season precipitation"></div>
+<div class="lab-card"><header><strong>⑨ 降水季节性</strong><small>0=全年均匀 · 1=高度集中</small></header><img src="generated/climate/rainfall-seasonality.png" alt="rainfall seasonality"></div>
+<div class="lab-card"><header><strong>⑩ 季风降水占比</strong><small>强季风 + 暖季降水盈余</small></header><img src="generated/climate/monsoon-rain-ratio.png" alt="monsoon rain ratio"></div>
 </div></main>
 <aside class="inspector"><div class="section"><h3>这一步在解决什么？</h3>
 <div class="card"><div class="card-title">陆地比海洋更容易冷热</div><p>同纬度下，大陆尤其内陆地区拥有更大的暖季 / 冷季温差；海洋热容量大，季节温差较小。</p></div>
 <div class="card"><div class="card-title">季风不是随机标签</div><p>只有低中纬陆地、陆海热力差明显并且仍能受到海洋影响时，Monsoon Index 才会增强。</p></div>
 <div class="card"><div class="card-title">暖季向陆，冷季离陆</div><p>季风异常叠加在已有盛行风上，而不是完全替换全球环流背景。</p></div>
-<div class="card"><div class="card-title">下一步</div><p>分别用暖季风场和冷季风场输送水汽，生成暖季降水、冷季降水和降水季节性。</p></div>
+<div class="card"><div class="card-title">季节降水已独立求解</div><p>暖季与冷季分别运行完整水汽输送、地形抬升与凝结，不是直接拿 Monsoon Index 去乘年降水。</p></div>
+<div class="card"><div class="card-title">长期背景水汽</div><p>季节态保留约 20% 的年平均水汽背景，避免强离陆风把冷季数值清零，同时仍保留明显旱雨季。</p></div>
+<div class="card"><div class="card-title">下一步</div><p>进入流域、水流方向、汇流量、河流与湖泊。水文会同时读取年降水总量和季节性。</p></div>
 </div></aside>
 </div></div></body></html>

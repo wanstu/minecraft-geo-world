@@ -56,11 +56,18 @@ func main() {
 	dryLand, wetLand := 0, 0
 	var tropicalLandPrecip, temperateLandPrecip, polarLandPrecip float64
 	var tropicalLandN, temperateLandN, polarLandN int
-	minSeasonality := math.Inf(1)
-	maxSeasonality := math.Inf(-1)
+	minSeasonalAmplitude := math.Inf(1)
+	maxSeasonalAmplitude := math.Inf(-1)
 	maxMonsoon := 0.0
 	monsoonSum := 0.0
 	monsoonN := 0
+	var warmSeasonLandSum, coldSeasonLandSum, seasonalAnnualLandSum float64
+	var seasonalityLandSum, monsoonRainLandSum float64
+	var seasonalityLandN, monsoonRainLandN int
+	maxRainfallSeasonality := 0.0
+	maxMonsoonRainRatio := 0.0
+	var weakMonsoonWarm, weakMonsoonCold, strongMonsoonWarm, strongMonsoonCold float64
+	var weakMonsoonN, strongMonsoonN int
 	landSum, oceanSum := 0.0, 0.0
 	landN, oceanN := 0, 0
 	for i, temp := range model.AnnualMeanTempC {
@@ -83,11 +90,11 @@ func main() {
 		if wind > maxWind {
 			maxWind = wind
 		}
-		if model.SeasonalAmplitudeC[i] < minSeasonality {
-			minSeasonality = model.SeasonalAmplitudeC[i]
+		if model.SeasonalAmplitudeC[i] < minSeasonalAmplitude {
+			minSeasonalAmplitude = model.SeasonalAmplitudeC[i]
 		}
-		if model.SeasonalAmplitudeC[i] > maxSeasonality {
-			maxSeasonality = model.SeasonalAmplitudeC[i]
+		if model.SeasonalAmplitudeC[i] > maxSeasonalAmplitude {
+			maxSeasonalAmplitude = model.SeasonalAmplitudeC[i]
 		}
 		if model.MonsoonIndex[i] > 0 {
 			monsoonSum += model.MonsoonIndex[i]
@@ -118,6 +125,31 @@ func main() {
 			landSum += temp
 			landPrecipSum += model.AnnualPrecipMM[i]
 			landMoistureSum += model.Moisture[i]
+			warmSeasonLandSum += model.WarmSeasonPrecipMM[i]
+			coldSeasonLandSum += model.ColdSeasonPrecipMM[i]
+			seasonalAnnualLandSum += model.SeasonalAnnualPrecipMM[i]
+			seasonalityLandSum += model.RainfallSeasonality[i]
+			seasonalityLandN++
+			if model.RainfallSeasonality[i] > maxRainfallSeasonality {
+				maxRainfallSeasonality = model.RainfallSeasonality[i]
+			}
+			if model.MonsoonRainRatio[i] > 0 {
+				monsoonRainLandSum += model.MonsoonRainRatio[i]
+				monsoonRainLandN++
+				if model.MonsoonRainRatio[i] > maxMonsoonRainRatio {
+					maxMonsoonRainRatio = model.MonsoonRainRatio[i]
+				}
+			}
+			if model.MonsoonIndex[i] < 0.20 {
+				weakMonsoonWarm += model.WarmSeasonPrecipMM[i]
+				weakMonsoonCold += model.ColdSeasonPrecipMM[i]
+				weakMonsoonN++
+			}
+			if model.MonsoonIndex[i] >= 0.60 {
+				strongMonsoonWarm += model.WarmSeasonPrecipMM[i]
+				strongMonsoonCold += model.ColdSeasonPrecipMM[i]
+				strongMonsoonN++
+			}
 			if model.AnnualPrecipMM[i] < 250 {
 				dryLand++
 			}
@@ -158,7 +190,7 @@ func main() {
 		}
 	}
 
-	fmt.Printf("GeoWorld Phase 3.1 Climate/Monsoon Lab\n")
+	fmt.Printf("GeoWorld Phase 3.2 Seasonal Precipitation Lab\n")
 	fmt.Printf("seed=%d grid=%dx%d latitude=±%.1f°\n", *seed, *width, *height, model.Config.MaxLatitudeDeg)
 	fmt.Printf("annual-temp=%.2f..%.2f C land-avg=%.2f C ocean-avg=%.2f C\n",
 		minTemp, maxTemp, landSum/float64(landN), oceanSum/float64(oceanN))
@@ -184,7 +216,21 @@ func main() {
 		avgMonsoon = monsoonSum / float64(monsoonN)
 	}
 	fmt.Printf("seasonal-amplitude=%.2f..%.2f C monsoon-index avg=%.3f max=%.3f cells=%d\n",
-		minSeasonality, maxSeasonality, avgMonsoon, maxMonsoon, monsoonN)
+		minSeasonalAmplitude, maxSeasonalAmplitude, avgMonsoon, maxMonsoon, monsoonN)
+	avgMonsoonRain := 0.0
+	if monsoonRainLandN > 0 {
+		avgMonsoonRain = monsoonRainLandSum / float64(monsoonRainLandN)
+	}
+	fmt.Printf("seasonal-land-precip warm=%.1f mm cold=%.1f mm annual=%.1f mm\n",
+		warmSeasonLandSum/float64(landN),
+		coldSeasonLandSum/float64(landN),
+		seasonalAnnualLandSum/float64(landN))
+	fmt.Printf("rainfall-seasonality avg=%.3f max=%.3f monsoon-rain-ratio avg=%.3f max=%.3f\n",
+		seasonalityLandSum/float64(seasonalityLandN), maxRainfallSeasonality,
+		avgMonsoonRain, maxMonsoonRainRatio)
+	fmt.Printf("weak-monsoon warm=%.1f cold=%.1f strong-monsoon warm=%.1f cold=%.1f\n",
+		safeAvg(weakMonsoonWarm, weakMonsoonN), safeAvg(weakMonsoonCold, weakMonsoonN),
+		safeAvg(strongMonsoonWarm, strongMonsoonN), safeAvg(strongMonsoonCold, strongMonsoonN))
 	fmt.Printf("output=%s\n", *out)
 }
 

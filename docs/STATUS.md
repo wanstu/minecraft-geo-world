@@ -8,7 +8,7 @@
 
 **Phase 3 — 季风与水文**
 
-当前子阶段：**Phase 3.2 — 季节性降水（准备开始）**
+当前子阶段：**Phase 3.3 — 流域与河网（准备开始）**
 
 ## 当前稳定基线
 
@@ -353,3 +353,28 @@ Phase 2 第一版正式完成。
 - 有效季风 Cell：60637
 
 下一步：**Phase 3.2 — Warm / Cold Season Precipitation + Rainfall Seasonality**。
+
+
+## Phase 3.2 — 季节性降水
+
+状态：**完成第一版**
+
+已实现：
+
+- 年平均 / 暖季 / 冷季共用同一套水汽求解器。
+- 暖季降水。
+- 冷季降水。
+- 季节年降水。
+- Rainfall Seasonality。
+- Monsoon Rain Ratio。
+- 季节温度对水汽的弱耦合。
+- 季节水汽向长期背景态回归，避免冷季数值清零。
+
+12 Seed 审计：
+
+- Seasonal Annual / Phase2 Annual：0.93 ～ 1.16
+- 弱季风暖 / 冷季比：1.27 ～ 1.92
+- 强季风暖 / 冷季比：1.68 ～ 28.19
+- 强季风陆地占比：11.2% ～ 23.6%
+
+下一步：**Phase 3.3 — Watershed / Flow Direction / Flow Accumulation / River Network**。

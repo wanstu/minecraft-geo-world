@@ -703,3 +703,247 @@ func TestMonsoonSummerWindOnshoreWinterWindOffshore(t *testing.T) {
 		t.Fatalf("winter monsoon should point seaward (-X), got %.3f", m.WinterWindX[i])
 	}
 }
+
+func syntheticSeasonalPrecipModel(t *testing.T) *Model {
+	t.Helper()
+
+	width, height := 24, 5
+	n := width * height
+	cfg := normalizeConfig(Config{
+		MoistureIterations:   96,
+		PrecipitationScaleMM: 40000,
+	})
+
+	m := &Model{
+		Config:                 cfg,
+		Width:                  width,
+		Height:                 height,
+		LandMask:               make([]bool, n),
+		LatitudeDeg:            make([]float64, n),
+		LandElevationM:         make([]float64, n),
+		PressureIndex:          make([]float64, n),
+		AdjustedAnnualTempC:    make([]float64, n),
+		SeaSurfaceTempC:        make([]float64, n),
+		SeasonalAmplitudeC:     make([]float64, n),
+		SummerTempC:            make([]float64, n),
+		WinterTempC:            make([]float64, n),
+		MonsoonIndex:           make([]float64, n),
+		SummerWindX:            make([]float64, n),
+		SummerWindZ:            make([]float64, n),
+		WinterWindX:            make([]float64, n),
+		WinterWindZ:            make([]float64, n),
+		WarmSeasonPrecipMM:     make([]float64, n),
+		ColdSeasonPrecipMM:     make([]float64, n),
+		SeasonalAnnualPrecipMM: make([]float64, n),
+		RainfallSeasonality:    make([]float64, n),
+		MonsoonRainRatio:       make([]float64, n),
+	}
+
+	for z := 0; z < height; z++ {
+		for x := 0; x < width; x++ {
+			i := z*width + x
+			m.LatitudeDeg[i] = 20
+			m.PressureIndex[i] = 0.46
+			m.AdjustedAnnualTempC[i] = 23
+			m.SummerTempC[i] = 29
+			m.WinterTempC[i] = 17
+			m.SeasonalAmplitudeC[i] = 6
+
+			if x < 4 {
+				m.SeaSurfaceTempC[i] = 26
+				m.SummerTempC[i] = 27
+				m.WinterTempC[i] = 23
+				m.SeasonalAmplitudeC[i] = 2
+				m.SummerWindX[i] = 1
+				m.WinterWindX[i] = -1
+				continue
+			}
+
+			m.LandMask[i] = true
+			m.MonsoonIndex[i] = 0.8
+			// Warm season carries marine air eastward into the continent.
+			m.SummerWindX[i] = 1
+			// Cold season reverses and exports dry continental air westward.
+			m.WinterWindX[i] = -1
+		}
+	}
+
+	return m
+}
+
+func TestSeasonalMonsoonCreatesWarmSeasonRainMaximum(t *testing.T) {
+	m := syntheticSeasonalPrecipModel(t)
+	m.computeSeasonalPrecipitation()
+
+	z := 2
+	i := z*m.Width + 9
+	warm := m.WarmSeasonPrecipMM[i]
+	cold := m.ColdSeasonPrecipMM[i]
+
+	if !(warm > cold*1.20) {
+		t.Fatalf("warm-season monsoon not wetter enough inland: warm=%.1f cold=%.1f", warm, cold)
+	}
+	if m.RainfallSeasonality[i] <= 0.08 {
+		t.Fatalf("expected meaningful rainfall seasonality, got %.3f", m.RainfallSeasonality[i])
+	}
+	if m.MonsoonRainRatio[i] <= 0 {
+		t.Fatalf("expected positive monsoon rain ratio, got %.3f", m.MonsoonRainRatio[i])
+	}
+}
+
+func TestSeasonalPrecipitationFieldsAreBoundedAndConsistent(t *testing.T) {
+	input := Input{
+		Width:     40,
+		Height:    24,
+		Elevation: make([]float64, 40*24),
+		LandMask:  make([]bool, 40*24),
+	}
+	for z := 4; z < 20; z++ {
+		for x := 8; x < 32; x++ {
+			i := z*input.Width + x
+			input.LandMask[i] = true
+			input.Elevation[i] = 0.56
+		}
+	}
+
+	m, err := Generate(input, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range m.WarmSeasonPrecipMM {
+		warm := m.WarmSeasonPrecipMM[i]
+		cold := m.ColdSeasonPrecipMM[i]
+		total := m.SeasonalAnnualPrecipMM[i]
+		seasonality := m.RainfallSeasonality[i]
+		ratio := m.MonsoonRainRatio[i]
+
+		if math.IsNaN(warm) || math.IsInf(warm, 0) ||
+			math.IsNaN(cold) || math.IsInf(cold, 0) ||
+			math.IsNaN(total) || math.IsInf(total, 0) {
+			t.Fatalf("invalid seasonal precipitation at %d", i)
+		}
+		if warm < 0 || warm > 3000.001 || cold < 0 || cold > 3000.001 {
+			t.Fatalf("season precipitation out of half-year bounds at %d: warm=%.2f cold=%.2f", i, warm, cold)
+		}
+		if math.Abs(total-(warm+cold)) > 1e-9 {
+			t.Fatalf("seasonal annual mismatch at %d: total=%.6f warm+cold=%.6f", i, total, warm+cold)
+		}
+		if seasonality < 0 || seasonality > 1 {
+			t.Fatalf("rainfall seasonality out of bounds at %d: %.4f", i, seasonality)
+		}
+		if ratio < 0 || ratio > 1 {
+			t.Fatalf("monsoon rain ratio out of bounds at %d: %.4f", i, ratio)
+		}
+		if !m.LandMask[i] && ratio != 0 {
+			t.Fatalf("ocean cell %d has monsoon rain ratio %.4f", i, ratio)
+		}
+	}
+}
+
+func TestMonsoonRainRatioRequiresWarmSeasonExcess(t *testing.T) {
+	m := syntheticSeasonalPrecipModel(t)
+
+	// Reverse the representative winds so the cold season is the marine inflow.
+	for i := range m.SummerWindX {
+		m.SummerWindX[i], m.WinterWindX[i] = m.WinterWindX[i], m.SummerWindX[i]
+	}
+	m.computeSeasonalPrecipitation()
+
+	i := 2*m.Width + 9
+	if m.WarmSeasonPrecipMM[i] >= m.ColdSeasonPrecipMM[i] {
+		t.Fatalf("test setup failed to create cold-season maximum: warm=%.1f cold=%.1f",
+			m.WarmSeasonPrecipMM[i], m.ColdSeasonPrecipMM[i])
+	}
+	if m.MonsoonRainRatio[i] != 0 {
+		t.Fatalf("warm-season monsoon rain ratio should be zero without warm-season excess, got %.4f",
+			m.MonsoonRainRatio[i])
+	}
+}
+
+func TestSeasonalPrecipitationSeedSweep(t *testing.T) {
+	seeds := []int64{3000, 19178, 43445, 75801}
+
+	for _, seed := range seeds {
+		world := phase1.Generate(phase1.Config{
+			Seed:          seed,
+			Width:         160,
+			Height:        100,
+			PlateCount:    18,
+			OceanFraction: 0.68,
+		})
+		m, err := Generate(InputFromPhase1(world), Config{})
+		if err != nil {
+			t.Fatalf("seed %d: %v", seed, err)
+		}
+
+		landN := 0
+		baseAnnual := 0.0
+		seasonalAnnual := 0.0
+		seasonalitySum := 0.0
+		seasonalitySaturated := 0
+
+		weakWarm, weakCold := 0.0, 0.0
+		strongWarm, strongCold := 0.0, 0.0
+		weakN, strongN := 0, 0
+
+		for i := range m.AnnualPrecipMM {
+			if world.Crust[i] != phase1.Continental {
+				continue
+			}
+			landN++
+			baseAnnual += m.AnnualPrecipMM[i]
+			seasonalAnnual += m.SeasonalAnnualPrecipMM[i]
+			seasonalitySum += m.RainfallSeasonality[i]
+			if m.RainfallSeasonality[i] >= 0.999 {
+				seasonalitySaturated++
+			}
+
+			switch {
+			case m.MonsoonIndex[i] < 0.20:
+				weakWarm += m.WarmSeasonPrecipMM[i]
+				weakCold += m.ColdSeasonPrecipMM[i]
+				weakN++
+			case m.MonsoonIndex[i] >= 0.60:
+				strongWarm += m.WarmSeasonPrecipMM[i]
+				strongCold += m.ColdSeasonPrecipMM[i]
+				strongN++
+			}
+		}
+
+		if landN == 0 {
+			t.Fatalf("seed %d has no land", seed)
+		}
+
+		baseAvg := baseAnnual / float64(landN)
+		seasonalAvg := seasonalAnnual / float64(landN)
+		ratio := seasonalAvg / math.Max(baseAvg, 1)
+		if ratio < 0.60 || ratio > 1.60 {
+			t.Fatalf("seed %d seasonal annual precipitation drifted too far: ratio %.3f", seed, ratio)
+		}
+
+		avgSeasonality := seasonalitySum / float64(landN)
+		if avgSeasonality < 0.10 || avgSeasonality > 0.85 {
+			t.Fatalf("seed %d rainfall seasonality suspicious: %.3f", seed, avgSeasonality)
+		}
+
+		saturatedPct := float64(seasonalitySaturated) / float64(landN)
+		if saturatedPct > 0.10 {
+			t.Fatalf("seed %d too much fully seasonal land: %.2f%%", seed, saturatedPct*100)
+		}
+
+		if weakN > 0 && weakCold > 1 {
+			weakRatio := (weakWarm / float64(weakN)) / (weakCold / float64(weakN))
+			if weakRatio > 3.0 {
+				t.Fatalf("seed %d weak-monsoon seasonal contrast too strong: %.2f", seed, weakRatio)
+			}
+		}
+
+		if strongN > 0 && strongCold > 1 {
+			strongRatio := (strongWarm / float64(strongN)) / (strongCold / float64(strongN))
+			if strongRatio > 50 {
+				t.Fatalf("seed %d strong-monsoon seasonal contrast numerically unstable: %.2f", seed, strongRatio)
+			}
+		}
+	}
+}
