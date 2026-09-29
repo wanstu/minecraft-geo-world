@@ -53,3 +53,13 @@ GeoWorld 只在中央有限区域生成完整地理世界：
 - `prototype/index.html`
 - `prototype/generator.html`
 - `prototype/runtime.html`
+
+
+## 项目文档
+
+- `docs/STATUS.md`：当前进度、稳定基线、正在进行和下一步。
+- `docs/DECISIONS.md`：关键设计决定及原因。
+- `docs/ROADMAP.md`：V1 分阶段路线。
+- `docs/PHASE1.md`：当前板块 / 大陆算法实验细节。
+- `docs/ARCHITECTURE.md`：整体架构。
+- `docs/PRODUCT.md`：产品边界。

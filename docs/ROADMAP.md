@@ -2,48 +2,79 @@
 
 ## Phase 0 — 原型与模型定义
 
-当前阶段。
+状态：**完成**
 
-目标：
+已完成：
 
-- 确定产品边界
-- 确定 Generator / Runtime 双形态
-- 确定 V1 世界拓扑
+- 产品边界
+- Generator / Runtime 双形态
+- V1 世界拓扑
+- Runtime 世界配置生命周期
 - 页面原型
-- 定义核心数据结构
-
-交付：
-
-- docs
-- HTML Prototype
+- 初始核心数据结构
 
 ## Phase 1 — 大陆与板块
 
-只验证宏观地理。
+状态：**进行中**
 
-输入：
+### Phase 1.1 — 最小构造链路
 
-- Seed
-- 地理区域尺寸
-- 板块数量
-- 海陆比例
+状态：**完成**
 
-输出图层：
+- Seed → 板块
+- 板块运动向量
+- 汇聚 / 张裂 / 转换边界
+- 大陆 / 海洋地壳独立于板块
+- 构造地貌初步分类
+- 粗略高程
+- PNG 可视化 Lab
 
-- Plate ID
-- Plate Type
-- Plate Velocity
-- Plate Boundary
-- Elevation
+### Phase 1.2 — 地壳年龄与构造影响带
+
+状态：**当前**
+
+- 海洋地壳年龄
+- 海洋-海洋俯冲方向
+- 海沟 / 岛弧两侧差异
+- 有宽度的造山 / 裂谷 / 洋中脊影响带
+
+### Phase 1.3 — 板块边界自然化
+
+- 去除明显 Voronoi 多边形感
+- 更自然的边界形状
+
+### Phase 1.4 — 地壳与构造参数深化
+
+- 地壳厚度
+- 构造强度
+- 海盆年龄
+- 板块速度对地貌幅度的影响
+
+### Phase 1.5 — 基础高程场
+
+输出：
+
+- Continental Interior
+- Continental Shelf
 - Ocean Basin
+- Collision Mountain Belt
+- Plateau
+- Trench
+- Island Arc
+- Mid-Ocean Ridge
+- Rift Valley
 
-验收重点：
+### Phase 1 验收
 
-- 大陆不会只是随机噪声斑块
-- 主要山系与板块边界有因果关系
-- 主大陆与外围海洋留出合理缓冲
+- 大陆不是随机噪声斑块。
+- 大陆和板块不等价。
+- 主要山脉、海沟、裂谷有明确构造成因。
+- 主大陆与外围海洋留有缓冲。
+- 同 Seed / 同配置完全可复现。
 
 ## Phase 2 — 气候骨架
+
+状态：未开始
 
 输入：
 
@@ -63,6 +94,8 @@
 
 ## Phase 3 — 季风与水文
 
+状态：未开始
+
 加入：
 
 - 夏 / 冬代表态
@@ -76,6 +109,8 @@
 
 ## Phase 4 — 生态与 Minecraft 映射
 
+状态：未开始
+
 输出：
 
 - Climate Type
@@ -86,6 +121,8 @@
 
 ## Phase 5 — Generator MVP
 
+状态：未开始
+
 能力：
 
 - 新建世界模型
@@ -94,20 +131,22 @@
 - 图层查看
 - 导出世界模型
 - 导出 PNG / Heightmap
-- 基础 Minecraft 预生成
+- Minecraft 世界预生成
 
 ## Phase 6 — Runtime MVP
 
-先选择一个 Loader 作为首个 Adapter。
+状态：未开始
+
+先选择一个 Loader 作为首个 Adapter，但架构不绑定 Loader。
 
 目标：
 
 - 创建世界时可选 GeoWorld
-- 加载同一世界模型
+- 保存世界级 GeoWorld 配置
+- 加载同一 World Model
 - 按 Chunk 生成
 - Infinite Storm Ocean
 - Infinite Frozen Ocean
-- 世界数据持久化
 - GeoWorld API
 
 ## 暂不进入 V1
