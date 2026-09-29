@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"geoworld/internal/phase1"
+	"geoworld/internal/world"
 )
 
 func TestLatitudeRunsNorthToSouth(t *testing.T) {
@@ -303,7 +304,7 @@ func TestSeaSurfaceTransportChangesLatitudeBaseline(t *testing.T) {
 func TestWarmCurrentInfluenceDecaysInland(t *testing.T) {
 	cfg := normalizeConfig(Config{
 		CoastalCurrentInfluence: 0.75,
-		CoastalTempDecayCells:   2,
+		CoastalTempDecayBlocks:  2 * world.DefaultMacroSpacingBlocks,
 	})
 	m := &Model{
 		Config:               cfg,
@@ -313,7 +314,7 @@ func TestWarmCurrentInfluenceDecaysInland(t *testing.T) {
 		LatitudeBaseTempC:    []float64{10, 10, 10, 10, 10, 10},
 		AnnualMeanTempC:      []float64{10, 10, 10, 10, 10, 10},
 		SeaSurfaceTempC:      []float64{15.2, 0, 0, 0, 0, 0}, // +4°C SST anomaly at ocean source
-		OceanDistanceCells:   make([]float64, 6),
+		OceanDistanceBlocks:  make([]float64, 6),
 		OceanTempCorrectionC: make([]float64, 6),
 		AdjustedAnnualTempC:  make([]float64, 6),
 	}
@@ -326,8 +327,198 @@ func TestWarmCurrentInfluenceDecaysInland(t *testing.T) {
 	}
 }
 
+func TestOceanTemperatureDistanceUsesPhysicalBlocksAcrossResolution(t *testing.T) {
+	makeModel := func(width, height int, spanX, spanZ float64) *Model {
+		geometry := world.GridGeometry{Width: width, Height: height, SpanXBlocks: spanX, SpanZBlocks: spanZ}
+		n := width * height
+		m := &Model{
+			Config:               normalizeConfig(Config{}),
+			Geometry:             geometry,
+			Width:                width,
+			Height:               height,
+			LandMask:             make([]bool, n),
+			LatitudeBaseTempC:    make([]float64, n),
+			AnnualMeanTempC:      make([]float64, n),
+			SeaSurfaceTempC:      make([]float64, n),
+			OceanDistanceBlocks:  make([]float64, n),
+			OceanTempCorrectionC: make([]float64, n),
+			AdjustedAnnualTempC:  make([]float64, n),
+		}
+		for z := 0; z < height; z++ {
+			for x := 0; x < width; x++ {
+				i := z*width + x
+				worldX, _ := geometry.NodePosition(x, z)
+				m.LatitudeBaseTempC[i] = 10
+				m.AnnualMeanTempC[i] = 10
+				if worldX <= 1024 {
+					m.SeaSurfaceTempC[i] = 15.2 // +4C anomaly from the 11.2C baseline.
+				} else {
+					m.LandMask[i] = true
+				}
+			}
+		}
+		m.applyOceanTemperatureInfluence()
+		return m
+	}
+
+	coarse := makeModel(33, 17, 4096, 2048)
+	fine := makeModel(65, 33, 4096, 2048)
+	coarseI := 8*coarse.Width + 16 // x=2048, z=1024
+	fineI := 16*fine.Width + 32    // same world position
+
+	if got := coarse.OceanDistanceBlocks[coarseI]; math.Abs(got-1024) > 1e-12 {
+		t.Fatalf("coarse ocean distance %.3f, want 1024 blocks", got)
+	}
+	if got := fine.OceanDistanceBlocks[fineI]; math.Abs(got-1024) > 1e-12 {
+		t.Fatalf("fine ocean distance %.3f, want 1024 blocks", got)
+	}
+	if math.Abs(coarse.OceanTempCorrectionC[coarseI]-fine.OceanTempCorrectionC[fineI]) > 1e-12 {
+		t.Fatalf("coastal temperature decay changed with resolution: coarse=%.12f fine=%.12f",
+			coarse.OceanTempCorrectionC[coarseI], fine.OceanTempCorrectionC[fineI])
+	}
+	if math.Abs(coarse.referenceStepCells()-1) > 1e-12 || math.Abs(fine.referenceStepCells()-2) > 1e-12 {
+		t.Fatalf("reference transport step mismatch: coarse=%.3f fine=%.3f",
+			coarse.referenceStepCells(), fine.referenceStepCells())
+	}
+}
+
+func TestSeaSurfaceTransportStableAcrossResolution(t *testing.T) {
+	makeModel := func(width, height int, span float64) *Model {
+		geometry := world.GridGeometry{Width: width, Height: height, SpanXBlocks: span, SpanZBlocks: span}
+		n := width * height
+		m := &Model{
+			Config:            normalizeConfig(Config{SSTTransportIterations: 8}),
+			Geometry:          geometry,
+			Width:             width,
+			Height:            height,
+			LandMask:          make([]bool, n),
+			LatitudeBaseTempC: make([]float64, n),
+			SeaSurfaceTempC:   make([]float64, n),
+			CurrentX:          make([]float64, n),
+			CurrentZ:          make([]float64, n),
+		}
+		for z := 0; z < height; z++ {
+			for x := 0; x < width; x++ {
+				i := z*width + x
+				worldX, _ := geometry.NodePosition(x, z)
+				m.LatitudeBaseTempC[i] = 8.8 // 10C relaxed SST baseline.
+				m.SeaSurfaceTempC[i] = 10
+				if worldX <= 512 {
+					m.SeaSurfaceTempC[i] = 20
+				}
+				m.CurrentX[i] = 1
+			}
+		}
+		m.transportSeaSurfaceHeat()
+		return m
+	}
+
+	coarse := makeModel(17, 17, 2048)
+	fine := makeModel(33, 33, 2048)
+	for z := 0; z < coarse.Height; z++ {
+		for x := 0; x < coarse.Width; x++ {
+			coarseV := coarse.SeaSurfaceTempC[z*coarse.Width+x]
+			fineV := fine.SeaSurfaceTempC[(z*2)*fine.Width+x*2]
+			if math.Abs(coarseV-fineV) > 1e-12 {
+				t.Fatalf("SST transport changed at physical node %d,%d: coarse=%.12f fine=%.12f", x, z, coarseV, fineV)
+			}
+		}
+	}
+}
+
+func TestMoistureTransportStableAcrossResolution(t *testing.T) {
+	makeModel := func(width, height int, spanX, spanZ float64) (*Model, []float64, []float64, []float64, []float64) {
+		geometry := world.GridGeometry{Width: width, Height: height, SpanXBlocks: spanX, SpanZBlocks: spanZ}
+		n := width * height
+		m := &Model{
+			Config:         normalizeConfig(Config{MoistureIterations: 10}),
+			Geometry:       geometry,
+			Width:          width,
+			Height:         height,
+			LandMask:       make([]bool, n),
+			PressureIndex:  make([]float64, n),
+			LandElevationM: make([]float64, n),
+			Moisture:       make([]float64, n),
+		}
+		temp := make([]float64, n)
+		windX := make([]float64, n)
+		windZ := make([]float64, n)
+		sst := make([]float64, n)
+		for z := 0; z < height; z++ {
+			for x := 0; x < width; x++ {
+				i := z*width + x
+				worldX, _ := geometry.NodePosition(x, z)
+				temp[i] = 20
+				windX[i] = 1
+				m.PressureIndex[i] = 0.6
+				if worldX <= 384 {
+					sst[i] = 20
+				} else {
+					m.LandMask[i] = true
+				}
+			}
+		}
+		return m, temp, windX, windZ, sst
+	}
+
+	coarse, ct, cwx, cwz, csst := makeModel(17, 5, 2048, 512)
+	fine, ft, fwx, fwz, fsst := makeModel(33, 9, 2048, 512)
+	cm, _, cp := coarse.solveMoistureAndPrecipitation(ct, cwx, cwz, csst, 0)
+	fm, _, fp := fine.solveMoistureAndPrecipitation(ft, fwx, fwz, fsst, 0)
+
+	for z := 0; z < coarse.Height; z++ {
+		for x := 0; x < coarse.Width; x++ {
+			ci := z*coarse.Width + x
+			fi := (z*2)*fine.Width + x*2
+			if math.Abs(cm[ci]-fm[fi]) > 1e-12 {
+				t.Fatalf("moisture changed at physical node %d,%d: coarse=%.12f fine=%.12f", x, z, cm[ci], fm[fi])
+			}
+			if math.Abs(cp[ci]-fp[fi]) > 1e-9 {
+				t.Fatalf("precipitation changed at physical node %d,%d: coarse=%.9f fine=%.9f", x, z, cp[ci], fp[fi])
+			}
+		}
+	}
+}
+
+func TestDefaultMoistureIterationsUsePhysicalSpan(t *testing.T) {
+	makeInput := func(width, height int, spanX, spanZ float64) Input {
+		n := width * height
+		return Input{
+			Width: width, Height: height,
+			Geometry:  world.GridGeometry{Width: width, Height: height, SpanXBlocks: spanX, SpanZBlocks: spanZ},
+			Elevation: make([]float64, n),
+			LandMask:  make([]bool, n),
+		}
+	}
+
+	coarse, err := Generate(makeInput(49, 25, 6144, 3072), Config{SSTTransportIterations: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fine, err := Generate(makeInput(97, 49, 6144, 3072), Config{SSTTransportIterations: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if coarse.Config.MoistureIterations != fine.Config.MoistureIterations {
+		t.Fatalf("default moisture iterations changed with resolution: coarse=%d fine=%d",
+			coarse.Config.MoistureIterations, fine.Config.MoistureIterations)
+	}
+}
+
+func TestClimateRejectsGeometryDimensionMismatch(t *testing.T) {
+	input := Input{
+		Width: 2, Height: 2,
+		Geometry:  world.GridGeometry{Width: 3, Height: 2, SpanXBlocks: 256, SpanZBlocks: 128},
+		Elevation: make([]float64, 4),
+		LandMask:  make([]bool, 4),
+	}
+	if _, err := Generate(input, Config{}); err == nil {
+		t.Fatal("expected mismatched climate geometry to be rejected")
+	}
+}
+
 func TestColdCurrentProducesNegativeCoastalCorrection(t *testing.T) {
-	cfg := normalizeConfig(Config{CoastalTempDecayCells: 3})
+	cfg := normalizeConfig(Config{CoastalTempDecayBlocks: 3 * world.DefaultMacroSpacingBlocks})
 	m := &Model{
 		Config:               cfg,
 		Width:                3,
@@ -336,7 +527,7 @@ func TestColdCurrentProducesNegativeCoastalCorrection(t *testing.T) {
 		LatitudeBaseTempC:    []float64{10, 10, 10},
 		AnnualMeanTempC:      []float64{10, 10, 10},
 		SeaSurfaceTempC:      []float64{7.2, 0, 0}, // -4°C anomaly from 11.2°C baseline
-		OceanDistanceCells:   make([]float64, 3),
+		OceanDistanceBlocks:  make([]float64, 3),
 		OceanTempCorrectionC: make([]float64, 3),
 		AdjustedAnnualTempC:  make([]float64, 3),
 	}
@@ -350,7 +541,7 @@ func TestColdCurrentProducesNegativeCoastalCorrection(t *testing.T) {
 func TestOceanCorrectionPreservesExistingLandTemperatureDifference(t *testing.T) {
 	cfg := normalizeConfig(Config{
 		CoastalCurrentInfluence: 0.75,
-		CoastalTempDecayCells:   1000, // nearly equal ocean influence on both land cells
+		CoastalTempDecayBlocks:  1000 * world.DefaultMacroSpacingBlocks, // nearly equal ocean influence on both land cells
 	})
 	m := &Model{
 		Config:               cfg,
@@ -360,7 +551,7 @@ func TestOceanCorrectionPreservesExistingLandTemperatureDifference(t *testing.T)
 		LatitudeBaseTempC:    []float64{10, 10, 10},
 		AnnualMeanTempC:      []float64{10, 5, -5},
 		SeaSurfaceTempC:      []float64{15.2, 0, 0},
-		OceanDistanceCells:   make([]float64, 3),
+		OceanDistanceBlocks:  make([]float64, 3),
 		OceanTempCorrectionC: make([]float64, 3),
 		AdjustedAnnualTempC:  make([]float64, 3),
 	}
@@ -644,7 +835,7 @@ func TestMonsoonIndexTargetsLowMidLatitudeLand(t *testing.T) {
 		LandMask:            []bool{false, true, true, false, true, true, false, true, true},
 		LatitudeDeg:         []float64{20, 20, 20, 65, 65, 65, 0, 0, 0},
 		AdjustedAnnualTempC: make([]float64, 9),
-		OceanDistanceCells:  []float64{0, 1, 2, 0, 1, 2, 0, 1, 2},
+		OceanDistanceBlocks: []float64{0, 128, 256, 0, 128, 256, 0, 128, 256},
 		WindX:               make([]float64, 9),
 		WindZ:               make([]float64, 9),
 		SeasonalAmplitudeC:  make([]float64, 9),
@@ -678,7 +869,7 @@ func TestMonsoonSummerWindOnshoreWinterWindOffshore(t *testing.T) {
 		LandMask:            []bool{false, true, true, true, true},
 		LatitudeDeg:         []float64{20, 20, 20, 20, 20},
 		AdjustedAnnualTempC: []float64{20, 20, 20, 20, 20},
-		OceanDistanceCells:  []float64{0, 1, 2, 3, 4},
+		OceanDistanceBlocks: []float64{0, 128, 256, 384, 512},
 		WindX:               make([]float64, 5),
 		WindZ:               make([]float64, 5),
 		SeasonalAmplitudeC:  make([]float64, 5),

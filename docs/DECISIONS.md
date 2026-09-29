@@ -918,3 +918,23 @@ Phase 1 的 OceanFraction 当前控制 Oceanic 地壳面积。修正后须分别
 状态：已执行文档整理
 
 STATUS.md 只描述当前基线、进行中、未解决及下一步。原有逐阶段状态全文归档到 PROGRESS.md；PHASE 文档保存实现细节与实验。所有历史数字标注语境，不因算法变化被删除或当作当前结果。每个开发切片在验证后同步状态并提交。
+
+
+## D-035：旧 Cell 空间参数必须通过共享参考物理尺度迁移
+
+状态：Phase 1 与 Climate 第一批已实现；其余阶段继续迁移
+
+历史算法大量使用 Cell / iteration 表达作用范围。Phase 6.1b 规定：
+
+1. 旧默认参数先解释为旧 128 blocks/node 基线下的物理距离，而不是直接把字段名从 Cells 改成 Blocks。
+2. 共享 world.DefaultMacroSpacingBlocks = 128 只用于翻译历史默认值，不规定未来世界必须使用 128 blocks/node。
+3. 每个阶段必须接收或保存 GridGeometry，运行时按实际节点间距把物理距离解析成采样偏移。
+4. 同一物理世界范围改变 Width / Height 时，已迁移机制的作用距离、坡度量纲和传播距离不得系统漂移。
+5. Legacy 手写输入可以暂时回退到 128 blocks/node 以保护旧测试/工具，但正式 adapter 必须传真实 Geometry；统一 Generator 后应集中解析兼容默认值。
+6. 对传播算法，迭代次数和每步距离要分开考虑：仅按节点数增加迭代次数不等于物理尺度正确。
+
+当前已按此原则迁移：
+- Phase 1 CoastDistance、构造影响半径及相关海岸/海盆阈值。
+- Climate OceanDistance / CoastalTempDecay、SST 传播、水汽传播、默认 MoistureIterations 与 Orographic Lift 梯度。
+
+Erosion / Hydrology / Geomorph 继续按同一规则处理。

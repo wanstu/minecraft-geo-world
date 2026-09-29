@@ -834,3 +834,32 @@ Phase 5 完成第一版。
 - Phase 1 其它以 grid-frequency 表达的 warp/noise 仍待后续评估。
 
 下一步：继续 6.1b climate 空间尺度迁移。
+
+
+## 2026-09-30 — Phase 6.1b 第二切片：Climate 物理尺度迁移
+
+基线：1439bcb，分支 agent/world-model-foundation。
+
+本切片完成：
+- 将旧 128 blocks/node 提升为 shared reference scale，只用于把历史 Cell 参数翻译成物理距离。
+- Climate Input / Model 接入 GridGeometry；Phase 1 adapter 传递真实 Geometry。
+- CoastalTempDecay 与 OceanDistance 改为 blocks。
+- SST 平流/扩散、水汽平流/扩散改为按 128-block 物理步长解析。
+- 默认 MoistureIterations 改为按世界 Span 推导，不再随相同世界的采样节点数变化。
+- Orographic Lift 的高程梯度加入真实节点间距校正。
+- 固定相同世界范围的 128 / 64 blocks-node 回归验证 OceanDistance、温度衰减、SST、水汽与降水对应世界坐标一致。
+
+验证：
+- climate 单元测试通过。
+- go test ./... -count=1 通过。
+- 16 Seed climate audit 与 12 Seed monsoon audit 通过。
+- 4 Seed / 640×400 Profile audit 与第一切片默认结果一致。
+- 2 Seed consistency audit 与第一切片默认结果一致。
+- 6.2 的最终海岸/水体/河床问题没有被隐藏或提前标记完成。
+
+未完成：
+- Erosion slope / local relief 的物理尺度。
+- Hydrology / Geomorph 的距离核与河谷扩散。
+- Phase 1 非距离型 grid-frequency warp/noise 的进一步评估。
+
+下一步：继续 6.1b Erosion。

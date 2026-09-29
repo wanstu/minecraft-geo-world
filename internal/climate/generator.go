@@ -16,13 +16,14 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		return nil, errors.New("climate: input field sizes do not match dimensions")
 	}
 
+	geometry, err := resolveInputGeometry(input)
+	if err != nil {
+		return nil, err
+	}
 	cfg = normalizeConfig(cfg)
 	if cfg.MoistureIterations <= 0 {
-		maxDim := input.Width
-		if input.Height > maxDim {
-			maxDim = input.Height
-		}
-		cfg.MoistureIterations = maxDim / 3
+		referenceMaxDim := math.Max(geometry.SpanXBlocks, geometry.SpanZBlocks)/world.DefaultMacroSpacingBlocks + 1
+		cfg.MoistureIterations = int(referenceMaxDim / 3)
 		if cfg.MoistureIterations < 48 {
 			cfg.MoistureIterations = 48
 		}
@@ -32,6 +33,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	}
 	m := &Model{
 		Config:                 cfg,
+		Geometry:               geometry,
 		Width:                  input.Width,
 		Height:                 input.Height,
 		LandMask:               append([]bool(nil), input.LandMask...),
@@ -45,7 +47,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		SeaSurfaceTempC:        make([]float64, n),
 		CurrentX:               make([]float64, n),
 		CurrentZ:               make([]float64, n),
-		OceanDistanceCells:     make([]float64, n),
+		OceanDistanceBlocks:    make([]float64, n),
 		OceanTempCorrectionC:   make([]float64, n),
 		AdjustedAnnualTempC:    make([]float64, n),
 		Moisture:               make([]float64, n),
@@ -117,6 +119,26 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	return m, nil
 }
 
+func resolveInputGeometry(input Input) (world.GridGeometry, error) {
+	geometry := input.Geometry
+	if geometry.Width == 0 && geometry.Height == 0 &&
+		geometry.SpanXBlocks == 0 && geometry.SpanZBlocks == 0 &&
+		geometry.OriginX == 0 && geometry.OriginZ == 0 {
+		geometry = world.GridGeometry{
+			Width: input.Width, Height: input.Height,
+			SpanXBlocks: float64(input.Width-1) * world.DefaultMacroSpacingBlocks,
+			SpanZBlocks: float64(input.Height-1) * world.DefaultMacroSpacingBlocks,
+		}
+	}
+	if geometry.Width != input.Width || geometry.Height != input.Height {
+		return world.GridGeometry{}, errors.New("climate: geometry dimensions do not match input")
+	}
+	if _, err := geometry.SquareCellSize(); err != nil {
+		return world.GridGeometry{}, err
+	}
+	return geometry, nil
+}
+
 func normalizeConfig(cfg Config) Config {
 	if cfg.MaxLatitudeDeg <= 0 || cfg.MaxLatitudeDeg > 89 {
 		cfg.MaxLatitudeDeg = 82
@@ -160,8 +182,8 @@ func normalizeConfig(cfg Config) Config {
 	if cfg.CoastalCurrentInfluence <= 0 || cfg.CoastalCurrentInfluence > 1 {
 		cfg.CoastalCurrentInfluence = 0.75
 	}
-	if cfg.CoastalTempDecayCells <= 0 {
-		cfg.CoastalTempDecayCells = 18
+	if cfg.CoastalTempDecayBlocks <= 0 {
+		cfg.CoastalTempDecayBlocks = 18 * world.DefaultMacroSpacingBlocks
 	}
 	if cfg.MoistureAdvection <= 0 || cfg.MoistureAdvection >= 1 {
 		cfg.MoistureAdvection = 0.82
@@ -362,8 +384,7 @@ func (m *Model) transportSeaSurfaceHeat() {
 	if selfWeight < 0.2 {
 		selfWeight = 0.2
 	}
-
-	dirs := [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+	stepCells := m.referenceStepCells()
 
 	for iter := 0; iter < m.Config.SSTTransportIterations; iter++ {
 		copy(next, prev)
@@ -383,33 +404,17 @@ func (m *Model) transportSeaSurfaceHeat() {
 				if mag > 1e-6 {
 					ux := m.CurrentX[i] / mag
 					uz := m.CurrentZ[i] / mag
-					sx := x - int(math.Round(ux))
-					sz := y - int(math.Round(uz))
-					if sx >= 0 && sx < m.Width && sz >= 0 && sz < m.Height {
-						si := sz*m.Width + sx
-						if !m.LandMask[si] {
-							advected = prev[si]
-						}
+					// The legacy SST solver quantized advection to one cardinal/diagonal
+					// macro step. Preserve that direction quantization, but express the
+					// step in physical world distance.
+					sx := float64(x) - math.Round(ux)*stepCells
+					sz := float64(y) - math.Round(uz)*stepCells
+					if sampled, ok := m.sampleOceanScalar(prev, sx, sz); ok {
+						advected = sampled
 					}
 				}
 
-				sum, count := 0.0, 0
-				for _, d := range dirs {
-					nx, nz := x+d[0], y+d[1]
-					if nx < 0 || nx >= m.Width || nz < 0 || nz >= m.Height {
-						continue
-					}
-					ni := nz*m.Width + nx
-					if m.LandMask[ni] {
-						continue
-					}
-					sum += prev[ni]
-					count++
-				}
-				diffused := self
-				if count > 0 {
-					diffused = sum / float64(count)
-				}
+				diffused := m.oceanNeighborAverageAtStep(prev, x, y, stepCells, self)
 
 				baseline := clamp(m.LatitudeBaseTempC[i]+1.2, -1.8, 30)
 				value := self*selfWeight +
@@ -480,11 +485,11 @@ func (m *Model) applyOceanTemperatureInfluence() {
 	for i := range m.AdjustedAnnualTempC {
 		m.AdjustedAnnualTempC[i] = m.AnnualMeanTempC[i]
 		if dist[i] < 0 {
-			m.OceanDistanceCells[i] = float64(maxInt(m.Width, m.Height))
+			m.OceanDistanceBlocks[i] = float64(maxInt(m.Width, m.Height)) * m.cellSizeBlocks()
 			continue
 		}
 
-		m.OceanDistanceCells[i] = float64(dist[i])
+		m.OceanDistanceBlocks[i] = float64(dist[i]) * m.cellSizeBlocks()
 		if !m.LandMask[i] {
 			// Air over the sea follows only part of the SST anomaly.
 			m.OceanTempCorrectionC[i] = sourceAnomaly[i] * 0.45
@@ -492,7 +497,7 @@ func (m *Model) applyOceanTemperatureInfluence() {
 			continue
 		}
 
-		influence := math.Exp(-float64(dist[i]) / m.Config.CoastalTempDecayCells)
+		influence := math.Exp(-m.OceanDistanceBlocks[i] / m.Config.CoastalTempDecayBlocks)
 		correction := sourceAnomaly[i] * m.Config.CoastalCurrentInfluence * influence
 		m.OceanTempCorrectionC[i] = correction
 		m.AdjustedAnnualTempC[i] += correction
@@ -600,6 +605,7 @@ func (m *Model) solveMoistureAndPrecipitation(
 		lift[i] = m.computeOrographicLiftAt(i, windX, windZ)
 	}
 
+	stepCells := m.referenceStepCells()
 	for iter := 0; iter < m.Config.MoistureIterations; iter++ {
 		for z := 0; z < m.Height; z++ {
 			for x := 0; x < m.Width; x++ {
@@ -610,10 +616,10 @@ func (m *Model) solveMoistureAndPrecipitation(
 				advected := prev[i]
 				if mag > 1e-6 {
 					ux, uz := wx/mag, wz/mag
-					advected = sampleScalar(prev, m.Width, m.Height, float64(x)-ux, float64(z)-uz)
+					advected = sampleScalar(prev, m.Width, m.Height, float64(x)-ux*stepCells, float64(z)-uz*stepCells)
 				}
 
-				diffused := neighborAverage(prev, m.Width, m.Height, x, z)
+				diffused := neighborAverageAtStep(prev, m.Width, m.Height, x, z, stepCells)
 				lowPressureLift := clamp((0.58-m.PressureIndex[i])/0.36, 0, 1)
 
 				rainout := 0.003 + lowPressureLift*0.008 + lift[i]*0.10
@@ -688,8 +694,9 @@ func (m *Model) computeOrographicLiftAt(i int, windX, windZ []float64) float64 {
 		down = m.LandElevationM[i+m.Width]
 	}
 
-	gradX := (right - left) / (2 * math.Max(1, m.Config.MaxLandElevationM))
-	gradZ := (down - up) / (2 * math.Max(1, m.Config.MaxLandElevationM))
+	physicalScale := world.DefaultMacroSpacingBlocks / m.cellSizeBlocks()
+	gradX := (right - left) / (2 * math.Max(1, m.Config.MaxLandElevationM)) * physicalScale
+	gradZ := (down - up) / (2 * math.Max(1, m.Config.MaxLandElevationM)) * physicalScale
 
 	wx, wz := windX[i], windZ[i]
 	mag := math.Hypot(wx, wz)
@@ -730,19 +737,85 @@ func sampleScalar(values []float64, width, height int, x, z float64) float64 {
 	return top + (bottom-top)*tz
 }
 
-func neighborAverage(values []float64, width, height, x, z int) float64 {
+func neighborAverageAtStep(values []float64, width, height, x, z int, step float64) float64 {
 	sum := 0.0
 	count := 0
-	for _, d := range [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
-		nx, nz := x+d[0], z+d[1]
-		if nx < 0 || nx >= width || nz < 0 || nz >= height {
+	for _, d := range [][2]float64{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+		nx := float64(x) + d[0]*step
+		nz := float64(z) + d[1]*step
+		if nx < 0 || nx > float64(width-1) || nz < 0 || nz > float64(height-1) {
 			continue
 		}
-		sum += values[nz*width+nx]
+		sum += sampleScalar(values, width, height, nx, nz)
 		count++
 	}
 	if count == 0 {
 		return values[z*width+x]
+	}
+	return sum / float64(count)
+}
+
+func (m *Model) cellSizeBlocks() float64 {
+	if size, err := m.Geometry.SquareCellSize(); err == nil {
+		return size
+	}
+	// Hand-built unit-test models predate Geometry. Keep their historical
+	// interpretation rather than turning internal helper tests into geometry tests.
+	return world.DefaultMacroSpacingBlocks
+}
+
+func (m *Model) referenceStepCells() float64 {
+	return world.DefaultMacroSpacingBlocks / m.cellSizeBlocks()
+}
+
+func (m *Model) sampleOceanScalar(values []float64, x, z float64) (float64, bool) {
+	if x < 0 || x > float64(m.Width-1) || z < 0 || z > float64(m.Height-1) {
+		return 0, false
+	}
+	x0 := int(math.Floor(x))
+	z0 := int(math.Floor(z))
+	x1 := minInt(x0+1, m.Width-1)
+	z1 := minInt(z0+1, m.Height-1)
+	tx := x - float64(x0)
+	tz := z - float64(z0)
+
+	type sample struct {
+		i int
+		w float64
+	}
+	samples := [4]sample{
+		{i: z0*m.Width + x0, w: (1 - tx) * (1 - tz)},
+		{i: z0*m.Width + x1, w: tx * (1 - tz)},
+		{i: z1*m.Width + x0, w: (1 - tx) * tz},
+		{i: z1*m.Width + x1, w: tx * tz},
+	}
+	sum, weight := 0.0, 0.0
+	for _, s := range samples {
+		if s.w == 0 || m.LandMask[s.i] {
+			continue
+		}
+		sum += values[s.i] * s.w
+		weight += s.w
+	}
+	if weight <= 0 {
+		return 0, false
+	}
+	return sum / weight, true
+}
+
+func (m *Model) oceanNeighborAverageAtStep(values []float64, x, z int, step, fallback float64) float64 {
+	sum := 0.0
+	count := 0
+	for _, d := range [][2]float64{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+		nx := float64(x) + d[0]*step
+		nz := float64(z) + d[1]*step
+		if v, ok := m.sampleOceanScalar(values, nx, nz); ok {
+			sum += v
+			count++
+		}
+	}
+	if count == 0 {
+		return fallback
 	}
 	return sum / float64(count)
 }
@@ -761,8 +834,8 @@ func (m *Model) computeSeasonalStates() {
 			monsoon := 0.0
 
 			if m.LandMask[i] {
-				distance := m.OceanDistanceCells[i]
-				continentality := 1 - math.Exp(-distance/28.0)
+				distance := m.OceanDistanceBlocks[i]
+				continentality := 1 - math.Exp(-distance/(28*world.DefaultMacroSpacingBlocks))
 				landBase := m.Config.LandSeasonalityBaseC +
 					m.Config.LandSeasonalityLatitudeC*latFactor
 				amplitude = landBase * (0.72 + 0.72*continentality)
@@ -770,7 +843,7 @@ func (m *Model) computeSeasonalStates() {
 				thermalContrast := math.Max(0, amplitude-oceanAmplitude)
 				latWeight := smoothstep(5, 14, absLat) *
 					(1 - smoothstep(38, 52, absLat))
-				oceanAccess := math.Exp(-distance / 95.0)
+				oceanAccess := math.Exp(-distance / (95 * world.DefaultMacroSpacingBlocks))
 				monsoon = clamp((thermalContrast/11.0)*latWeight*(0.45+0.55*oceanAccess), 0, 1)
 			}
 
@@ -811,22 +884,22 @@ func (m *Model) computeSeasonalStates() {
 
 func (m *Model) oceanDistanceGradient(x, z int) (dx, dz float64) {
 	i := z*m.Width + x
-	left := m.OceanDistanceCells[i]
-	right := m.OceanDistanceCells[i]
-	up := m.OceanDistanceCells[i]
-	down := m.OceanDistanceCells[i]
+	left := m.OceanDistanceBlocks[i]
+	right := m.OceanDistanceBlocks[i]
+	up := m.OceanDistanceBlocks[i]
+	down := m.OceanDistanceBlocks[i]
 
 	if x > 0 {
-		left = m.OceanDistanceCells[i-1]
+		left = m.OceanDistanceBlocks[i-1]
 	}
 	if x+1 < m.Width {
-		right = m.OceanDistanceCells[i+1]
+		right = m.OceanDistanceBlocks[i+1]
 	}
 	if z > 0 {
-		up = m.OceanDistanceCells[i-m.Width]
+		up = m.OceanDistanceBlocks[i-m.Width]
 	}
 	if z+1 < m.Height {
-		down = m.OceanDistanceCells[i+m.Width]
+		down = m.OceanDistanceBlocks[i+m.Width]
 	}
 
 	return (right - left) * 0.5, (down - up) * 0.5

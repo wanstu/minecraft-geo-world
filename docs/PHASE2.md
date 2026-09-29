@@ -265,7 +265,8 @@ Ocean Thermal Anomaly
 默认：
 
 - CoastalCurrentInfluence = 0.75
-- CoastalTempDecayCells = 18
+- Phase 2.4 初版：`CoastalTempDecayCells = 18`。
+- Phase 6.1b：迁移为 `CoastalTempDecayBlocks = 2304`，即旧 18 Cell × 128 blocks；提高宏观网格精度时沿岸温度作用距离不再随 Cell 变窄。
 
 当前测试 Seed：
 
@@ -297,7 +298,8 @@ Ocean temperature correction  -0.391°C .. +0.289°C
 
 - 盛行风上游平流。
 - 小尺度扩散。
-- 迭代次数随宏观网格尺寸自适应，不再固定 64 次。
+- Phase 2.5 初版：迭代次数随宏观网格节点数自适应。
+- Phase 6.1b：默认迭代次数改为按世界物理 Span 解析；单次平流/扩散按 128 blocks 的参考物理步长换算到当前 GridGeometry，因此提高网格精度不会把水汽每步传播距离缩短。
 
 ### 降水机制
 
@@ -312,7 +314,7 @@ Temperature Capacity
 → Annual Precipitation
 ```
 
-山地迎风坡通过风向与海拔梯度点积计算抬升。
+山地迎风坡通过风向与海拔梯度点积计算抬升。Phase 6.1b 起梯度除以真实节点物理间距，并用旧 128-block 基线归一化，避免网格加密后 Orographic Lift 系统性变强。
 
 迎风坡增强凝结并消耗水汽，因此背风侧自然形成雨影。
 

@@ -11,6 +11,11 @@ import (
 // Minecraft Y or a physical elevation in metres.
 const DefaultSeaLevelNormalized = 0.5
 
+// DefaultMacroSpacingBlocks is the physical spacing represented by one legacy
+// macro-grid step. New code should carry GridGeometry explicitly and use this
+// constant only when translating old cell-based defaults.
+const DefaultMacroSpacingBlocks = 128.0
+
 // GridGeometry describes node locations, not cell-centred pixels.
 // Spans are in Minecraft blocks and remain independent of sampling resolution.
 type GridGeometry struct {

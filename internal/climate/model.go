@@ -1,5 +1,7 @@
 package climate
 
+import "geoworld/internal/world"
+
 type Config struct {
 	MaxLatitudeDeg                  float64
 	EquatorTempC                    float64
@@ -15,7 +17,7 @@ type Config struct {
 	SSTAdvection                    float64
 	SSTDiffusion                    float64
 	CoastalCurrentInfluence         float64
-	CoastalTempDecayCells           float64
+	CoastalTempDecayBlocks          float64
 	MoistureIterations              int
 	MoistureAdvection               float64
 	MoistureDiffusion               float64
@@ -34,12 +36,14 @@ type Config struct {
 type Input struct {
 	Width     int
 	Height    int
+	Geometry  world.GridGeometry
 	Elevation []float64
 	LandMask  []bool
 }
 
 type Model struct {
 	Config                 Config
+	Geometry               world.GridGeometry
 	Width                  int
 	Height                 int
 	LandMask               []bool
@@ -53,7 +57,7 @@ type Model struct {
 	SeaSurfaceTempC        []float64
 	CurrentX               []float64
 	CurrentZ               []float64
-	OceanDistanceCells     []float64
+	OceanDistanceBlocks    []float64
 	OceanTempCorrectionC   []float64
 	AdjustedAnnualTempC    []float64
 	Moisture               []float64

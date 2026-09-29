@@ -193,3 +193,35 @@ phase1.Generate 仍保留旧的非 error 返回接口：内部产生非法高程
 - 最终连续海岸/河床问题仍明确为 UNRESOLVED，留到 6.2。
 
 下一切片：把 GridGeometry 传入 climate，优先迁移 CoastalTempDecay 与水汽/海温传播距离；之后处理 erosion slope 与 hydrology/geomorph 空间核。
+
+
+## Phase 6.1b 第二切片实施结果（2026-09-30）
+
+基线：1439bcb；开发分支：agent/world-model-foundation。
+
+本切片迁移 Climate 的距离、传播步长和坡度量纲；6.1b 仍未整体完成。
+
+已完成：
+- [x] world.DefaultMacroSpacingBlocks = 128 提升为跨阶段共享的旧 Cell 默认值参考尺度。
+- [x] climate.Input / Model 保存 GridGeometry；InputFromPhase1 传入 Phase 1 的真实 Geometry。
+- [x] Legacy 手写 climate Input 未提供 Geometry 时才兼容解析为 128 blocks/node；Geometry 尺寸不匹配或非等距明确报错。
+- [x] CoastalTempDecayCells 迁为 CoastalTempDecayBlocks，默认 2304 blocks。
+- [x] OceanDistanceCells 迁为 OceanDistanceBlocks；季节大陆性和季风 ocean-access 的旧距离常量同步按 128-block 参考尺度换算。
+- [x] SST 平流方向保留旧 cardinal/diagonal 量化，但一次传播距离固定为 128 blocks，并按当前节点间距解析采样位置。
+- [x] SST 扩散按 128-block 物理邻域采样；默认 128-block 网格与旧算法结果一致。
+- [x] 水汽平流/扩散按 128-block 物理步长采样；默认 MoistureIterations 按世界物理 Span 推导，而不是按节点数推导。
+- [x] Orographic Lift 的地形梯度按实际 GridGeometry 节点间距修正，再映射到旧 128-block 基线量纲。
+- [x] 固定世界范围 128 → 64 blocks/node 回归覆盖 OceanDistance、Coastal temperature、SST transport、Moisture 和 Precipitation。
+- [ ] Erosion slope / relief、Hydrology / Geomorph 距离核仍待下一切片。
+- [ ] Phase 1 中非距离型的 grid-frequency warp/noise 仍待单独评估，不在本切片冒充已解决。
+
+### 验证
+
+- go test ./internal/climate -count=1：通过。
+- go test ./... -count=1：通过。
+- go run ./cmd/geoworld-climate-audit：16 Seed / 320×200 通过。
+- go run ./cmd/geoworld-monsoon-audit：12 Seed / 240×150 通过。
+- go run ./cmd/geoworld-mcprofile-audit -count 4：默认 128-block 输出与 1439bcb 第一切片一致；Unknown=0；平均 confidence 0.691–0.764。
+- go run ./cmd/geoworld-consistency-audit：731894205 / 10400 的全部当前诊断与 1439bcb 一致；最终连续海岸/河床问题仍为 UNRESOLVED。
+
+下一切片：Erosion 的 slope / local relief 物理尺度，然后 Hydrology / Geomorph。

@@ -59,7 +59,7 @@ type Plate struct {
 	Velocity Vec2
 }
 
-const DefaultReferenceCellSizeBlocks = 128.0
+const DefaultReferenceCellSizeBlocks = world.DefaultMacroSpacingBlocks
 
 type Config struct {
 	Seed       int64

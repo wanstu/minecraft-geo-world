@@ -7,6 +7,7 @@ func InputFromPhase1(w *phase1.World) Input {
 	return Input{
 		Width:     w.Config.Width,
 		Height:    w.Config.Height,
+		Geometry:  w.Geometry,
 		Elevation: append([]float64(nil), w.Elevation...),
 		LandMask:  land,
 	}
