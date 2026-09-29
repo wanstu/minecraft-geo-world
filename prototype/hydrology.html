@@ -1,0 +1,51 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GeoWorld · 水文实验</title><link rel="stylesheet" href="assets/common.css">
+<style>
+.lab-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:max-content;align-content:start;gap:14px;padding:16px;overflow:auto}
+.lab-card{min-width:0;background:#0f171e;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.lab-card header{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
+.lab-card header small{color:var(--muted)}.lab-card img{width:100%;height:auto;aspect-ratio:8/5;object-fit:contain;display:block;image-rendering:pixelated;background:#091016}
+.note{margin:16px;padding:12px;border:1px solid #355766;background:#13232b;border-radius:8px;color:#badde8;font-size:13px;line-height:1.6}
+@media(max-width:900px){.lab-grid{grid-template-columns:1fr}}
+</style></head><body>
+<div class="app"><header class="topbar"><a class="brand" href="index.html"><span>Geo</span>World Generator</a>
+<div class="badge">Phase 3.3 Lab</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
+<div class="shell">
+<aside class="sidebar"><div class="section"><h3>世界模型</h3>
+<a class="nav-item" href="generator.html">世界总览</a>
+<a class="nav-item" href="plates.html">板块构造</a>
+<div class="nav-item">地形与海盆</div>
+<a class="nav-item" href="climate.html">气候骨架</a>
+<a class="nav-item" href="monsoon.html">季风 / 季节性</a>
+<a class="nav-item active" href="hydrology.html"><i class="dot"></i>水文</a>
+<div class="nav-item">生态区</div></div>
+<div class="section"><h3>本次 Lab</h3>
+<div class="kv"><span>Seed</span><span>731894205</span></div>
+<div class="kv"><span>宏观网格</span><span>640 × 400</span></div>
+<div class="kv"><span>全部流域</span><span>1738</span></div>
+<div class="kv"><span>主要流域</span><span>62</span></div>
+<div class="kv"><span>河流 Cell</span><span>2.07%</span></div>
+</div></aside>
+<main class="main">
+<div class="toolbar"><div class="title">Phase 3.3 · 流域与河网骨架</div><div class="badge">Elevation + Rainfall → Drainage → Rivers</div></div>
+<div class="note"><strong>当前仍是宏观水文。</strong> 蓝色河网表示未来河谷 / 河道的骨架位置，不是 Minecraft 方块宽度。填洼只用于建立稳定排水方向，原始洼地深度会保留下来作为湖泊候选，而不是被永久抹平。</div>
+<div class="lab-grid">
+<div class="lab-card"><header><strong>① 水文填洼高程</strong><small>保证每个陆地 Cell 有稳定出口</small></header><img src="generated/hydrology/filled-elevation.png" alt="filled elevation"></div>
+<div class="lab-card"><header><strong>② 填洼深度</strong><small>潜在封闭洼地 / 湖盆</small></header><img src="generated/hydrology/fill-depth.png" alt="fill depth"></div>
+<div class="lab-card"><header><strong>③ 本地径流</strong><small>降水 - 损失 × 季节性径流系数</small></header><img src="generated/hydrology/runoff.png" alt="runoff"></div>
+<div class="lab-card"><header><strong>④ 流向</strong><small>D8 + Priority Flood 出口约束</small></header><img src="generated/hydrology/flow-direction.png" alt="flow direction"></div>
+<div class="lab-card"><header><strong>⑤ 汇流量</strong><small>所有上游径流逐级累积</small></header><img src="generated/hydrology/flow-accumulation.png" alt="flow accumulation"></div>
+<div class="lab-card"><header><strong>⑥ 流域</strong><small>同一出海口 / 下游出口归为同一 Basin</small></header><img src="generated/hydrology/basins.png" alt="basins"></div>
+<div class="lab-card"><header><strong>⑦ 河网</strong><small>高汇流量路径提取</small></header><img src="generated/hydrology/rivers.png" alt="rivers"></div>
+<div class="lab-card"><header><strong>⑧ 湖泊候选</strong><small>填洼深度 + 水量供应</small></header><img src="generated/hydrology/lake-potential.png" alt="lake potential"></div>
+<div class="lab-card"><header><strong>⑨ 湿地候选</strong><small>低坡度 + 高汇流 + 较稳定水分</small></header><img src="generated/hydrology/wetland-potential.png" alt="wetland potential"></div>
+</div></main>
+<aside class="inspector"><div class="section"><h3>当前结果</h3>
+<div class="metric"><strong>62</strong><small>主要河流流域</small></div>
+<div class="row"><div class="metric"><strong>2.07%</strong><small>河流陆地占比</small></div><div class="metric"><strong>1.74%</strong><small>湖泊候选</small></div></div>
+<div class="card"><div class="card-title">为什么要先填洼？</div><p>原始宏观高程会存在数值洼地。Priority Flood 只建立“能从哪里溢出去”的水文表面，避免 Flow Direction 出现死循环。</p></div>
+<div class="card"><div class="card-title">湖泊没有被填没</div><p>FilledElevation 用于排水计算；OriginalElevation 和 FillDepth 仍保留。FillDepth 越大且水量越足，越可能在后续成为实际湖泊。</p></div>
+<div class="card"><div class="card-title">河流不是随机线</div><p>河网来自降水产生的径流沿真实高程流向逐级汇聚。干旱区若没有足够径流，不会仅因为“地图需要河”而强行生成。</p></div>
+<div class="card"><div class="card-title">下一步</div><p>加入河流等级、主要支流、湖泊连通与出水口，再做 Phase 3 水文验收。</p></div>
+</div></aside>
+</div></div></body></html>

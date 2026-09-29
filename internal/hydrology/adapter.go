@@ -1,0 +1,28 @@
+package hydrology
+
+import (
+	"geoworld/internal/climate"
+	"geoworld/internal/phase1"
+)
+
+func InputFromWorld(world *phase1.World, climateModel *climate.Model) Input {
+	n := world.Config.Width * world.Config.Height
+	land := make([]bool, n)
+	for i, crust := range world.Crust {
+		land[i] = crust == phase1.Continental
+	}
+
+	precip := climateModel.SeasonalAnnualPrecipMM
+	if len(precip) != n {
+		precip = climateModel.AnnualPrecipMM
+	}
+
+	return Input{
+		Width:               world.Config.Width,
+		Height:              world.Config.Height,
+		Elevation:           append([]float64(nil), world.Elevation...),
+		LandMask:            land,
+		AnnualPrecipMM:      append([]float64(nil), precip...),
+		RainfallSeasonality: append([]float64(nil), climateModel.RainfallSeasonality...),
+	}
+}

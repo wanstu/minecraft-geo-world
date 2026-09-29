@@ -85,5 +85,6 @@ Windows 可直接双击：
 - `prototype/acceptance.html`：Phase 1 多 Seed 静态验收
 - `prototype/climate.html`：Phase 2 气候骨架实验
 - `prototype/monsoon.html`：Phase 3 季风 / 季节性实验
+- `prototype/hydrology.html`：Phase 3 流域 / 河网 / 湖泊实验
 
 所有 CSS 与生成图片均使用相对路径，可通过 `file://` 直接加载。

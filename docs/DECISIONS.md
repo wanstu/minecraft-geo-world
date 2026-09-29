@@ -448,3 +448,36 @@ Soft Ocean Edge Bias
 硬缓冲保证外围一定为海洋；软偏置保证缓冲区内侧的大陆轮廓仍然自然退入海洋，而不是沿矩形边界被切断。
 
 大陆 Cell 数从合法候选区中精确选取，因此目标 OceanFraction 不因硬缓冲而漂移。
+
+
+---
+
+## D-019：水文填洼表面与真实地形必须分离
+
+状态：已实现
+
+水文算法需要一个保证可排水的高程表面，但最终世界又必须保留真实洼地和湖盆。
+
+因此同时保留：
+
+```text
+OriginalElevation
+FilledElevation
+FillDepth
+```
+
+其中：
+
+- OriginalElevation：真实宏观地形，后续侵蚀 / Runtime 继续使用。
+- FilledElevation：仅用于 Flow Direction / Flow Accumulation。
+- FillDepth：记录为了建立排水出口临时抬高了多少。
+
+禁止：
+
+```text
+OriginalElevation = FilledElevation
+```
+
+否则会永久抹平湖盆、内流洼地和未来可形成湖泊的地貌。
+
+LakePotential 应从 FillDepth 与水量供应继续推导，而不是把 Priority Flood 结果直接当最终地形。

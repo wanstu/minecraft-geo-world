@@ -8,12 +8,14 @@
 
 **Phase 3 — 季风与水文**
 
-当前子阶段：**Phase 3.3 — 流域与河网（准备开始）**
+当前子阶段：**Phase 3.4 — 河网等级与湖泊连通（准备开始）**
 
 ## 当前稳定基线
 
 最近提交：
 
+- `aca7269` — add seasonal precipitation and monsoon rainfall
+- `aa94199` — add seasonal thermal contrast and monsoon winds
 - `59e9d32` — add moisture transport precipitation and rain shadow
 - `879cd5a` — propagate ocean thermal anomalies onto land
 - `f73c13a` — add wind driven surface currents and SST transport
@@ -378,3 +380,48 @@ Phase 2 第一版正式完成。
 - 强季风陆地占比：11.2% ～ 23.6%
 
 下一步：**Phase 3.3 — Watershed / Flow Direction / Flow Accumulation / River Network**。
+
+
+## Phase 3.3 — 流域与河网骨架
+
+状态：**完成第一版**
+
+新增独立模块：
+
+- `internal/hydrology`
+- `cmd/geoworld-hydrology-lab`
+- `cmd/geoworld-hydrology-audit`
+- `prototype/hydrology.html`
+
+已实现：
+
+- Priority Flood 水文填洼。
+- Original / Filled Elevation 分离。
+- FillDepth。
+- D8 Flow Direction。
+- 降水驱动 Local Runoff。
+- Flow Accumulation。
+- BasinID。
+- MajorBasinCount。
+- RiverStrength。
+- LakePotential。
+- WetlandPotential。
+
+8 Seed 审计：
+
+- 河流：1.72% ～ 3.15% 陆地
+- 填洼：3.88% ～ 9.69%
+- 湖泊候选：2.09% ～ 6.42%
+- 湿地候选：1.33% ～ 4.21%
+- 主要河流流域：13 ～ 38
+- 最大归一化填洼深度：0.080 ～ 0.145
+
+当前 640 × 400 Seed 731894205：
+
+- 全部流域：1738
+- 主要流域：62
+- 河流：2.07%
+- 湖泊候选：1.74%
+- 湿地候选：1.59%
+
+下一步：**Phase 3.4 — River Hierarchy / Lake Connectivity / Phase 3 Acceptance**。

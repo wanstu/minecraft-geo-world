@@ -284,15 +284,219 @@ Strong monsoon land area          11.2% .. 23.6%
 - `rainfall-seasonality.png`
 - `monsoon-rain-ratio.png`
 
-## 下一步 — Phase 3.3
+## Phase 3.3 — 流域与河网骨架
 
-流域与河网：
+状态：**完成第一版**
 
-- 对陆地高程做水文填洼 / 出口处理。
-- 计算 Flow Direction。
-- 计算 Flow Accumulation。
-- 结合年降水与季节性估计 Runoff。
-- 提取主河流 / 支流。
-- 识别内流盆地、湖泊与湿地倾向。
+水文已拆成独立包：
 
-这些仍属于宏观世界模型，不直接在这一阶段生成 Minecraft 方块河道。
+`internal/hydrology`
+
+输入：
+
+- Phase 1 最终宏观高程。
+- 陆地 / 海洋 Mask。
+- Phase 3 季节年降水。
+- RainfallSeasonality。
+
+### Priority Flood / 水文填洼
+
+原始宏观地形允许出现封闭洼地。
+
+为了让 Flow Direction 稳定，水文层计算：
+
+- OriginalElevation：真实宏观地形。
+- FilledElevation：仅用于排水求解。
+- FillDepth：Filled - Original。
+
+海洋作为固定海平面出口。
+
+Priority Flood 从所有海洋 Cell 向陆地推进，只把洼地抬到能够找到溢流出口所需的最低高度。
+
+重要：
+
+```text
+FilledElevation ≠ 最终世界地形
+```
+
+它不能覆盖 OriginalElevation。
+
+FillDepth 会继续用于湖泊候选。
+
+### Flow Direction
+
+第一版使用 D8 邻域。
+
+每个陆地 Cell 优先选择 FilledElevation 上最陡下降方向。
+
+若出现极端平坦数值情况，则回退到 Priority Flood 的父节点，保证：
+
+- 无死路。
+- 无 Flow Cycle。
+- 最终能够到达海洋。
+
+### Runoff
+
+本地径流近似：
+
+```text
+effective precipitation
+= max(0, precipitation - loss)
+
+runoff coefficient
+= base
++ rainfall seasonality boost
+
+LocalRunoff
+= effective precipitation × coefficient
+```
+
+当前默认：
+
+- RunoffLossMM = 180
+- BaseRunoffCoefficient = 0.48
+- SeasonalityRunoffBoost = 0.22
+
+这里还没有显式土壤、植被和岩性渗透率；Phase 5 / 后续地质模型可替换该近似。
+
+### Flow Accumulation
+
+所有陆地 Cell 按 FilledElevation 从高到低处理。
+
+```text
+Accumulation(downstream)
++= Accumulation(upstream)
+```
+
+积累的是径流量，不只是“上游 Cell 数”。
+
+因此同样大小的流域：
+
+- 湿润区更容易形成大河。
+- 干旱区不一定形成永久河流。
+
+### 河流
+
+第一版使用：
+
+- 汇流量分位数阈值。
+- 最低绝对汇流量阈值。
+
+当前默认：
+
+- RiverQuantile = 0.965
+- MinRiverAccumulation = 5000
+
+RiverStrength 是连续值，不只是 bool。
+
+后续 Runtime 可以据此决定：
+
+- 河谷宽度。
+- 河床宽度。
+- 河流等级。
+- 是否只生成季节河。
+
+### Basin
+
+所有陆地 Cell 沿 FlowTo 追踪到共同出口，得到 BasinID。
+
+需要区分：
+
+- BasinCount：所有小型海岸流域也计入。
+- MajorBasinCount：流域最大汇流量达到 RiverThreshold 才计入。
+
+当前 Seed 731894205 / 640 × 400：
+
+```text
+All basins       1738
+Major basins       62
+River cells      2.07% land
+Filled cells     6.06% land
+Lake candidates  1.74% land
+Wetland candidates 1.59% land
+Max fill depth   0.1254 normalized
+```
+
+### 湖泊候选
+
+LakePotential 使用：
+
+- FillDepth。
+- 流域水量供应。
+
+当前只是“适合形成湖”的连续场，不直接等于最终湖面。
+
+后续需要：
+
+- LakeID。
+- Spill Elevation。
+- Lake Surface Elevation。
+- Outlet。
+- 上游 / 下游河流连通。
+
+### 湿地候选
+
+WetlandPotential 由：
+
+- 高汇流量。
+- 低坡度。
+- 较稳定的全年水分。
+
+共同形成。
+
+降水季节性越极端，永久湿地倾向适度降低。
+
+### 8 Seed 水文审计
+
+240 × 150：
+
+```text
+River land %                  1.72 .. 3.15
+Filled land %                 3.88 .. 9.69
+Lake candidate land %         2.09 .. 6.42
+Wetland candidate land %      1.33 .. 4.21
+Major river basins              13 .. 38
+Max normalized fill depth     0.080 .. 0.145
+```
+
+### 自动测试
+
+验证：
+
+- 封闭洼地能够被填到溢流高度。
+- FillDepth / LakePotential 保留原始洼地信息。
+- 每个陆地 Cell 最终能够排入海洋。
+- FlowTo 不允许出现循环。
+- 汇流量向下游增加。
+- 干旱地形不会凭空生成河流。
+- 湿润下游能够形成 RiverStrength。
+- Basin 只分配给陆地。
+- 同输入结果完全确定。
+- 多 Seed 河流 / 湖泊 / 湿地比例存在回归护栏。
+
+### 当前可视化
+
+`prototype/hydrology.html`
+
+图层：
+
+- `filled-elevation.png`
+- `fill-depth.png`
+- `runoff.png`
+- `flow-direction.png`
+- `flow-accumulation.png`
+- `basins.png`
+- `rivers.png`
+- `lake-potential.png`
+- `wetland-potential.png`
+
+## 下一步 — Phase 3.4
+
+河网与湖泊深化：
+
+- 河流等级 / Strahler Order。
+- 主河 / 支流区分。
+- 湖泊连通。
+- LakeID / Spill / Outlet。
+- 季节河倾向。
+- Phase 3 多 Seed 最终验收。
