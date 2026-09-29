@@ -863,3 +863,28 @@ Phase 5 完成第一版。
 - Phase 1 非距离型 grid-frequency warp/noise 的进一步评估。
 
 下一步：继续 6.1b Erosion。
+
+
+## 2026-09-30 — Phase 6.1b 第三切片：Erosion 物理尺度迁移
+
+基线：6a3ecf0，分支 agent/world-model-foundation。
+
+本切片完成：
+- Erosion Input / Model 接入 GridGeometry。
+- Slope 中心差分加入真实节点间距，并保持旧 128-block reference slope 的 SlopeScale 语义。
+- ReliefRadiusCells 改为 ReliefRadiusBlocks；默认值按物理 Span 在旧 reference grid 上解析。
+- LocalRelief 使用固定 blocks 邻域，不再让提高网格精度缩小实际观察范围。
+- 新增 128 / 64 blocks-node 固定物理范围测试，Slope、HillslopeErosion 和 LocalRelief 对应坐标一致。
+
+验证：
+- erosion 单元测试通过。
+- go test ./... -count=1 通过。
+- 8 Seed erosion audit 通过。
+- 4 Seed Profile / 2 Seed Consistency 最终复验通过，默认数值与 6a3ecf0 一致；继续保留 6.2 未解决海岸/河床诊断。
+
+未完成：
+- Hydrology 的距离/坡降量纲。
+- Geomorph / 河谷扩散物理尺度。
+- Phase 1 非距离型 grid-frequency warp/noise 评估。
+
+下一步：继续 6.1b Hydrology。

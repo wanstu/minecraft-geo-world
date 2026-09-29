@@ -936,5 +936,6 @@ STATUS.md 只描述当前基线、进行中、未解决及下一步。原有逐�
 当前已按此原则迁移：
 - Phase 1 CoastDistance、构造影响半径及相关海岸/海盆阈值。
 - Climate OceanDistance / CoastalTempDecay、SST 传播、水汽传播、默认 MoistureIterations 与 Orographic Lift 梯度。
+- Erosion Slope / ReliefRadius / LocalRelief。
 
-Erosion / Hydrology / Geomorph 继续按同一规则处理。
+Hydrology / Geomorph 继续按同一规则处理。

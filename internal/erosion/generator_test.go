@@ -7,6 +7,7 @@ import (
 	"geoworld/internal/climate"
 	"geoworld/internal/hydrology"
 	"geoworld/internal/phase1"
+	"geoworld/internal/world"
 )
 
 func baseInput(width, height int) Input {
@@ -190,7 +191,7 @@ func TestReliefMeasuresNeighborhoodRange(t *testing.T) {
 	center := 3*in.Width + 3
 	in.Elevation[center] = 0.90
 
-	m, err := Generate(in, Config{ReliefRadiusCells: 2})
+	m, err := Generate(in, Config{ReliefRadiusBlocks: 2 * world.DefaultMacroSpacingBlocks})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,6 +200,103 @@ func TestReliefMeasuresNeighborhoodRange(t *testing.T) {
 	}
 	if m.ReliefIndex[center] <= 0 {
 		t.Fatalf("expected positive relief index")
+	}
+}
+
+func TestSlopeAndReliefPhysicalScaleStableAcrossResolution(t *testing.T) {
+	makeInput := func(width, height int, span float64) Input {
+		in := baseInput(width, height)
+		geometry := world.GridGeometry{Width: width, Height: height, SpanXBlocks: span, SpanZBlocks: span}
+		in.Geometry = geometry
+		for z := 0; z < height; z++ {
+			for x := 0; x < width; x++ {
+				i := z*width + x
+				worldX, _ := geometry.NodePosition(x, z)
+				in.Elevation[i] = 0.82 - 0.10*(worldX/span)
+			}
+		}
+		return in
+	}
+
+	coarse, err := Generate(makeInput(17, 17, 2048), Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fine, err := Generate(makeInput(33, 33, 2048), Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ci := 8*coarse.Width + 8
+	fi := 16*fine.Width + 16
+	if math.Abs(coarse.Slope[ci]-fine.Slope[fi]) > 1e-12 {
+		t.Fatalf("slope changed with resolution: coarse=%.12f fine=%.12f", coarse.Slope[ci], fine.Slope[fi])
+	}
+	if math.Abs(coarse.HillslopeErosion[ci]-fine.HillslopeErosion[fi]) > 1e-12 {
+		t.Fatalf("hillslope erosion changed with resolution: coarse=%.12f fine=%.12f",
+			coarse.HillslopeErosion[ci], fine.HillslopeErosion[fi])
+	}
+	if math.Abs(coarse.LocalRelief[ci]-fine.LocalRelief[fi]) > 1e-12 {
+		t.Fatalf("local relief changed with resolution: coarse=%.12f fine=%.12f",
+			coarse.LocalRelief[ci], fine.LocalRelief[fi])
+	}
+	if coarse.Config.ReliefRadiusBlocks != fine.Config.ReliefRadiusBlocks {
+		t.Fatalf("default relief radius changed with resolution: coarse=%.1f fine=%.1f blocks",
+			coarse.Config.ReliefRadiusBlocks, fine.Config.ReliefRadiusBlocks)
+	}
+	if coarse.Config.ReliefRadiusBlocks != world.DefaultMacroSpacingBlocks {
+		t.Fatalf("unexpected default relief radius %.1f blocks", coarse.Config.ReliefRadiusBlocks)
+	}
+}
+
+func TestExplicitReliefRadiusUsesPhysicalBlocksAcrossResolution(t *testing.T) {
+	makeModel := func(width, height int, span float64) *Model {
+		geometry := world.GridGeometry{Width: width, Height: height, SpanXBlocks: span, SpanZBlocks: span}
+		n := width * height
+		m := &Model{
+			Config: Config{
+				ReliefRadiusBlocks: 2 * world.DefaultMacroSpacingBlocks,
+				ReliefScale:        0.16,
+			},
+			Geometry:        geometry,
+			Width:           width,
+			Height:          height,
+			LandMask:        make([]bool, n),
+			ErodedElevation: make([]float64, n),
+			LocalRelief:     make([]float64, n),
+			ReliefIndex:     make([]float64, n),
+		}
+		for i := range m.LandMask {
+			m.LandMask[i] = true
+			m.ErodedElevation[i] = 0.70
+		}
+		cx, cz := (width-1)/2, (height-1)/2
+		m.ErodedElevation[cz*width+cx] = 0.90
+		m.computeRelief()
+		return m
+	}
+
+	coarse := makeModel(9, 9, 1024)
+	fine := makeModel(17, 17, 1024)
+
+	coarseInside := coarse.LocalRelief[4*coarse.Width+6] // world x=768, exactly +256 blocks.
+	fineInside := fine.LocalRelief[8*fine.Width+12]
+	if math.Abs(coarseInside-fineInside) > 1e-12 || coarseInside < 0.19 {
+		t.Fatalf("relief radius differs at physical boundary: coarse=%.4f fine=%.4f", coarseInside, fineInside)
+	}
+
+	coarseOutside := coarse.LocalRelief[4*coarse.Width+7] // world x=896, +384 blocks.
+	fineOutside := fine.LocalRelief[8*fine.Width+14]
+	if math.Abs(coarseOutside-fineOutside) > 1e-12 || coarseOutside > 1e-12 {
+		t.Fatalf("relief leaked beyond physical radius: coarse=%.4f fine=%.4f", coarseOutside, fineOutside)
+	}
+}
+
+func TestErosionRejectsGeometryDimensionMismatch(t *testing.T) {
+	in := baseInput(4, 4)
+	in.Geometry = world.GridGeometry{Width: 5, Height: 4, SpanXBlocks: 512, SpanZBlocks: 384}
+	if _, err := Generate(in, Config{}); err == nil {
+		t.Fatal("expected mismatched erosion geometry to be rejected")
 	}
 }
 

@@ -1,19 +1,23 @@
 package erosion
 
+import "geoworld/internal/world"
+
 type Config struct {
-	SeaLevelNormalized      float64
-	ReferencePrecipMM       float64
+	SeaLevelNormalized float64
+	ReferencePrecipMM  float64
+	// SlopeScale remains expressed in the legacy 128-block reference-slope unit.
 	SlopeScale              float64
 	MaxValleyIncision       float64
 	MaxHillslopeErosion     float64
 	TectonicSupportStrength float64
-	ReliefRadiusCells       int
+	ReliefRadiusBlocks      float64
 	ReliefScale             float64
 }
 
 type Input struct {
-	Width  int
-	Height int
+	Width    int
+	Height   int
+	Geometry world.GridGeometry
 
 	LandMask          []bool
 	Elevation         []float64
@@ -29,9 +33,10 @@ type Input struct {
 }
 
 type Model struct {
-	Config Config
-	Width  int
-	Height int
+	Config   Config
+	Geometry world.GridGeometry
+	Width    int
+	Height   int
 
 	LandMask []bool
 

@@ -53,6 +53,8 @@ Tectonics
 
 第一版使用局部中心差分近似宏观坡度。
 
+Phase 6.1b 起，中心差分会除以真实 GridGeometry 节点间距，并映射回旧 128-block reference slope 单位；因此同一物理斜坡提高宏观采样精度时，Slope / Hillslope Erosion 不再系统放大。
+
 坡度只是侵蚀驱动力之一，不单独决定山地 / 丘陵。
 
 ### 湿润度
@@ -190,6 +192,8 @@ max elevation - min elevation
 
 它和 Elevation 明确分离。
 
+Phase 6.1b 起 `ReliefRadiusCells` 迁为 `ReliefRadiusBlocks`。默认仍保留旧算法“约世界短边 1%、最少 1 Cell、最多 32 Cell”的物理含义：先在 128 blocks/node 参考尺度上解析，再按当前 GridGeometry 采样。
+
 例如：
 
 - 高海拔 + 低 Relief → 高原倾向。
@@ -227,6 +231,20 @@ Strong erosion >= 0.015         0 .. 0.035%
 
 Relief 占比不作为死护栏，因为它依赖 Relief 观察窗口尺度。
 
+上述数值是 Phase 4.1 初版历史快照。Phase 6.1a 统一宏观 LandMask 后，当前 Phase 6 基线的 8 Seed / 240×150 审计为：
+
+```text
+Average erosion                 0.00200 .. 0.00321
+Maximum erosion                 0.01480 .. 0.02392
+Valley incision land %          1.27 .. 3.05
+High relief land %             20.04 .. 39.86
+Average local relief            0.06122 .. 0.08888
+Strong erosion >= 0.015         0 .. 0.314%
+```
+
+Phase 6.1b 的 Erosion 物理尺度迁移在默认 128 blocks/node 下保持这组当前基线不变；旧数值保留用于历史追溯，不能拿来直接比较后声称侵蚀“变好/变坏”。
+
+
 ### 自动测试
 
 验证：
@@ -240,6 +258,8 @@ Relief 占比不作为死护栏，因为它依赖 Relief 观察窗口尺度。
 - 侵蚀不能抬高地形。
 - 原始低海岸 Cell 不被 floor 错误抬高。
 - 多 Seed 平均侵蚀 / 最大侵蚀 / 河谷占比存在回归护栏。
+- 固定相同物理世界范围时，128 / 64 blocks-node 的坡度、坡面侵蚀与 LocalRelief 对应世界坐标一致。
+- 显式 ReliefRadiusBlocks 的作用范围不随网格精度变化。
 
 ### 当前可视化
 

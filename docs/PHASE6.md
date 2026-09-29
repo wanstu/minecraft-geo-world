@@ -225,3 +225,29 @@ phase1.Generate 仍保留旧的非 error 返回接口：内部产生非法高程
 - go run ./cmd/geoworld-consistency-audit：731894205 / 10400 的全部当前诊断与 1439bcb 一致；最终连续海岸/河床问题仍为 UNRESOLVED。
 
 下一切片：Erosion 的 slope / local relief 物理尺度，然后 Hydrology / Geomorph。
+
+
+## Phase 6.1b 第三切片实施结果（2026-09-30）
+
+基线：6a3ecf0；开发分支：agent/world-model-foundation。
+
+本切片迁移 Erosion 的坡度量纲与 Relief 观察尺度；6.1b 仍未整体完成。
+
+已完成：
+- [x] erosion.Input / Model 接入 GridGeometry；InputFromWorld 传入 Phase 1 的真实 Geometry。
+- [x] Legacy 手写 erosion Input 未提供 Geometry 时兼容解析为 128 blocks/node；Geometry 尺寸不匹配或非等距明确报错。
+- [x] localSlope 的中心差分按真实节点间距缩放，并归一回旧 128-block reference slope 单位；默认 SlopeScale=0.06 的历史语义保持。
+- [x] ReliefRadiusCells 迁为 ReliefRadiusBlocks。
+- [x] 默认 Relief 半径继续按旧规则解析：约世界短边 1%，在 128-block reference grid 上取整并夹到 1..32 个旧 Cell，即 128..4096 blocks。
+- [x] LocalRelief 在当前 GridGeometry 上按物理方形邻域采样；显式 ReliefRadiusBlocks 不再随网格精度改变物理作用范围。
+- [x] 固定世界范围 128 → 64 blocks/node 回归覆盖 Slope、HillslopeErosion、默认/显式 ReliefRadius 与 LocalRelief。
+- [ ] Hydrology / Geomorph 的距离、坡降和扩散尺度仍待下一切片。
+
+### 验证
+
+- go test ./internal/erosion -count=1：通过。
+- go test ./... -count=1：通过。
+- go run ./cmd/geoworld-erosion-audit：8 Seed / 240×150 通过。
+- 默认 128-block 公式在 slope scale=1、Relief radius 整数 Cell 时与旧路径等价；4 Seed Profile 与 2 Seed Consistency 最终复验均通过，数值与 6a3ecf0 基线一致。
+
+下一切片：Hydrology 的距离/坡降量纲，然后 Geomorph / 河谷扩散。

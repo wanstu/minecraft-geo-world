@@ -18,6 +18,7 @@ func InputFromWorld(world *phase1.World, climateModel *climate.Model, hydro *hyd
 	return Input{
 		Width:             world.Config.Width,
 		Height:            world.Config.Height,
+		Geometry:          world.Geometry,
 		LandMask:          land,
 		Elevation:         append([]float64(nil), world.Elevation...),
 		CrustThickness:    append([]float64(nil), world.CrustThickness...),

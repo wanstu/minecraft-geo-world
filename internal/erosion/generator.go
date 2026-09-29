@@ -32,9 +32,14 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		return nil, errors.New("erosion: mask field sizes do not match dimensions")
 	}
 
-	cfg = normalizeConfig(cfg, input.Width, input.Height)
+	geometry, err := resolveInputGeometry(input)
+	if err != nil {
+		return nil, err
+	}
+	cfg = normalizeConfig(cfg, geometry)
 	m := &Model{
 		Config:            cfg,
+		Geometry:          geometry,
 		Width:             input.Width,
 		Height:            input.Height,
 		LandMask:          append([]bool(nil), input.LandMask...),
@@ -60,7 +65,27 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	return m, nil
 }
 
-func normalizeConfig(cfg Config, width, height int) Config {
+func resolveInputGeometry(input Input) (world.GridGeometry, error) {
+	geometry := input.Geometry
+	if geometry.Width == 0 && geometry.Height == 0 &&
+		geometry.SpanXBlocks == 0 && geometry.SpanZBlocks == 0 &&
+		geometry.OriginX == 0 && geometry.OriginZ == 0 {
+		geometry = world.GridGeometry{
+			Width: input.Width, Height: input.Height,
+			SpanXBlocks: float64(input.Width-1) * world.DefaultMacroSpacingBlocks,
+			SpanZBlocks: float64(input.Height-1) * world.DefaultMacroSpacingBlocks,
+		}
+	}
+	if geometry.Width != input.Width || geometry.Height != input.Height {
+		return world.GridGeometry{}, errors.New("erosion: geometry dimensions do not match input")
+	}
+	if _, err := geometry.SquareCellSize(); err != nil {
+		return world.GridGeometry{}, err
+	}
+	return geometry, nil
+}
+
+func normalizeConfig(cfg Config, geometry world.GridGeometry) Config {
 	if cfg.SeaLevelNormalized <= 0 || cfg.SeaLevelNormalized >= 1 {
 		cfg.SeaLevelNormalized = world.DefaultSeaLevelNormalized
 	}
@@ -79,18 +104,18 @@ func normalizeConfig(cfg Config, width, height int) Config {
 	if cfg.TectonicSupportStrength <= 0 || cfg.TectonicSupportStrength > 1 {
 		cfg.TectonicSupportStrength = 0.65
 	}
-	if cfg.ReliefRadiusCells <= 0 || cfg.ReliefRadiusCells > 32 {
-		minDim := width
-		if height < minDim {
-			minDim = height
+	maxReliefRadiusBlocks := 32 * world.DefaultMacroSpacingBlocks
+	if cfg.ReliefRadiusBlocks <= 0 || cfg.ReliefRadiusBlocks > maxReliefRadiusBlocks {
+		minSpan := math.Min(geometry.SpanXBlocks, geometry.SpanZBlocks)
+		referenceMinDim := minSpan/world.DefaultMacroSpacingBlocks + 1
+		referenceRadiusCells := int(math.Round(referenceMinDim * 0.01))
+		if referenceRadiusCells < 1 {
+			referenceRadiusCells = 1
 		}
-		cfg.ReliefRadiusCells = int(math.Round(float64(minDim) * 0.01))
-		if cfg.ReliefRadiusCells < 1 {
-			cfg.ReliefRadiusCells = 1
+		if referenceRadiusCells > 32 {
+			referenceRadiusCells = 32
 		}
-		if cfg.ReliefRadiusCells > 32 {
-			cfg.ReliefRadiusCells = 32
-		}
+		cfg.ReliefRadiusBlocks = float64(referenceRadiusCells) * world.DefaultMacroSpacingBlocks
 	}
 	if cfg.ReliefScale <= 0 {
 		cfg.ReliefScale = 0.16
@@ -106,7 +131,7 @@ func (m *Model) computeDrivers(input Input) {
 				continue
 			}
 
-			slope := localSlope(input.Elevation, input.LandMask, m.Width, m.Height, x, z)
+			slope := localSlope(input.Elevation, input.LandMask, m.Width, m.Height, x, z, m.Geometry.SpacingX())
 			m.Slope[i] = slope
 
 			wetness := clamp(input.AnnualPrecipMM[i]/m.Config.ReferencePrecipMM, 0, 1.25)
@@ -194,7 +219,8 @@ func (m *Model) erode(input Input) {
 }
 
 func (m *Model) computeRelief() {
-	r := m.Config.ReliefRadiusCells
+	cellSizeBlocks := m.Geometry.SpacingX()
+	radiusCells := int(math.Ceil(m.Config.ReliefRadiusBlocks / cellSizeBlocks))
 	for z := 0; z < m.Height; z++ {
 		for x := 0; x < m.Width; x++ {
 			i := z*m.Width + x
@@ -204,12 +230,18 @@ func (m *Model) computeRelief() {
 
 			minV := math.Inf(1)
 			maxV := math.Inf(-1)
-			for dz := -r; dz <= r; dz++ {
+			for dz := -radiusCells; dz <= radiusCells; dz++ {
+				if math.Abs(float64(dz))*cellSizeBlocks > m.Config.ReliefRadiusBlocks+1e-9 {
+					continue
+				}
 				nz := z + dz
 				if nz < 0 || nz >= m.Height {
 					continue
 				}
-				for dx := -r; dx <= r; dx++ {
+				for dx := -radiusCells; dx <= radiusCells; dx++ {
+					if math.Abs(float64(dx))*cellSizeBlocks > m.Config.ReliefRadiusBlocks+1e-9 {
+						continue
+					}
 					nx := x + dx
 					if nx < 0 || nx >= m.Width {
 						continue
@@ -238,7 +270,7 @@ func (m *Model) computeRelief() {
 	}
 }
 
-func localSlope(elevation []float64, land []bool, width, height, x, z int) float64 {
+func localSlope(elevation []float64, land []bool, width, height, x, z int, cellSizeBlocks float64) float64 {
 	i := z*width + x
 	center := elevation[i]
 	left, right, up, down := center, center, center, center
@@ -268,8 +300,9 @@ func localSlope(elevation []float64, land []bool, width, height, x, z int) float
 		}
 	}
 
-	gx := (right - left) * 0.5
-	gz := (down - up) * 0.5
+	referenceScale := world.DefaultMacroSpacingBlocks / cellSizeBlocks
+	gx := (right - left) * 0.5 * referenceScale
+	gz := (down - up) * 0.5 * referenceScale
 	return math.Hypot(gx, gz)
 }
 
