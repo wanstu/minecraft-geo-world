@@ -1,0 +1,48 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GeoWorld · 气候骨架</title><link rel="stylesheet" href="assets/common.css">
+<style>
+.lab-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:max-content;align-content:start;gap:14px;padding:16px;overflow:auto}
+.lab-card{min-width:0;background:#0f171e;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.lab-card header{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
+.lab-card header small{color:var(--muted)}.lab-card img{width:100%;height:auto;aspect-ratio:8/5;object-fit:contain;display:block;image-rendering:pixelated;background:#091016}
+.note{margin:16px;padding:12px;border:1px solid #355766;background:#13232b;border-radius:8px;color:#b9dbe7;font-size:13px;line-height:1.6}
+@media(max-width:900px){.lab-grid{grid-template-columns:1fr}}
+</style></head><body>
+<div class="app"><header class="topbar"><a class="brand" href="index.html"><span>Geo</span>World Generator</a>
+<div class="badge">Phase 2.2 Lab</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
+<div class="shell">
+<aside class="sidebar"><div class="section"><h3>世界模型</h3>
+<a class="nav-item" href="generator.html">世界总览</a>
+<a class="nav-item" href="plates.html">板块构造</a>
+<div class="nav-item">地形与海盆</div>
+<div class="nav-item">风场 / 洋流</div>
+<a class="nav-item active" href="climate.html"><i class="dot"></i>气候骨架</a>
+<div class="nav-item">水文</div><div class="nav-item">生态区</div></div>
+<div class="section"><h3>本次 Lab</h3>
+<div class="kv"><span>Seed</span><span>731894205</span></div>
+<div class="kv"><span>宏观网格</span><span>640 × 400</span></div>
+<div class="kv"><span>纬度</span><span>82°N ～ 82°S</span></div>
+<div class="kv"><span>赤道基准</span><span>28°C</span></div>
+<div class="kv"><span>极区基准</span><span>-18°C</span></div>
+<div class="kv"><span>直减率</span><span>6.5°C / km</span></div>
+</div></aside>
+<main class="main">
+<div class="toolbar"><div class="title">Phase 2.2 · 基础温度与全球环流</div><div class="badge">Latitude + Elevation → Temperature → Pressure / Wind</div></div>
+<div class="note"><strong>当前只看温度骨架。</strong> 还没有加入洋流、季风、降水或实时天气。海洋格子的温度按海平面处理，不会因为海底很深而被错误降温。</div>
+<div class="lab-grid">
+<div class="lab-card"><header><strong>① 纬度</strong><small>北 → 赤道 → 南</small></header><img src="generated/climate/latitude.png" alt="latitude"></div>
+<div class="lab-card"><header><strong>② 纯纬度温度</strong><small>还没有海拔修正</small></header><img src="generated/climate/temperature-latitude.png" alt="latitude temperature"></div>
+<div class="lab-card"><header><strong>③ 陆地有效海拔</strong><small>海洋按 0m 处理</small></header><img src="generated/climate/land-elevation.png" alt="land elevation"></div>
+<div class="lab-card"><header><strong>④ 年平均温度</strong><small>纬度 + 陆地海拔</small></header><img src="generated/climate/temperature-annual.png" alt="annual temperature"></div>
+<div class="lab-card"><header><strong>⑤ 理想化气压带</strong><small>赤道低压 / 副热带高压 / 副极地低压 / 极地高压</small></header><img src="generated/climate/pressure.png" alt="pressure"></div>
+<div class="lab-card"><header><strong>⑥ 盛行风</strong><small>信风 / 西风带 / 极地东风</small></header><img src="generated/climate/wind.png" alt="wind"></div>
+</div></main>
+<aside class="inspector"><div class="section"><h3>当前结果</h3>
+<div class="metric"><strong>-37.84°C</strong><small>当前最低年均温</small></div>
+<div class="metric"><strong>27.95°C</strong><small>当前最高年均温</small></div>
+<div class="card"><div class="card-title">为什么高山更冷？</div><p>陆地按约 6.5°C / km 的垂直递减率降温。高纬高山会同时受到纬度和海拔两重降温。</p></div>
+<div class="card"><div class="card-title">为什么海沟不会变成超低温？</div><p>气候层使用海平面空气温度，海底深度只属于海洋地形，不作为空气海拔扣温。</p></div>
+<div class="card"><div class="card-title">全球环流已加入</div><p>当前已有赤道低压、副热带高压、副极地低压、极地高压，以及连续过渡的信风、西风带和极地东风。</p></div>
+<div class="card"><div class="card-title">下一步</div><p>建立海表温度和风驱表层洋流，让暖流 / 寒流开始反过来修正沿海温度。</p></div>
+</div></aside>
+</div></div></body></html>
