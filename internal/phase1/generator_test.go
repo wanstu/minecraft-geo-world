@@ -3,6 +3,8 @@ package phase1
 import (
 	"math"
 	"testing"
+
+	"geoworld/internal/world"
 )
 
 func testConfig() Config {
@@ -96,6 +98,94 @@ func TestTectonicInfluenceHasWidth(t *testing.T) {
 	}
 	if influencedCount <= sourceCount {
 		t.Fatalf("influence did not expand beyond boundary sources: sources=%d influenced=%d", sourceCount, influencedCount)
+	}
+}
+
+func TestDefaultSpatialConfigUsesReferenceCellSize(t *testing.T) {
+	w := Generate(testConfig())
+	if got := w.Geometry.SpacingX(); math.Abs(got-DefaultReferenceCellSizeBlocks) > 1e-12 {
+		t.Fatalf("default X spacing %.3f, want %.3f blocks", got, DefaultReferenceCellSizeBlocks)
+	}
+	if got := w.Geometry.SpacingZ(); math.Abs(got-DefaultReferenceCellSizeBlocks) > 1e-12 {
+		t.Fatalf("default Z spacing %.3f, want %.3f blocks", got, DefaultReferenceCellSizeBlocks)
+	}
+	wantX := float64(w.Config.Width-1) * DefaultReferenceCellSizeBlocks
+	wantZ := float64(w.Config.Height-1) * DefaultReferenceCellSizeBlocks
+	if w.Config.SpanXBlocks != wantX || w.Config.SpanZBlocks != wantZ {
+		t.Fatalf("resolved spans %.1fx%.1f, want %.1fx%.1f blocks", w.Config.SpanXBlocks, w.Config.SpanZBlocks, wantX, wantZ)
+	}
+}
+
+func TestCoastDistancePhysicalScaleStableAcrossResolution(t *testing.T) {
+	makeWorld := func(width, height int, spanX, spanZ float64) *World {
+		geometry := world.GridGeometry{Width: width, Height: height, SpanXBlocks: spanX, SpanZBlocks: spanZ}
+		w := &World{
+			Geometry:      geometry,
+			Config:        Config{Width: width, Height: height, SpanXBlocks: spanX, SpanZBlocks: spanZ},
+			Crust:         make([]CrustType, width*height),
+			CoastDistance: make([]float64, width*height),
+		}
+		for z := 0; z < height; z++ {
+			for x := 0; x < width; x++ {
+				worldX, _ := geometry.NodePosition(x, z)
+				if worldX >= 1024 {
+					w.Crust[w.index(x, z)] = Continental
+				} else {
+					w.Crust[w.index(x, z)] = Oceanic
+				}
+			}
+		}
+		w.computeCoastDistance()
+		return w
+	}
+
+	coarse := makeWorld(33, 17, 4096, 2048) // 128 blocks/node
+	fine := makeWorld(65, 33, 4096, 2048)   // 64 blocks/node
+
+	coarseDistance := coarse.CoastDistance[coarse.index(16, 8)] // world X=2048
+	fineDistance := fine.CoastDistance[fine.index(32, 16)]      // world X=2048
+	if math.Abs(coarseDistance-fineDistance) > 1e-12 {
+		t.Fatalf("coast distance changed with resolution: coarse=%.3f fine=%.3f blocks", coarseDistance, fineDistance)
+	}
+	if math.Abs(coarseDistance-1024) > 1e-12 {
+		t.Fatalf("coast distance %.3f, want 1024 blocks", coarseDistance)
+	}
+}
+
+func TestTectonicInfluencePhysicalScaleStableAcrossResolution(t *testing.T) {
+	makeWorld := func(width, height int, spanX, spanZ float64, sourceX, sourceZ int) *World {
+		geometry := world.GridGeometry{Width: width, Height: height, SpanXBlocks: spanX, SpanZBlocks: spanZ}
+		n := width * height
+		w := &World{
+			Geometry:          geometry,
+			Config:            Config{Width: width, Height: height, SpanXBlocks: spanX, SpanZBlocks: spanZ},
+			Crust:             make([]CrustType, n),
+			Feature:           make([]TectonicFeature, n),
+			TectonicIntensity: make([]float64, n),
+			TectonicInfluence: make([]float64, n),
+			InfluenceFeature:  make([]TectonicFeature, n),
+		}
+		for i := range w.Crust {
+			w.Crust[i] = Continental
+		}
+		i := w.index(sourceX, sourceZ)
+		w.Feature[i] = CollisionOrogen
+		w.TectonicIntensity[i] = 0.5
+		w.computeTectonicInfluence()
+		return w
+	}
+
+	coarse := makeWorld(65, 33, 8192, 4096, 32, 16) // 128 blocks/node
+	fine := makeWorld(129, 65, 8192, 4096, 64, 32)  // 64 blocks/node
+
+	for _, offsetBlocks := range []int{0, 512, 1024, 1536} {
+		coarseX := 32 + offsetBlocks/128
+		fineX := 64 + offsetBlocks/64
+		coarseV := coarse.TectonicInfluence[coarse.index(coarseX, 16)]
+		fineV := fine.TectonicInfluence[fine.index(fineX, 32)]
+		if math.Abs(coarseV-fineV) > 1e-12 {
+			t.Fatalf("tectonic influence at +%d blocks changed with resolution: coarse=%.12f fine=%.12f", offsetBlocks, coarseV, fineV)
+		}
 	}
 }
 
@@ -203,11 +293,11 @@ func TestCoastDistanceIsSigned(t *testing.T) {
 		}
 	}
 
-	if maxLand < 5 {
-		t.Fatalf("continental interior too shallow: %.2f cells", maxLand)
+	if maxLand < 5*DefaultReferenceCellSizeBlocks {
+		t.Fatalf("continental interior too shallow: %.2f blocks", maxLand)
 	}
-	if minOcean > -10 {
-		t.Fatalf("ocean basin too close to coast: %.2f cells", minOcean)
+	if minOcean > -10*DefaultReferenceCellSizeBlocks {
+		t.Fatalf("ocean basin too close to coast: %.2f blocks", minOcean)
 	}
 	if landCoast == 0 || oceanCoast == 0 {
 		t.Fatalf("expected coast cells on both sides: land=%d ocean=%d", landCoast, oceanCoast)
@@ -225,10 +315,10 @@ func TestBaseElevationFormsShelfSlopeAndBasin(t *testing.T) {
 		}
 		d := -w.CoastDistance[i]
 		switch {
-		case d <= 6:
+		case d <= continentalShelfWidthBlocks:
 			shelfSum += w.BaseElevation[i]
 			shelfN++
-		case d <= 18:
+		case d <= continentalSlopeWidthBlocks:
 			slopeSum += w.BaseElevation[i]
 			slopeN++
 		default:

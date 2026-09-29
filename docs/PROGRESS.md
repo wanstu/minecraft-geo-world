@@ -806,3 +806,31 @@ Phase 5 完成第一版。
 - 全量测试、4 Seed Profile、2 Seed 宏观一致性审计通过。
 - 最终连续海岸和河网逆坡仍未解决，未将其标成已完成。
 - 下一步：6.1b 旧空间参数迁移。
+
+
+## 2026-09-30 — Phase 6.1b 第一切片：Phase 1 物理尺度迁移
+
+基线：7de68a4，分支 agent/world-model-foundation。
+
+本切片完成：
+- Phase 1 Config 增加 OriginX / OriginZ / SpanXBlocks / SpanZBlocks。
+- 旧默认仍按 128 blocks/node 解析，现有 640×400 世界物理范围不变。
+- Phase 1 World 保存 GridGeometry，并明确要求当前宏观网格 X/Z 等距。
+- CoastDistance 从 Cell 单位迁移为 blocks。
+- 大陆内部、陆架、陆坡、海盆、海岸/高原等依赖 CoastDistance 的阈值全部按旧 128-block 参考尺度换算。
+- Tectonic feature band 由固定 Cell 扩散改为物理半径 + 当前网格重采样。
+- 新增 128 与 64 blocks/node 的固定世界范围回归，验证相同世界坐标的海岸距离和构造影响不随精度变化。
+
+验证：
+- go test ./internal/phase1 -count=1：通过。
+- go test ./... -count=1：通过。
+- 4 Seed / 640×400 mcprofile audit：通过，Unknown=0，平均 confidence 0.691–0.764。
+- consistency audit：731894205 / 10400 的宏观结果与 6.1a 一致；最终连续海岸与河道问题仍未解决。
+
+未完成：
+- climate 的 CoastalTempDecay / 海温与水汽传播距离。
+- erosion slope 与 relief 等尺度。
+- hydrology / geomorph 距离核。
+- Phase 1 其它以 grid-frequency 表达的 warp/noise 仍待后续评估。
+
+下一步：继续 6.1b climate 空间尺度迁移。

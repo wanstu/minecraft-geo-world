@@ -59,11 +59,21 @@ type Plate struct {
 	Velocity Vec2
 }
 
+const DefaultReferenceCellSizeBlocks = 128.0
+
 type Config struct {
 	Seed       int64
 	Width      int
 	Height     int
 	PlateCount int
+
+	// Physical world extent is independent from macro-grid resolution. Zero spans
+	// preserve the legacy default of 128 blocks between neighbouring macro nodes.
+	OriginX     float64
+	OriginZ     float64
+	SpanXBlocks float64
+	SpanZBlocks float64
+
 	// OceanFraction currently controls oceanic crust area, not inundated ocean area.
 	OceanFraction           float64
 	EdgeOceanBufferFraction float64
@@ -72,6 +82,7 @@ type Config struct {
 type World struct {
 	// Surface is derived from elevation and ocean connectivity, never crust type.
 	Surface           *world.Surface
+	Geometry          world.GridGeometry
 	Config            Config
 	Plates            []Plate
 	RawPlateID        []int

@@ -1,6 +1,6 @@
 # Phase 6 — 统一世界模型与最小 Generator
 
-更新时间：2026-09-29。当前进度以 STATUS.md 为准；本文保留评审依据、实施顺序与验收契约。
+更新时间：2026-09-30。当前进度以 STATUS.md 为准；本文保留评审依据、实施顺序与验收契约。
 
 ## 目标与边界
 
@@ -159,3 +159,37 @@ consistency-audit 默认对已实现的宏观契约执行失败检查，同时�
 phase1.Generate 仍保留旧的非 error 返回接口：内部产生非法高程会 panic。6.2 统一入口需先完整验证配置并改为可报告错误；本轮不把这项旧接口限制隐藏掉。
 
 静态原型图片仍是先前实验快照，本轮没有批量重绘所有历史图。当前算法数值以命令审计为准，正式实时图层接入仍在 6.3。
+
+
+## Phase 6.1b 第一切片实施结果（2026-09-30）
+
+基线：7de68a4；开发分支：agent/world-model-foundation。
+
+本切片只处理 Phase 1 的第一组空间尺度，不把整个 6.1b 误报为完成。
+
+已完成：
+- [x] Phase 1 Config 增加 OriginX / OriginZ / SpanXBlocks / SpanZBlocks。
+- [x] 未显式给 Span 时按旧基线解析为 128 blocks/node，保留现有命令与审计默认行为。
+- [x] Phase 1 World 保存已解析 GridGeometry；当前通过 SquareCellSize 明确拒绝 X/Z 非等距采样。
+- [x] CoastDistance 从宏观 Cell 数改为 Minecraft blocks。
+- [x] 大陆内部厚度衰减、基础高程、大陆架/大陆坡/海盆、海岸/高原分区阈值同步迁移为 blocks。
+- [x] 构造影响带的旧 Cell 半径先映射到 128-block 参考物理半径，再按当前节点间距采样；不是简单改参数名。
+- [x] coast-distance 渲染标尺同步保持旧物理含义。
+- [x] 新增固定物理范围的 128 → 64 blocks/node 回归：CoastDistance 与构造影响在相同世界坐标保持一致。
+- [ ] 板块 warp、局部粗糙度等其它 Phase 1 cell-frequency 逻辑仍未全部空间化；本切片只保证已列出的距离型参数。
+- [ ] Climate / Erosion / Hydrology / Geomorph 的距离与坡度迁移尚未完成。
+
+兼容性策略：
+- 旧命令只给 Width / Height 时，世界物理尺寸仍按旧 128 blocks/node 推导，因此 640×400 仍对应约 81.8k×51.1k blocks。
+- 显式给定相同 Span、改变 Width / Height 时，已迁移的距离型算法保持物理作用范围；未迁移算法仍可能产生差异，后续切片逐项收口。
+- phase1.Generate 仍是 legacy panic API；非法几何通过 GridGeometry/SquareCellSize 被拒绝，但统一 error 返回延后到 6.2。
+
+### 验证
+
+- `go test ./internal/phase1 -count=1`：通过。
+- `go test ./... -count=1`：通过。
+- `go run ./cmd/geoworld-mcprofile-audit -count 4`：通过；Unknown=0；平均置信度 0.691–0.764；低置信度 0.086%–0.216%。
+- `go run ./cmd/geoworld-consistency-audit`：通过当前宏观门槛；两个正式 Seed 的结果与 6.1a 基线一致。
+- 最终连续海岸/河床问题仍明确为 UNRESOLVED，留到 6.2。
+
+下一切片：把 GridGeometry 传入 climate，优先迁移 CoastalTempDecay 与水汽/海温传播距离；之后处理 erosion slope 与 hydrology/geomorph 空间核。

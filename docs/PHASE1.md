@@ -254,7 +254,7 @@ Feature Type
 - 大陆 Cell：正值。
 - 海洋 Cell：负值。
 - 海岸两侧 Cell：0。
-- 距离单位为宏观 Grid Cell。
+- Phase 1.5 初版距离单位为宏观 Grid Cell；Phase 6.1b 已迁移为 Minecraft blocks，旧 1 Cell 按 128 blocks 作为兼容参考尺度。
 
 这成为大陆内部程度、陆架、陆坡、海盆等地貌的统一空间依据。
 
@@ -280,9 +280,9 @@ Final Macro Elevation
 
 当前宏观海洋剖面：
 
-- 0～6 Cell：Continental Shelf，大陆架，缓慢加深。
-- 6～18 Cell：Continental Slope，大陆坡，快速加深。
-- >18 Cell：Ocean Basin，深海盆地。
+- Phase 1.5 初版：0～6 Cell / 6～18 Cell / >18 Cell。
+- Phase 6.1b 当前物理尺度：0～768 blocks 为 Continental Shelf；768～2304 blocks 为 Continental Slope；>2304 blocks 为 Ocean Basin。
+- 这些 blocks 阈值来自旧 128 blocks/node 基线，默认输出保持一致；提高宏观精度时不再缩短实际地理作用距离。
 - 深海盆地继续叠加海洋地壳年龄导致的冷却下沉。
 
 ### 宏观地形分区

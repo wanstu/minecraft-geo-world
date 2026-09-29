@@ -1,11 +1,11 @@
 # GeoWorld 项目状态
 
-更新时间：2026-09-29。当前状态以本文件为入口；历史逐阶段记录完整保存在 [PROGRESS.md](PROGRESS.md)。
+更新时间：2026-09-30。当前状态以本文件为入口；历史逐阶段记录完整保存在 [PROGRESS.md](PROGRESS.md)。
 
 ## 当前目标与阶段
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。
 
-**Phase 6.0 已完成；Phase 6.1a 已完成首版并验证。下一步是 6.1b：统一旧算法的空间尺度。**
+**Phase 6.0、6.1a 已完成；Phase 6.1b 进行中。第一切片（Phase 1 构造影响带 + 海岸距离物理尺度化）已实现并验证。**
 
 ## 仓库与基线
 - 仓库：D:\projects\minecraft-geo-world
@@ -13,7 +13,8 @@
 - 当前开发分支：agent/world-model-foundation
 - master / Phase 5.2 基线：4a5f685 — feat: add minecraft generation profiles and phase 6 plan
 - 上一生态基线：661544d
-- 本次功能提交：feat: establish world geometry and shared macro surface（以 git log 获取提交号）。
+- Phase 6.1a：7de68a4 — feat: establish world geometry and shared macro surface。
+- Phase 6.1b 当前切片：Phase 1 physical scale migration（提交号以 git log 获取）。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -27,9 +28,14 @@
 - 各阶段默认海平面使用统一常量；完整可配置海平面的调度约束仍待统一 Generator。
 - 新增可重复执行的 geoworld-consistency-audit；明确区分已通过的宏观约束与未完成的最终地形约束。
 - Phase 1 CLI 分开报告海洋地壳比例与实际宏观海洋比例。
+- Phase 1 Config 现在显式携带 Origin / SpanXBlocks / SpanZBlocks；零 Span 仅作为兼容入口解析为旧默认 128 blocks/node。
+- Phase 1 World 保存已解析 GridGeometry；当前仍明确要求 X/Z 等距，避免静默拉伸。
+- CoastDistance 已从 Cell 单位迁到 blocks；大陆内部、陆架、陆坡、海盆、高原/海岸阈值同步按参考物理尺度换算。
+- 构造影响带由固定 Cell 半径改为物理半径；不同宏观分辨率按 blocks 重新采样影响范围。
 
 ## 本轮验证
-- go test ./... -count=1：全部通过（包括新的连通性、负坐标、分辨率/范围和全链路回归）。
+- go test ./... -count=1：全部通过（包括新的连通性、负坐标、分辨率/范围、Phase 1 物理尺度和全链路回归）。
+- 新增固定物理范围多分辨率回归：128 → 64 blocks/node 时，同一物理位置的 CoastDistance 与构造影响值保持一致。
 - 4 Seed / 640×400 Profile audit：通过；Unknown=0；平均置信度范围 0.691–0.764，低置信度 0.086%–0.216%。
 - 2 Seed / 640×400 consistency audit：宏观海洋高于海平面=0；跨模块海陆标签不一致=0。
 - 基线原型引用检查：387 处本地引用，无缺失。
@@ -38,16 +44,16 @@
 ## 仍未完成（不要误报完成）
 1. 最终连续地形改变海岸：两个 Seed 的宏观/最终海陆变化节点为 806、608；最终海洋标签高于海平面的节点为 336、326。
 2. 最终河床/水面校正未做：同口径河网逆坡连线为 72/908、126/1342。海陆修正不是河网修复，第二个 Seed 该计数还略有增加。
-3. 固定 Cell 的构造带、海温衰减、坡度等尚未全部迁移；坐标契约不等于已实现全算法精度无关。
+3. Phase 1 构造带与海岸相关尺度已迁移；气候海温/水汽衰减、侵蚀坡度、水文/河谷扩散等固定 Cell 逻辑仍未全部迁移。坐标契约不等于已实现全算法精度无关。
 4. 最终海岸/湖面/生态协调、外围拓扑与四角过渡仍待实现。宏观四邻接海洋与 D8 水文的细化协调属于后续水体约束。
 5. phase1.Generate 仍保留旧 API 的默认值与 panic 方式；统一入口需要完整配置校验与错误返回。
 6. WorldModel 版本化保存/重开、Java reader/sampler、实际游戏生成均未完成。
 7. 静态原型生成/保存按钮未接入；prototype/generated 仍是先前实验快照，不能代表本轮修改后的实时结果。
 
 ## 下一步（6.1b）
-1. 把固定世界范围/网格精度显式传入模拟配置；不能只改某个 Lab 的输出尺寸。
-2. 优先迁移 Phase 1 构造带宽与海岸尺度，再迁移气候衰减/传输、坡度和水文距离。
-3. 用固定物理范围下的多分辨率检查衡量作用距离、海岸与地貌变化；保留离散化误差，不把所有图强行做成相同。
+1. Phase 1 已完成第一批物理尺度迁移；继续把 GridGeometry 传入 climate / erosion / hydrology 的正式输入契约。
+2. 下一切片迁移气候 CoastalTempDecay、海温/水汽传播的空间尺度；随后迁移坡度和水文/河谷距离。
+3. 每一批都保留固定物理范围下的多分辨率检查；允许离散化误差，但作用距离不能随网格精度系统漂移。
 4. 然后进入 6.2 的 GenerateWorld 与最终水体约束，再做 6.3 保存/重开。
 5. 6.4 提前验证 Go -> Java -> 一个 Loader，完整界面与批量导出随后扩展。
 

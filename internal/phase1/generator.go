@@ -19,6 +19,18 @@ type cellPoint struct {
 	Y int
 }
 
+const (
+	crustInteriorScaleBlocks    = 18 * DefaultReferenceCellSizeBlocks
+	landBaseInteriorScaleBlocks = 22 * DefaultReferenceCellSizeBlocks
+	continentalShelfWidthBlocks = 6 * DefaultReferenceCellSizeBlocks
+	continentalSlopeWidthBlocks = 18 * DefaultReferenceCellSizeBlocks
+	oceanBasinDepthScaleBlocks  = 28 * DefaultReferenceCellSizeBlocks
+	plateauInteriorMinBlocks    = 18 * DefaultReferenceCellSizeBlocks
+	continentalCoastWidthBlocks = 3 * DefaultReferenceCellSizeBlocks
+	coastRenderLandScaleBlocks  = 36 * DefaultReferenceCellSizeBlocks
+	coastRenderOceanScaleBlocks = 42 * DefaultReferenceCellSizeBlocks
+)
+
 func Generate(cfg Config) *World {
 	if cfg.Width <= 0 {
 		cfg.Width = 320
@@ -34,6 +46,20 @@ func Generate(cfg Config) *World {
 	}
 	if cfg.EdgeOceanBufferFraction <= 0 || cfg.EdgeOceanBufferFraction >= 0.20 {
 		cfg.EdgeOceanBufferFraction = 0.04
+	}
+	if cfg.SpanXBlocks == 0 {
+		cfg.SpanXBlocks = float64(cfg.Width-1) * DefaultReferenceCellSizeBlocks
+	}
+	if cfg.SpanZBlocks == 0 {
+		cfg.SpanZBlocks = float64(cfg.Height-1) * DefaultReferenceCellSizeBlocks
+	}
+	geometry := world.GridGeometry{
+		Width: cfg.Width, Height: cfg.Height,
+		OriginX: cfg.OriginX, OriginZ: cfg.OriginZ,
+		SpanXBlocks: cfg.SpanXBlocks, SpanZBlocks: cfg.SpanZBlocks,
+	}
+	if _, err := geometry.SquareCellSize(); err != nil {
+		panic(err) // Generate keeps the legacy non-error API until Phase 6.2.
 	}
 
 	r := rand.New(rand.NewPCG(uint64(cfg.Seed), uint64(cfg.Seed)^0x9e3779b97f4a7c15))
@@ -57,6 +83,7 @@ func Generate(cfg Config) *World {
 
 	n := cfg.Width * cfg.Height
 	w := &World{
+		Geometry:          geometry,
 		Config:            cfg,
 		Plates:            plates,
 		RawPlateID:        make([]int, n),
@@ -233,8 +260,9 @@ func edgeOceanBufferCells(cfg Config) int {
 	return clampInt(cells, 2, maxInt(2, minSize/5))
 }
 
-// computeCoastDistance 计算到最近海岸的有符号 Cell 距离。
-// 大陆为正，海洋为负；海岸两侧的边界 Cell 为 0。
+// computeCoastDistance calculates signed physical distance to the nearest
+// crust coastline. Distances are stored in Minecraft blocks rather than cells;
+// land is positive, ocean is negative, and coastline nodes on both sides are 0.
 func (w *World) computeCoastDistance() {
 	const unvisited = -1
 	dist := make([]int, len(w.CoastDistance))
@@ -281,15 +309,17 @@ func (w *World) computeCoastDistance() {
 		}
 	}
 
+	cellSizeBlocks := w.Geometry.SpacingX()
 	for i := range w.CoastDistance {
 		d := dist[i]
 		if d < 0 {
 			d = maxInt(w.Config.Width, w.Config.Height)
 		}
+		distanceBlocks := float64(d) * cellSizeBlocks
 		if w.Crust[i] == Continental {
-			w.CoastDistance[i] = float64(d)
+			w.CoastDistance[i] = distanceBlocks
 		} else {
-			w.CoastDistance[i] = -float64(d)
+			w.CoastDistance[i] = -distanceBlocks
 		}
 	}
 }
@@ -304,7 +334,7 @@ func (w *World) computeCrustThickness() {
 			}
 
 			d := math.Max(0, w.CoastDistance[i])
-			interior := 1 - math.Exp(-d/18.0)
+			interior := 1 - math.Exp(-d/crustInteriorScaleBlocks)
 			lowFreq := math.Sin(float64(x)*0.021+float64(w.Config.Seed%421))*0.025 +
 				math.Cos(float64(y)*0.019-float64(w.Config.Seed%353))*0.02
 			w.CrustThickness[i] = clamp(0.48+interior*0.34+lowFreq, 0.44, 0.88)
@@ -592,25 +622,27 @@ func (w *World) computeTectonicInfluence() {
 	subsidence := make([]float64, len(w.TectonicInfluence))
 	upliftFeature := make([]TectonicFeature, len(w.TectonicInfluence))
 	subsidenceFeature := make([]TectonicFeature, len(w.TectonicInfluence))
+	cellSizeBlocks := w.Geometry.SpacingX()
 
 	for y := 0; y < w.Config.Height; y++ {
 		for x := 0; x < w.Config.Width; x++ {
 			i := w.index(x, y)
 			feature := w.Feature[i]
 			intensity := w.TectonicIntensity[i]
-			radius, amplitude := featureBand(feature, intensity)
-			if radius == 0 || amplitude == 0 {
+			radiusBlocks, amplitude := featureBand(feature, intensity)
+			if radiusBlocks == 0 || amplitude == 0 {
 				continue
 			}
+			radiusCells := maxInt(1, int(math.Ceil(radiusBlocks/cellSizeBlocks)))
 
-			for dy := -radius; dy <= radius; dy++ {
-				for dx := -radius; dx <= radius; dx++ {
+			for dy := -radiusCells; dy <= radiusCells; dy++ {
+				for dx := -radiusCells; dx <= radiusCells; dx++ {
 					tx, ty := x+dx, y+dy
 					if !w.inside(tx, ty) {
 						continue
 					}
-					d := math.Hypot(float64(dx), float64(dy))
-					if d > float64(radius) {
+					dBlocks := math.Hypot(float64(dx), float64(dy)) * cellSizeBlocks
+					if dBlocks > radiusBlocks {
 						continue
 					}
 					ti := w.index(tx, ty)
@@ -618,7 +650,7 @@ func (w *World) computeTectonicInfluence() {
 						continue
 					}
 
-					falloff := 1 - d/float64(radius)
+					falloff := 1 - dBlocks/radiusBlocks
 					effect := amplitude * falloff * falloff
 					if effect > 0 && effect > uplift[ti] {
 						uplift[ti] = effect
@@ -643,35 +675,39 @@ func (w *World) computeTectonicInfluence() {
 	}
 }
 
-func featureBand(feature TectonicFeature, intensity float64) (radius int, amplitude float64) {
+// featureBand resolves legacy cell radii into a physical reference distance.
+// The reference keeps the existing 128-block baseline byte-for-byte while
+// allowing a denser macro grid to sample the same physical influence radius.
+func featureBand(feature TectonicFeature, intensity float64) (radiusBlocks, amplitude float64) {
 	intensity = clamp(intensity, 0, 1)
 	scaleR := 0.72 + intensity*0.58
 	scaleA := 0.52 + intensity*0.78
 
-	baseRadius := 0
+	baseRadiusCells := 0
 	baseAmplitude := 0.0
 	switch feature {
 	case CollisionOrogen:
-		baseRadius, baseAmplitude = 14, 0.34
+		baseRadiusCells, baseAmplitude = 14, 0.34
 	case VolcanicArc:
-		baseRadius, baseAmplitude = 9, 0.21
+		baseRadiusCells, baseAmplitude = 9, 0.21
 	case IslandArc:
-		baseRadius, baseAmplitude = 7, 0.18
+		baseRadiusCells, baseAmplitude = 7, 0.18
 	case Trench:
-		baseRadius, baseAmplitude = 6, -0.24
+		baseRadiusCells, baseAmplitude = 6, -0.24
 	case MidOceanRidge:
-		baseRadius, baseAmplitude = 8, 0.12
+		baseRadiusCells, baseAmplitude = 8, 0.12
 	case ContinentalRift:
-		baseRadius, baseAmplitude = 10, -0.13
+		baseRadiusCells, baseAmplitude = 10, -0.13
 	case TransformFault:
-		baseRadius, baseAmplitude = 4, -0.025
+		baseRadiusCells, baseAmplitude = 4, -0.025
 	default:
 		return 0, 0
 	}
 
-	radius = maxInt(2, int(math.Round(float64(baseRadius)*scaleR)))
+	referenceRadiusCells := maxInt(2, int(math.Round(float64(baseRadiusCells)*scaleR)))
+	radiusBlocks = float64(referenceRadiusCells) * DefaultReferenceCellSizeBlocks
 	amplitude = baseAmplitude * scaleA
-	return radius, amplitude
+	return radiusBlocks, amplitude
 }
 
 func featureAppliesToCrust(feature TectonicFeature, crust CrustType) bool {
@@ -714,24 +750,24 @@ func (w *World) computeBaseElevation() {
 			if w.Crust[i] == Continental {
 				d := math.Max(0, w.CoastDistance[i])
 				thickness := clamp((w.CrustThickness[i]-0.44)/(0.88-0.44), 0, 1)
-				interior := 1 - math.Exp(-d/22.0)
+				interior := 1 - math.Exp(-d/landBaseInteriorScaleBlocks)
 				w.BaseElevation[i] = clamp(0.535+thickness*0.075+interior*0.035, 0.525, 0.66)
 				continue
 			}
 
 			d := math.Max(0, -w.CoastDistance[i])
 			switch {
-			case d <= 6:
+			case d <= continentalShelfWidthBlocks:
 				// 大陆架：浅海缓慢下降。
-				t := d / 6
+				t := d / continentalShelfWidthBlocks
 				w.BaseElevation[i] = 0.485 - t*0.045
-			case d <= 18:
+			case d <= continentalSlopeWidthBlocks:
 				// 大陆坡：从浅海快速进入深海。
-				t := (d - 6) / 12
+				t := (d - continentalShelfWidthBlocks) / (continentalSlopeWidthBlocks - continentalShelfWidthBlocks)
 				w.BaseElevation[i] = 0.44 - t*0.15
 			default:
 				// 深海盆地：距离海岸越远、地壳越老，平均海底越深。
-				deep := 1 - math.Exp(-(d-18)/28.0)
+				deep := 1 - math.Exp(-(d-continentalSlopeWidthBlocks)/oceanBasinDepthScaleBlocks)
 				w.BaseElevation[i] = 0.29 - deep*0.045 - w.OceanAge[i]*0.045
 			}
 			w.BaseElevation[i] = clamp(w.BaseElevation[i], 0.16, 0.495)
@@ -750,10 +786,10 @@ func (w *World) classifyMacroTerrain() {
 				w.TerrainZone[i] = RiftValleyZone
 			case (feature == CollisionOrogen || feature == VolcanicArc) && influence > 0.10:
 				w.TerrainZone[i] = MountainBelt
-			case w.CoastDistance[i] >= 18 && w.CrustThickness[i] >= 0.76 && influence > 0.035:
+			case w.CoastDistance[i] >= plateauInteriorMinBlocks && w.CrustThickness[i] >= 0.76 && influence > 0.035:
 				// 高原不是“普通大陆内部”的同义词；要求厚地壳并存在广域构造抬升。
 				w.TerrainZone[i] = Plateau
-			case w.CoastDistance[i] <= 3:
+			case w.CoastDistance[i] <= continentalCoastWidthBlocks:
 				w.TerrainZone[i] = ContinentalCoast
 			default:
 				w.TerrainZone[i] = ContinentalInterior
@@ -771,9 +807,9 @@ func (w *World) classifyMacroTerrain() {
 		default:
 			d := math.Max(0, -w.CoastDistance[i])
 			switch {
-			case d <= 6:
+			case d <= continentalShelfWidthBlocks:
 				w.TerrainZone[i] = ContinentalShelf
-			case d <= 18:
+			case d <= continentalSlopeWidthBlocks:
 				w.TerrainZone[i] = ContinentalSlope
 			default:
 				w.TerrainZone[i] = OceanBasin

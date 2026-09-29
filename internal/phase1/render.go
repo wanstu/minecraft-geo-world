@@ -33,10 +33,10 @@ func RenderAll(w *World, outDir string) error {
 			i := w.index(x, y)
 			d := w.CoastDistance[i]
 			if d >= 0 {
-				t := clamp(d/36, 0, 1)
+				t := clamp(d/coastRenderLandScaleBlocks, 0, 1)
 				return lerpColor(color.RGBA{204, 219, 166, 255}, color.RGBA{69, 104, 58, 255}, t)
 			}
-			t := clamp((-d)/42, 0, 1)
+			t := clamp((-d)/coastRenderOceanScaleBlocks, 0, 1)
 			return lerpColor(color.RGBA{105, 196, 210, 255}, color.RGBA{15, 42, 86, 255}, t)
 		}},
 		{"crust-thickness.png", func(x, y int) color.RGBA {
