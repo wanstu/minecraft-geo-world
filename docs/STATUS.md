@@ -8,12 +8,13 @@
 
 **Phase 4 — 侵蚀、Relief 与地貌细化**
 
-当前子阶段：**Phase 4.1 — 侵蚀驱动力与河谷切割（准备开始）**
+当前子阶段：**Phase 4.2 — 丘陵 / 山麓 / 平原连续权重（准备开始）**
 
 ## 当前稳定基线
 
 最近提交：
 
+- `8340ed4` — add river hierarchy seasonal flow and explicit lakes
 - `bbf3890` — add hydrology basins runoff and river network
 - `aca7269` — add seasonal precipitation and monsoon rainfall
 - `aa94199` — add seasonal thermal contrast and monsoon winds
@@ -467,3 +468,48 @@ Phase 2 第一版正式完成。
 Phase 3 第一版正式完成。
 
 下一步：**Phase 4.1 — Erosion Driver / Valley Incision / Relief**。
+
+
+## Phase 4.1 — 侵蚀驱动力与河谷切割
+
+状态：**完成第一版**
+
+新增：
+
+- `internal/erosion`
+- `cmd/geoworld-erosion-lab`
+- `cmd/geoworld-erosion-audit`
+- `prototype/erosion.html`
+
+已实现：
+
+- Slope。
+- Wetness。
+- TectonicSupport。
+- TerrainMaturity proxy。
+- ErosionResistance proxy。
+- FluvialPower。
+- ValleyIncision。
+- HillslopeErosion。
+- TotalErosion。
+- ErodedElevation。
+- LocalRelief / ReliefIndex。
+
+当前 640 × 400 Seed：
+
+- 平均侵蚀：0.00074
+- 最大侵蚀：0.01962
+- 河谷切割影响：1.53% 陆地
+- 高 Relief：17.39% 陆地
+
+多 Seed 回归曾发现并修复：
+
+- 原始低海岸 Cell 被 erosion floor 错误抬高。
+
+当前保证：
+
+- 侵蚀只降低地形。
+- 海洋不变。
+- 低于 floor 的原始陆地保持原样。
+
+下一步：**Phase 4.2 — Hills / Foothills / Rolling Plains / Plateau continuous weights**。

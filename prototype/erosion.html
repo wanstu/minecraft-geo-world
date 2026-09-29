@@ -1,0 +1,53 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GeoWorld · 侵蚀与 Relief 实验</title><link rel="stylesheet" href="assets/common.css">
+<style>
+.lab-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:max-content;align-content:start;gap:14px;padding:16px;overflow:auto}
+.lab-card{min-width:0;background:#0f171e;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.lab-card header{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
+.lab-card header small{color:var(--muted)}.lab-card img{width:100%;height:auto;aspect-ratio:8/5;object-fit:contain;display:block;image-rendering:pixelated;background:#091016}
+.note{margin:16px;padding:12px;border:1px solid #625336;background:#241f15;border-radius:8px;color:#e1d19d;font-size:13px;line-height:1.6}
+@media(max-width:900px){.lab-grid{grid-template-columns:1fr}}
+</style></head><body>
+<div class="app"><header class="topbar"><a class="brand" href="index.html"><span>Geo</span>World Generator</a>
+<div class="badge">Phase 4.1 Lab</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
+<div class="shell">
+<aside class="sidebar"><div class="section"><h3>世界模型</h3>
+<a class="nav-item" href="generator.html">世界总览</a>
+<a class="nav-item" href="plates.html">板块构造</a>
+<div class="nav-item">地形与海盆</div>
+<a class="nav-item" href="climate.html">气候骨架</a>
+<a class="nav-item" href="monsoon.html">季风 / 季节性</a>
+<a class="nav-item" href="hydrology.html">水文</a>
+<a class="nav-item active" href="erosion.html"><i class="dot"></i>侵蚀 / Relief</a>
+<div class="nav-item">生态区</div></div>
+<div class="section"><h3>本次 Lab</h3>
+<div class="kv"><span>Seed</span><span>731894205</span></div>
+<div class="kv"><span>宏观网格</span><span>640 × 400</span></div>
+<div class="kv"><span>平均侵蚀</span><span>0.00074</span></div>
+<div class="kv"><span>最大侵蚀</span><span>0.01962</span></div>
+<div class="kv"><span>河谷影响</span><span>1.53%</span></div>
+</div></aside>
+<main class="main">
+<div class="toolbar"><div class="title">Phase 4.1 · 侵蚀驱动力与河谷切割</div><div class="badge">Climate + Hydrology + Tectonics → Erosion</div></div>
+<div class="note"><strong>这里不是“噪声把地表磨花”。</strong> 河谷由真实河网和汇流量切割；坡面侵蚀由坡度、降水、构造支撑和抗侵蚀近似共同决定。丘陵还没有在这一阶段直接分类，先把连续 Relief 场做出来。</div>
+<div class="lab-grid">
+<div class="lab-card"><header><strong>① 坡度</strong><small>侵蚀基本驱动力之一</small></header><img src="generated/erosion/slope.png" alt="slope"></div>
+<div class="lab-card"><header><strong>② 湿润度</strong><small>长期降水控制风化 / 侵蚀潜力</small></header><img src="generated/erosion/wetness.png" alt="wetness"></div>
+<div class="lab-card"><header><strong>③ 构造支撑</strong><small>活跃抬升抵消长期削低</small></header><img src="generated/erosion/tectonic-support.png" alt="tectonic support"></div>
+<div class="lab-card"><header><strong>④ 地形成熟度代理</strong><small>不是实际地质年龄</small></header><img src="generated/erosion/terrain-maturity.png" alt="terrain maturity"></div>
+<div class="lab-card"><header><strong>⑤ 河流侵蚀功率</strong><small>河流强度 × 汇流量 × 坡度 × 湿润度</small></header><img src="generated/erosion/fluvial-power.png" alt="fluvial power"></div>
+<div class="lab-card"><header><strong>⑥ 河谷切割</strong><small>仅沿河网显著发生</small></header><img src="generated/erosion/valley-incision.png" alt="valley incision"></div>
+<div class="lab-card"><header><strong>⑦ 坡面侵蚀</strong><small>广泛但通常幅度很弱</small></header><img src="generated/erosion/hillslope-erosion.png" alt="hillslope erosion"></div>
+<div class="lab-card"><header><strong>⑧ 总侵蚀</strong><small>河谷 + 坡面</small></header><img src="generated/erosion/total-erosion.png" alt="total erosion"></div>
+<div class="lab-card"><header><strong>⑨ 侵蚀后高程</strong><small>Phase 4.1 地形结果</small></header><img src="generated/erosion/eroded-elevation.png" alt="eroded elevation"></div>
+<div class="lab-card"><header><strong>⑩ Local Relief</strong><small>邻域高低差，不等于海拔</small></header><img src="generated/erosion/relief.png" alt="local relief"></div>
+</div></main>
+<aside class="inspector"><div class="section"><h3>当前结果</h3>
+<div class="metric"><strong>1.53%</strong><small>明显河谷切割陆地占比</small></div>
+<div class="row"><div class="metric"><strong>0.00074</strong><small>平均侵蚀</small></div><div class="metric"><strong>0.01962</strong><small>最大侵蚀</small></div></div>
+<div class="card"><div class="card-title">为什么坡面侵蚀覆盖很广？</div><p>它表示长期背景削低过程。虽然超过 75% 陆地有非零值，但平均实际高程变化只有约 0.00074 normalized，并不是大片大陆一起降低很多。</p></div>
+<div class="card"><div class="card-title">Relief 和海拔不是一回事</div><p>高原可以高海拔、低 Relief；丘陵则更依赖中等 Relief。下一步会结合海拔、Relief、河谷距离和构造背景推导丘陵 / 山麓 / 起伏平原。</p></div>
+<div class="card"><div class="card-title">低海岸不会被侵蚀算法抬高</div><p>多 Seed 回归已经抓到并修复该问题：侵蚀只允许降低地形；原本低于侵蚀保护线的陆地保持原样。</p></div>
+<div class="card"><div class="card-title">下一步</div><p>Phase 4.2：从连续 Relief 场推导丘陵、山麓、山地过渡和起伏平原，并保证类别之间不是硬切。</p></div>
+</div></aside>
+</div></div></body></html>

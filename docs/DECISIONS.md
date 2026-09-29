@@ -518,3 +518,35 @@ PermanentOutlet
 - Endorheic / 内流湖。
 - Seasonal / 季节湖。
 - Saline tendency / 盐湖倾向。
+
+
+---
+
+## D-021：TerrainMaturity 是侵蚀成熟度代理，不是实际地质年龄
+
+状态：已确定
+
+Phase 4 当前没有模拟大陆数亿年的真实演化历史。
+
+因此使用：
+
+```text
+TerrainMaturityProxy
+```
+
+表达“构造活动较弱、长期削低作用更充分”的倾向。
+
+第一版：
+
+```text
+TerrainMaturityProxy
+≈ 1 - TectonicSupport
+```
+
+禁止把这个字段解释为：
+
+- 年份。
+- 百万年。
+- 岩石真实年龄。
+
+未来若 GeoWorld 加入显式地质历史，可将该代理替换为真正的地形 / 岩性年龄模型。
