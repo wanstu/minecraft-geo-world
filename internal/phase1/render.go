@@ -61,6 +61,32 @@ func RenderAll(w *World, outDir string) error {
 	}); err != nil {
 		return err
 	}
+	if err := render(filepath.Join(outDir, "features.png"), w.Config.Width, w.Config.Height, func(x, y int) color.RGBA {
+		i := y*w.Config.Width + x
+		switch w.Feature[i] {
+		case CollisionOrogen:
+			return color.RGBA{239, 83, 80, 255}
+		case VolcanicArc:
+			return color.RGBA{245, 142, 66, 255}
+		case Trench:
+			return color.RGBA{46, 72, 128, 255}
+		case OceanicSubduction:
+			return color.RGBA{117, 84, 155, 255}
+		case MidOceanRidge:
+			return color.RGBA{67, 185, 214, 255}
+		case ContinentalRift:
+			return color.RGBA{224, 188, 70, 255}
+		case TransformFault:
+			return color.RGBA{202, 202, 202, 255}
+		default:
+			if w.Crust[i] == Continental {
+				return color.RGBA{47, 67, 48, 255}
+			}
+			return color.RGBA{18, 42, 56, 255}
+		}
+	}); err != nil {
+		return err
+	}
 	return render(filepath.Join(outDir, "elevation.png"), w.Config.Width, w.Config.Height, func(x, y int) color.RGBA {
 		v := w.Elevation[y*w.Config.Width+x]
 		if v < 0.5 {

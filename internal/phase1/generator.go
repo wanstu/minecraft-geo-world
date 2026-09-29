@@ -53,6 +53,7 @@ func Generate(cfg Config) *World {
 		Crust:         make([]CrustType, n),
 		LandPotential: make([]float64, n),
 		Boundary:      make([]BoundaryType, n),
+		Feature:       make([]TectonicFeature, n),
 		Elevation:     make([]float64, n),
 	}
 
@@ -63,7 +64,7 @@ func Generate(cfg Config) *World {
 	}
 
 	w.generateCrust(r)
-	w.classifyBoundaries()
+	w.classifyTectonics()
 	w.computeElevation()
 	return w
 }
@@ -113,12 +114,10 @@ func (w *World) generateCrust(r *rand.Rand) {
 				potential += s.Weight * math.Exp(-(dx*dx+dy*dy)*0.5)
 			}
 
-			// 宏观扰动只改变大陆轮廓，不直接生成最终地形细节。
 			potential += math.Sin(fx*0.031+float64(w.Config.Seed%401)) * 0.10
 			potential += math.Cos(fy*0.037-float64(w.Config.Seed%271)) * 0.08
 			potential += math.Sin((fx+fy)*0.019) * 0.05
 
-			// 给主地理区外围留海洋缓冲，避免大陆直接顶到无尽海洋边界。
 			dxEdge := math.Min(fx, width-1-fx) / width
 			dyEdge := math.Min(fy, height-1-fy) / height
 			edge := math.Min(dxEdge, dyEdge)
@@ -145,39 +144,41 @@ func (w *World) generateCrust(r *rand.Rand) {
 	}
 }
 
-func (w *World) classifyBoundaries() {
+func (w *World) classifyTectonics() {
+	dirs := [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+
 	for y := 0; y < w.Config.Height; y++ {
 		for x := 0; x < w.Config.Width; x++ {
 			i := w.index(x, y)
-			a := w.PlateID[i]
-			best := NoBoundary
+			aID := w.PlateID[i]
+			bestBoundary := NoBoundary
+			bestFeature := NoFeature
 
-			if x+1 < w.Config.Width {
-				if b := w.PlateID[w.index(x+1, y)]; b != a {
-					best = stronger(best, classify(w.Plates[a], w.Plates[b]))
+			for _, d := range dirs {
+				nx, ny := x+d[0], y+d[1]
+				if nx < 0 || ny < 0 || nx >= w.Config.Width || ny >= w.Config.Height {
+					continue
 				}
-			}
-			if y+1 < w.Config.Height {
-				if b := w.PlateID[w.index(x, y+1)]; b != a {
-					best = stronger(best, classify(w.Plates[a], w.Plates[b]))
+				ni := w.index(nx, ny)
+				bID := w.PlateID[ni]
+				if bID == aID {
+					continue
 				}
+
+				boundary := classifyBoundary(w.Plates[aID], w.Plates[bID])
+				feature := classifyFeature(w.Crust[i], w.Crust[ni], boundary)
+
+				bestBoundary = strongerBoundary(bestBoundary, boundary)
+				bestFeature = strongerFeature(bestFeature, feature)
 			}
-			if x > 0 {
-				if b := w.PlateID[w.index(x-1, y)]; b != a {
-					best = stronger(best, classify(w.Plates[a], w.Plates[b]))
-				}
-			}
-			if y > 0 {
-				if b := w.PlateID[w.index(x, y-1)]; b != a {
-					best = stronger(best, classify(w.Plates[a], w.Plates[b]))
-				}
-			}
-			w.Boundary[i] = best
+
+			w.Boundary[i] = bestBoundary
+			w.Feature[i] = bestFeature
 		}
 	}
 }
 
-func classify(a, b Plate) BoundaryType {
+func classifyBoundary(a, b Plate) BoundaryType {
 	nx := b.Center.X - a.Center.X
 	ny := b.Center.Y - a.Center.Y
 	l := math.Hypot(nx, ny)
@@ -187,7 +188,6 @@ func classify(a, b Plate) BoundaryType {
 	nx /= l
 	ny /= l
 
-	// closing > 0: 两个板块沿边界法线相向运动。
 	closing := (a.Velocity.X-b.Velocity.X)*nx + (a.Velocity.Y-b.Velocity.Y)*ny
 	switch {
 	case closing > 0.22:
@@ -199,7 +199,32 @@ func classify(a, b Plate) BoundaryType {
 	}
 }
 
-func stronger(a, b BoundaryType) BoundaryType {
+func classifyFeature(local, other CrustType, boundary BoundaryType) TectonicFeature {
+	switch boundary {
+	case Convergent:
+		switch {
+		case local == Continental && other == Continental:
+			return CollisionOrogen
+		case local == Continental && other == Oceanic:
+			return VolcanicArc
+		case local == Oceanic && other == Continental:
+			return Trench
+		default:
+			return OceanicSubduction
+		}
+	case Divergent:
+		if local == Continental || other == Continental {
+			return ContinentalRift
+		}
+		return MidOceanRidge
+	case Transform:
+		return TransformFault
+	default:
+		return NoFeature
+	}
+}
+
+func strongerBoundary(a, b BoundaryType) BoundaryType {
 	if a == Convergent || b == Convergent {
 		return Convergent
 	}
@@ -212,6 +237,34 @@ func stronger(a, b BoundaryType) BoundaryType {
 	return NoBoundary
 }
 
+func strongerFeature(a, b TectonicFeature) TectonicFeature {
+	if featurePriority(b) > featurePriority(a) {
+		return b
+	}
+	return a
+}
+
+func featurePriority(f TectonicFeature) int {
+	switch f {
+	case CollisionOrogen:
+		return 8
+	case VolcanicArc:
+		return 7
+	case Trench:
+		return 6
+	case OceanicSubduction:
+		return 5
+	case ContinentalRift:
+		return 4
+	case MidOceanRidge:
+		return 3
+	case TransformFault:
+		return 2
+	default:
+		return 0
+	}
+}
+
 func (w *World) computeElevation() {
 	for y := 0; y < w.Config.Height; y++ {
 		for x := 0; x < w.Config.Width; x++ {
@@ -222,20 +275,23 @@ func (w *World) computeElevation() {
 				base = 0.25
 			}
 
-			switch w.Boundary[i] {
-			case Convergent:
-				if w.Crust[i] == Continental {
-					base += 0.27
-				} else {
-					base += 0.10
-				}
-			case Divergent:
-				base -= 0.07
-			case Transform:
-				base += 0.025
+			switch w.Feature[i] {
+			case CollisionOrogen:
+				base += 0.30
+			case VolcanicArc:
+				base += 0.20
+			case Trench:
+				base -= 0.18
+			case OceanicSubduction:
+				base += 0.06
+			case MidOceanRidge:
+				base += 0.10
+			case ContinentalRift:
+				base -= 0.11
+			case TransformFault:
+				base += 0.02
 			}
 
-			// 仅用于打散完全平坦区域，不负责宏观大陆结构。
 			n := math.Sin(float64(x)*0.071+float64(w.Config.Seed%997)) *
 				math.Cos(float64(y)*0.083-float64(w.Config.Seed%313))
 			base += n * 0.03

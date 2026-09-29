@@ -16,6 +16,19 @@ const (
 	Transform
 )
 
+type TectonicFeature uint8
+
+const (
+	NoFeature TectonicFeature = iota
+	CollisionOrogen
+	VolcanicArc
+	Trench
+	OceanicSubduction
+	MidOceanRidge
+	ContinentalRift
+	TransformFault
+)
+
 type Vec2 struct {
 	X float64
 	Y float64
@@ -42,5 +55,6 @@ type World struct {
 	Crust         []CrustType
 	LandPotential []float64
 	Boundary      []BoundaryType
+	Feature       []TectonicFeature
 	Elevation     []float64
 }

@@ -51,7 +51,8 @@ Seed
 - `crust.png`：独立大陆 / 海洋地壳场
 - `boundaries.png`：三类板块边界
 - `tectonics.png`：地壳与板块边界叠加，用于检查大陆是否跨板块
-- `elevation.png`：基于地壳类型和边界抬升的粗略高程倾向
+- `features.png`：构造地貌分类，包括大陆碰撞山系、火山弧、海沟、洋中脊、大陆裂谷等
+- `elevation.png`：基于地壳类型和构造地貌的粗略高程倾向
 
 ## 下一步算法改进
 
@@ -74,3 +75,24 @@ Seed
 - 板块边界决定主要构造地貌，但不会直接等价于海岸线。
 
 当前 Lab 已把 crust field 从 plate field 中拆开。下一步需要继续细化：大陆地壳年龄 / 厚度、板块边界两侧地壳组合，以及俯冲方向。
+
+
+## 当前构造地貌规则
+
+### 汇聚边界
+
+- continental + continental → Collision Orogen
+- continental 一侧面对 oceanic → Volcanic Arc
+- oceanic 一侧面对 continental → Trench
+- oceanic + oceanic → Oceanic Subduction（后续根据地壳年龄决定俯冲侧）
+
+### 张裂边界
+
+- oceanic + oceanic → Mid-Ocean Ridge
+- 任一侧为 continental → Continental Rift
+
+### 转换边界
+
+- Transform Fault
+
+这些规则仍是宏观近似，但已经让“板块边界类型”真正开始影响地貌类型，而不是只负责画一条边界线。
