@@ -1,0 +1,74 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GeoWorld Generator</title><link rel="stylesheet" href="assets/common.css"></head><body>
+<div class="app"><header class="topbar"><a class="brand" href="index.html"><span>Geo</span>World Generator</a>
+<div class="badge">World: Auriga-42</div><div class="badge">Seed 731894205</div>
+<div class="top-actions"><button class="btn">保存模型</button><button class="btn primary">生成 / 更新</button></div></header>
+
+<div class="shell">
+<aside class="sidebar">
+<div class="section"><h3>世界模型</h3>
+<a class="nav-item active" href="generator.html"><i class="dot"></i>世界总览</a><a class="nav-item" href="plates.html">板块构造</a><div class="nav-item">地形与海盆</div>
+<div class="nav-item">风场 / 洋流</div><div class="nav-item">气候 / 季风</div><div class="nav-item">水文</div><div class="nav-item">生态区</div></div>
+<div class="section"><h3>基础参数</h3>
+<div class="field"><label>Seed</label><input value="731894205"></div>
+<div class="field"><label>主地理区域</label><select><option>标准 · 131072 × 131072 blocks</option><option>小型 · 65536 × 65536</option><option>大型 · 262144 × 262144</option></select></div>
+<div class="row"><div class="field"><label>板块数</label><input value="18"></div><div class="field"><label>目标海洋</label><input value="68%"></div></div>
+<div class="field"><label>过渡海域宽度</label><input value="32768 blocks"></div>
+</div>
+<div class="section"><h3>模拟策略</h3>
+<div class="field"><label>宏观网格</label><select><option>1024 × 1024</option><option>2048 × 2048</option></select></div>
+<div class="field"><label>气候迭代</label><input value="12"></div>
+</div></aside>
+
+<main class="main">
+<div class="toolbar"><div class="title">世界总览</div>
+<div class="toolchip active" data-layer="biome">生态</div><div class="toolchip" data-layer="plate">板块</div><div class="toolchip" data-layer="elevation">海拔</div>
+<div class="toolchip" data-layer="current">洋流</div><div class="toolchip" data-layer="rain">降水</div>
+<div style="margin-left:auto" class="badge">1 px ≈ 128 blocks</div></div>
+
+<div class="canvas-wrap"><div class="map-frame">
+<svg viewBox="0 0 1000 620" preserveAspectRatio="none">
+<defs>
+<linearGradient id="sea" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#183342"/><stop offset=".5" stop-color="#153b47"/><stop offset="1" stop-color="#1a3140"/></linearGradient>
+<linearGradient id="ice" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#b9e4ef" stop-opacity=".85"/><stop offset="1" stop-color="#294652" stop-opacity=".1"/></linearGradient>
+<filter id="soft"><feGaussianBlur stdDeviation="7"/></filter>
+</defs>
+<rect width="1000" height="620" fill="url(#sea)"/>
+<rect y="0" width="1000" height="70" fill="url(#ice)"/><rect y="550" width="1000" height="70" fill="url(#ice)" transform="rotate(180 500 585)"/>
+<rect width="85" height="620" fill="#384956" opacity=".38"/><rect x="915" width="85" height="620" fill="#384956" opacity=".38"/>
+<path d="M165 185 C220 105 335 95 405 145 C455 182 462 230 430 270 C390 321 330 322 302 372 C275 421 223 448 172 412 C130 382 119 334 138 294 C157 255 132 225 165 185Z" fill="#4d7a54"/>
+<path d="M405 145 C482 102 585 110 637 161 C686 208 678 261 632 289 C590 314 561 352 576 398 C592 446 548 490 486 465 C427 442 397 401 411 350 C423 304 457 280 430 270" fill="#698a56"/>
+<path d="M645 320 C707 271 805 278 846 326 C879 365 858 413 810 437 C758 462 714 448 672 470 C620 497 585 463 600 421 C612 385 610 349 645 320Z" fill="#9b8c52"/>
+<path d="M278 130 C320 151 354 183 380 227" fill="none" stroke="#d7c47a" stroke-width="13" opacity=".78"/>
+<path d="M575 149 C617 180 635 217 635 264" fill="none" stroke="#d7c47a" stroke-width="10" opacity=".7"/>
+<path d="M620 345 C691 351 748 378 790 420" fill="none" stroke="#d7c47a" stroke-width="8" opacity=".5"/>
+<path d="M86 135 C128 115 156 106 187 113" fill="none" stroke="#66c1cf" stroke-width="4" stroke-dasharray="10 8" opacity=".75"/>
+<path d="M830 220 C866 245 896 282 918 325" fill="none" stroke="#66c1cf" stroke-width="4" stroke-dasharray="10 8" opacity=".75"/>
+<path d="M518 510 C460 534 392 536 334 515" fill="none" stroke="#66c1cf" stroke-width="4" stroke-dasharray="10 8" opacity=".75"/>
+<path d="M315 265 C332 306 347 334 327 382" fill="none" stroke="#75b5d8" stroke-width="3"/>
+<path d="M582 275 C566 318 544 339 552 389" fill="none" stroke="#75b5d8" stroke-width="3"/>
+<g opacity=".12" stroke="#d5edf2"><path d="M0 155H1000"/><path d="M0 310H1000"/><path d="M0 465H1000"/><path d="M250 0V620"/><path d="M500 0V620"/><path d="M750 0V620"/></g>
+<text x="500" y="30" fill="#d6f0f7" opacity=".75" text-anchor="middle" font-size="14">北极过渡带</text>
+<text x="500" y="603" fill="#d6f0f7" opacity=".75" text-anchor="middle" font-size="14">南极过渡带</text>
+<text x="34" y="310" fill="#e1e9ed" opacity=".68" text-anchor="middle" font-size="13" transform="rotate(-90 34 310)">风暴洋过渡带</text>
+<text x="966" y="310" fill="#e1e9ed" opacity=".68" text-anchor="middle" font-size="13" transform="rotate(90 966 310)">风暴洋过渡带</text>
+</svg></div>
+<div class="legend"><div><span class="sw" style="background:#4d7a54"></span>湿润大陆</div><div><span class="sw" style="background:#9b8c52"></span>干旱大陆</div>
+<div><span class="sw" style="background:#d7c47a"></span>主要山系</div><div><span class="sw" style="background:#66c1cf"></span>主要洋流</div></div></div>
+
+<div class="statusbar"><div><strong style="font-size:13px">模拟链路</strong><div style="font-size:11px;color:#90a3af">板块 → 地形 → 风 / 洋流 → 气候 → 水文 → 生态</div></div>
+<div class="stage"><i style="width:78%"></i></div><div class="badge">5 / 7 已就绪</div></div>
+</main>
+
+<aside class="inspector"><div class="section"><h3>世界统计</h3>
+<div class="metric"><strong>67.8%</strong><small>海洋覆盖率</small></div>
+<div class="row"><div class="metric"><strong>18</strong><small>板块</small></div><div class="metric"><strong>7</strong><small>主要陆块</small></div></div>
+<div class="metric"><strong>8,420 m</strong><small>理论最高海拔</small></div></div>
+<div class="section"><h3>光标位置</h3><div class="kv"><span>坐标</span><span>+18432, -9216</span></div><div class="kv"><span>纬度</span><span>18.4° N</span></div>
+<div class="kv"><span>板块</span><span>P-07 Continental</span></div><div class="kv"><span>生态</span><span>热带季风林</span></div>
+<div class="kv"><span>年降水</span><span>1680 mm</span></div><div class="kv"><span>季风指数</span><span>0.82</span></div></div>
+<div class="section"><h3>当前判断</h3><div class="card"><div class="card-title">明显季风区</div><p>大陆东南缘受到暖流与夏季海洋风共同影响；西侧山系形成部分雨影。</p></div>
+<div class="card"><div class="card-title">可解释地形</div><p>主要山脉与 P-07 / P-11 汇聚边界高度相关。</p></div></div></aside>
+</div></div>
+<script>document.querySelectorAll('.toolchip').forEach(x=>x.onclick=()=>{document.querySelectorAll('.toolchip').forEach(y=>y.classList.remove('active'));x.classList.add('active')})</script>
+</body></html>

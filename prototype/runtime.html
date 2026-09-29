@@ -1,0 +1,87 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GeoWorld Runtime Prototype</title><link rel="stylesheet" href="assets/common.css">
+<style>
+body{background:#101418}
+.mc-wrap{height:calc(100vh - 54px);display:grid;grid-template-columns:290px 1fr;background:#101418}
+.mc-left{border-right:2px solid #2d343a;background:#171b1f;padding:18px;overflow:auto}
+.mc-left h2{margin:0 0 6px;font-size:20px}.mc-left .sub{font-size:12px;color:#8f9ca4;line-height:1.5;margin-bottom:16px}
+.mc-menu{display:flex;flex-direction:column;gap:6px}.mc-menu button{background:#252b31;border:2px solid #353d45;color:#dfe7eb;padding:11px 12px;text-align:left;cursor:pointer}
+.mc-menu button.active{background:#31443d;border-color:#5f8977;color:#fff}
+.mc-main{min-width:0;overflow:auto;padding:26px 30px}
+.mc-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:18px}
+.mc-head h1{margin:0;font-size:28px}.locknote{border:1px solid #6c5d35;background:#2a2518;color:#e7cf8a;padding:10px 12px;border-radius:6px;font-size:12px;max-width:410px}
+.config-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}
+.mc-card{background:#171c21;border:2px solid #303840;box-shadow:inset 0 0 0 1px #0b0e11;padding:16px}
+.mc-card h3{margin:0 0 12px;font-size:16px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mc-field label{display:block;color:#a9b5bd;font-size:12px;margin-bottom:5px}.mc-field input,.mc-field select{width:100%;background:#0e1215;border:2px solid #323a42;color:#fff;padding:9px}
+.preview{height:340px;border:2px solid #303840;background:
+radial-gradient(ellipse at 49% 48%,#6f8a58 0 18%,transparent 19%),
+radial-gradient(ellipse at 60% 55%,#9b8855 0 12%,transparent 13%),
+radial-gradient(ellipse at 38% 43%,#4f7658 0 14%,transparent 15%),
+linear-gradient(to bottom,#cde6ef 0 9%,#153443 10% 90%,#cde6ef 91% 100%);position:relative;overflow:hidden}
+.preview:before,.preview:after{content:"";position:absolute;top:0;bottom:0;width:12%;background:rgba(72,83,95,.45)}
+.preview:before{left:0}.preview:after{right:0}.caption{font-size:12px;color:#94a4ad;margin-top:8px;line-height:1.5}
+.rule{display:flex;justify-content:space-between;gap:20px;padding:10px 0;border-top:1px solid #2b3238}.rule:first-child{border-top:0}.rule small{color:#91a0a8}
+.readonly{opacity:.7}.locked{display:inline-block;padding:3px 7px;border:1px solid #665e47;background:#262218;color:#dbc989;font-size:11px;border-radius:999px}
+.footer-actions{display:flex;justify-content:space-between;align-items:center;margin-top:20px;gap:10px}.footer-actions .right{display:flex;gap:10px}
+.mode-switch{display:flex;gap:6px;margin-bottom:16px}.mode-switch button{padding:8px 12px;background:#22282e;color:#cfd8dd;border:1px solid #3a4248;cursor:pointer}.mode-switch button.active{background:#30453d;border-color:#567967;color:#fff}
+@media(max-width:980px){.mc-wrap{grid-template-columns:220px 1fr}.config-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}}
+</style></head>
+<body>
+<div class="topbar"><a class="brand" href="index.html"><span>Geo</span>World Runtime</a><div class="badge">Minecraft Mod UI Prototype</div><div class="top-actions"><a class="btn" href="generator.html">打开 Generator 原型</a></div></div>
+<div class="mc-wrap">
+<aside class="mc-left">
+<h2>创建新世界</h2><div class="sub">GeoWorld 作为世界生成类型出现在 Minecraft 创建世界流程中。复杂模拟参数被收进高级页。</div>
+<div class="mc-menu">
+<button>游戏设置</button><button>世界设置</button><button class="active">GeoWorld</button><button>数据包</button><button>游戏规则</button>
+</div>
+<div class="card" style="margin-top:18px"><div class="card-title">关键原则</div><p>这些参数属于当前世界本身。创建完成后将写入存档，不再跟随全局设置变化。</p></div>
+</aside>
+<main class="mc-main">
+<div class="mode-switch"><button id="newBtn" class="active">创建新世界</button><button id="existingBtn">已有世界（只读）</button></div>
+<div class="mc-head"><div><h1 id="pageTitle">GeoWorld 世界设置</h1><div class="hint">真实地理驱动的 Minecraft 世界生成</div></div>
+<div class="locknote" id="notice">以下设置会影响未来全部地形、群系和气候结果。<strong>世界创建后将锁定</strong>，避免新旧区块出现断层。</div></div>
+
+<div class="config-grid">
+<section class="mc-card" id="settingsCard"><h3>世界生成参数</h3>
+<div class="form-grid">
+<div class="mc-field"><label>世界 Seed</label><input value="731894205"></div>
+<div class="mc-field"><label>地理规模</label><select><option>标准 · 131072 × 131072 blocks</option><option>小型 · 65536 × 65536</option><option>大型 · 262144 × 262144</option></select></div>
+<div class="mc-field"><label>大陆丰富度</label><select><option>均衡</option><option>大陆偏多</option><option>海洋偏多</option></select></div>
+<div class="mc-field"><label>板块活动</label><select><option>标准</option><option>温和</option><option>活跃</option></select></div>
+<div class="mc-field"><label>目标海洋覆盖</label><select><option>68%</option><option>60%</option><option>75%</option></select></div>
+<div class="mc-field"><label>模拟精度</label><select><option>标准</option><option>高</option><option>快速</option></select></div>
+</div>
+<div style="margin-top:14px">
+<div class="rule"><div><strong>东西方向</strong><br><small>主地理区外进入过渡海域，最终为无尽风暴洋。</small></div><span>Storm Ocean</span></div>
+<div class="rule"><div><strong>南北方向</strong><br><small>纬度逐渐升高，最终进入无尽冰冻洋。</small></div><span>Frozen Ocean</span></div>
+<div class="rule"><div><strong>季风系统</strong><br><small>影响长期降水与生态，不添加四季玩法。</small></div><span>Climate only</span></div>
+</div>
+</section>
+
+<section class="mc-card"><h3>世界预览</h3><div class="preview"></div>
+<div class="caption">示意：上下为极地过渡，左右为风暴洋过渡，中部为有限 GeoWorld 地理区。正式版本可在这里显示 Seed 的低分辨率世界预览。</div>
+<div class="card"><div class="card-title">生成方式</div><p>创建时先生成宏观 World Model；玩家探索新区块时读取模型并细化成 Minecraft Chunk。</p></div></section>
+</div>
+
+<section class="mc-card" style="margin-top:18px"><h3>配置生命周期</h3>
+<div class="rule"><div><strong>世界生成配置</strong><br><small>Seed、尺寸、板块、海陆、气候模型等。</small></div><span class="locked">仅创建新世界</span></div>
+<div class="rule"><div><strong>运行时性能配置</strong><br><small>缓存大小、预加载半径、调试日志等。</small></div><span>可随时修改</span></div>
+<div class="rule"><div><strong>已有世界生成配置</strong><br><small>从存档读取，用于保证未来新区块继续遵循同一套规则。</small></div><span class="locked">只读</span></div>
+</section>
+
+<div class="footer-actions"><div class="hint">全局默认值只影响“下一次创建世界”，不会改动现有存档。</div><div class="right"><button class="btn">高级设置</button><button class="btn primary" id="createBtn">创建世界</button></div></div>
+</main></div>
+<script>
+const newBtn=document.getElementById('newBtn'), existingBtn=document.getElementById('existingBtn'), card=document.getElementById('settingsCard'), notice=document.getElementById('notice'), title=document.getElementById('pageTitle'), createBtn=document.getElementById('createBtn');
+function setMode(existing){
+  newBtn.classList.toggle('active',!existing); existingBtn.classList.toggle('active',existing);
+  card.classList.toggle('readonly',existing);
+  card.querySelectorAll('input,select').forEach(el=>el.disabled=existing);
+  title.textContent=existing?'GeoWorld 世界信息':'GeoWorld 世界设置';
+  notice.innerHTML=existing?'这是已有世界保存下来的生成配置。<strong>为避免新区块与旧区块割裂，生成参数不可修改。</strong>':'以下设置会影响未来全部地形、群系和气候结果。<strong>世界创建后将锁定</strong>，避免新旧区块出现断层。';
+  createBtn.style.display=existing?'none':'inline-block';
+}
+newBtn.onclick=()=>setMode(false);existingBtn.onclick=()=>setMode(true);
+</script>
+</body></html>
