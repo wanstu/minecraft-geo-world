@@ -333,3 +333,57 @@ Final Macro Elevation
 - `coast-distance.png`
 - `base-elevation.png`
 - `terrain-zones.png`
+
+
+## Phase 1.6 验收记录
+
+### 多 Seed 不变量
+
+新增 `TestMultipleSeedsPhase1Invariants`，当前覆盖：
+
+- 1
+- 2
+- 42
+- 2026
+- 123456789
+- 731894205
+- -99
+- -987654321
+
+验证：
+
+- 海洋覆盖率不漂移。
+- 最终高程无 NaN / Inf。
+- 最终高程保持 0..1。
+- 模拟区域四条最外边均为海洋。
+
+### 性能基线
+
+新增：
+
+- `BenchmarkGenerate640x400`
+- `BenchmarkGenerate1024x640`
+
+2026-09-29 当前开发机基线：
+
+```text
+640x400    ≈ 147 ms   ≈ 66 MB alloc
+1024x640   ≈ 375 ms   ≈ 168 MB alloc
+```
+
+该数据只用于回归比较。
+
+当前 Phase 1 Lab 保留了大量调试数组：
+
+- Plate IDs
+- Crust
+- Coast Distance
+- Crust Thickness
+- Ocean Age
+- Boundary / Feature
+- Tectonic Intensity / Influence
+- Base Elevation
+- Terrain Zone
+- Final Elevation
+
+因此这不是最终 Minecraft Runtime 的目标内存占用。

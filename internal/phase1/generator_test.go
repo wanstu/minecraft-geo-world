@@ -262,3 +262,71 @@ func TestMacroTerrainHasCoreZones(t *testing.T) {
 		}
 	}
 }
+
+func TestMultipleSeedsPhase1Invariants(t *testing.T) {
+	seeds := []int64{1, 2, 42, 2026, 123456789, 731894205, -99, -987654321}
+	for _, seed := range seeds {
+		cfg := testConfig()
+		cfg.Seed = seed
+		w := Generate(cfg)
+
+		ocean := 0
+		for i, crust := range w.Crust {
+			if crust == Oceanic {
+				ocean++
+			}
+			if math.IsNaN(w.Elevation[i]) || math.IsInf(w.Elevation[i], 0) {
+				t.Fatalf("seed %d produced invalid elevation at %d", seed, i)
+			}
+			if w.Elevation[i] < 0 || w.Elevation[i] > 1 {
+				t.Fatalf("seed %d elevation out of range at %d: %.3f", seed, i, w.Elevation[i])
+			}
+		}
+
+		gotOcean := float64(ocean) / float64(len(w.Crust))
+		if math.Abs(gotOcean-cfg.OceanFraction) > 0.002 {
+			t.Fatalf("seed %d ocean fraction %.4f, want %.4f", seed, gotOcean, cfg.OceanFraction)
+		}
+
+		for x := 0; x < cfg.Width; x++ {
+			if w.Crust[w.index(x, 0)] != Oceanic || w.Crust[w.index(x, cfg.Height-1)] != Oceanic {
+				t.Fatalf("seed %d has land touching north/south simulation edge", seed)
+			}
+		}
+		for y := 0; y < cfg.Height; y++ {
+			if w.Crust[w.index(0, y)] != Oceanic || w.Crust[w.index(cfg.Width-1, y)] != Oceanic {
+				t.Fatalf("seed %d has land touching east/west simulation edge", seed)
+			}
+		}
+	}
+}
+
+func BenchmarkGenerate640x400(b *testing.B) {
+	cfg := Config{
+		Seed:          731894205,
+		Width:         640,
+		Height:        400,
+		PlateCount:    18,
+		OceanFraction: 0.68,
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cfg.Seed = 731894205 + int64(i)
+		_ = Generate(cfg)
+	}
+}
+
+func BenchmarkGenerate1024x640(b *testing.B) {
+	cfg := Config{
+		Seed:          731894205,
+		Width:         1024,
+		Height:        640,
+		PlateCount:    18,
+		OceanFraction: 0.68,
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cfg.Seed = 731894205 + int64(i)
+		_ = Generate(cfg)
+	}
+}
