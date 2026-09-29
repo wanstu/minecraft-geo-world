@@ -550,3 +550,53 @@ TerrainMaturityProxy
 - 岩石真实年龄。
 
 未来若 GeoWorld 加入显式地质历史，可将该代理替换为真正的地形 / 岩性年龄模型。
+
+
+---
+
+## D-022：宏观网格分辨率不能隐式改变地貌物理尺度
+
+状态：已实现第一步
+
+GeoWorld 的 Macro Grid 主要承担：
+
+- 世界模型采样。
+- Generator 预计算。
+- Runtime 插值数据源。
+
+因此：
+
+```text
+240 × 150
+640 × 400
+1024 × 640
+```
+
+可以具有不同计算精度，但不应该仅因为 Cell 数变化就把：
+
+- 山系变宽数倍。
+- Relief 观察尺度变大数倍。
+- 河谷扩散范围变大数倍。
+- 山麓覆盖半张大陆。
+
+Phase 4.2 实测发现固定 Cell 半径会造成：
+
+```text
+same seed
+640×400 mountain ≈ 15%
+240×150 mountain ≈ 33%
+```
+
+因此所有代表空间尺度的默认 Kernel / Radius 应：
+
+1. 根据宏观网格 / 世界物理尺度解析。
+2. 不直接把固定 Cell 数当成物理距离。
+3. 显式实验参数可以覆盖默认解析值。
+
+Phase 4 当前已处理：
+
+- ReliefRadius。
+- MountainInfluence distance。
+- ValleySpread radius / decay。
+
+后续继续审查 Phase 1 / Phase 2 中仍以 Cell 为单位的空间参数，并逐步迁移到统一的 GeoScale / WorldMetric 抽象。

@@ -88,5 +88,6 @@ Windows 可直接双击：
 - `prototype/monsoon.html`：Phase 3 季风 / 季节性实验
 - `prototype/hydrology.html`：Phase 3 流域 / 河网 / 湖泊实验
 - `prototype/erosion.html`：Phase 4 侵蚀 / Relief 实验
+- `prototype/landform.html`：Phase 4 丘陵 / 山麓 / 高原连续权重实验
 
 所有 CSS 与生成图片均使用相对路径，可通过 `file://` 直接加载。

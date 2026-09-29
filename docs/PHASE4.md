@@ -258,21 +258,236 @@ Relief 占比不作为死护栏，因为它依赖 Relief 观察窗口尺度。
 - `eroded-elevation.png`
 - `relief.png`
 
-## 下一步 — Phase 4.2
+## Phase 4.2 — 丘陵、山麓与连续地貌权重
 
-从连续字段推导区域地貌权重：
+状态：**完成第一版**
+
+模块：
+
+- `internal/landform`
+- `cmd/geoworld-landform-lab`
+- `cmd/geoworld-landform-audit`
+- `prototype/landform.html`
+
+### 基础地貌不是硬分类
+
+每个陆地 Cell 同时输出：
 
 - RollingPlainWeight
 - HillWeight
 - FoothillWeight
 - MountainWeight
 - PlateauWeight
+
+并保证：
+
+```text
+Plain
++ Hill
++ Foothill
++ Mountain
++ Plateau
+= 1
+```
+
+Dominant Landform 只用于调试画图。
+
+Runtime / 后续 Terrain Composer 不允许直接按 dominant 分类硬切地形函数。
+
+### Valley 是 Overlay
+
+新增：
+
+- ValleyCore
 - ValleyWeight
 
-要求：
+河谷不参与基础五类归一化。
 
-- 不使用硬分类墙。
-- 权重连续混合。
-- 丘陵由中等 Relief + 地形成熟度 + 山系距离 / 河谷切割共同形成。
-- 山麓应自然连接平原和山地。
-- 高原必须是高海拔 + 低 / 中 Relief，而不是“高就是山”。
+原因：
+
+> 河谷可以穿过平原、丘陵、山麓、山地和高原。
+
+第一版先从：
+
+- ValleyIncision
+- FluvialPower
+
+建立 ValleyCore，再向河道两侧连续衰减形成有宽度的 ValleyWeight。
+
+### 丘陵
+
+丘陵不是：
+
+```text
+noise > threshold
+```
+
+第一版 HillWeight 主要来自：
+
+```text
+中等 Relief
++ TerrainMaturity
+- MountainInfluence
+- PlateauSignal
+```
+
+因此丘陵倾向于出现在：
+
+- 经过较长期侵蚀的稳定陆地。
+- 起伏明显但又不是强山地的地区。
+- 山地外围以外的成熟地形。
+
+### 山麓
+
+山麓来自：
+
+```text
+Mountain Core
+→ Distance / Influence
+→ FoothillWeight
+```
+
+因此山麓是平原 / 丘陵与山地之间的连续过渡，不是独立随机生成的斑块。
+
+### 高原
+
+高原和山地明确区分：
+
+```text
+High / Mid-High Elevation
++ Thick Continental Crust
++ Low Relief
+→ Plateau
+
+High Elevation
++ High Relief
+→ Mountain
+```
+
+高原信号会主动削弱普通 PlainWeight 的竞争。
+
+这解决了一个实际问题：
+
+> 低 Relief 同时是“平原”和“高原”的共同特征，如果不加入海拔 / 地壳厚度竞争，高原会永远被平原压住。
+
+### 宏观网格尺度一致性
+
+Phase 4.2 验收时发现：
+
+同一个 Seed：
+
+```text
+640 × 400 → Mountain dominant 14.96%
+240 × 150 → Mountain dominant 33.24%
+```
+
+原因不是 Seed，而是：
+
+- ReliefRadius
+- MountainInfluence
+- ValleySpread
+
+最初使用固定 Cell 数。
+
+低分辨率时，同样 4～10 Cell 会覆盖更大的世界比例。
+
+已改为根据宏观网格短边解析默认空间尺度。
+
+修复后同 Seed：
+
+```text
+640 × 400 → Mountain dominant 14.96%
+240 × 150 → Mountain dominant 12.42%
+```
+
+因此：
+
+> 宏观网格尺寸主要表示采样精度，不应隐式改变区域地貌的物理尺度。
+
+显式 Config 仍可覆盖默认尺度，方便实验。
+
+### 当前 640 × 400 Seed 731894205
+
+```text
+Rolling Plain dominant   65.59%
+Hill dominant            16.06%
+Foothill dominant         2.78%
+Mountain dominant        14.96%
+Plateau dominant          0.61%
+Mixed transition         11.45%
+Strong valley overlay     0.22%
+```
+
+Mixed transition 表示：
+
+- 第一权重与第二权重差值 < 0.20。
+
+它不是异常，而是连续地貌混合真正存在的证据。
+
+### 4 Seed 正式尺寸审计
+
+640 × 400：
+
+```text
+Plain dominant        62.80% .. 65.64%
+Hill dominant          9.63% .. 11.73%
+Foothill dominant      3.64% .. 4.30%
+Mountain dominant     18.20% .. 21.13%
+Plateau dominant       0.05% .. 3.58%
+Mixed transition      11.53% .. 16.45%
+Strong valley overlay  0.64% .. 0.84%
+```
+
+测试 Seed 731894205 的丘陵比例更高（16.06%），但仍在合理范围，说明不同世界可以有不同成熟地貌结构。
+
+### 自动测试
+
+验证：
+
+- 基础五类权重严格归一化。
+- 低 Relief 成熟地形偏平原。
+- 中 Relief 成熟地形偏丘陵。
+- 高海拔 + 低 Relief + 厚地壳偏高原而不是山。
+- 高 Relief 偏山地。
+- 山地外围产生 FoothillWeight。
+- ValleyWeight 是 Overlay，不破坏基础权重归一化。
+- 海洋不会获得陆地地貌权重。
+- Relief 小幅变化不会引发权重突变。
+- 默认空间核随宏观网格尺寸变化。
+- 同 Seed 在 240×150 / 640×400 下 Mountain 占比不得再次发生数量级漂移。
+
+### 当前可视化
+
+`prototype/landform.html`
+
+图层：
+
+- `mountain-core.png`
+- `mountain-influence.png`
+- `rolling-plain-weight.png`
+- `hill-weight.png`
+- `foothill-weight.png`
+- `mountain-weight.png`
+- `plateau-weight.png`
+- `valley-weight.png`
+- `dominant-landform.png`
+
+## 下一步 — Phase 4.3
+
+把宏观高程 + 连续地貌权重真正合成为可连续采样的 Regional Terrain：
+
+```text
+ErodedElevation
++ Landform Weights
++ Regional Detail Fields
++ Valley Shape
+→ RegionalTerrainHeight(x,z)
+```
+
+重点验收：
+
+- 宏观 Cell 边界无台阶。
+- Minecraft 16×16 Chunk 边界无接缝。
+- 平原 → 丘陵 → 山麓 → 山地连续过渡。
+- 河谷不出现“切一条直槽”的人工感。
+- 局部细节可以使用噪声，但不能改变宏观地貌归属。

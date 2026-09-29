@@ -8,12 +8,13 @@
 
 **Phase 4 — 侵蚀、Relief 与地貌细化**
 
-当前子阶段：**Phase 4.2 — 丘陵 / 山麓 / 平原连续权重（准备开始）**
+当前子阶段：**Phase 4.3 — Regional Terrain 合成与连续采样（准备开始）**
 
 ## 当前稳定基线
 
 最近提交：
 
+- `d626e6a` — add erosion drivers valley incision and relief
 - `8340ed4` — add river hierarchy seasonal flow and explicit lakes
 - `bbf3890` — add hydrology basins runoff and river network
 - `aca7269` — add seasonal precipitation and monsoon rainfall
@@ -513,3 +514,48 @@ Phase 3 第一版正式完成。
 - 低于 floor 的原始陆地保持原样。
 
 下一步：**Phase 4.2 — Hills / Foothills / Rolling Plains / Plateau continuous weights**。
+
+
+## Phase 4.2 — 丘陵 / 山麓 / 高原连续权重
+
+状态：**完成第一版**
+
+新增：
+
+- `internal/landform`
+- `cmd/geoworld-landform-lab`
+- `cmd/geoworld-landform-audit`
+- `prototype/landform.html`
+
+基础地貌连续权重：
+
+- RollingPlainWeight
+- HillWeight
+- FoothillWeight
+- MountainWeight
+- PlateauWeight
+
+额外 Overlay：
+
+- ValleyCore
+- ValleyWeight
+
+当前正式 640 × 400 多 Seed 审计：
+
+- 平原 dominant：62.80% ～ 65.64%
+- 丘陵：9.63% ～ 11.73%
+- 山麓：3.64% ～ 4.30%
+- 山地：18.20% ～ 21.13%
+- 高原：0.05% ～ 3.58%
+- 混合过渡带：11.53% ～ 16.45%
+- 强河谷 Overlay：0.64% ～ 0.84%
+
+尺度问题已修复：
+
+- 同 Seed 240×150 山地占比曾为 33.24%。
+- 640×400 为 14.96%。
+- Phase 4 空间核改为按网格尺度解析后，240×150 降至 12.42%。
+
+已新增完整流水线尺度回归测试，防止预览分辨率再次改变世界地貌比例。
+
+下一步：**Phase 4.3 — Regional Terrain Height / continuous sampling / chunk seam acceptance**。

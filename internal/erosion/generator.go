@@ -30,7 +30,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		return nil, errors.New("erosion: mask field sizes do not match dimensions")
 	}
 
-	cfg = normalizeConfig(cfg)
+	cfg = normalizeConfig(cfg, input.Width, input.Height)
 	m := &Model{
 		Config:            cfg,
 		Width:             input.Width,
@@ -58,7 +58,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	return m, nil
 }
 
-func normalizeConfig(cfg Config) Config {
+func normalizeConfig(cfg Config, width, height int) Config {
 	if cfg.SeaLevelNormalized <= 0 || cfg.SeaLevelNormalized >= 1 {
 		cfg.SeaLevelNormalized = 0.5
 	}
@@ -78,7 +78,17 @@ func normalizeConfig(cfg Config) Config {
 		cfg.TectonicSupportStrength = 0.65
 	}
 	if cfg.ReliefRadiusCells <= 0 || cfg.ReliefRadiusCells > 32 {
-		cfg.ReliefRadiusCells = 4
+		minDim := width
+		if height < minDim {
+			minDim = height
+		}
+		cfg.ReliefRadiusCells = int(math.Round(float64(minDim) * 0.01))
+		if cfg.ReliefRadiusCells < 1 {
+			cfg.ReliefRadiusCells = 1
+		}
+		if cfg.ReliefRadiusCells > 32 {
+			cfg.ReliefRadiusCells = 32
+		}
 	}
 	if cfg.ReliefScale <= 0 {
 		cfg.ReliefScale = 0.16

@@ -1,0 +1,58 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GeoWorld · 地貌权重实验</title><link rel="stylesheet" href="assets/common.css">
+<style>
+.lab-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:max-content;align-content:start;gap:14px;padding:16px;overflow:auto}
+.lab-card{min-width:0;background:#0f171e;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.lab-card header{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
+.lab-card header small{color:var(--muted)}.lab-card img{width:100%;height:auto;aspect-ratio:8/5;object-fit:contain;display:block;image-rendering:pixelated;background:#091016}
+.note{margin:16px;padding:12px;border:1px solid #4e5b38;background:#1b2116;border-radius:8px;color:#d1deb4;font-size:13px;line-height:1.6}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:0 16px 16px}.legend span{padding:5px 8px;border:1px solid var(--line);border-radius:999px;font-size:12px;color:var(--muted)}
+@media(max-width:900px){.lab-grid{grid-template-columns:1fr}}
+</style></head><body>
+<div class="app"><header class="topbar"><a class="brand" href="index.html"><span>Geo</span>World Generator</a>
+<div class="badge">Phase 4.2 Lab</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
+<div class="shell">
+<aside class="sidebar"><div class="section"><h3>世界模型</h3>
+<a class="nav-item" href="generator.html">世界总览</a>
+<a class="nav-item" href="plates.html">板块构造</a>
+<div class="nav-item">地形与海盆</div>
+<a class="nav-item" href="climate.html">气候骨架</a>
+<a class="nav-item" href="monsoon.html">季风 / 季节性</a>
+<a class="nav-item" href="hydrology.html">水文</a>
+<a class="nav-item" href="erosion.html">侵蚀 / Relief</a>
+<a class="nav-item active" href="landform.html"><i class="dot"></i>地貌权重</a>
+<div class="nav-item">生态区</div></div>
+<div class="section"><h3>本次 Lab</h3>
+<div class="kv"><span>Seed</span><span>731894205</span></div>
+<div class="kv"><span>宏观网格</span><span>640 × 400</span></div>
+<div class="kv"><span>平原 dominant</span><span>65.59%</span></div>
+<div class="kv"><span>丘陵 dominant</span><span>16.06%</span></div>
+<div class="kv"><span>山麓 dominant</span><span>2.78%</span></div>
+<div class="kv"><span>山地 dominant</span><span>14.96%</span></div>
+<div class="kv"><span>高原 dominant</span><span>0.61%</span></div>
+</div></aside>
+<main class="main">
+<div class="toolbar"><div class="title">Phase 4.2 · 连续地貌权重</div><div class="badge">Relief + Elevation + Tectonics → Landform Weights</div></div>
+<div class="note"><strong>GeoWorld 不会把一个宏观 Cell 硬标成“丘陵”然后突然切换。</strong> 每个陆地 Cell 同时拥有平原、丘陵、山麓、山地、高原权重，基础权重总和恒为 1。河谷是额外叠加层，因此河谷可以穿过平原、丘陵和山地。</div>
+<div class="legend"><span>基础权重：Plain + Hill + Foothill + Mountain + Plateau = 1</span><span>Valley = Overlay</span><span>Dominant Map 仅用于调试</span></div>
+<div class="lab-grid">
+<div class="lab-card"><header><strong>① 山地核心</strong><small>高 Relief + 海拔 + 构造支撑</small></header><img src="generated/landform/mountain-core.png" alt="mountain core"></div>
+<div class="lab-card"><header><strong>② 山地影响</strong><small>用于形成连续山麓过渡</small></header><img src="generated/landform/mountain-influence.png" alt="mountain influence"></div>
+<div class="lab-card"><header><strong>③ 起伏平原权重</strong><small>低 Relief + 成熟地形</small></header><img src="generated/landform/rolling-plain-weight.png" alt="rolling plain"></div>
+<div class="lab-card"><header><strong>④ 丘陵权重</strong><small>中等 Relief + 成熟度</small></header><img src="generated/landform/hill-weight.png" alt="hill"></div>
+<div class="lab-card"><header><strong>⑤ 山麓权重</strong><small>山地外围的中等 Relief 过渡</small></header><img src="generated/landform/foothill-weight.png" alt="foothill"></div>
+<div class="lab-card"><header><strong>⑥ 山地权重</strong><small>高 Relief，不等于“高海拔”</small></header><img src="generated/landform/mountain-weight.png" alt="mountain"></div>
+<div class="lab-card"><header><strong>⑦ 高原权重</strong><small>中高海拔 + 厚地壳 + 低 Relief</small></header><img src="generated/landform/plateau-weight.png" alt="plateau"></div>
+<div class="lab-card"><header><strong>⑧ 河谷叠加权重</strong><small>从河线向两侧连续衰减</small></header><img src="generated/landform/valley-weight.png" alt="valley"></div>
+<div class="lab-card"><header><strong>⑨ Dominant Landform</strong><small>仅供调试，不用于硬切地形</small></header><img src="generated/landform/dominant-landform.png" alt="dominant landform"></div>
+</div></main>
+<aside class="inspector"><div class="section"><h3>当前结果</h3>
+<div class="metric"><strong>11.45%</strong><small>混合过渡带</small></div>
+<div class="row"><div class="metric"><strong>16.06%</strong><small>丘陵 dominant</small></div><div class="metric"><strong>2.78%</strong><small>山麓 dominant</small></div></div>
+<div class="card"><div class="card-title">丘陵怎么来的？</div><p>不是噪声阈值。第一版主要来自中等 Relief、较成熟地形，并避开强山地核心和明显高原信号。后续局部噪声只会在这个权重允许的范围内增加自然细节。</p></div>
+<div class="card"><div class="card-title">高原为什么不是山？</div><p>高原要求较高海拔和较厚大陆地壳，但 Relief 必须较低；高海拔 + 高 Relief 才更偏山地。</p></div>
+<div class="card"><div class="card-title">为什么有 11% 混合区？</div><p>这正是我们想要的过渡。平原→丘陵→山麓→山地不应存在分类墙，多个权重接近时会平滑混合。</p></div>
+<div class="card"><div class="card-title">尺度一致性</div><p>Relief 半径、山麓影响距离和河谷宽度已改成随宏观网格尺度解析，避免降低预览精度后“半张大陆突然变山地”。</p></div>
+<div class="card"><div class="card-title">下一步</div><p>Phase 4.3：把这些连续权重真正合成为最终 Regional Terrain Height，并验证跨宏观 Cell、跨 Minecraft Chunk 的平滑连续性。</p></div>
+</div></aside>
+</div></div></body></html>
