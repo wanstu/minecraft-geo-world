@@ -372,3 +372,36 @@ Temperate land precipitation  221 .. 830 mm
 - AnnualPrecipitation
 
 Phase 2 第一版至此完成。
+
+
+## Phase 5.1 回溯校准：温度与米制海拔标尺
+
+生态模型接入真实世界后发现原 Phase 2 温度场系统性偏冷。
+
+根因并非生态分类，而是：
+
+1. 归一化宏观高程线性映射到 0..6000m。
+2. 纬度温度曲线在中纬度下降过快。
+
+当前修正：
+
+- `ElevationCurvePower = 1.70`
+- `LatitudeTempCurvePower = 3.50`
+
+原则：
+
+> GeoWorld 的 normalized elevation 是宏观形态控制值，不等同于线性米制高度尺。
+
+同时：
+
+> 赤道 / 极区端点可以固定，但中纬度响应必须独立校准，不能只靠线性或过陡幂函数。
+
+修正后重新运行：
+
+- climate tests
+- climate audit
+- monsoon audit
+- hydrology audit
+- ecology audit
+
+均通过。

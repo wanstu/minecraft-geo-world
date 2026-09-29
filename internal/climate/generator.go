@@ -74,7 +74,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 
 		latFactor := math.Sin(latRad) / maxLatSin
 		latFactor = clamp(latFactor, 0, 1)
-		latFactor = math.Pow(latFactor, 1.22)
+		latFactor = math.Pow(latFactor, cfg.LatitudeTempCurvePower)
 
 		baseTemp := cfg.EquatorTempC +
 			(cfg.PolarTempC-cfg.EquatorTempC)*latFactor
@@ -89,7 +89,8 @@ func Generate(input Input, cfg Config) (*Model, error) {
 			if input.LandMask[i] {
 				aboveSea := math.Max(0, input.Elevation[i]-cfg.SeaLevelNormalized)
 				span := math.Max(1e-9, 1-cfg.SeaLevelNormalized)
-				elevationM = clamp(aboveSea/span, 0, 1) * cfg.MaxLandElevationM
+				normalizedHeight := clamp(aboveSea/span, 0, 1)
+				elevationM = math.Pow(normalizedHeight, cfg.ElevationCurvePower) * cfg.MaxLandElevationM
 				temp -= cfg.LapseRateCPerKm * elevationM / 1000
 			}
 
@@ -124,11 +125,17 @@ func normalizeConfig(cfg Config) Config {
 	if cfg.PolarTempC == 0 {
 		cfg.PolarTempC = -18
 	}
+	if cfg.LatitudeTempCurvePower <= 0.5 || cfg.LatitudeTempCurvePower > 8 {
+		cfg.LatitudeTempCurvePower = 3.50
+	}
 	if cfg.LapseRateCPerKm <= 0 {
 		cfg.LapseRateCPerKm = 6.5
 	}
 	if cfg.MaxLandElevationM <= 0 {
 		cfg.MaxLandElevationM = 6000
+	}
+	if cfg.ElevationCurvePower <= 0.5 || cfg.ElevationCurvePower > 4 {
+		cfg.ElevationCurvePower = 1.70
 	}
 	if cfg.SeaLevelNormalized <= 0 || cfg.SeaLevelNormalized >= 1 {
 		cfg.SeaLevelNormalized = 0.5

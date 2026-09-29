@@ -947,3 +947,70 @@ func TestSeasonalPrecipitationSeedSweep(t *testing.T) {
 		}
 	}
 }
+
+func TestElevationCurveCompressesMidElevation(t *testing.T) {
+	input := Input{
+		Width:     2,
+		Height:    2,
+		Elevation: []float64{0.625, 0.75, 0.90, 1.0},
+		LandMask:  []bool{true, true, true, true},
+	}
+	cfg := Config{
+		MaxLatitudeDeg:      10,
+		EquatorTempC:        28,
+		PolarTempC:          24,
+		LapseRateCPerKm:     6.5,
+		MaxLandElevationM:   6000,
+		ElevationCurvePower: 1.70,
+		SeaLevelNormalized:  0.5,
+	}
+	m, err := Generate(input, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if m.LandElevationM[0] < 500 || m.LandElevationM[0] > 650 {
+		t.Fatalf("quarter normalized land height mapped unexpectedly: %.1fm", m.LandElevationM[0])
+	}
+	if m.LandElevationM[1] < 1750 || m.LandElevationM[1] > 1950 {
+		t.Fatalf("half normalized land height mapped unexpectedly: %.1fm", m.LandElevationM[1])
+	}
+	if !(m.LandElevationM[0] < m.LandElevationM[1] &&
+		m.LandElevationM[1] < m.LandElevationM[2] &&
+		m.LandElevationM[2] < m.LandElevationM[3]) {
+		t.Fatalf("elevation curve is not monotonic: %v", m.LandElevationM)
+	}
+	if math.Abs(m.LandElevationM[3]-6000) > 1e-9 {
+		t.Fatalf("maximum land height changed: %.3f", m.LandElevationM[3])
+	}
+}
+
+func TestLatitudeTemperatureCurveKeepsMidLatitudesTemperate(t *testing.T) {
+	cfg := normalizeConfig(Config{})
+	maxLatRad := cfg.MaxLatitudeDeg * math.Pi / 180
+	maxLatSin := math.Sin(maxLatRad)
+
+	tempAt := func(lat float64) float64 {
+		latFactor := math.Sin(math.Abs(lat)*math.Pi/180) / maxLatSin
+		latFactor = clamp(latFactor, 0, 1)
+		latFactor = math.Pow(latFactor, cfg.LatitudeTempCurvePower)
+		return cfg.EquatorTempC + (cfg.PolarTempC-cfg.EquatorTempC)*latFactor
+	}
+
+	t30 := tempAt(30)
+	t45 := tempAt(45)
+	t60 := tempAt(60)
+
+	if t30 < 20 || t30 > 27 {
+		t.Fatalf("30-degree sea-level climate too cold/hot: %.2fC", t30)
+	}
+	if t45 < 10 || t45 > 18 {
+		t.Fatalf("45-degree sea-level climate too cold/hot: %.2fC", t45)
+	}
+	if t60 < -3 || t60 > 5 {
+		t.Fatalf("60-degree sea-level climate outside expected cool range: %.2fC", t60)
+	}
+	if !(t30 > t45 && t45 > t60) {
+		t.Fatalf("latitude temperature curve not monotonic: 30=%.2f 45=%.2f 60=%.2f", t30, t45, t60)
+	}
+}

@@ -25,7 +25,7 @@
 <a class="nav-item" href="landform.html">平原 / 丘陵 / 山地</a>
 <a class="nav-item" href="geomorph.html">河谷与沉积地貌</a>
 <a class="nav-item active" href="terrain.html">最终地形</a>
-<div class="nav-item disabled">生态与群系（后续）</div>
+<a class="nav-item" href="ecology.html">生态与群系</a>
 </div>
 <div class="section"><h3>示例数据</h3>
 <div class="kv"><span>Seed</span><span>731894205</span></div>
@@ -53,7 +53,7 @@
 <div class="card"><div class="card-title">为什么不再只用 Bilinear？</div><p>双线性高度连续，但坡度会在宏观 Cell 边界改变。Regional Terrain 改用 Cubic B-Spline，内部达到 C2 连续，同时使用非负基函数，不会产生普通三次插值常见的 overshoot 尖峰。</p></div>
 <div class="card"><div class="card-title">为什么噪声不会破坏宏观地理？</div><p>噪声只产生 RegionalDetail，而且振幅被 Plain / Hill / Foothill / Mountain / Plateau 权重限制。它无法重新决定大陆、山系或丘陵存在在哪里。</p></div>
 <div class="card"><div class="card-title">山顶不会被硬截平</div><p>最终高度不是简单 clamp。接近 0/1 时，新增细节会按剩余高度空间平滑压缩，避免 Regional Detail 新制造大面积平顶或深坑。</p></div>
-<div class="card"><div class="card-title">下一步</div><p>Phase 4.4：补冲积平原、山前冲积扇、河漫滩与峡谷/谷底横断面，然后做 Phase 4 最终验收。</p></div>
+<div class="card"><div class="card-title">这些地形后面怎么用？</div><p>最终连续地形会继续和长期生态区结合，再映射成 Minecraft 的群系、表面材料与植被。</p></div>
 </div></aside>
 </div></div><script src="assets/prototype.js"></script>
 </body></html>

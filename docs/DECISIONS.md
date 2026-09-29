@@ -727,3 +727,105 @@ river
 2. 固定多 Seed 验收批次中相关机制不能整体失效。
 3. 各字段保持连续、确定、可解释。
 4. 接入最终 Terrain 后不得破坏 Chunk / Macro Grid 连续性。
+
+
+---
+
+## D-025：宏观归一化高程与米制海拔必须分离
+
+状态：已实现第一版
+
+GeoWorld 的宏观 Elevation 是世界形态控制值，不是线性物理米数。
+
+禁止默认：
+
+```text
+normalized 0.5..1.0
+→ linear 0..6000m
+```
+
+原因：
+
+- 普通大陆内部会被解释成过高海拔。
+- 气候 lapse rate 会把大量中纬度陆地降温成寒带。
+- 后续生态会系统性偏向苔原 / 冰原。
+
+当前气候层单独使用可校准转换：
+
+```text
+physicalElevation =
+  normalizedHeight ^ ElevationCurvePower
+  × MaxLandElevationM
+```
+
+默认：
+
+`ElevationCurvePower = 1.70`
+
+端点保持：
+
+- sea level → 0m
+- normalized top → MaxLandElevationM
+
+---
+
+## D-026：纬度温度端点与中纬度曲线必须独立校准
+
+状态：已实现第一版
+
+只规定：
+
+- EquatorTempC
+- PolarTempC
+
+还不足以定义合理的全球温度场。
+
+旧曲线虽然端点正确，但会把中纬度算得过冷。
+
+因此加入：
+
+`LatitudeTempCurvePower`
+
+默认：
+
+`3.50`
+
+目标：
+
+- 赤道仍保持热带温度。
+- 高纬 / 极区仍显著寒冷。
+- 中纬度先缓慢降温，再向高纬明显下降。
+
+该参数属于长期气候模型参数，必须写入世界自己的生成配置版本。
+
+---
+
+## D-027：Eco Region 与 Minecraft Biome 分离
+
+状态：已实现 Eco Region 第一版
+
+GeoWorld 不采用：
+
+```text
+climate threshold
+→ Minecraft biome
+```
+
+而采用：
+
+```text
+Climate
++ Hydrology
++ Terrain
+→ Continuous Ecology
+→ Eco Region
+→ Minecraft Biome / Surface / Vegetation
+```
+
+原因：
+
+- 同一个温带森林可以出现在平原、丘陵、河漫滩和山地。
+- Minecraft Biome 是渲染 / 游戏世界分类，Eco Region 是长期生态语义。
+- 分离后未来可以替换 Minecraft Adapter，而不改核心生态模型。
+
+Eco Region 代表长期稳定生态，不代表实时天气或当前季节。

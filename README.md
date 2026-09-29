@@ -64,6 +64,7 @@ GeoWorld 只在中央有限区域生成完整地理世界：
 - `docs/PHASE2.md`：气候骨架实验记录。
 - `docs/PHASE3.md`：季风与水文实验记录。
 - `docs/PHASE4.md`：侵蚀、Relief 与地貌细化实验记录。
+- `docs/PHASE5.md`：长期生态区与 Minecraft 映射实验记录。
 - `docs/ARCHITECTURE.md`：整体架构。
 - `docs/SAMPLING.md`：连续世界坐标采样与 Chunk 无缝原则。
 - `docs/PRODUCT.md`：产品边界。
@@ -90,6 +91,7 @@ Windows 可直接双击：
 - `prototype/erosion.html`：Phase 4 侵蚀 / Relief 实验
 - `prototype/landform.html`：Phase 4 丘陵 / 山麓 / 高原连续权重实验
 - `prototype/geomorph.html`：河漫滩 / 冲积平原 / 冲积扇 / 峡谷实验
-- `prototype/terrain.html`：Phase 4 Regional Terrain / Chunk 无缝实验
+- `prototype/terrain.html`：最终连续地形 / Chunk 无缝实验
+- `prototype/ecology.html`：长期生态区 / 植被 / 湿地 / 高山生态实验
 
 所有 CSS 与生成图片均使用相对路径，可通过 `file://` 直接加载。

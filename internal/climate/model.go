@@ -4,8 +4,10 @@ type Config struct {
 	MaxLatitudeDeg                  float64
 	EquatorTempC                    float64
 	PolarTempC                      float64
+	LatitudeTempCurvePower          float64
 	LapseRateCPerKm                 float64
 	MaxLandElevationM               float64
+	ElevationCurvePower             float64
 	SeaLevelNormalized              float64
 	OceanCurrentDeflectionDeg       float64
 	OceanCurrentWindScale           float64

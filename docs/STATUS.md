@@ -8,12 +8,13 @@
 
 **Phase 5 — 生态区与 Minecraft 映射**
 
-当前子阶段：**Phase 5.1 — 生态区分类模型（准备开始）**
+当前子阶段：**Phase 5.2 — Minecraft Biome / Surface Mapping（准备开始）**
 
 ## 当前稳定基线
 
 最近提交：
 
+- `d238299` — add fluvial depositional geomorphology
 - `151df07` — simplify generator prototype navigation and explanations
 - `5b7a1e0` — add continuous regional terrain sampling
 - `6545409` — add continuous landform weights and scale aware terrain context
@@ -688,3 +689,60 @@ Tectonics
 ```
 
 下一步：**Phase 5.1 — Climate / Hydrology / Terrain → Eco Region 分类**。
+
+## Phase 5.1 — 长期生态区分类
+
+状态：**完成第一版**
+
+新增：
+
+- `internal/ecology`
+- `cmd/geoworld-ecology-lab`
+- `cmd/geoworld-ecology-audit`
+- `prototype/ecology.html`
+- `docs/PHASE5.md`
+
+连续生态字段：
+
+- Moisture / Aridity
+- Tree / Grass / Shrub / Bare Ground
+- Snow
+- Soil Moisture
+- Vegetation Density
+- Wetland Ecology
+- Alpine Ecology
+
+有限 Eco Region：
+
+- Warm / Temperate / Cold / Frozen Ocean
+- Ice Sheet
+- Tundra
+- Alpine
+- Boreal / Temperate / Subtropical Forest
+- Temperate Grassland
+- Temperate / Hot Desert
+- Mediterranean Shrubland
+- Savanna
+- Tropical Monsoon Forest
+- Tropical Rainforest
+- Wetland
+
+Phase 5.1 接入真实世界时反向发现并修复 Phase 2 温度标尺问题：
+
+- normalized elevation 不再线性映射到 0..6000m。
+- 新增 ElevationCurvePower，默认 1.70。
+- 新增 LatitudeTempCurvePower，默认 3.50。
+- 中纬度不再被系统性算得过冷。
+
+正式 640×400 多 Seed 生态审计：
+
+- 冷地生态：约 5% ～ 17%
+- 森林：约 27% ～ 37%
+- 干旱生态：约 15% ～ 27%
+- 草原 / 灌丛：约 27% ～ 40%
+- 热带生态：约 39% ～ 46%
+- 低置信度：约 1.4% ～ 2.1%
+
+全量气候 / 季风 / 水文回归仍通过。
+
+下一步：**Phase 5.2 — Eco Region → Minecraft Biome / Surface / Vegetation Mapping**。
