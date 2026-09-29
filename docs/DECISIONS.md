@@ -600,3 +600,52 @@ Phase 4 当前已处理：
 - ValleySpread radius / decay。
 
 后续继续审查 Phase 1 / Phase 2 中仍以 Cell 为单位的空间参数，并逐步迁移到统一的 GeoScale / WorldMetric 抽象。
+
+
+---
+
+## D-023：Regional Terrain 使用世界坐标连续函数，默认采用 Cubic B-Spline
+
+状态：已实现第一版
+
+Phase 4.3 将最终区域地形定义为：
+
+```text
+H(worldX, worldZ)
+```
+
+而不是：
+
+```text
+H(chunkX, chunkZ, localX, localZ)
+```
+
+Chunk 只负责查询世界坐标。
+
+为了同时满足：
+
+- 高度连续。
+- 坡度连续。
+- 不 overshoot。
+- 不出现宏观 Cell 台阶。
+
+Regional Terrain 默认使用 Uniform Cubic B-Spline 对宏观控制场采样。
+
+选择 B-Spline 而不是普通 Catmull-Rom 的主要原因：
+
+- B-Spline 基函数非负。
+- 权重和为 1。
+- 不会在山脊 / 高原附近产生超过控制点范围的插值尖峰。
+- 网格内部可达到 C2 连续。
+
+代价：
+
+- 不保证曲线精确穿过每个宏观节点。
+
+GeoWorld 接受这一点，因为宏观 Grid Node 本来就是世界模型控制点，而不是必须保真的方块级高度样本。
+
+Regional Detail 也必须：
+
+- 只读取绝对世界坐标 + Seed。
+- 不能读取 Chunk-local 随机状态。
+- 振幅受连续 LandformWeight 控制。

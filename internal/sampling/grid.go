@@ -99,3 +99,62 @@ func minInt(a, b int) int {
 	}
 	return b
 }
+
+// SampleCubicBSpline samples the field with a uniform cubic B-spline.
+//
+// Unlike interpolating cubics such as Catmull-Rom, the cubic B-spline basis is
+// non-negative and sums to one. The result therefore remains inside the convex
+// hull of the neighbouring control values and cannot create interpolation
+// spikes. In the grid interior the field is C2 continuous.
+//
+// Macro values are treated as control points rather than mandatory pass-through
+// points. This is intentional for final terrain shaping.
+func (g ScalarGrid) SampleCubicBSpline(worldX, worldZ float64) float64 {
+	gx := (worldX - g.OriginX) / g.CellSize
+	gz := (worldZ - g.OriginZ) / g.CellSize
+
+	gx = clamp(gx, 0, float64(g.Width-1))
+	gz = clamp(gz, 0, float64(g.Height-1))
+
+	xBase := int(math.Floor(gx))
+	zBase := int(math.Floor(gz))
+	tx := gx - float64(xBase)
+	tz := gz - float64(zBase)
+
+	wx := cubicBSplineWeights(tx)
+	wz := cubicBSplineWeights(tz)
+
+	sum := 0.0
+	for dz := 0; dz < 4; dz++ {
+		z := clampInt(zBase+dz-1, 0, g.Height-1)
+		for dx := 0; dx < 4; dx++ {
+			x := clampInt(xBase+dx-1, 0, g.Width-1)
+			sum += g.at(x, z) * wx[dx] * wz[dz]
+		}
+	}
+	return sum
+}
+
+func cubicBSplineWeights(t float64) [4]float64 {
+	t = clamp(t, 0, 1)
+	t2 := t * t
+	t3 := t2 * t
+	oneMinus := 1 - t
+
+	return [4]float64{
+		oneMinus * oneMinus * oneMinus / 6,
+		(3*t3 - 6*t2 + 4) / 6,
+		(-3*t3 + 3*t2 + 3*t + 1) / 6,
+		t3 / 6,
+	}
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}

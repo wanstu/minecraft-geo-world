@@ -472,22 +472,253 @@ Strong valley overlay  0.64% .. 0.84%
 - `valley-weight.png`
 - `dominant-landform.png`
 
-## 下一步 — Phase 4.3
+## Phase 4.3 — Regional Terrain 合成与连续采样
 
-把宏观高程 + 连续地貌权重真正合成为可连续采样的 Regional Terrain：
+状态：**完成第一版**
+
+模块：
+
+- `internal/terrain`
+- `cmd/geoworld-terrain-lab`
+- `cmd/geoworld-terrain-audit`
+- `prototype/terrain.html`
+
+### 最终区域高度函数
+
+Regional Terrain 不以 Chunk 为生成单位。
+
+统一入口：
 
 ```text
-ErodedElevation
-+ Landform Weights
-+ Regional Detail Fields
-+ Valley Shape
-→ RegionalTerrainHeight(x,z)
+H(worldX, worldZ)
 ```
 
-重点验收：
+第一版结构：
 
-- 宏观 Cell 边界无台阶。
-- Minecraft 16×16 Chunk 边界无接缝。
-- 平原 → 丘陵 → 山麓 → 山地连续过渡。
-- 河谷不出现“切一条直槽”的人工感。
-- 局部细节可以使用噪声，但不能改变宏观地貌归属。
+```text
+CubicBSpline(ErodedElevation)
++
+Σ LandformWeightᵢ × RegionalDetailᵢ
+-
+ValleyCarve
+→ RegionalTerrainHeight
+```
+
+其中：
+
+- worldX / worldZ 是绝对世界坐标。
+- Chunk 坐标不进入数学公式。
+- 相同世界坐标无论从哪个 Chunk 请求都得到相同结果。
+
+### Cubic B-Spline
+
+Phase 1 的 `ScalarGrid` 原本只有 Bilinear。
+
+Phase 4.3 新增：
+
+- `SampleCubicBSpline(worldX, worldZ)`
+
+原因：
+
+- Bilinear 保证 C0 连续，即高度不断裂。
+- 但一阶坡度会在宏观 Cell 边界改变。
+- Regional Terrain 需要更平滑的坡面。
+
+Uniform Cubic B-Spline 具有：
+
+- 网格内部 C2 连续。
+- 基函数非负。
+- 基函数总和为 1。
+- 结果保持在邻域控制点凸包内。
+- 不产生普通 interpolating cubic 容易出现的 overshoot 尖峰。
+
+宏观节点因此被解释为：
+
+> 地形控制点，而不是最终曲线必须精确穿过的点。
+
+### Regional Detail
+
+噪声只允许负责区域细节。
+
+第一版各地貌振幅关系：
+
+```text
+Mountain
+>
+Foothill
+>
+Hill
+>
+Plain
+
+Plateau < Hill
+```
+
+因此：
+
+- 山地可以有更强区域起伏。
+- 丘陵有中等起伏。
+- 平原只有轻微波动。
+- 高原则保持高海拔但较平缓。
+
+所有噪声只读取：
+
+- Seed
+- worldX
+- worldZ
+
+不读取 Chunk 坐标。
+
+### 噪声连续性
+
+Regional Detail 使用：
+
+- 世界坐标 Value Noise。
+- Quintic Fade。
+- 多 octave FBM。
+
+Quintic Fade 在晶格边界提供平滑导数。
+
+因此噪声自身不会在：
+
+- Minecraft Chunk 边界
+- Macro Cell 边界
+
+产生跳变。
+
+### 河谷形状
+
+ValleyWeight 不再只作用在一条河线。
+
+Phase 4.2 已把 ValleyCore 向两侧连续扩散。
+
+Phase 4.3：
+
+```text
+ValleyWeight
+→ ValleyCarve
++ local detail damping
+```
+
+效果：
+
+- 谷底被进一步轻微压低。
+- 河谷内部高频粗糙度降低。
+- 不会把河流处理成“一条直线切槽”。
+
+### 平滑高度限幅
+
+初版曾使用：
+
+```text
+clamp(base + detail, 0, 1)
+```
+
+多 Seed 审计发现少量高山被 Regional Detail 推到 1.0，可能造成硬截平。
+
+已改成 bounded additive：
+
+- 接近 1.0 时，正向细节按剩余 headroom 平滑压缩。
+- 接近 0.0 时，负向细节按剩余 footroom 平滑压缩。
+- 中间高度区仍近似正常加法。
+
+因此不会为了防越界而整体降低山地细节振幅。
+
+### 当前测试 Seed 731894205
+
+正式网格：
+
+```text
+Macro Grid       640 × 400
+Macro Cell       128 blocks
+World Extent     ≈ 81,792 × 51,072 blocks
+```
+
+结果：
+
+```text
+Height              0.14571 .. 0.91951
+Regional Detail    -0.03224 .. +0.03088
+Max Valley Carve    0.00454
+```
+
+连续性：
+
+```text
+Max Chunk Boundary epsilon jump
+= 0.000000102249
+
+Max Macro Boundary slope mismatch
+= 0.000005356980
+```
+
+### 4 Seed 正式尺寸审计
+
+640 × 400 / 128 blocks per macro cell：
+
+```text
+Maximum |Regional Detail|
+0.03314 .. 0.03689
+
+Maximum Valley Carve
+0.00441 .. 0.00558
+
+Chunk Boundary epsilon jump
+1.13e-7 .. 1.48e-7
+
+Macro Boundary slope mismatch
+2.26e-6 .. 6.13e-6
+```
+
+审计护栏：
+
+- `|RegionalDetail| <= 0.06`
+- `Chunk epsilon jump <= 1e-5`
+- `Macro slope mismatch <= 1e-4`
+
+超过护栏时 `geoworld-terrain-audit` 直接失败。
+
+### 自动测试
+
+验证：
+
+- B-Spline 常量场保持不变。
+- B-Spline 不超出控制值范围。
+- B-Spline 宏观边界一阶导连续。
+- Minecraft Chunk 边界无接缝。
+- 同坐标结果完全确定。
+- 不同 Seed 会改变区域细节。
+- Mountain detail 振幅 > Hill > Plain。
+- Plateau detail 比 Hill 平缓。
+- Valley Overlay 会压低地形并削弱粗糙度。
+- 连续采样后的基础地貌权重仍保持归一化。
+- 最终高度无 NaN / Inf。
+- bounded add 不新制造硬 0 / 1 截断。
+
+### 当前可视化
+
+`prototype/terrain.html`
+
+图层：
+
+- `regional-detail.png`
+- `valley-carve.png`
+- `regional-height.png`
+
+同时对照：
+
+- Phase 4.1 `eroded-elevation.png`
+- Phase 4.2 `dominant-landform.png`
+
+## 下一步 — Phase 4.4
+
+补充侵蚀之后的沉积型地貌和河谷横断面：
+
+- Floodplain / 河漫滩。
+- Alluvial Plain / 冲积平原。
+- Alluvial Fan / 山前冲积扇。
+- Canyon tendency / 峡谷倾向。
+- Valley floor width / 谷底宽度。
+- 河口与低地沉积倾向。
+
+Phase 4.4 完成后进行 Phase 4 总体验收。

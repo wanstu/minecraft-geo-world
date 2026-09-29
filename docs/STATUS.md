@@ -8,12 +8,13 @@
 
 **Phase 4 — 侵蚀、Relief 与地貌细化**
 
-当前子阶段：**Phase 4.3 — Regional Terrain 合成与连续采样（准备开始）**
+当前子阶段：**Phase 4.4 — 沉积型地貌 / 河谷横断面 / Phase 4 验收（准备开始）**
 
 ## 当前稳定基线
 
 最近提交：
 
+- `6545409` — add continuous landform weights and scale aware terrain context
 - `d626e6a` — add erosion drivers valley incision and relief
 - `8340ed4` — add river hierarchy seasonal flow and explicit lakes
 - `bbf3890` — add hydrology basins runoff and river network
@@ -559,3 +560,43 @@ Phase 3 第一版正式完成。
 已新增完整流水线尺度回归测试，防止预览分辨率再次改变世界地貌比例。
 
 下一步：**Phase 4.3 — Regional Terrain Height / continuous sampling / chunk seam acceptance**。
+
+
+## Phase 4.3 — Regional Terrain 合成与连续采样
+
+状态：**完成第一版**
+
+新增：
+
+- `internal/terrain`
+- `cmd/geoworld-terrain-lab`
+- `cmd/geoworld-terrain-audit`
+- `prototype/terrain.html`
+- `ScalarGrid.SampleCubicBSpline`
+
+Regional Terrain：
+
+```text
+ErodedElevation
++ continuous Landform Weights
++ world-coordinate Regional Detail
+- Valley Carve
+→ H(worldX, worldZ)
+```
+
+正式测试 Seed 731894205：
+
+- Grid：640 × 400
+- Cell：128 blocks
+- 约 81.8k × 51.1k blocks
+- Height：0.14571 ～ 0.91951
+- Regional Detail：-0.03224 ～ +0.03088
+- Max Valley Carve：0.00454
+- Chunk epsilon jump：1.02e-7
+- Macro slope mismatch：5.36e-6
+
+已实现 smooth bounded height addition，避免 Regional Detail 把山顶硬 clamp 到 1.0。
+
+多 Seed Terrain Audit 已加入失败护栏。
+
+下一步：**Phase 4.4 — Floodplain / Alluvial Fan / Canyon / Valley Profile / Phase 4 Acceptance**。

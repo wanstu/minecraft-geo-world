@@ -13,23 +13,45 @@ for each block (worldX, worldZ):
 
 无论该坐标由哪个 Chunk 请求，结果都必须一致。
 
-## 当前第一版
+## 当前实现
 
 实现位置：
 
 `internal/sampling/grid.go`
 
-当前使用：
+当前同时保留两种采样：
 
-**Bilinear Interpolation / 双线性插值**
+### Bilinear Interpolation
+
+用于：
+
+- 简单字段。
+- 早期算法验证。
+- 需要精确穿过宏观节点的场景。
 
 优点：
 
-- 连续。
-- 不会 overshoot。
+- C0 连续。
+- 不 overshoot。
 - 计算便宜。
 - 与 Chunk 无关。
-- 非常适合第一版 Runtime 和算法验证。
+
+### Cubic B-Spline
+
+Phase 4.3 新增：
+
+`SampleCubicBSpline(worldX, worldZ)`
+
+主要用于 Regional Terrain 和需要更平滑坡面的连续场。
+
+特性：
+
+- 网格内部 C2 连续。
+- 基函数非负。
+- 基函数总和为 1。
+- 输出位于邻域控制点凸包中。
+- 不产生三次插值尖峰。
+- 宏观节点作为控制点，不要求曲线精确穿过节点。
 
 当前接口：
 
