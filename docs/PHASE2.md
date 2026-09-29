@@ -282,13 +282,93 @@ Ocean temperature correction  -0.391°C .. +0.289°C
 - 洋流修正不会抹掉原有高地 / 低地温差。
 - 修正后温度无 NaN / Inf。
 
-## 下一步 — Phase 2.5
+## Phase 2.5 — 长期水汽与降水骨架
 
-长期降水骨架：
+状态：**完成第一版**
 
-- 海洋蒸发水汽源。
-- 盛行风输送水汽。
-- 低压区上升增雨。
-- 山地迎风坡地形雨。
-- 背风侧雨影。
-- 初步年降水量。
+### 水汽来源与输送
+
+水汽来源：
+
+- 海洋蒸发，强度受 SST 影响。
+- 陆地使用弱的温度相关再循环项，近似长期蒸散。
+
+运输：
+
+- 盛行风上游平流。
+- 小尺度扩散。
+- 迭代次数随宏观网格尺寸自适应，不再固定 64 次。
+
+### 降水机制
+
+```text
+Moisture
++
+Low-pressure Lift
++
+Orographic Upslope
++
+Temperature Capacity
+→ Annual Precipitation
+```
+
+山地迎风坡通过风向与海拔梯度点积计算抬升。
+
+迎风坡增强凝结并消耗水汽，因此背风侧自然形成雨影。
+
+### 陆地水汽再循环
+
+初版加入弱的长期再循环项，近似蒸散作用。
+
+为避免水汽指数增长：
+
+- 再循环水汽有上限。
+- 再循环强度较弱。
+- 合成大陆测试要求水汽仍随内陆距离下降。
+
+未来进入土壤 / 植被 / 水文阶段后，应由真实 Soil Moisture / Evapotranspiration 替代该近似。
+
+### 自动测试
+
+验证：
+
+- 合成山脉迎风坡存在正 Orographic Lift。
+- 背风下降坡不会错误地产生地形抬升。
+- 迎风坡降水明显高于背风坡。
+- 水汽总体由海洋进入大陆并向内陆衰减。
+- 年降水无 NaN / Inf，范围保持 0..6000 mm。
+- 多 Seed 不允许退化成全沙漠或全雨林。
+
+### 16 Seed 气候审计
+
+320 × 200 宏观网格：
+
+```text
+Land precipitation avg        734 .. 1528 mm
+Dry land <250mm              22.7% .. 59.7%
+Wet land >1500mm            14.0% .. 38.1%
+Precip saturation            0.39% .. 1.27%
+Tropical land precipitation   936 .. 1749 mm
+Temperate land precipitation  221 .. 830 mm
+>60° land precipitation       320 .. 943 mm
+```
+
+这里 >60° 包含副极地低压 / 风暴带，不等于纯极地沙漠。
+
+### Phase 2 输出
+
+当前气候层已经提供：
+
+- Latitude
+- AnnualMeanTemperature
+- AdjustedAnnualTemperature
+- PressureIndex
+- PrevailingWind
+- SeaSurfaceTemperature
+- SurfaceOceanCurrent
+- OceanThermalCorrection
+- Moisture
+- OrographicLift
+- AnnualPrecipitation
+
+Phase 2 第一版至此完成。

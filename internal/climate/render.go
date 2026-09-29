@@ -58,6 +58,17 @@ func RenderAll(m *Model, outDir string) error {
 		{"temperature-adjusted.png", func(i int) color.RGBA {
 			return temperatureColor(m.AdjustedAnnualTempC[i])
 		}},
+		{"moisture.png", func(i int) color.RGBA {
+			v := clamp(m.Moisture[i]/1.2, 0, 1)
+			return lerpColor(color.RGBA{126, 104, 76, 255}, color.RGBA{71, 168, 196, 255}, v)
+		}},
+		{"orographic-lift.png", func(i int) color.RGBA {
+			v := clamp(m.OrographicLift[i], 0, 1)
+			return lerpColor(color.RGBA{48, 51, 52, 255}, color.RGBA{229, 202, 109, 255}, v)
+		}},
+		{"precipitation.png", func(i int) color.RGBA {
+			return precipitationColor(m.AnnualPrecipMM[i])
+		}},
 	}
 
 	for _, r := range renderers {
@@ -270,4 +281,19 @@ func renderOceanCurrent(path string, m *Model) error {
 		}
 	}
 	return writePNG(path, img)
+}
+
+func precipitationColor(mm float64) color.RGBA {
+	switch {
+	case mm <= 250:
+		return lerpColor(color.RGBA{170, 132, 82, 255}, color.RGBA{201, 179, 101, 255}, clamp(mm/250, 0, 1))
+	case mm <= 750:
+		return lerpColor(color.RGBA{201, 179, 101, 255}, color.RGBA{121, 171, 93, 255}, (mm-250)/500)
+	case mm <= 1500:
+		return lerpColor(color.RGBA{121, 171, 93, 255}, color.RGBA{65, 154, 113, 255}, (mm-750)/750)
+	case mm <= 3000:
+		return lerpColor(color.RGBA{65, 154, 113, 255}, color.RGBA{60, 133, 181, 255}, (mm-1500)/1500)
+	default:
+		return lerpColor(color.RGBA{60, 133, 181, 255}, color.RGBA{75, 77, 157, 255}, clamp((mm-3000)/3000, 0, 1))
+	}
 }

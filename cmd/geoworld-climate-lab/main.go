@@ -49,6 +49,13 @@ func main() {
 	maxCorrection := math.Inf(-1)
 	minAdjusted := math.Inf(1)
 	maxAdjusted := math.Inf(-1)
+	minPrecip := math.Inf(1)
+	maxPrecip := math.Inf(-1)
+	landPrecipSum, oceanPrecipSum := 0.0, 0.0
+	landMoistureSum, oceanMoistureSum := 0.0, 0.0
+	dryLand, wetLand := 0, 0
+	var tropicalLandPrecip, temperateLandPrecip, polarLandPrecip float64
+	var tropicalLandN, temperateLandN, polarLandN int
 	landSum, oceanSum := 0.0, 0.0
 	landN, oceanN := 0, 0
 	for i, temp := range model.AnnualMeanTempC {
@@ -83,11 +90,39 @@ func main() {
 		if model.AdjustedAnnualTempC[i] > maxAdjusted {
 			maxAdjusted = model.AdjustedAnnualTempC[i]
 		}
+		if model.AnnualPrecipMM[i] < minPrecip {
+			minPrecip = model.AnnualPrecipMM[i]
+		}
+		if model.AnnualPrecipMM[i] > maxPrecip {
+			maxPrecip = model.AnnualPrecipMM[i]
+		}
 		if world.Crust[i] == phase1.Continental {
 			landSum += temp
+			landPrecipSum += model.AnnualPrecipMM[i]
+			landMoistureSum += model.Moisture[i]
+			if model.AnnualPrecipMM[i] < 250 {
+				dryLand++
+			}
+			if model.AnnualPrecipMM[i] > 1500 {
+				wetLand++
+			}
+			absLat := math.Abs(model.LatitudeDeg[i])
+			switch {
+			case absLat < 30:
+				tropicalLandPrecip += model.AnnualPrecipMM[i]
+				tropicalLandN++
+			case absLat < 60:
+				temperateLandPrecip += model.AnnualPrecipMM[i]
+				temperateLandN++
+			default:
+				polarLandPrecip += model.AnnualPrecipMM[i]
+				polarLandN++
+			}
 			landN++
 		} else {
 			oceanSum += temp
+			oceanPrecipSum += model.AnnualPrecipMM[i]
+			oceanMoistureSum += model.Moisture[i]
 			oceanN++
 			if model.SeaSurfaceTempC[i] < minSST {
 				minSST = model.SeaSurfaceTempC[i]
@@ -105,7 +140,7 @@ func main() {
 		}
 	}
 
-	fmt.Printf("GeoWorld Phase 2.4 Climate Lab\n")
+	fmt.Printf("GeoWorld Phase 2.5 Climate Lab\n")
 	fmt.Printf("seed=%d grid=%dx%d latitude=±%.1f°\n", *seed, *width, *height, model.Config.MaxLatitudeDeg)
 	fmt.Printf("annual-temp=%.2f..%.2f C land-avg=%.2f C ocean-avg=%.2f C\n",
 		minTemp, maxTemp, landSum/float64(landN), oceanSum/float64(oceanN))
@@ -117,5 +152,21 @@ func main() {
 		minSST, maxSST, minCurrent, maxCurrent)
 	fmt.Printf("ocean-temp-correction=%.3f..%.3f C adjusted-temp=%.2f..%.2f C\n",
 		minCorrection, maxCorrection, minAdjusted, maxAdjusted)
+	fmt.Printf("annual-precip=%.1f..%.1f mm land-avg=%.1f mm ocean-avg=%.1f mm\n",
+		minPrecip, maxPrecip, landPrecipSum/float64(landN), oceanPrecipSum/float64(oceanN))
+	fmt.Printf("moisture land-avg=%.4f ocean-avg=%.4f dry-land=%.1f%% wet-land=%.1f%%\n",
+		landMoistureSum/float64(landN), oceanMoistureSum/float64(oceanN),
+		float64(dryLand)/float64(landN)*100, float64(wetLand)/float64(landN)*100)
+	fmt.Printf("land-precip tropical=%.1f mm temperate=%.1f mm polar=%.1f mm\n",
+		safeAvg(tropicalLandPrecip, tropicalLandN),
+		safeAvg(temperateLandPrecip, temperateLandN),
+		safeAvg(polarLandPrecip, polarLandN))
 	fmt.Printf("output=%s\n", *out)
+}
+
+func safeAvg(sum float64, n int) float64 {
+	if n == 0 {
+		return 0
+	}
+	return sum / float64(n)
 }

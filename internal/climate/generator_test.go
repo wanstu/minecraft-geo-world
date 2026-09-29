@@ -3,6 +3,8 @@ package climate
 import (
 	"math"
 	"testing"
+
+	"geoworld/internal/phase1"
 )
 
 func TestLatitudeRunsNorthToSouth(t *testing.T) {
@@ -392,6 +394,196 @@ func TestAdjustedTemperatureFinite(t *testing.T) {
 	for i, temp := range m.AdjustedAnnualTempC {
 		if math.IsNaN(temp) || math.IsInf(temp, 0) {
 			t.Fatalf("invalid adjusted temperature at %d: %v", i, temp)
+		}
+	}
+}
+
+func syntheticRainShadowModel(t *testing.T) *Model {
+	t.Helper()
+	width, height := 24, 5
+	n := width * height
+	cfg := normalizeConfig(Config{
+		MoistureIterations:     80,
+		MoistureAdvection:      0.82,
+		MoistureDiffusion:      0.08,
+		OrographicRainStrength: 0.28,
+		PrecipitationScaleMM:   18000,
+	})
+
+	m := &Model{
+		Config:              cfg,
+		Width:               width,
+		Height:              height,
+		LandMask:            make([]bool, n),
+		LandElevationM:      make([]float64, n),
+		AdjustedAnnualTempC: make([]float64, n),
+		PressureIndex:       make([]float64, n),
+		WindX:               make([]float64, n),
+		WindZ:               make([]float64, n),
+		SeaSurfaceTempC:     make([]float64, n),
+		Moisture:            make([]float64, n),
+		OrographicLift:      make([]float64, n),
+		AnnualPrecipMM:      make([]float64, n),
+	}
+
+	for z := 0; z < height; z++ {
+		for x := 0; x < width; x++ {
+			i := z*width + x
+			m.LandMask[i] = x >= 4
+			m.AdjustedAnnualTempC[i] = 20
+			m.PressureIndex[i] = 0.52
+			m.WindX[i] = 1
+			m.WindZ[i] = 0
+			if x < 4 {
+				m.SeaSurfaceTempC[i] = 25
+			}
+
+			// West-to-east wind crosses a ridge centered near x=12.
+			switch x {
+			case 8:
+				m.LandElevationM[i] = 500
+			case 9:
+				m.LandElevationM[i] = 1200
+			case 10:
+				m.LandElevationM[i] = 2200
+			case 11:
+				m.LandElevationM[i] = 3400
+			case 12:
+				m.LandElevationM[i] = 4500
+			case 13:
+				m.LandElevationM[i] = 3200
+			case 14:
+				m.LandElevationM[i] = 1800
+			case 15:
+				m.LandElevationM[i] = 800
+			}
+		}
+	}
+	return m
+}
+
+func TestOrographicLiftAppearsOnWindwardSlope(t *testing.T) {
+	m := syntheticRainShadowModel(t)
+	m.computeMoistureAndPrecipitation()
+
+	z := 2
+	windward := m.OrographicLift[z*m.Width+10]
+	leeward := m.OrographicLift[z*m.Width+14]
+	if windward <= 0.02 {
+		t.Fatalf("expected positive windward lift, got %.4f", windward)
+	}
+	if leeward > 0.01 {
+		t.Fatalf("leeward descending slope should not have strong uplift, got %.4f", leeward)
+	}
+}
+
+func TestMountainProducesRainShadow(t *testing.T) {
+	m := syntheticRainShadowModel(t)
+	m.computeMoistureAndPrecipitation()
+
+	z := 2
+	windward := m.AnnualPrecipMM[z*m.Width+10]
+	leeward := m.AnnualPrecipMM[z*m.Width+15]
+	if !(windward > leeward*1.20) {
+		t.Fatalf("rain shadow too weak: windward %.1f mm leeward %.1f mm", windward, leeward)
+	}
+}
+
+func TestMoistureComesFromOceanAndDeclinesInland(t *testing.T) {
+	m := syntheticRainShadowModel(t)
+	m.computeMoistureAndPrecipitation()
+
+	z := 2
+	coast := m.Moisture[z*m.Width+4]
+	farInland := m.Moisture[z*m.Width+20]
+	if !(coast > farInland) {
+		t.Fatalf("expected moisture to decline inland: coast %.4f inland %.4f", coast, farInland)
+	}
+}
+
+func TestPrecipitationFiniteAndBounded(t *testing.T) {
+	input := Input{
+		Width:     16,
+		Height:    12,
+		Elevation: make([]float64, 192),
+		LandMask:  make([]bool, 192),
+	}
+	for z := 3; z < 9; z++ {
+		for x := 5; x < 11; x++ {
+			i := z*input.Width + x
+			input.LandMask[i] = true
+			input.Elevation[i] = 0.72
+		}
+	}
+	m, err := Generate(input, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, p := range m.AnnualPrecipMM {
+		if math.IsNaN(p) || math.IsInf(p, 0) || p < 0 || p > 6000 {
+			t.Fatalf("invalid precipitation at %d: %.3f", i, p)
+		}
+	}
+}
+
+func TestClimateSeedSweepDoesNotCollapsePrecipitation(t *testing.T) {
+	seeds := []int64{2000, 14302, 32755, 94265}
+	for _, seed := range seeds {
+		world := phase1.Generate(phase1.Config{
+			Seed:          seed,
+			Width:         160,
+			Height:        100,
+			PlateCount:    18,
+			OceanFraction: 0.68,
+		})
+		m, err := Generate(InputFromPhase1(world), Config{})
+		if err != nil {
+			t.Fatalf("seed %d: %v", seed, err)
+		}
+
+		landN := 0
+		landSum := 0.0
+		dryN := 0
+		wetN := 0
+		saturated := 0
+		for i, p := range m.AnnualPrecipMM {
+			if math.IsNaN(p) || math.IsInf(p, 0) {
+				t.Fatalf("seed %d invalid precip at %d", seed, i)
+			}
+			if p >= 5999 {
+				saturated++
+			}
+			if world.Crust[i] != phase1.Continental {
+				continue
+			}
+			landN++
+			landSum += p
+			if p < 250 {
+				dryN++
+			}
+			if p > 1500 {
+				wetN++
+			}
+		}
+		if landN == 0 {
+			t.Fatalf("seed %d has no land", seed)
+		}
+
+		avg := landSum / float64(landN)
+		if avg < 250 || avg > 2500 {
+			t.Fatalf("seed %d land precipitation collapsed: avg=%.1f mm", seed, avg)
+		}
+		dryPct := float64(dryN) / float64(landN)
+		wetPct := float64(wetN) / float64(landN)
+		if dryPct < 0.05 || dryPct > 0.90 {
+			t.Fatalf("seed %d dry-land fraction suspicious: %.1f%%", seed, dryPct*100)
+		}
+		if wetPct < 0.01 || wetPct > 0.60 {
+			t.Fatalf("seed %d wet-land fraction suspicious: %.1f%%", seed, wetPct*100)
+		}
+		satPct := float64(saturated) / float64(len(m.AnnualPrecipMM))
+		if satPct > 0.05 {
+			t.Fatalf("seed %d precipitation saturation too high: %.2f%%", seed, satPct*100)
 		}
 	}
 }

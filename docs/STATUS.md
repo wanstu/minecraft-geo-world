@@ -6,9 +6,9 @@
 
 ## 当前阶段
 
-**Phase 2 — 气候骨架**
+**Phase 3 — 季风与水文**
 
-当前子阶段：**Phase 2.5 — 长期降水骨架（准备开始）**
+当前子阶段：**Phase 3.1 — 夏 / 冬代表态与季风指数（准备开始）**
 
 ## 当前稳定基线
 
@@ -302,3 +302,31 @@ Latitude
 - Ocean Temperature Correction：-0.391°C ～ +0.289°C
 
 下一步：**Phase 2.5 — Moisture Transport / Precipitation / Orographic Rain**。
+
+
+## Phase 2.5 — 长期水汽与降水骨架
+
+状态：**完成第一版**
+
+已实现：
+
+- SST 控制海洋蒸发潜力。
+- 盛行风平流水汽。
+- 邻域扩散。
+- 网格尺寸自适应水汽迭代。
+- 弱陆地蒸散再循环近似。
+- 低压抬升增雨。
+- 山地迎风坡地形雨。
+- 水汽消耗形成背风雨影。
+- 初步年降水 mm。
+
+16 Seed 审计：
+
+- 陆地平均降水：734 ～ 1528 mm
+- <250 mm 干旱陆地：22.7% ～ 59.7%
+- >1500 mm 湿润陆地：14.0% ～ 38.1%
+- 6000 mm 顶格区域：最多 1.27%
+
+Phase 2 第一版正式完成。
+
+下一步：**Phase 3.1 — Summer/Winter Representative States + Monsoon Index**。

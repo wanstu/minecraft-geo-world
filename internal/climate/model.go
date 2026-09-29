@@ -14,6 +14,11 @@ type Config struct {
 	SSTDiffusion              float64
 	CoastalCurrentInfluence   float64
 	CoastalTempDecayCells     float64
+	MoistureIterations        int
+	MoistureAdvection         float64
+	MoistureDiffusion         float64
+	OrographicRainStrength    float64
+	PrecipitationScaleMM      float64
 }
 
 type Input struct {
@@ -41,4 +46,7 @@ type Model struct {
 	OceanDistanceCells   []float64
 	OceanTempCorrectionC []float64
 	AdjustedAnnualTempC  []float64
+	Moisture             []float64
+	OrographicLift       []float64
+	AnnualPrecipMM       []float64
 }

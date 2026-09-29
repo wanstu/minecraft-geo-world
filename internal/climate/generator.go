@@ -15,6 +15,19 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	}
 
 	cfg = normalizeConfig(cfg)
+	if cfg.MoistureIterations <= 0 {
+		maxDim := input.Width
+		if input.Height > maxDim {
+			maxDim = input.Height
+		}
+		cfg.MoistureIterations = maxDim / 3
+		if cfg.MoistureIterations < 48 {
+			cfg.MoistureIterations = 48
+		}
+		if cfg.MoistureIterations > 192 {
+			cfg.MoistureIterations = 192
+		}
+	}
 	m := &Model{
 		Config:               cfg,
 		Width:                input.Width,
@@ -33,6 +46,9 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		OceanDistanceCells:   make([]float64, n),
 		OceanTempCorrectionC: make([]float64, n),
 		AdjustedAnnualTempC:  make([]float64, n),
+		Moisture:             make([]float64, n),
+		OrographicLift:       make([]float64, n),
+		AnnualPrecipMM:       make([]float64, n),
 	}
 
 	maxLatRad := cfg.MaxLatitudeDeg * math.Pi / 180
@@ -78,6 +94,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	m.computeSurfaceCurrents()
 	m.transportSeaSurfaceHeat()
 	m.applyOceanTemperatureInfluence()
+	m.computeMoistureAndPrecipitation()
 
 	return m, nil
 }
@@ -121,6 +138,18 @@ func normalizeConfig(cfg Config) Config {
 	}
 	if cfg.CoastalTempDecayCells <= 0 {
 		cfg.CoastalTempDecayCells = 18
+	}
+	if cfg.MoistureAdvection <= 0 || cfg.MoistureAdvection >= 1 {
+		cfg.MoistureAdvection = 0.82
+	}
+	if cfg.MoistureDiffusion <= 0 || cfg.MoistureDiffusion >= 0.3 {
+		cfg.MoistureDiffusion = 0.08
+	}
+	if cfg.OrographicRainStrength <= 0 {
+		cfg.OrographicRainStrength = 0.22
+	}
+	if cfg.PrecipitationScaleMM <= 0 {
+		cfg.PrecipitationScaleMM = 40000
 	}
 	return cfg
 }
@@ -420,4 +449,169 @@ func (m *Model) applyOceanTemperatureInfluence() {
 		m.OceanTempCorrectionC[i] = correction
 		m.AdjustedAnnualTempC[i] += correction
 	}
+}
+
+func (m *Model) computeMoistureAndPrecipitation() {
+	n := m.Width * m.Height
+	prev := make([]float64, n)
+	next := make([]float64, n)
+
+	// Start oceans with moisture according to SST. Land starts dry and is
+	// progressively moistened by advection/diffusion from ocean sources.
+	for i := 0; i < n; i++ {
+		if !m.LandMask[i] {
+			warmth := clamp((m.SeaSurfaceTempC[i]+1.8)/(30+1.8), 0, 1)
+			prev[i] = 0.35 + warmth*0.65
+		}
+	}
+
+	for i := range m.OrographicLift {
+		m.OrographicLift[i] = m.computeOrographicLiftAt(i)
+	}
+
+	for iter := 0; iter < m.Config.MoistureIterations; iter++ {
+		for z := 0; z < m.Height; z++ {
+			for x := 0; x < m.Width; x++ {
+				i := z*m.Width + x
+				wx, wz := m.WindX[i], m.WindZ[i]
+				mag := math.Hypot(wx, wz)
+
+				advected := prev[i]
+				if mag > 1e-6 {
+					ux, uz := wx/mag, wz/mag
+					advected = sampleScalar(prev, m.Width, m.Height, float64(x)-ux, float64(z)-uz)
+				}
+
+				diffused := neighborAverage(prev, m.Width, m.Height, x, z)
+
+				lowPressureLift := clamp((0.58-m.PressureIndex[i])/0.36, 0, 1)
+				rainout := 0.003 + lowPressureLift*0.008 +
+					m.OrographicLift[i]*0.10
+				rainout = clamp(rainout, 0.002, 0.18)
+
+				oceanSource := 0.0
+				landRecycling := 0.0
+				if !m.LandMask[i] {
+					warmth := clamp((m.SeaSurfaceTempC[i]+1.8)/(30+1.8), 0, 1)
+					oceanSource = (0.20 + 0.35*warmth) * 0.10
+				} else {
+					// Placeholder for long-term evapotranspiration recycling.
+					// Later hydrology/ecology stages can replace this with soil-
+					// and vegetation-aware evaporation.
+					warmth := clamp((m.AdjustedAnnualTempC[i]+20)/40, 0, 1)
+					recyclable := math.Min(prev[i], 0.8)
+					landRecycling = recyclable * (0.008 + 0.028*warmth)
+				}
+
+				selfWeight := 1 - m.Config.MoistureAdvection - m.Config.MoistureDiffusion
+				if selfWeight < 0.05 {
+					selfWeight = 0.05
+				}
+
+				available := prev[i]*selfWeight +
+					advected*m.Config.MoistureAdvection +
+					diffused*m.Config.MoistureDiffusion +
+					oceanSource +
+					landRecycling
+				next[i] = clamp(available*(1-rainout), 0, 1.6)
+			}
+		}
+		prev, next = next, prev
+	}
+
+	copy(m.Moisture, prev)
+
+	for i := 0; i < n; i++ {
+		lowPressureLift := clamp((0.58-m.PressureIndex[i])/0.36, 0, 1)
+		condensation := 0.018 +
+			lowPressureLift*0.045 +
+			m.OrographicLift[i]*0.30
+
+		// Warm moist air can support more precipitation; very cold regions
+		// retain a minimum so polar snowfall is still possible.
+		tempFactor := clamp((m.AdjustedAnnualTempC[i]+25)/45, 0.05, 1)
+		rate := m.Moisture[i] * condensation * tempFactor
+		m.AnnualPrecipMM[i] = clamp(rate*m.Config.PrecipitationScaleMM, 0, 6000)
+	}
+}
+
+func (m *Model) computeOrographicLiftAt(i int) float64 {
+	x := i % m.Width
+	z := i / m.Width
+
+	left := m.LandElevationM[i]
+	right := m.LandElevationM[i]
+	up := m.LandElevationM[i]
+	down := m.LandElevationM[i]
+
+	if x > 0 {
+		left = m.LandElevationM[i-1]
+	}
+	if x+1 < m.Width {
+		right = m.LandElevationM[i+1]
+	}
+	if z > 0 {
+		up = m.LandElevationM[i-m.Width]
+	}
+	if z+1 < m.Height {
+		down = m.LandElevationM[i+m.Width]
+	}
+
+	gradX := (right - left) / (2 * math.Max(1, m.Config.MaxLandElevationM))
+	gradZ := (down - up) / (2 * math.Max(1, m.Config.MaxLandElevationM))
+
+	wx, wz := m.WindX[i], m.WindZ[i]
+	mag := math.Hypot(wx, wz)
+	if mag < 1e-6 {
+		return 0
+	}
+	wx /= mag
+	wz /= mag
+
+	upslope := wx*gradX + wz*gradZ
+	return clamp(upslope*12, 0, 1)
+}
+
+func sampleScalar(values []float64, width, height int, x, z float64) float64 {
+	x = clamp(x, 0, float64(width-1))
+	z = clamp(z, 0, float64(height-1))
+
+	x0 := int(math.Floor(x))
+	z0 := int(math.Floor(z))
+	x1 := x0 + 1
+	z1 := z0 + 1
+	if x1 >= width {
+		x1 = width - 1
+	}
+	if z1 >= height {
+		z1 = height - 1
+	}
+	tx := x - float64(x0)
+	tz := z - float64(z0)
+
+	v00 := values[z0*width+x0]
+	v10 := values[z0*width+x1]
+	v01 := values[z1*width+x0]
+	v11 := values[z1*width+x1]
+
+	top := v00 + (v10-v00)*tx
+	bottom := v01 + (v11-v01)*tx
+	return top + (bottom-top)*tz
+}
+
+func neighborAverage(values []float64, width, height, x, z int) float64 {
+	sum := 0.0
+	count := 0
+	for _, d := range [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}} {
+		nx, nz := x+d[0], z+d[1]
+		if nx < 0 || nx >= width || nz < 0 || nz >= height {
+			continue
+		}
+		sum += values[nz*width+nx]
+		count++
+	}
+	if count == 0 {
+		return values[z*width+x]
+	}
+	return sum / float64(count)
 }
