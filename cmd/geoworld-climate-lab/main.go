@@ -45,6 +45,10 @@ func main() {
 	maxSST := math.Inf(-1)
 	minCurrent := math.Inf(1)
 	maxCurrent := math.Inf(-1)
+	minCorrection := math.Inf(1)
+	maxCorrection := math.Inf(-1)
+	minAdjusted := math.Inf(1)
+	maxAdjusted := math.Inf(-1)
 	landSum, oceanSum := 0.0, 0.0
 	landN, oceanN := 0, 0
 	for i, temp := range model.AnnualMeanTempC {
@@ -66,6 +70,18 @@ func main() {
 		}
 		if wind > maxWind {
 			maxWind = wind
+		}
+		if model.OceanTempCorrectionC[i] < minCorrection {
+			minCorrection = model.OceanTempCorrectionC[i]
+		}
+		if model.OceanTempCorrectionC[i] > maxCorrection {
+			maxCorrection = model.OceanTempCorrectionC[i]
+		}
+		if model.AdjustedAnnualTempC[i] < minAdjusted {
+			minAdjusted = model.AdjustedAnnualTempC[i]
+		}
+		if model.AdjustedAnnualTempC[i] > maxAdjusted {
+			maxAdjusted = model.AdjustedAnnualTempC[i]
 		}
 		if world.Crust[i] == phase1.Continental {
 			landSum += temp
@@ -89,7 +105,7 @@ func main() {
 		}
 	}
 
-	fmt.Printf("GeoWorld Phase 2.3 Climate Lab\n")
+	fmt.Printf("GeoWorld Phase 2.4 Climate Lab\n")
 	fmt.Printf("seed=%d grid=%dx%d latitude=±%.1f°\n", *seed, *width, *height, model.Config.MaxLatitudeDeg)
 	fmt.Printf("annual-temp=%.2f..%.2f C land-avg=%.2f C ocean-avg=%.2f C\n",
 		minTemp, maxTemp, landSum/float64(landN), oceanSum/float64(oceanN))
@@ -99,5 +115,7 @@ func main() {
 		minPressure, maxPressure, minWind, maxWind)
 	fmt.Printf("sst=%.2f..%.2f C current-magnitude=%.3f..%.3f\n",
 		minSST, maxSST, minCurrent, maxCurrent)
+	fmt.Printf("ocean-temp-correction=%.3f..%.3f C adjusted-temp=%.2f..%.2f C\n",
+		minCorrection, maxCorrection, minAdjusted, maxAdjusted)
 	fmt.Printf("output=%s\n", *out)
 }

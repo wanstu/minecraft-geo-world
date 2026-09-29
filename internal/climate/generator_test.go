@@ -297,3 +297,101 @@ func TestSeaSurfaceTransportChangesLatitudeBaseline(t *testing.T) {
 		t.Fatal("surface current transport did not modify SST anywhere")
 	}
 }
+
+func TestWarmCurrentInfluenceDecaysInland(t *testing.T) {
+	cfg := normalizeConfig(Config{
+		CoastalCurrentInfluence: 0.75,
+		CoastalTempDecayCells:   2,
+	})
+	m := &Model{
+		Config:               cfg,
+		Width:                6,
+		Height:               1,
+		LandMask:             []bool{false, true, true, true, true, true},
+		LatitudeBaseTempC:    []float64{10, 10, 10, 10, 10, 10},
+		AnnualMeanTempC:      []float64{10, 10, 10, 10, 10, 10},
+		SeaSurfaceTempC:      []float64{15.2, 0, 0, 0, 0, 0}, // +4°C SST anomaly at ocean source
+		OceanDistanceCells:   make([]float64, 6),
+		OceanTempCorrectionC: make([]float64, 6),
+		AdjustedAnnualTempC:  make([]float64, 6),
+	}
+	m.applyOceanTemperatureInfluence()
+
+	if !(m.OceanTempCorrectionC[1] > m.OceanTempCorrectionC[2] &&
+		m.OceanTempCorrectionC[2] > m.OceanTempCorrectionC[3] &&
+		m.OceanTempCorrectionC[3] > 0) {
+		t.Fatalf("warm-current correction does not decay inland: %v", m.OceanTempCorrectionC)
+	}
+}
+
+func TestColdCurrentProducesNegativeCoastalCorrection(t *testing.T) {
+	cfg := normalizeConfig(Config{CoastalTempDecayCells: 3})
+	m := &Model{
+		Config:               cfg,
+		Width:                3,
+		Height:               1,
+		LandMask:             []bool{false, true, true},
+		LatitudeBaseTempC:    []float64{10, 10, 10},
+		AnnualMeanTempC:      []float64{10, 10, 10},
+		SeaSurfaceTempC:      []float64{7.2, 0, 0}, // -4°C anomaly from 11.2°C baseline
+		OceanDistanceCells:   make([]float64, 3),
+		OceanTempCorrectionC: make([]float64, 3),
+		AdjustedAnnualTempC:  make([]float64, 3),
+	}
+	m.applyOceanTemperatureInfluence()
+
+	if m.OceanTempCorrectionC[1] >= 0 {
+		t.Fatalf("cold current should cool coast, got %.3f", m.OceanTempCorrectionC[1])
+	}
+}
+
+func TestOceanCorrectionPreservesExistingLandTemperatureDifference(t *testing.T) {
+	cfg := normalizeConfig(Config{
+		CoastalCurrentInfluence: 0.75,
+		CoastalTempDecayCells:   1000, // nearly equal ocean influence on both land cells
+	})
+	m := &Model{
+		Config:               cfg,
+		Width:                3,
+		Height:               1,
+		LandMask:             []bool{false, true, true},
+		LatitudeBaseTempC:    []float64{10, 10, 10},
+		AnnualMeanTempC:      []float64{10, 5, -5},
+		SeaSurfaceTempC:      []float64{15.2, 0, 0},
+		OceanDistanceCells:   make([]float64, 3),
+		OceanTempCorrectionC: make([]float64, 3),
+		AdjustedAnnualTempC:  make([]float64, 3),
+	}
+	m.applyOceanTemperatureInfluence()
+
+	before := m.AnnualMeanTempC[1] - m.AnnualMeanTempC[2]
+	after := m.AdjustedAnnualTempC[1] - m.AdjustedAnnualTempC[2]
+	if math.Abs(before-after) > 0.01 {
+		t.Fatalf("ocean correction erased existing land temperature structure: before %.3f after %.3f", before, after)
+	}
+}
+
+func TestAdjustedTemperatureFinite(t *testing.T) {
+	input := Input{
+		Width:     16,
+		Height:    12,
+		Elevation: make([]float64, 192),
+		LandMask:  make([]bool, 192),
+	}
+	for z := 3; z < 9; z++ {
+		for x := 5; x < 11; x++ {
+			input.LandMask[z*input.Width+x] = true
+			input.Elevation[z*input.Width+x] = 0.7
+		}
+	}
+
+	m, err := Generate(input, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, temp := range m.AdjustedAnnualTempC {
+		if math.IsNaN(temp) || math.IsInf(temp, 0) {
+			t.Fatalf("invalid adjusted temperature at %d: %v", i, temp)
+		}
+	}
+}

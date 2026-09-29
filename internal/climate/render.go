@@ -45,6 +45,19 @@ func RenderAll(m *Model, outDir string) error {
 			}
 			return temperatureColor(m.SeaSurfaceTempC[i])
 		}},
+		{"ocean-temp-correction.png", func(i int) color.RGBA {
+			v := m.OceanTempCorrectionC[i]
+			if math.Abs(v) < 0.02 {
+				return color.RGBA{65, 68, 67, 255}
+			}
+			if v > 0 {
+				return lerpColor(color.RGBA{65, 68, 67, 255}, color.RGBA{219, 91, 66, 255}, clamp(v/4, 0, 1))
+			}
+			return lerpColor(color.RGBA{65, 68, 67, 255}, color.RGBA{72, 126, 211, 255}, clamp(-v/4, 0, 1))
+		}},
+		{"temperature-adjusted.png", func(i int) color.RGBA {
+			return temperatureColor(m.AdjustedAnnualTempC[i])
+		}},
 	}
 
 	for _, r := range renderers {

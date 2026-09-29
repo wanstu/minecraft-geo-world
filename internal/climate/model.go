@@ -12,6 +12,8 @@ type Config struct {
 	SSTTransportIterations    int
 	SSTAdvection              float64
 	SSTDiffusion              float64
+	CoastalCurrentInfluence   float64
+	CoastalTempDecayCells     float64
 }
 
 type Input struct {
@@ -22,18 +24,21 @@ type Input struct {
 }
 
 type Model struct {
-	Config            Config
-	Width             int
-	Height            int
-	LandMask          []bool
-	LatitudeDeg       []float64
-	LatitudeBaseTempC []float64
-	LandElevationM    []float64
-	AnnualMeanTempC   []float64
-	PressureIndex     []float64
-	WindX             []float64
-	WindZ             []float64
-	SeaSurfaceTempC   []float64
-	CurrentX          []float64
-	CurrentZ          []float64
+	Config               Config
+	Width                int
+	Height               int
+	LandMask             []bool
+	LatitudeDeg          []float64
+	LatitudeBaseTempC    []float64
+	LandElevationM       []float64
+	AnnualMeanTempC      []float64
+	PressureIndex        []float64
+	WindX                []float64
+	WindZ                []float64
+	SeaSurfaceTempC      []float64
+	CurrentX             []float64
+	CurrentZ             []float64
+	OceanDistanceCells   []float64
+	OceanTempCorrectionC []float64
+	AdjustedAnnualTempC  []float64
 }

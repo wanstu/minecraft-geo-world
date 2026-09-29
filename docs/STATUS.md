@@ -8,7 +8,7 @@
 
 **Phase 2 — 气候骨架**
 
-当前子阶段：**Phase 2.4 — 海洋对陆地温度修正（准备开始）**
+当前子阶段：**Phase 2.5 — 长期降水骨架（准备开始）**
 
 ## 当前稳定基线
 
@@ -284,3 +284,21 @@ Latitude
 - Current Magnitude：0.001 ～ 0.593
 
 下一步：**Phase 2.4 — Ocean-to-Land Temperature Correction**。
+
+
+## Phase 2.4 — 洋流对陆地温度修正
+
+状态：**完成第一版**
+
+已实现：
+
+- SST 相对同纬度基准的暖 / 寒异常。
+- 最近海洋异常向陆地传播。
+- 影响随离海距离指数衰减。
+- 原有海拔降温不会被直接覆盖。
+
+当前测试 Seed：
+
+- Ocean Temperature Correction：-0.391°C ～ +0.289°C
+
+下一步：**Phase 2.5 — Moisture Transport / Precipitation / Orographic Rain**。

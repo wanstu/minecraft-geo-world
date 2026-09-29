@@ -16,20 +16,23 @@ func Generate(input Input, cfg Config) (*Model, error) {
 
 	cfg = normalizeConfig(cfg)
 	m := &Model{
-		Config:            cfg,
-		Width:             input.Width,
-		Height:            input.Height,
-		LandMask:          append([]bool(nil), input.LandMask...),
-		LatitudeDeg:       make([]float64, n),
-		LatitudeBaseTempC: make([]float64, n),
-		LandElevationM:    make([]float64, n),
-		AnnualMeanTempC:   make([]float64, n),
-		PressureIndex:     make([]float64, n),
-		WindX:             make([]float64, n),
-		WindZ:             make([]float64, n),
-		SeaSurfaceTempC:   make([]float64, n),
-		CurrentX:          make([]float64, n),
-		CurrentZ:          make([]float64, n),
+		Config:               cfg,
+		Width:                input.Width,
+		Height:               input.Height,
+		LandMask:             append([]bool(nil), input.LandMask...),
+		LatitudeDeg:          make([]float64, n),
+		LatitudeBaseTempC:    make([]float64, n),
+		LandElevationM:       make([]float64, n),
+		AnnualMeanTempC:      make([]float64, n),
+		PressureIndex:        make([]float64, n),
+		WindX:                make([]float64, n),
+		WindZ:                make([]float64, n),
+		SeaSurfaceTempC:      make([]float64, n),
+		CurrentX:             make([]float64, n),
+		CurrentZ:             make([]float64, n),
+		OceanDistanceCells:   make([]float64, n),
+		OceanTempCorrectionC: make([]float64, n),
+		AdjustedAnnualTempC:  make([]float64, n),
 	}
 
 	maxLatRad := cfg.MaxLatitudeDeg * math.Pi / 180
@@ -74,6 +77,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	m.initializeOceanSurface()
 	m.computeSurfaceCurrents()
 	m.transportSeaSurfaceHeat()
+	m.applyOceanTemperatureInfluence()
 
 	return m, nil
 }
@@ -111,6 +115,12 @@ func normalizeConfig(cfg Config) Config {
 	}
 	if cfg.SSTDiffusion <= 0 || cfg.SSTDiffusion >= 0.3 {
 		cfg.SSTDiffusion = 0.06
+	}
+	if cfg.CoastalCurrentInfluence <= 0 || cfg.CoastalCurrentInfluence > 1 {
+		cfg.CoastalCurrentInfluence = 0.75
+	}
+	if cfg.CoastalTempDecayCells <= 0 {
+		cfg.CoastalTempDecayCells = 18
 	}
 	return cfg
 }
@@ -337,4 +347,77 @@ func (m *Model) transportSeaSurfaceHeat() {
 	}
 
 	copy(m.SeaSurfaceTempC, prev)
+}
+
+func (m *Model) applyOceanTemperatureInfluence() {
+	const unvisited = -1
+	n := len(m.LandMask)
+	dist := make([]int, n)
+	sourceAnomaly := make([]float64, n)
+	for i := range dist {
+		dist[i] = unvisited
+	}
+
+	type point struct{ x, z int }
+	queue := make([]point, 0, n/2)
+
+	// Every ocean cell is a source. The propagated value is not the absolute SST,
+	// but the anomaly relative to the same-latitude SST baseline.
+	for z := 0; z < m.Height; z++ {
+		for x := 0; x < m.Width; x++ {
+			i := z*m.Width + x
+			if m.LandMask[i] {
+				continue
+			}
+			baselineSST := clamp(m.LatitudeBaseTempC[i]+1.2, -1.8, 30)
+			sourceAnomaly[i] = m.SeaSurfaceTempC[i] - baselineSST
+			dist[i] = 0
+			queue = append(queue, point{x: x, z: z})
+		}
+	}
+
+	dirs := [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+	head := 0
+	for head < len(queue) {
+		p := queue[head]
+		head++
+		pi := p.z*m.Width + p.x
+
+		for _, d := range dirs {
+			nx, nz := p.x+d[0], p.z+d[1]
+			if nx < 0 || nx >= m.Width || nz < 0 || nz >= m.Height {
+				continue
+			}
+			ni := nz*m.Width + nx
+			if dist[ni] != unvisited {
+				continue
+			}
+			// Ocean cells were already initialized as local sources, so this
+			// propagation naturally proceeds only through land.
+			dist[ni] = dist[pi] + 1
+			sourceAnomaly[ni] = sourceAnomaly[pi]
+			queue = append(queue, point{x: nx, z: nz})
+		}
+	}
+
+	for i := range m.AdjustedAnnualTempC {
+		m.AdjustedAnnualTempC[i] = m.AnnualMeanTempC[i]
+		if dist[i] < 0 {
+			m.OceanDistanceCells[i] = float64(maxInt(m.Width, m.Height))
+			continue
+		}
+
+		m.OceanDistanceCells[i] = float64(dist[i])
+		if !m.LandMask[i] {
+			// Air over the sea follows only part of the SST anomaly.
+			m.OceanTempCorrectionC[i] = sourceAnomaly[i] * 0.45
+			m.AdjustedAnnualTempC[i] += m.OceanTempCorrectionC[i]
+			continue
+		}
+
+		influence := math.Exp(-float64(dist[i]) / m.Config.CoastalTempDecayCells)
+		correction := sourceAnomaly[i] * m.Config.CoastalCurrentInfluence * influence
+		m.OceanTempCorrectionC[i] = correction
+		m.AdjustedAnnualTempC[i] += correction
+	}
 }
