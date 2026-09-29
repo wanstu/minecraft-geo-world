@@ -1,0 +1,46 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GeoWorld · 风场与洋流</title><link rel="stylesheet" href="assets/common.css">
+<style>
+.lab-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:max-content;align-content:start;gap:14px;padding:16px;overflow:auto}
+.lab-card{min-width:0;background:#0f171e;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.lab-card header{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
+.lab-card header small{color:var(--muted)}.lab-card img{width:100%;height:auto;aspect-ratio:8/5;object-fit:contain;display:block;image-rendering:pixelated;background:#091016}
+@media(max-width:900px){.lab-grid{grid-template-columns:1fr}}
+</style></head><body>
+<div class="app"><header class="topbar"><a class="brand" href="index.html"><span>Geo</span>World Generator</a>
+<div class="badge">算法原型</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
+<div class="shell">
+<aside class="sidebar">
+<div class="section"><h3>世界生成流程</h3>
+<a class="nav-item" href="generator.html">世界总览</a>
+<a class="nav-item" href="plates.html">板块与大陆</a>
+<a class="nav-item" href="terrain-ocean.html">地形与海盆</a>
+<a class="nav-item active" href="circulation.html">风场与洋流</a>
+<a class="nav-item" href="climate.html">气候与降水</a>
+<a class="nav-item" href="monsoon.html">季风与季节性</a>
+<a class="nav-item" href="hydrology.html">河流与湖泊</a>
+<a class="nav-item" href="erosion.html">侵蚀与地表起伏</a>
+<a class="nav-item" href="landform.html">平原 / 丘陵 / 山地</a>
+<a class="nav-item" href="terrain.html">最终地形</a>
+<div class="nav-item disabled">生态与群系（后续）</div>
+</div>
+<div class="section"><h3>这一页看什么</h3>
+<div class="prototype-hint">看空气和海水大体往哪里流。它们会继续影响沿海温度、水汽输送和降水分布。</div>
+</div></aside>
+<main class="main">
+<div class="toolbar"><div class="title">风场与洋流</div><div class="badge">纬度与气压 → 盛行风 → 洋流 → 海温影响</div></div>
+<div class="page-intro"><strong>这一步决定“热量和水汽怎么被搬运”。</strong> 先根据纬度建立全球气压带和盛行风，再让海洋表层受风、地转偏转和海岸阻挡影响形成洋流。</div>
+<div class="lab-grid">
+<div class="lab-card"><header><strong>① 全球气压带</strong><small>赤道低压、副热带高压、副极地低压、极地高压</small></header><img src="generated/climate/pressure.png" alt="pressure"></div>
+<div class="lab-card"><header><strong>② 盛行风方向</strong><small>信风、西风带和极地东风</small></header><img src="generated/climate/wind.png" alt="wind"></div>
+<div class="lab-card"><header><strong>③ 表层洋流</strong><small>盛行风 + 半球偏转 + 海岸阻挡</small></header><img src="generated/climate/ocean-current.png" alt="ocean current"></div>
+<div class="lab-card"><header><strong>④ 海表温度</strong><small>纬度温度基础上再受洋流搬运热量影响</small></header><img src="generated/climate/sst.png" alt="sea surface temperature"></div>
+<div class="lab-card"><header><strong>⑤ 暖流 / 寒流影响</strong><small>红色偏暖，蓝色偏冷</small></header><img src="generated/climate/ocean-temp-correction.png" alt="ocean temperature correction"></div>
+<div class="lab-card"><header><strong>⑥ 大气水汽</strong><small>海洋蒸发后被盛行风输送到陆地</small></header><img src="generated/climate/moisture.png" alt="moisture"></div>
+</div></main>
+<aside class="inspector"><div class="section"><h3>怎么理解</h3>
+<div class="card"><div class="card-title">风不是随机箭头</div><p>风场先由全球气压带决定大方向，再连续过渡，不按每块区域随机选方向。</p></div>
+<div class="card"><div class="card-title">洋流受海岸约束</div><p>表层海水不能直接穿过陆地，靠岸后会更偏向沿岸流动。</p></div>
+<div class="card"><div class="card-title">最终影响气候</div><p>暖流和寒流改变沿岸海温，风再把这些热量和水汽带向陆地，继续影响温度与降水。</p></div>
+</div></aside></div></div>
+<script src="assets/prototype.js"></script></body></html>

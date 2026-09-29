@@ -1,5 +1,5 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GeoWorld · Phase 1 多 Seed 验收</title><link rel="stylesheet" href="assets/common.css">
+<title>GeoWorld · 多种 Seed 对照</title><link rel="stylesheet" href="assets/common.css">
 <style>
 body{overflow:auto}.accept-wrap{max-width:1500px;margin:0 auto;padding:18px}.accept-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:16px}
 .accept-head h1{margin:0 0 7px}.accept-head p{margin:0;color:var(--muted);line-height:1.6;max-width:850px}
@@ -14,12 +14,12 @@ body{overflow:auto}.accept-wrap{max-width:1500px;margin:0 auto;padding:18px}.acc
 .accept-note{border:1px solid #5a5330;background:#242013;border-radius:8px;padding:11px 13px;color:#dccd8c;font-size:13px;line-height:1.6}
 @media(max-width:900px){.core-grid{grid-template-columns:1fr}.accept-head{display:block}.stats{margin-left:0;margin-top:8px;justify-content:flex-start}}
 </style></head><body>
-<div class="topbar"><a class="brand" href="index.html"><span>Geo</span>World</a><div class="badge">Phase 1 Acceptance</div>
+<div class="topbar"><a class="brand" href="index.html"><span>Geo</span>World</a><div class="badge">稳定性对照</div>
 <div class="top-actions"><a class="btn" href="plates.html">单 Seed 调试页</a></div></div>
 <main class="accept-wrap">
-<div class="accept-head"><div><h1>Phase 1 · 多 Seed 视觉验收</h1>
+<div class="accept-head"><div><h1>多种 Seed 的宏观世界对照</h1>
 <p>每个世界只展示 4 张核心图。重点检查：大陆轮廓是否有差异、构造是否跟随板块关系、海岸到深海是否连续、最终高程有没有大面积饱和或异常条带。</p></div></div>
-<div class="accept-note">这里不是最终 Minecraft 世界效果，而是 Phase 1 的宏观骨架。丘陵、山麓、河谷等中尺度地貌会在后续气候、水文和侵蚀阶段形成。</div>
+<div class="accept-note">这里对照的是不同 Seed 的海陆、板块和宏观高程，用来检查算法是否具有稳定的多样性。它不是最终 Minecraft 地表；丘陵、河谷等细节会在后续步骤继续形成。</div>
 
 <section class="seed">
 <div class="seed-head"><h2>Seed 1</h2><div class="stats"><span class="stat">海洋 68%</span><span class="stat">构造影响 22.68%</span><span class="stat">山系 4.66%</span><span class="stat">高程顶格 0.424%</span></div></div>
@@ -27,7 +27,7 @@ body{overflow:auto}.accept-wrap{max-width:1500px;margin:0 auto;padding:18px}.acc
 <a class="figure" href="generated/acceptance/seed-1/crust.png"><header><strong>① 海陆骨架</strong><small>大陆 / 海洋</small></header><img src="generated/acceptance/seed-1/crust.png" alt="crust"></a>
 <a class="figure" href="generated/acceptance/seed-1/tectonic-influence.png"><header><strong>② 构造影响</strong><small>抬升 / 下沉</small></header><img src="generated/acceptance/seed-1/tectonic-influence.png" alt="tectonic influence"></a>
 <a class="figure" href="generated/acceptance/seed-1/terrain-zones.png"><header><strong>③ 宏观地形分区</strong><small>陆架 / 陆坡 / 海盆 / 山系等</small></header><img src="generated/acceptance/seed-1/terrain-zones.png" alt="terrain zones"></a>
-<a class="figure" href="generated/acceptance/seed-1/elevation.png"><header><strong>④ 最终宏观高程</strong><small>Phase 1 输出</small></header><img src="generated/acceptance/seed-1/elevation.png" alt="elevation"></a>
+<a class="figure" href="generated/acceptance/seed-1/elevation.png"><header><strong>④ 最终宏观高程</strong><small>宏观地形结果</small></header><img src="generated/acceptance/seed-1/elevation.png" alt="elevation"></a>
 </div>
 <div class="legend-note">点击任意图片可直接查看原始完整 PNG。不同 Seed 应该保持同一套地理规律，但大陆位置、构造活动与山系分布不应雷同。</div>
 </section>
@@ -37,7 +37,7 @@ body{overflow:auto}.accept-wrap{max-width:1500px;margin:0 auto;padding:18px}.acc
 <a class="figure" href="generated/acceptance/seed-42/crust.png"><header><strong>① 海陆骨架</strong><small>大陆 / 海洋</small></header><img src="generated/acceptance/seed-42/crust.png" alt="crust"></a>
 <a class="figure" href="generated/acceptance/seed-42/tectonic-influence.png"><header><strong>② 构造影响</strong><small>抬升 / 下沉</small></header><img src="generated/acceptance/seed-42/tectonic-influence.png" alt="tectonic influence"></a>
 <a class="figure" href="generated/acceptance/seed-42/terrain-zones.png"><header><strong>③ 宏观地形分区</strong><small>陆架 / 陆坡 / 海盆 / 山系等</small></header><img src="generated/acceptance/seed-42/terrain-zones.png" alt="terrain zones"></a>
-<a class="figure" href="generated/acceptance/seed-42/elevation.png"><header><strong>④ 最终宏观高程</strong><small>Phase 1 输出</small></header><img src="generated/acceptance/seed-42/elevation.png" alt="elevation"></a>
+<a class="figure" href="generated/acceptance/seed-42/elevation.png"><header><strong>④ 最终宏观高程</strong><small>宏观地形结果</small></header><img src="generated/acceptance/seed-42/elevation.png" alt="elevation"></a>
 </div>
 <div class="legend-note">点击任意图片可直接查看原始完整 PNG。不同 Seed 应该保持同一套地理规律，但大陆位置、构造活动与山系分布不应雷同。</div>
 </section>
@@ -47,7 +47,7 @@ body{overflow:auto}.accept-wrap{max-width:1500px;margin:0 auto;padding:18px}.acc
 <a class="figure" href="generated/acceptance/seed-2026/crust.png"><header><strong>① 海陆骨架</strong><small>大陆 / 海洋</small></header><img src="generated/acceptance/seed-2026/crust.png" alt="crust"></a>
 <a class="figure" href="generated/acceptance/seed-2026/tectonic-influence.png"><header><strong>② 构造影响</strong><small>抬升 / 下沉</small></header><img src="generated/acceptance/seed-2026/tectonic-influence.png" alt="tectonic influence"></a>
 <a class="figure" href="generated/acceptance/seed-2026/terrain-zones.png"><header><strong>③ 宏观地形分区</strong><small>陆架 / 陆坡 / 海盆 / 山系等</small></header><img src="generated/acceptance/seed-2026/terrain-zones.png" alt="terrain zones"></a>
-<a class="figure" href="generated/acceptance/seed-2026/elevation.png"><header><strong>④ 最终宏观高程</strong><small>Phase 1 输出</small></header><img src="generated/acceptance/seed-2026/elevation.png" alt="elevation"></a>
+<a class="figure" href="generated/acceptance/seed-2026/elevation.png"><header><strong>④ 最终宏观高程</strong><small>宏观地形结果</small></header><img src="generated/acceptance/seed-2026/elevation.png" alt="elevation"></a>
 </div>
 <div class="legend-note">点击任意图片可直接查看原始完整 PNG。不同 Seed 应该保持同一套地理规律，但大陆位置、构造活动与山系分布不应雷同。</div>
 </section>
@@ -57,7 +57,7 @@ body{overflow:auto}.accept-wrap{max-width:1500px;margin:0 auto;padding:18px}.acc
 <a class="figure" href="generated/acceptance/seed-731894205/crust.png"><header><strong>① 海陆骨架</strong><small>大陆 / 海洋</small></header><img src="generated/acceptance/seed-731894205/crust.png" alt="crust"></a>
 <a class="figure" href="generated/acceptance/seed-731894205/tectonic-influence.png"><header><strong>② 构造影响</strong><small>抬升 / 下沉</small></header><img src="generated/acceptance/seed-731894205/tectonic-influence.png" alt="tectonic influence"></a>
 <a class="figure" href="generated/acceptance/seed-731894205/terrain-zones.png"><header><strong>③ 宏观地形分区</strong><small>陆架 / 陆坡 / 海盆 / 山系等</small></header><img src="generated/acceptance/seed-731894205/terrain-zones.png" alt="terrain zones"></a>
-<a class="figure" href="generated/acceptance/seed-731894205/elevation.png"><header><strong>④ 最终宏观高程</strong><small>Phase 1 输出</small></header><img src="generated/acceptance/seed-731894205/elevation.png" alt="elevation"></a>
+<a class="figure" href="generated/acceptance/seed-731894205/elevation.png"><header><strong>④ 最终宏观高程</strong><small>宏观地形结果</small></header><img src="generated/acceptance/seed-731894205/elevation.png" alt="elevation"></a>
 </div>
 <div class="legend-note">点击任意图片可直接查看原始完整 PNG。不同 Seed 应该保持同一套地理规律，但大陆位置、构造活动与山系分布不应雷同。</div>
 </section>

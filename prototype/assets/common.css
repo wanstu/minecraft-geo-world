@@ -44,3 +44,25 @@ border-radius:8px;padding:10px 12px;font-size:12px;color:#c9d6dc}.legend div{dis
 .toggle{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #272e34}.pill{width:36px;height:20px;border-radius:20px;background:#294c40;position:relative}
 .pill:after{content:"";position:absolute;width:14px;height:14px;border-radius:50%;background:white;right:3px;top:3px}
 @media(max-width:900px){.shell{grid-template-columns:210px 1fr}.inspector{display:none}.choice-grid{grid-template-columns:1fr}}
+
+
+/* prototype UX normalization */
+.sidebar .section:first-child{padding-top:12px}
+.sidebar .section:first-child h3{margin-bottom:8px}
+.nav-item{position:relative;min-height:38px;padding:9px 10px 9px 12px}
+.nav-item::before{content:"";width:7px;height:7px;border-radius:50%;flex:0 0 7px;background:transparent;box-shadow:0 0 0 1px transparent}
+.nav-item.active::before{background:var(--accent);box-shadow:0 0 0 1px rgba(100,199,162,.18)}
+.nav-item .dot{display:none}
+.nav-item.disabled{opacity:.48;cursor:default}
+.nav-item:hover:not(.disabled){background:#17242d}
+.nav-item.active:hover{background:#1c2d34}
+.prototype-hint{font-size:12px;line-height:1.55;color:var(--muted);padding:9px 10px;border:1px dashed #344550;border-radius:7px;background:#0d151b;margin-top:8px}
+.btn[disabled]{opacity:.48;cursor:not-allowed;filter:none}
+.page-intro{margin:16px;padding:13px 14px;border:1px solid #30424f;background:#111b23;border-radius:9px;color:#c9d7de;font-size:13px;line-height:1.7}
+.page-intro strong{color:#eef5f7}
+.lab-card header{gap:12px;align-items:flex-start}
+.lab-card header strong{line-height:1.35}
+.lab-card header small{line-height:1.4;text-align:right}
+.tech-details{margin:0 16px 16px;border:1px solid var(--line);border-radius:8px;background:#0d141b;color:var(--muted);font-size:12px}
+.tech-details summary{cursor:pointer;padding:10px 12px;color:#b9c8cf}
+.tech-details>div{padding:0 12px 12px;line-height:1.65}

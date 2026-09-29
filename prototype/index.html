@@ -1,16 +1,19 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GeoWorld Prototype</title><link rel="stylesheet" href="assets/common.css"></head>
-<body><div class="topbar"><div class="brand"><span>Geo</span>World</div><div class="badge">Prototype 0.1</div></div>
+<title>GeoWorld 原型</title><link rel="stylesheet" href="assets/common.css"></head>
+<body><div class="topbar"><div class="brand"><span>Geo</span>World</div><div class="badge">产品 / 算法原型</div></div>
 <main class="hero"><h1><span>GeoWorld</span> 地理世界生成引擎</h1>
-<p>从板块、大陆、洋流、季风和长期气候出发，生成可解释的 Minecraft 世界。当前原型同时探索离线 Generator 与游戏内 Runtime 两种使用方式。</p>
+<p>从板块、大陆、风、洋流、气候和河流出发，逐步生成可解释的 Minecraft 世界。这里主要用于确认“生成逻辑和界面应该长什么样”；真正的生成、保存和游戏接入会在正式实现阶段完成。</p>
 <div class="choice-grid">
-<a class="choice" href="generator.html"><h2>GeoWorld Generator</h2><p>游戏外创建世界模型、运行模拟、查看图层、调参和预生成地图。更偏开发工具与地图作者工作台。</p><span class="go">打开工具原型 →</span></a>
-<a class="choice" href="runtime.html"><h2>GeoWorld Runtime</h2><p>Minecraft 创建世界时的 GeoWorld 配置体验。只暴露玩家真正需要理解的参数，隐藏复杂模拟细节。</p><span class="go">打开模组原型 →</span></a>
-<a class="choice" href="acceptance.html"><h2>Phase 1 多 Seed 验收</h2><p>并排查看不同 Seed 的海陆、构造、宏观地形和最终高程，检查算法是否只对单个世界有效。</p><span class="go">打开验收页 →</span></a>
-<a class="choice" href="climate.html"><h2>Phase 2 气候骨架</h2><p>查看当前纬度、海拔与年平均温度模型，后续将在这里加入风场、洋流和降水。</p><span class="go">打开气候实验 →</span></a>
-<a class="choice" href="monsoon.html"><h2>Phase 3 季风实验</h2><p>查看陆海热力差如何形成暖季向陆、冷季离陆的季风驱动力，并为季节性降水做准备。</p><span class="go">打开季风实验 →</span></a>
-<a class="choice" href="hydrology.html"><h2>Phase 3 水文实验</h2><p>查看降水如何通过填洼、流向、汇流和流域计算形成宏观河网、湖泊与湿地候选。</p><span class="go">打开水文实验 →</span></a>
-<a class="choice" href="erosion.html"><h2>Phase 4 侵蚀与 Relief</h2><p>查看河流、降水、坡度和构造支撑如何共同形成河谷切割、坡面侵蚀与局部起伏。</p><span class="go">打开侵蚀实验 →</span></a>
-<a class="choice" href="landform.html"><h2>Phase 4 地貌权重</h2><p>查看平原、丘陵、山麓、山地、高原和河谷如何以连续权重混合，而不是硬分类切换。</p><span class="go">打开地貌权重实验 →</span></a>
-<a class="choice" href="terrain.html"><h2>Phase 4 Regional Terrain</h2><p>查看连续地貌权重如何合成为 H(worldX, worldZ)，并验证宏观 Cell 和 Minecraft Chunk 边界无接缝。</p><span class="go">打开最终地形实验 →</span></a>
+<a class="choice" href="generator.html"><h2>世界生成器总览</h2><p>从一个示例世界查看整个生成流程、图层和未来需要的世界参数。</p><span class="go">打开总览 →</span></a>
+<a class="choice" href="runtime.html"><h2>Minecraft 创建世界原型</h2><p>查看玩家创建新世界时会看到哪些 GeoWorld 设置，以及哪些设置创建后会锁定。</p><span class="go">打开模组原型 →</span></a>
+<a class="choice" href="plates.html"><h2>板块与大陆</h2><p>查看板块、大陆地壳、山系、裂谷和海沟为什么出现在特定位置。</p><span class="go">查看板块与大陆 →</span></a>
+<a class="choice" href="terrain-ocean.html"><h2>地形与海盆</h2><p>查看大陆、海岸、大陆架、大陆坡、深海盆和宏观高程如何形成。</p><span class="go">查看地形与海盆 →</span></a>
+<a class="choice" href="circulation.html"><h2>风场与洋流</h2><p>查看全球盛行风和表层洋流如何搬运热量与水汽。</p><span class="go">查看风场与洋流 →</span></a>
+<a class="choice" href="climate.html"><h2>气候与降水</h2><p>查看纬度、海拔、风和洋流如何共同决定温度、水汽与长期降水。</p><span class="go">查看气候 →</span></a>
+<a class="choice" href="monsoon.html"><h2>季风与季节性</h2><p>查看陆海冷热差如何形成雨季 / 旱季和季节性降水。</p><span class="go">查看季风 →</span></a>
+<a class="choice" href="hydrology.html"><h2>河流与湖泊</h2><p>查看降水如何汇成支流、主河、湖泊和湿地。</p><span class="go">查看河流与湖泊 →</span></a>
+<a class="choice" href="erosion.html"><h2>侵蚀与地表起伏</h2><p>查看河流、坡度和降水如何切出河谷并塑造起伏地表。</p><span class="go">查看侵蚀 →</span></a>
+<a class="choice" href="landform.html"><h2>平原、丘陵与山地</h2><p>查看不同地貌如何连续过渡，而不是在边界处突然切换。</p><span class="go">查看地貌 →</span></a>
+<a class="choice" href="terrain.html"><h2>最终地形</h2><p>查看前面的宏观地理如何合成连续地表，并检查 Minecraft 区块之间不会出现接缝。</p><span class="go">查看最终地形 →</span></a>
+<a class="choice" href="acceptance.html"><h2>多种 Seed 对照</h2><p>并排查看多个 Seed 的海陆、板块和宏观高程，防止算法只对某一张测试地图有效。</p><span class="go">打开稳定性对照 →</span></a>
 </div></main></body></html>

@@ -1,5 +1,5 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GeoWorld · 水文实验</title><link rel="stylesheet" href="assets/common.css">
+<title>GeoWorld · 河流与湖泊</title><link rel="stylesheet" href="assets/common.css">
 <style>
 .lab-grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:max-content;align-content:start;gap:14px;padding:16px;overflow:auto}
 .lab-card{min-width:0;background:#0f171e;border:1px solid var(--line);border-radius:10px;overflow:hidden}
@@ -9,50 +9,57 @@
 @media(max-width:900px){.lab-grid{grid-template-columns:1fr}}
 </style></head><body>
 <div class="app"><header class="topbar"><a class="brand" href="index.html"><span>Geo</span>World Generator</a>
-<div class="badge">Phase 3.4 Lab</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
+<div class="badge">算法原型</div><div class="top-actions"><a class="btn" href="generator.html">返回世界总览</a></div></header>
 <div class="shell">
-<aside class="sidebar"><div class="section"><h3>世界模型</h3>
+<aside class="sidebar">
+<div class="section"><h3>世界生成流程</h3>
 <a class="nav-item" href="generator.html">世界总览</a>
-<a class="nav-item" href="plates.html">板块构造</a>
-<div class="nav-item">地形与海盆</div>
-<a class="nav-item" href="climate.html">气候骨架</a>
-<a class="nav-item" href="monsoon.html">季风 / 季节性</a>
-<a class="nav-item active" href="hydrology.html"><i class="dot"></i>水文</a>
-<a class="nav-item" href="erosion.html">侵蚀 / Relief</a><a class="nav-item" href="landform.html">地貌权重</a><a class="nav-item" href="terrain.html">Regional Terrain</a><div class="nav-item">生态区</div></div>
-<div class="section"><h3>本次 Lab</h3>
+<a class="nav-item" href="plates.html">板块与大陆</a>
+<a class="nav-item" href="terrain-ocean.html">地形与海盆</a>
+<a class="nav-item" href="circulation.html">风场与洋流</a>
+<a class="nav-item" href="climate.html">气候与降水</a>
+<a class="nav-item" href="monsoon.html">季风与季节性</a>
+<a class="nav-item active" href="hydrology.html">河流与湖泊</a>
+<a class="nav-item" href="erosion.html">侵蚀与地表起伏</a>
+<a class="nav-item" href="landform.html">平原 / 丘陵 / 山地</a>
+<a class="nav-item" href="terrain.html">最终地形</a>
+<div class="nav-item disabled">生态与群系（后续）</div>
+</div>
+<div class="section"><h3>示例数据</h3>
 <div class="kv"><span>Seed</span><span>731894205</span></div>
 <div class="kv"><span>宏观网格</span><span>640 × 400</span></div>
 <div class="kv"><span>全部流域</span><span>1738</span></div>
 <div class="kv"><span>主要流域</span><span>62</span></div>
-<div class="kv"><span>河流 Cell</span><span>2.07%</span></div>
+<div class="kv"><span>河流区域占陆地</span><span>2.07%</span></div>
 </div></aside>
 <main class="main">
-<div class="toolbar"><div class="title">Phase 3.4 · 河流等级、季节河与显式湖泊</div><div class="badge">Drainage → River Hierarchy / Seasonality / Lakes</div></div>
-<div class="note"><strong>当前仍是宏观水文。</strong> 蓝色河网表示未来河谷 / 河道的骨架位置，不是 Minecraft 方块宽度。填洼只用于建立稳定排水方向，原始洼地深度会保留下来作为湖泊候选，而不是被永久抹平。</div>
+<div class="toolbar"><div class="title">河流与湖泊</div><div class="badge">降水 → 地表径流 → 河流 / 湖泊 / 湿地</div></div>
+<div class="page-intro"><strong>这一步回答“水最终会流到哪里”。</strong> 降水落到陆地后沿高程向下汇聚，小水流逐渐合成支流和主河；封闭低地可能形成湖泊，平缓而湿润的低地可能形成湿地。图里的河线只是宏观骨架，不是最终方块宽度。</div>
 <div class="lab-grid">
-<div class="lab-card"><header><strong>① 水文填洼高程</strong><small>保证每个陆地 Cell 有稳定出口</small></header><img src="generated/hydrology/filled-elevation.png" alt="filled elevation"></div>
-<div class="lab-card"><header><strong>② 填洼深度</strong><small>潜在封闭洼地 / 湖盆</small></header><img src="generated/hydrology/fill-depth.png" alt="fill depth"></div>
-<div class="lab-card"><header><strong>③ 本地径流</strong><small>降水 - 损失 × 季节性径流系数</small></header><img src="generated/hydrology/runoff.png" alt="runoff"></div>
-<div class="lab-card"><header><strong>④ 流向</strong><small>D8 + Priority Flood 出口约束</small></header><img src="generated/hydrology/flow-direction.png" alt="flow direction"></div>
-<div class="lab-card"><header><strong>⑤ 汇流量</strong><small>所有上游径流逐级累积</small></header><img src="generated/hydrology/flow-accumulation.png" alt="flow accumulation"></div>
-<div class="lab-card"><header><strong>⑥ 流域</strong><small>同一出海口 / 下游出口归为同一 Basin</small></header><img src="generated/hydrology/basins.png" alt="basins"></div>
+<div class="lab-card"><header><strong>① 排水计算用的高程</strong><small>让水能稳定找到下游方向</small></header><img src="generated/hydrology/filled-elevation.png" alt="filled elevation"></div>
+<div class="lab-card"><header><strong>② 洼地有多深</strong><small>越深越可能成为湖盆</small></header><img src="generated/hydrology/fill-depth.png" alt="fill depth"></div>
+<div class="lab-card"><header><strong>③ 地表产生多少径流</strong><small>降水扣除渗透等损失后的水量</small></header><img src="generated/hydrology/runoff.png" alt="runoff"></div>
+<div class="lab-card"><header><strong>④ 水往哪个方向流</strong><small>每个区域寻找自己的下游</small></header><img src="generated/hydrology/flow-direction.png" alt="flow direction"></div>
+<div class="lab-card"><header><strong>⑤ 下游汇聚了多少水</strong><small>越亮通常越接近大河主干</small></header><img src="generated/hydrology/flow-accumulation.png" alt="flow accumulation"></div>
+<div class="lab-card"><header><strong>⑥ 流域分区</strong><small>最终流向同一出口的区域属于同一流域</small></header><img src="generated/hydrology/basins.png" alt="basins"></div>
 <div class="lab-card"><header><strong>⑦ 河网</strong><small>高汇流量路径提取</small></header><img src="generated/hydrology/rivers.png" alt="rivers"></div>
 <div class="lab-card"><header><strong>⑧ 湖泊候选</strong><small>填洼深度 + 水量供应</small></header><img src="generated/hydrology/lake-potential.png" alt="lake potential"></div>
 <div class="lab-card"><header><strong>⑨ 湿地候选</strong><small>低坡度 + 高汇流 + 较稳定水分</small></header><img src="generated/hydrology/wetland-potential.png" alt="wetland potential"></div>
-<div class="lab-card"><header><strong>⑩ 河流等级</strong><small>Strahler Order：主河 / 支流层级</small></header><img src="generated/hydrology/river-order.png" alt="river order"></div>
+<div class="lab-card"><header><strong>⑩ 主河与支流层级</strong><small>两条同等级支流汇合后河流等级提升</small></header><img src="generated/hydrology/river-order.png" alt="river order"></div>
 <div class="lab-card"><header><strong>⑪ 常流 / 季节河倾向</strong><small>蓝=常流倾向 · 黄=季节河倾向</small></header><img src="generated/hydrology/river-seasonality.png" alt="river seasonality"></div>
-<div class="lab-card"><header><strong>⑫ 显式湖泊</strong><small>蓝=LakeID · 黄=潜在溢流口</small></header><img src="generated/hydrology/lakes.png" alt="explicit lakes"></div>
+<div class="lab-card"><header><strong>⑫ 已识别的湖泊</strong><small>蓝=湖区 · 黄=水位足够高时的潜在出水口</small></header><img src="generated/hydrology/lakes.png" alt="explicit lakes"></div>
 </div></main>
 <aside class="inspector"><div class="section"><h3>当前结果</h3>
 <div class="metric"><strong>62</strong><small>主要河流流域</small></div>
 <div class="row"><div class="metric"><strong>3</strong><small>最高河流等级</small></div><div class="metric"><strong>14</strong><small>显式湖泊</small></div></div>
-<div class="row"><div class="metric"><strong>2.07%</strong><small>河流陆地占比</small></div><div class="metric"><strong>222</strong><small>最大湖泊 Cell</small></div></div>
-<div class="card"><div class="card-title">为什么要先填洼？</div><p>原始宏观高程会存在数值洼地。Priority Flood 只建立“能从哪里溢出去”的水文表面，避免 Flow Direction 出现死循环。</p></div>
+<div class="row"><div class="metric"><strong>2.07%</strong><small>河流区域占陆地</small></div><div class="metric"><strong>222</strong><small>最大湖泊宏观格数</small></div></div>
+<div class="card"><div class="card-title">为什么排水计算要临时处理洼地？</div><p>模型需要先知道水位升高后会从哪里溢出去，才能建立稳定的下游方向。这个计算不会把真实湖盆从最终地形里抹掉。</p></div>
 <div class="card"><div class="card-title">湖泊没有被填没</div><p>FilledElevation 用于排水计算；OriginalElevation 和 FillDepth 仍保留。FillDepth 越大且水量越足，越可能在后续成为实际湖泊。</p></div>
 <div class="card"><div class="card-title">河流不是随机线</div><p>河网来自降水产生的径流沿真实高程流向逐级汇聚。干旱区若没有足够径流，不会仅因为“地图需要河”而强行生成。</p></div>
-<div class="card"><div class="card-title">河流现在有等级</div><p>Strahler Order 用真实汇流拓扑计算：两条同级支流汇合才提升一级，因此后续河谷宽度可以跟河流层级走。</p></div>
+<div class="card"><div class="card-title">主河和支流有层级</div><p>小支流逐渐汇入更大的河流；两条同等级河流汇合后，下游会提升一级。后续可以据此决定河谷和河床的大致规模。</p></div>
 <div class="card"><div class="card-title">季节河不是标签</div><p>暖季和冷季径流沿同一河网分别汇流；枯水季仍有足够水量时偏常流，季节反差大时偏季节河。</p></div>
-<div class="card"><div class="card-title">黄色点只是 Spill Outlet</div><p>它表示湖盆达到溢流水位时最可能从哪里出水，不代表这个湖一定全年外流。后续可按水量平衡区分外流湖、内流湖和季节湖。</p></div>
-<div class="card"><div class="card-title">下一步</div><p>Phase 3 收口后进入 Phase 4：用河网、降水、坡度和地形年龄做侵蚀，形成河谷、丘陵、山麓与最终连续地形。</p></div>
+<div class="card"><div class="card-title">黄色点是“潜在出水口”</div><p>只有湖水涨到足够高时才会从那里溢出，所以它不代表这个湖一定全年向外流水。后续仍可区分外流湖、内流湖和季节湖。</p></div>
+<div class="card"><div class="card-title">这些结果后面怎么用？</div><p>河网会继续切出河谷，并影响冲积平原、湿地和最终地形；湖泊则会保留自己的盆地与潜在出水位置。</p></div>
 </div></aside>
-</div></div></body></html>
+</div></div><script src="assets/prototype.js"></script>
+</body></html>
