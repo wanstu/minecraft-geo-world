@@ -54,10 +54,13 @@ type World struct {
 	RawPlateID        []int
 	PlateID           []int
 	Crust             []CrustType
+	CrustThickness    []float64
 	LandPotential     []float64
 	Boundary          []BoundaryType
+	BoundaryStrength  []float64
 	OceanAge          []float64
 	Feature           []TectonicFeature
+	TectonicIntensity []float64
 	TectonicInfluence []float64
 	Elevation         []float64
 }

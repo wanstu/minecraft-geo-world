@@ -146,7 +146,7 @@ GeoWorld 可以计算夏 / 冬甚至 12 个月的气候统计值，但 V1 只输
 
 ## D-009：板块构造应该产生“带”，不是一格线
 
-状态：进行中
+状态：已实现第一版
 
 真实造山带、裂谷、海沟、岛弧都有宽度。
 
@@ -217,7 +217,7 @@ Elevation Field
 - Continental Rift：较宽下沉
 - Transform Fault：窄且弱
 
-后续会把带宽和幅度从固定常量升级为由相对板块速度、地壳厚度、地壳年龄等决定。
+带宽和幅度已经升级为由相对板块速度、地壳厚度、地壳年龄等共同决定；后续仍会继续校准物理关系。
 
 
 ---
@@ -261,3 +261,31 @@ Nearest Plate Seed
 - 不稳定的构造带
 
 原始 `RawPlateID` 保留用于调试与算法比较，实际构造计算使用自然化后的 `PlateID`。
+
+
+---
+
+## D-013：构造强度不能只由“边界类型”决定
+
+状态：已实现第一版
+
+同样是大陆碰撞，慢速轻微挤压与高速强烈碰撞不应产生一样的山脉。
+
+因此 GeoWorld 使用：
+
+```text
+Relative Plate Velocity
+        ↓
+Boundary Strength
+        +
+Crust Thickness / Ocean Age
+        ↓
+Tectonic Intensity
+        ↓
+Landform Width + Elevation Amplitude
+```
+
+这让地貌类型和地貌强度分离：
+
+- Feature 决定“是什么”。
+- Intensity 决定“有多强”。

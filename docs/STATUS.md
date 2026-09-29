@@ -8,17 +8,17 @@
 
 **Phase 1 — 板块与大陆骨架**
 
-当前子阶段：**Phase 1.4 — 地壳与构造参数深化（准备开始）**
+当前子阶段：**Phase 1.5 — 基础高程场（准备开始）**
 
 ## 当前稳定基线
 
 最近提交：
 
+- `3f85f67` — show complete phase1 lab maps
+- `8e672b1` — naturalize plate boundaries with smooth domain warp
 - `4cee4af` — model ocean crust age and tectonic influence bands
 - `4f31402` — record geoworld status decisions and roadmap
 - `f3f0ba0` — classify tectonic landform interactions
-- `fc6acf4` — decouple crust field from tectonic plates
-- `f863d3e` — bootstrap geoworld planning and phase1 plate lab
 
 ## 已完成
 
@@ -62,56 +62,54 @@
 
 ### Phase 1.3 — 板块边界自然化
 
+状态：完成第一版
+
+- 保留原始 Voronoi 作为调试骨架。
+- 实际板块归属使用平滑 Domain Warp 后的查询坐标。
+- 板块边界变得弯曲和不规则。
+- 不做逐 Cell 随机抖动，避免碎片。
+- 当前测试 Seed Plate Warp 变化比例：6.21%。
+
+### Phase 1.4 — 地壳与构造参数深化
+
 状态：**完成第一版**
 
-实现：
+已实现：
 
-- 保留原始 Voronoi 作为可解释拓扑骨架。
-- 在查询板块归属前对坐标做低频平滑 Domain Warp。
-- 实际板块边界出现弯曲与不规则变化。
-- 不使用逐 Cell 随机抖动，避免盐胡椒碎片。
-- 保留 `plates-raw.png` 与 `plates.png` 对照。
-- 自动测试限制 warp 必须产生明显变化，但不能重写过多 Cell。
+1. 大陆地壳厚度场：大陆边缘较薄，内部逐渐增厚。
+2. 板块相对运动速度进入 Boundary Strength。
+3. Boundary Strength + 地壳厚度 + 海洋年龄共同形成 Tectonic Intensity。
+4. 强碰撞形成更高、更宽的山系；弱碰撞影响更小。
+5. 海沟、岛弧、裂谷、洋中脊的带宽与幅度不再完全固定。
+6. Generator 新增 `crust-thickness.png` 与 `tectonic-intensity.png`。
+7. 自动测试增加地壳厚度变化与构造强度变化检查。
 
-## 当前实验参数
+当前测试 Seed：
 
-默认 Lab：
-
-- Seed：731894205
-- Grid：640 × 400
-- Plate Count：18
-- Ocean Area：68%
-- 当前测试 Seed 的 Plate Warp 变化比例：6.21%
+- Ocean Area：68.00%
 - Ocean Age：0.000 ～ 0.908
-- Tectonic Influence：覆盖约 16.41% Cell
+- Continental Thickness：0.440 ～ 0.825
+- Tectonic Intensity：0.089 ～ 0.920
+- Tectonic Influence：约 15.24% Cell
 
-当前输出：
+## 当前输出
 
 - `plates-raw.png`
 - `plates.png`
 - `crust.png`
+- `crust-thickness.png`
 - `boundaries.png`
 - `tectonics.png`
 - `features.png`
 - `ocean-age.png`
 - `subduction.png`
+- `tectonic-intensity.png`
 - `tectonic-influence.png`
 - `elevation.png`
 
-## 下一步：Phase 1.4 — 地壳与构造参数深化
+## 下一步：Phase 1.5 — 基础高程场
 
 目标：
-
-1. 大陆地壳厚度场。
-2. 板块相对运动速度进入“构造强度”。
-3. 碰撞越强，山系 / 海沟 / 裂谷影响越明显。
-4. 海洋地壳年龄参与俯冲强度。
-5. 构造影响带宽度不再完全是固定常量。
-6. 给 Generator 增加 crust thickness / tectonic intensity 图层。
-
-## Phase 1.5 — 基础高程场
-
-计划：
 
 - 大陆内部基础高程
 - 大陆架
@@ -123,6 +121,8 @@
 - 岛弧
 - 洋中脊
 - 裂谷
+
+这一阶段完成后，Phase 1 的输出才会从“构造倾向图”变成真正可供后续气候、水文和 Minecraft 地形细化使用的宏观高程场。
 
 ## Phase 1.6 — Phase 1 验收
 

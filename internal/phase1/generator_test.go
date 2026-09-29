@@ -111,3 +111,58 @@ func TestPlateWarpChangesBoundaries(t *testing.T) {
 		t.Fatalf("plate warp changed too much: %.3f", ratio)
 	}
 }
+
+func TestCrustThicknessVaries(t *testing.T) {
+	w := Generate(testConfig())
+	minThickness := 1.0
+	maxThickness := 0.0
+	count := 0
+	for i, crust := range w.Crust {
+		if crust != Continental {
+			continue
+		}
+		count++
+		v := w.CrustThickness[i]
+		if v < minThickness {
+			minThickness = v
+		}
+		if v > maxThickness {
+			maxThickness = v
+		}
+	}
+	if count == 0 {
+		t.Fatal("expected continental cells")
+	}
+	if maxThickness-minThickness < 0.12 {
+		t.Fatalf("continental crust thickness varies too little: %.3f..%.3f", minThickness, maxThickness)
+	}
+}
+
+func TestTectonicIntensityVaries(t *testing.T) {
+	w := Generate(testConfig())
+	minIntensity := 1.0
+	maxIntensity := 0.0
+	count := 0
+	for i, feature := range w.Feature {
+		if feature == NoFeature {
+			continue
+		}
+		count++
+		v := w.TectonicIntensity[i]
+		if v < minIntensity {
+			minIntensity = v
+		}
+		if v > maxIntensity {
+			maxIntensity = v
+		}
+		if v < 0 || v > 1 {
+			t.Fatalf("tectonic intensity out of range at %d: %.3f", i, v)
+		}
+	}
+	if count == 0 {
+		t.Fatal("expected tectonic features")
+	}
+	if maxIntensity-minIntensity < 0.15 {
+		t.Fatalf("tectonic intensity varies too little: %.3f..%.3f", minIntensity, maxIntensity)
+	}
+}

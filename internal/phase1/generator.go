@@ -57,10 +57,13 @@ func Generate(cfg Config) *World {
 		RawPlateID:        make([]int, n),
 		PlateID:           make([]int, n),
 		Crust:             make([]CrustType, n),
+		CrustThickness:    make([]float64, n),
 		LandPotential:     make([]float64, n),
 		Boundary:          make([]BoundaryType, n),
+		BoundaryStrength:  make([]float64, n),
 		OceanAge:          make([]float64, n),
 		Feature:           make([]TectonicFeature, n),
+		TectonicIntensity: make([]float64, n),
 		TectonicInfluence: make([]float64, n),
 		Elevation:         make([]float64, n),
 	}
@@ -76,6 +79,7 @@ func Generate(cfg Config) *World {
 	}
 
 	w.generateCrust(r)
+	w.computeCrustThickness()
 	w.classifyBoundaries()
 	w.computeOceanAge()
 	w.classifyFeatures()
@@ -185,6 +189,75 @@ func (w *World) generateCrust(r *rand.Rand) {
 	}
 }
 
+func (w *World) computeCrustThickness() {
+	const unvisited = -1
+	dist := make([]int, len(w.CrustThickness))
+	for i := range dist {
+		dist[i] = unvisited
+	}
+
+	queue := make([]cellPoint, 0, len(dist)/8)
+	dirs := [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+
+	// 海岸线上的大陆 Cell 作为大陆地壳厚度的“薄边缘”。
+	for y := 0; y < w.Config.Height; y++ {
+		for x := 0; x < w.Config.Width; x++ {
+			i := w.index(x, y)
+			if w.Crust[i] != Continental {
+				w.CrustThickness[i] = 0.18
+				continue
+			}
+			for _, d := range dirs {
+				nx, ny := x+d[0], y+d[1]
+				if !w.inside(nx, ny) {
+					continue
+				}
+				if w.Crust[w.index(nx, ny)] == Oceanic {
+					dist[i] = 0
+					queue = append(queue, cellPoint{X: x, Y: y})
+					break
+				}
+			}
+		}
+	}
+
+	head := 0
+	for head < len(queue) {
+		p := queue[head]
+		head++
+		pi := w.index(p.X, p.Y)
+		for _, d := range dirs {
+			nx, ny := p.X+d[0], p.Y+d[1]
+			if !w.inside(nx, ny) {
+				continue
+			}
+			ni := w.index(nx, ny)
+			if w.Crust[ni] != Continental || dist[ni] != unvisited {
+				continue
+			}
+			dist[ni] = dist[pi] + 1
+			queue = append(queue, cellPoint{X: nx, Y: ny})
+		}
+	}
+
+	for y := 0; y < w.Config.Height; y++ {
+		for x := 0; x < w.Config.Width; x++ {
+			i := w.index(x, y)
+			if w.Crust[i] != Continental {
+				continue
+			}
+			d := dist[i]
+			if d < 0 {
+				d = 24
+			}
+			interior := 1 - math.Exp(-float64(d)/18.0)
+			lowFreq := math.Sin(float64(x)*0.021+float64(w.Config.Seed%421))*0.025 +
+				math.Cos(float64(y)*0.019-float64(w.Config.Seed%353))*0.02
+			w.CrustThickness[i] = clamp(0.48+interior*0.34+lowFreq, 0.44, 0.88)
+		}
+	}
+}
+
 func (w *World) classifyBoundaries() {
 	dirs := [][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
 
@@ -193,6 +266,7 @@ func (w *World) classifyBoundaries() {
 			i := w.index(x, y)
 			aID := w.PlateID[i]
 			best := NoBoundary
+			bestStrength := 0.0
 
 			for _, d := range dirs {
 				nx, ny := x+d[0], y+d[1]
@@ -204,9 +278,15 @@ func (w *World) classifyBoundaries() {
 				if bID == aID {
 					continue
 				}
-				best = strongerBoundary(best, classifyBoundary(w.Plates[aID], w.Plates[bID]))
+				boundary, strength := boundaryKinematics(w.Plates[aID], w.Plates[bID])
+				if featurePriorityForBoundary(boundary) > featurePriorityForBoundary(best) ||
+					(boundary == best && strength > bestStrength) {
+					best = boundary
+					bestStrength = strength
+				}
 			}
 			w.Boundary[i] = best
+			w.BoundaryStrength[i] = bestStrength
 		}
 	}
 }
@@ -314,6 +394,7 @@ func (w *World) classifyFeatures() {
 			i := w.index(x, y)
 			aID := w.PlateID[i]
 			best := NoFeature
+			bestIntensity := 0.0
 
 			for _, d := range dirs {
 				nx, ny := x+d[0], y+d[1]
@@ -326,38 +407,76 @@ func (w *World) classifyFeatures() {
 					continue
 				}
 
-				boundary := classifyBoundary(w.Plates[aID], w.Plates[bID])
+				boundary, boundaryStrength := boundaryKinematics(w.Plates[aID], w.Plates[bID])
 				feature := classifyFeature(
 					w.Crust[i], w.Crust[ni],
 					w.OceanAge[i], w.OceanAge[ni],
 					aID, bID,
 					boundary,
 				)
-				best = strongerFeature(best, feature)
+				intensity := tectonicFeatureIntensity(
+					feature,
+					boundaryStrength,
+					w.CrustThickness[i], w.CrustThickness[ni],
+					w.OceanAge[i], w.OceanAge[ni],
+				)
+				if featurePriority(feature) > featurePriority(best) ||
+					(feature == best && intensity > bestIntensity) {
+					best = feature
+					bestIntensity = intensity
+				}
 			}
 			w.Feature[i] = best
+			w.TectonicIntensity[i] = bestIntensity
 		}
 	}
 }
 
 func classifyBoundary(a, b Plate) BoundaryType {
+	boundary, _ := boundaryKinematics(a, b)
+	return boundary
+}
+
+func boundaryKinematics(a, b Plate) (BoundaryType, float64) {
 	nx := b.Center.X - a.Center.X
 	ny := b.Center.Y - a.Center.Y
 	l := math.Hypot(nx, ny)
 	if l == 0 {
-		return Transform
+		return Transform, 0
 	}
 	nx /= l
 	ny /= l
 
-	closing := (a.Velocity.X-b.Velocity.X)*nx + (a.Velocity.Y-b.Velocity.Y)*ny
+	rvx := a.Velocity.X - b.Velocity.X
+	rvy := a.Velocity.Y - b.Velocity.Y
+	closing := rvx*nx + rvy*ny
+	relative := math.Hypot(rvx, rvy)
+	tangentSq := relative*relative - closing*closing
+	if tangentSq < 0 {
+		tangentSq = 0
+	}
+	tangent := math.Sqrt(tangentSq)
+
 	switch {
 	case closing > 0.22:
-		return Convergent
+		return Convergent, clamp(0.18+(closing-0.22)/1.55, 0, 1)
 	case closing < -0.22:
-		return Divergent
+		return Divergent, clamp(0.18+(-closing-0.22)/1.55, 0, 1)
 	default:
-		return Transform
+		return Transform, clamp(0.12+tangent/1.8, 0, 1)
+	}
+}
+
+func featurePriorityForBoundary(b BoundaryType) int {
+	switch b {
+	case Convergent:
+		return 3
+	case Divergent:
+		return 2
+	case Transform:
+		return 1
+	default:
+		return 0
 	}
 }
 
@@ -393,6 +512,32 @@ func classifyFeature(local, other CrustType, localAge, otherAge float64, localPl
 	}
 }
 
+func tectonicFeatureIntensity(feature TectonicFeature, boundaryStrength, localThickness, otherThickness, localAge, otherAge float64) float64 {
+	base := clamp(boundaryStrength, 0, 1)
+	switch feature {
+	case CollisionOrogen:
+		thickness := clamp((localThickness+otherThickness)/1.5, 0, 1)
+		return clamp(base*(0.72+0.38*thickness), 0, 1)
+	case VolcanicArc:
+		return clamp(base*(0.72+0.22*otherAge+0.12*localThickness), 0, 1)
+	case Trench:
+		age := math.Max(localAge, otherAge)
+		return clamp(base*(0.68+0.38*age), 0, 1)
+	case IslandArc:
+		ageContrast := math.Abs(localAge - otherAge)
+		return clamp(base*(0.68+0.24*math.Max(localAge, otherAge)+0.12*ageContrast), 0, 1)
+	case MidOceanRidge:
+		return clamp(base*0.92, 0, 1)
+	case ContinentalRift:
+		thickness := math.Max(localThickness, otherThickness)
+		return clamp(base*(0.68+0.28*thickness), 0, 1)
+	case TransformFault:
+		return clamp(base*0.72, 0, 1)
+	default:
+		return 0
+	}
+}
+
 func (w *World) computeTectonicInfluence() {
 	uplift := make([]float64, len(w.TectonicInfluence))
 	subsidence := make([]float64, len(w.TectonicInfluence))
@@ -401,7 +546,8 @@ func (w *World) computeTectonicInfluence() {
 		for x := 0; x < w.Config.Width; x++ {
 			i := w.index(x, y)
 			feature := w.Feature[i]
-			radius, amplitude := featureBand(feature)
+			intensity := w.TectonicIntensity[i]
+			radius, amplitude := featureBand(feature, intensity)
 			if radius == 0 || amplitude == 0 {
 				continue
 			}
@@ -438,25 +584,35 @@ func (w *World) computeTectonicInfluence() {
 	}
 }
 
-func featureBand(feature TectonicFeature) (radius int, amplitude float64) {
+func featureBand(feature TectonicFeature, intensity float64) (radius int, amplitude float64) {
+	intensity = clamp(intensity, 0, 1)
+	scaleR := 0.72 + intensity*0.58
+	scaleA := 0.52 + intensity*0.78
+
+	baseRadius := 0
+	baseAmplitude := 0.0
 	switch feature {
 	case CollisionOrogen:
-		return 14, 0.34
+		baseRadius, baseAmplitude = 14, 0.34
 	case VolcanicArc:
-		return 9, 0.21
+		baseRadius, baseAmplitude = 9, 0.21
 	case IslandArc:
-		return 7, 0.18
+		baseRadius, baseAmplitude = 7, 0.18
 	case Trench:
-		return 6, -0.24
+		baseRadius, baseAmplitude = 6, -0.24
 	case MidOceanRidge:
-		return 8, 0.12
+		baseRadius, baseAmplitude = 8, 0.12
 	case ContinentalRift:
-		return 10, -0.13
+		baseRadius, baseAmplitude = 10, -0.13
 	case TransformFault:
-		return 4, -0.025
+		baseRadius, baseAmplitude = 4, -0.025
 	default:
 		return 0, 0
 	}
+
+	radius = maxInt(2, int(math.Round(float64(baseRadius)*scaleR)))
+	amplitude = baseAmplitude * scaleA
+	return radius, amplitude
 }
 
 func featureAppliesToCrust(feature TectonicFeature, crust CrustType) bool {
@@ -516,7 +672,8 @@ func (w *World) computeElevation() {
 		for x := 0; x < w.Config.Width; x++ {
 			i := w.index(x, y)
 
-			base := 0.66
+			// 大陆地壳越厚，长期平均基底略高；海洋地壳则随年龄增长冷却下沉。
+			base := 0.58 + clamp((w.CrustThickness[i]-0.44)/(0.88-0.44), 0, 1)*0.10
 			if w.Crust[i] == Oceanic {
 				// 年轻海洋地壳较热、海底较高；老地壳冷却收缩后海盆更深。
 				base = 0.31 - w.OceanAge[i]*0.10

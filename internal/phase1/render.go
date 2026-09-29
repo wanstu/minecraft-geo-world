@@ -29,6 +29,14 @@ func RenderAll(w *World, outDir string) error {
 			}
 			return color.RGBA{31, 76, 99, 255}
 		}},
+		{"crust-thickness.png", func(x, y int) color.RGBA {
+			i := w.index(x, y)
+			if w.Crust[i] == Oceanic {
+				return color.RGBA{24, 52, 69, 255}
+			}
+			t := clamp((w.CrustThickness[i]-0.44)/(0.88-0.44), 0, 1)
+			return lerpColor(color.RGBA{110, 118, 77, 255}, color.RGBA{231, 204, 128, 255}, t)
+		}},
 		{"boundaries.png", func(x, y int) color.RGBA {
 			i := w.index(x, y)
 			base := palette(w.PlateID[i])
@@ -91,6 +99,17 @@ func RenderAll(w *World, outDir string) error {
 				}
 				return color.RGBA{13, 31, 48, 255}
 			}
+		}},
+		{"tectonic-intensity.png", func(x, y int) color.RGBA {
+			i := w.index(x, y)
+			v := clamp(w.TectonicIntensity[i], 0, 1)
+			if w.Feature[i] == NoFeature {
+				if w.Crust[i] == Continental {
+					return color.RGBA{39, 48, 39, 255}
+				}
+				return color.RGBA{18, 34, 47, 255}
+			}
+			return lerpColor(color.RGBA{74, 78, 84, 255}, color.RGBA{244, 93, 61, 255}, v)
 		}},
 		{"tectonic-influence.png", func(x, y int) color.RGBA {
 			v := w.TectonicInfluence[w.index(x, y)]

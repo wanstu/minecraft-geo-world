@@ -185,3 +185,61 @@ Seed
 
 - naturalized plate map 必须相对 raw map 有明显变化。
 - 改变比例不能过大，避免整个板块拓扑被 warp 重写。
+
+
+## Phase 1.4 完成记录
+
+### 大陆地壳厚度
+
+大陆海岸附近地壳较薄，向大陆内部逐渐增厚。
+
+当前为归一化“有效地壳厚度”，主要用于控制：
+
+- 大陆基础高程
+- 碰撞造山强度
+- 大陆裂谷响应
+
+### 板块运动强度
+
+不再只有 Boundary Type。
+
+新增：
+
+- `BoundaryStrength`
+- `TectonicIntensity`
+
+Boundary Strength 由两块板块的相对速度分解得到：
+
+- 汇聚 / 张裂主要看边界法线方向速度。
+- 转换断层主要看切向相对速度。
+
+Tectonic Intensity 再结合：
+
+- Boundary Strength
+- Continental Crust Thickness
+- Ocean Crust Age
+
+决定实际构造作用强弱。
+
+### 构造带动态宽度 / 幅度
+
+`featureBand` 已从固定值改为：
+
+```text
+Feature Type
++ Tectonic Intensity
+→ Band Radius
++ Elevation Amplitude
+```
+
+因此相同类型的碰撞不再生成完全一样的山系或海沟。
+
+### 新增图层
+
+- `crust-thickness.png`
+- `tectonic-intensity.png`
+
+### 新增测试
+
+- Continental crust thickness 必须存在明显变化范围。
+- Tectonic intensity 必须在 0..1 内并存在明显强弱差异。

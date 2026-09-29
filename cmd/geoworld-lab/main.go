@@ -34,10 +34,30 @@ func main() {
 	warpedCells := 0
 	minAge := 1.0
 	maxAge := 0.0
+	minCrustThickness := 1.0
+	maxCrustThickness := 0.0
+	minTectonicIntensity := 1.0
+	maxTectonicIntensity := 0.0
 	influenced := 0
 	for i, c := range world.Crust {
 		if world.RawPlateID[i] != world.PlateID[i] {
 			warpedCells++
+		}
+		if c == phase1.Continental {
+			if world.CrustThickness[i] < minCrustThickness {
+				minCrustThickness = world.CrustThickness[i]
+			}
+			if world.CrustThickness[i] > maxCrustThickness {
+				maxCrustThickness = world.CrustThickness[i]
+			}
+		}
+		if world.Feature[i] != phase1.NoFeature {
+			if world.TectonicIntensity[i] < minTectonicIntensity {
+				minTectonicIntensity = world.TectonicIntensity[i]
+			}
+			if world.TectonicIntensity[i] > maxTectonicIntensity {
+				maxTectonicIntensity = world.TectonicIntensity[i]
+			}
 		}
 		if c == phase1.Oceanic {
 			oceanCells++
@@ -61,5 +81,7 @@ func main() {
 		cfg.Seed, cfg.Width, cfg.Height, len(world.Plates), oceanPct)
 	fmt.Printf("plate-warp=%.2f%% cells ocean-age=%.3f..%.3f tectonic-influence=%.2f%% cells\n",
 		warpPct, minAge, maxAge, influencePct)
+	fmt.Printf("continental-thickness=%.3f..%.3f tectonic-intensity=%.3f..%.3f\n",
+		minCrustThickness, maxCrustThickness, minTectonicIntensity, maxTectonicIntensity)
 	fmt.Printf("output=%s\n", *out)
 }

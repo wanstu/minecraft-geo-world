@@ -47,19 +47,23 @@
 
 ### Phase 1.4 — 地壳与构造参数深化
 
-状态：**当前**
+状态：**完成第一版**
 
-- 地壳厚度
-- 构造强度
-- 海盆年龄
-- 板块速度对地貌幅度的影响
+- 大陆地壳厚度
+- 板块相对运动强度
+- 海洋地壳年龄
+- Tectonic Intensity
+- 动态构造带宽度 / 幅度
 
 ### Phase 1.5 — 基础高程场
+
+状态：**当前**
 
 输出：
 
 - Continental Interior
 - Continental Shelf
+- Continental Slope
 - Ocean Basin
 - Collision Mountain Belt
 - Plateau
