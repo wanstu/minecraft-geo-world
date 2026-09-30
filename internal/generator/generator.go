@@ -16,6 +16,7 @@ import (
 	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/terrain"
+	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
 )
 
@@ -174,6 +175,15 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 	}
 	reporter.done(StageReconcile)
 
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	wb, err := waterbed.Build(coastTerrain, rec, h, resolved.Waterbed)
+	if err != nil {
+		return nil, fmt.Errorf("generator: waterbed: %w", err)
+	}
+	reporter.done(StageWaterbed)
+
 	model := &WorldModel{
 		Geometry:       w.Geometry,
 		Surface:        w.Surface,
@@ -188,6 +198,7 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 		Terrain:        t,
 		CoastTerrain:   coastTerrain,
 		Reconciliation: rec,
+		Waterbed:       wb,
 	}
 	model.Config = ResolvedConfig{
 		Seed:               resolved.Seed,
@@ -202,6 +213,7 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 		Ecology:            eco.Config,
 		Terrain:            t.Config,
 		Reconcile:          rec.Config,
+		Waterbed:           wb.Config,
 	}
 	return model, nil
 }

@@ -514,3 +514,73 @@ Phase 1 reference-world / coast / tectonics
 - `-strict-final` 仍应失败，因为 river/lake bed overlay 与最终 water/runtime 语义尚未完成。
 
 下一切片：把 CoastTerrain 上重算的 RiverBedTarget 与 LakeBedCeiling 转成 carve-only local bed correction，独立于 broad coast correction；应用后重新审计 river upslope、lake bed、Chunk/Macro 连续性。
+
+
+## Phase 6.2 第四切片实施结果（2026-09-30）
+
+基线：a2ca47a；开发分支：agent/world-model-foundation。
+
+目标：把第三切片已经真实应用的 CoastTerrain 继续向下接到局部 River/Lake bed，而不是把 RiverBedTarget / LakeBedCeiling 停留在“可解约束”层。
+
+已完成：
+- [x] 新增 `internal/waterbed`，以 CoastTerrain 为 broad base，局部消费 Reconciliation 的 RiverBedTarget / LakeBedCeiling。
+- [x] River overlay carve-only：任何采样点只能保持或降低 broad terrain，不能抬高河床伪造下坡。
+- [x] 河道半宽直接使用 Minecraft blocks；默认 4..18 blocks，按强河流 RiverStrength 连续映射。
+- [x] River centerline profile 按物理 block 步长预采样，实际 profile 取 min(broad terrain, target) 并保持纵向非上升。
+- [x] 河网 profile 按 DAG 拓扑顺序构建；上游 segment 的**实际采样出口高度**会传播到下游 segment 起点，解决汇流 corridor 重叠产生“深坑后回升”的连续逆坡。
+- [x] Lake overlay 使用显式 LakeBedCeiling，本地 square raster footprint 内 carve，边缘 smoothstep 回到 broad terrain；只有床面低于 Lake.SurfaceElevation 才暴露 lake water datum。
+- [x] Waterbed 采用 macro-node spatial buckets 限制局部查询候选，不在每个世界坐标扫描全河网/全湖泊。
+- [x] GenerateWorld 新增 Waterbed 阶段；WorldModel 同时保留 Raw Terrain、CoastTerrain、Reconciliation、Waterbed。
+- [x] Consistency Audit 对实际 Waterbed centerline 做高密度非节点采样，不再只检查宏观端点；LakeBedCeiling 也检查实际应用后的床面。
+- [x] Coast broad correction 增加 homogeneous Cell interior refinement：四角均为外海或均为正常陆地的 Macro Cell 内采 5 点，并把最大缺口回灌到四角 correction；封闭低地与混合海岸不强制。
+- [x] Raw Terrain 的 806/608 海岸变化、72/126 河床逆坡仍原样保留为历史基线，但不再被称为已应用 Terrain 的最终结果。
+
+### 真实问题与修复
+
+初次把 local Waterbed 接上后，两个正式 Seed 的宏观 target 与湖床都能满足，但连续河流中心线仍出现小幅回升：
+- Seed 731894205：425 / 258152 个采样步上坡，最大 rise 2.12536e-4。
+- Seed 10400：813 / 388804 个采样步上坡，最大 rise 9.66002e-5。
+
+诊断确认最大上坡点的**当前 segment 自身 profile 仍然下降**，问题来自汇流处另一条 segment 的 corridor overlap：上游实际 profile 出口可能低于其宏观 endpoint target，离开汇流点时额外 carve 衰减，于是表面出现回升。
+
+修复后 Waterbed 在 DAG 顺序中传播 actual outlet height，两个 Seed 均达到 0 连续上坡采样。
+
+CoastTerrain 节点命中后新增非节点检查，又发现 Seed 731894205 的“四角全正常陆地”Cell 内有 160 个采样点跌到海平面下，最大 deficit 0.0061282。新增 interior refinement 后两个正式 Seed 的 homogeneous coast interior 违规均降为 0；外海内部始终为 0。
+
+### 当前正式 Seed 验证
+
+Seed 731894205：
+- AppliedCoastSurfaceMismatches = 0
+- CoastInteriorOceanAboveSea = 0
+- CoastInteriorLandBelowSea = 0
+- Coast adjusted nodes = 740（raise 404 / carve 336）
+- CoastTerrain Chunk jump = 5.59045e-8
+- CoastTerrain Macro slope mismatch = 6.55886e-6
+- Waterbed RiverSampleSteps = 258152
+- Waterbed RiverUpslopeSteps = 0
+- Waterbed LakeBedViolations = 0
+- Waterbed Chunk jump = 5.59045e-8
+
+Seed 10400：
+- AppliedCoastSurfaceMismatches = 0
+- CoastInteriorOceanAboveSea = 0
+- CoastInteriorLandBelowSea = 0
+- Coast adjusted nodes = 577（raise 251 / carve 326）
+- CoastTerrain Chunk jump = 6.29519e-8
+- CoastTerrain Macro slope mismatch = 6.74817e-6
+- Waterbed RiverSampleSteps = 388804
+- Waterbed RiverUpslopeSteps = 0
+- Waterbed LakeBedViolations = 0
+- Waterbed Chunk jump = 6.29519e-8
+
+全量 `go test ./... -count=1`：通过。
+
+### 当前边界
+
+- [ ] River 只有 bed + width，还没有正式 water depth / water surface 规则；不能因为床面单调就声称 Runtime 水体完成。
+- [ ] Ocean / Lake 已有明确 datum，但还需要一个统一 Runtime-facing Water Surface sampler，把 Ocean/Lake/River 与最终 terrain 一起消费。
+- [ ] Mixed coast cell 的具体 coastline crossing 仍由连续 Terrain + sea datum 决定；当前 interior 护栏只约束四角同类的 Cell，不强行扭曲混合海岸。
+- [ ] Ecology / MC Profile 仍消费宏观语义，最终 Runtime sampling 与 biome/surface rules 的联动仍需下一步验证。
+- [ ] `-strict-final` 应继续失败，直到 Runtime river water-surface/depth 语义完成；Raw Terrain 历史 mismatch 不再是 strict-final 的失败理由。
+
+下一切片：建立统一 Runtime-facing Terrain/Water sampler，Ocean=shared SeaLevel、Lake=Lake.SurfaceElevation、River=bed + explicit depth/surface rule，并把 strict-final 门槛迁到该 sampler。

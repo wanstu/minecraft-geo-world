@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"geoworld/internal/hydrology"
+	"geoworld/internal/sampling"
 	"geoworld/internal/terrain"
 	"geoworld/internal/world"
 )
@@ -123,18 +124,13 @@ func Build(input Input, cfg Config) (*Model, error) {
 		}
 
 		m.CoastCorrection[i] = target - old
-		if target != old {
-			m.CoastTargetElevation[i] = target
-			m.CoastAdjustedNodes++
-			if target > old {
-				m.CoastRaisedNodes++
-				m.MaxCoastRaise = math.Max(m.MaxCoastRaise, target-old)
-			} else {
-				m.CoastCarvedNodes++
-				m.MaxCoastCarve = math.Max(m.MaxCoastCarve, old-target)
-			}
-		}
+		m.CoastTargetElevation[i] = target
 	}
+
+	if err := m.refineCoastCorrection(input.Terrain, input.MacroSurface); err != nil {
+		return nil, err
+	}
+	m.finalizeCoastTargets()
 
 	m.ConstrainedSurface, err = world.ClassifySurface(
 		input.Geometry.Width,
@@ -154,6 +150,162 @@ func Build(input Input, cfg Config) (*Model, error) {
 		return nil, err
 	}
 	return m, nil
+}
+
+func (m *Model) refineCoastCorrection(raw *terrain.Model, surface *world.Surface) error {
+	if raw == nil || surface == nil {
+		return errors.New("reconcile: coast refinement requires terrain and surface")
+	}
+	offsets := [][2]float64{
+		{0.25, 0.25},
+		{0.75, 0.25},
+		{0.50, 0.50},
+		{0.25, 0.75},
+		{0.75, 0.75},
+	}
+	coastLow := m.SeaLevelNormalized - m.Config.CoastMarginNormalized
+	coastHigh := m.SeaLevelNormalized + m.Config.CoastMarginNormalized
+	spacing := m.Geometry.SpacingX()
+
+	for iteration := 0; iteration < 4; iteration++ {
+		grid, err := sampling.NewScalarGridWithGeometry(m.Geometry, m.CoastCorrection)
+		if err != nil {
+			return fmt.Errorf("reconcile: build coast correction grid: %w", err)
+		}
+		adjustment := make([]float64, len(m.CoastCorrection))
+		changed := false
+
+		for z := 0; z < m.Geometry.Height-1; z++ {
+			for x := 0; x < m.Geometry.Width-1; x++ {
+				indices := [4]int{
+					z*m.Geometry.Width + x,
+					z*m.Geometry.Width + x + 1,
+					(z+1)*m.Geometry.Width + x,
+					(z+1)*m.Geometry.Width + x + 1,
+				}
+
+				allOcean := true
+				allNormalLand := true
+				for _, i := range indices {
+					if surface.LandMask[i] {
+						allOcean = false
+					} else {
+						allNormalLand = false
+					}
+					if !surface.LandMask[i] || surface.EnclosedBelowSea[i] {
+						allNormalLand = false
+					}
+				}
+				if !allOcean && !allNormalLand {
+					continue
+				}
+
+				required := 0.0
+				for _, off := range offsets {
+					wx := m.Geometry.OriginX + (float64(x)+off[0])*spacing
+					wz := m.Geometry.OriginZ + (float64(z)+off[1])*spacing
+					h := clamp(
+						raw.SampleNormalized(wx, wz)+grid.SampleSmoothstepBilinear(wx, wz),
+						0,
+						1,
+					)
+					if allOcean {
+						required = math.Max(required, h-coastLow)
+					} else {
+						required = math.Max(required, coastHigh-h)
+					}
+				}
+				if required <= 1e-12 {
+					continue
+				}
+				changed = true
+				for _, i := range indices {
+					if allOcean {
+						adjustment[i] = math.Min(adjustment[i], -required)
+					} else {
+						adjustment[i] = math.Max(adjustment[i], required)
+					}
+				}
+			}
+		}
+
+		if !changed {
+			return nil
+		}
+		for i, delta := range adjustment {
+			m.CoastCorrection[i] += delta
+			if !finite(m.CoastCorrection[i]) {
+				return errors.New("reconcile: coast refinement produced non-finite correction")
+			}
+		}
+	}
+
+	grid, err := sampling.NewScalarGridWithGeometry(m.Geometry, m.CoastCorrection)
+	if err != nil {
+		return err
+	}
+	for z := 0; z < m.Geometry.Height-1; z++ {
+		for x := 0; x < m.Geometry.Width-1; x++ {
+			indices := [4]int{
+				z*m.Geometry.Width + x,
+				z*m.Geometry.Width + x + 1,
+				(z+1)*m.Geometry.Width + x,
+				(z+1)*m.Geometry.Width + x + 1,
+			}
+			allOcean := true
+			allNormalLand := true
+			for _, i := range indices {
+				if surface.LandMask[i] {
+					allOcean = false
+				} else {
+					allNormalLand = false
+				}
+				if !surface.LandMask[i] || surface.EnclosedBelowSea[i] {
+					allNormalLand = false
+				}
+			}
+			if !allOcean && !allNormalLand {
+				continue
+			}
+			for _, off := range offsets {
+				wx := m.Geometry.OriginX + (float64(x)+off[0])*spacing
+				wz := m.Geometry.OriginZ + (float64(z)+off[1])*spacing
+				h := clamp(raw.SampleNormalized(wx, wz)+grid.SampleSmoothstepBilinear(wx, wz), 0, 1)
+				if allOcean && h > coastLow+1e-10 {
+					return errors.New("reconcile: ocean interior coast refinement did not converge")
+				}
+				if allNormalLand && h < coastHigh-1e-10 {
+					return errors.New("reconcile: land interior coast refinement did not converge")
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func (m *Model) finalizeCoastTargets() {
+	m.CoastAdjustedNodes = 0
+	m.CoastRaisedNodes = 0
+	m.CoastCarvedNodes = 0
+	m.MaxCoastRaise = 0
+	m.MaxCoastCarve = 0
+
+	for i, raw := range m.RawTerrainElevation {
+		target := clamp(raw+m.CoastCorrection[i], 0, 1)
+		m.CoastTargetElevation[i] = target
+		delta := target - raw
+		if math.Abs(delta) <= 1e-15 {
+			continue
+		}
+		m.CoastAdjustedNodes++
+		if delta > 0 {
+			m.CoastRaisedNodes++
+			m.MaxCoastRaise = math.Max(m.MaxCoastRaise, delta)
+		} else {
+			m.CoastCarvedNodes++
+			m.MaxCoastCarve = math.Max(m.MaxCoastCarve, -delta)
+		}
+	}
 }
 
 func (m *Model) buildLakeConstraints(h *hydrology.Model) error {
@@ -445,6 +597,16 @@ func sameGeometry(a, b world.GridGeometry) bool {
 		math.Abs(a.OriginZ-b.OriginZ) <= 1e-12 &&
 		math.Abs(a.SpanXBlocks-b.SpanXBlocks) <= 1e-9 &&
 		math.Abs(a.SpanZBlocks-b.SpanZBlocks) <= 1e-9
+}
+
+func clamp(v, lo, hi float64) float64 {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }
 
 func finite(v float64) bool {

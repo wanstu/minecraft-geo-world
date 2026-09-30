@@ -156,6 +156,9 @@ func TestGenerateWorldStoresResolvedConfig(t *testing.T) {
 	if m.Config.Reconcile.CoastMarginNormalized <= 0 || m.Config.Reconcile.MinRiverBedDropNormalized <= 0 {
 		t.Fatal("resolved reconciliation defaults were not retained")
 	}
+	if m.Config.Waterbed.MinRiverHalfWidthBlocks <= 0 || m.Config.Waterbed.MaxRiverHalfWidthBlocks <= 0 || m.Config.Waterbed.RiverProfileStepBlocks <= 0 {
+		t.Fatal("resolved waterbed defaults were not retained")
+	}
 	if m.Reconciliation == nil {
 		t.Fatal("world model is missing reconciliation stage")
 	}
@@ -167,6 +170,13 @@ func TestGenerateWorldStoresResolvedConfig(t *testing.T) {
 	}
 	if m.CoastTerrain == nil {
 		t.Fatal("world model is missing applied coast terrain")
+	}
+	if m.Waterbed == nil {
+		t.Fatal("world model is missing local waterbed stage")
+	}
+	wd := m.Waterbed.Audit(16, m.Config.Reconcile.FinalUpslopeEpsilon)
+	if wd.RiverUpslopeSteps != 0 || wd.LakeBedViolations != 0 {
+		t.Fatalf("waterbed audit failed: %+v", wd)
 	}
 	if m.Reconciliation.AppliedCoastSurfaceMismatch != 0 {
 		t.Fatalf("applied coast surface mismatches=%d want=0", m.Reconciliation.AppliedCoastSurfaceMismatch)

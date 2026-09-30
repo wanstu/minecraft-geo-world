@@ -266,3 +266,46 @@ Final Runtime Terrain（尚未命名/冻结）
 CoastCorrection 使用 interpolating smoothstep-bilinear，而不是普通 bilinear 或 B-Spline：普通 bilinear 会给 correction 带来 Macro boundary slope kink；B-Spline 则不能保证 correction 在宏观控制点精确命中。当前 sampler 同时满足 exact target、convex hull 与 correction boundary derivative≈0。
 
 GenerateWorld 保留 Raw Terrain 和 CoastTerrain 两份模型，Reconciliation 在 CoastTerrain 应用后重新采样控制点，并重新构建 LakeBed / RiverBed 约束。这样局部水道约束始终建立在真实 broad base 上，不会使用过期高度场。
+
+
+## 12. Local Waterbed layer
+
+Phase 6.2 第四切片后，最终地形链进一步分层：
+
+```text
+Raw Terrain
+   + broad CoastCorrection
+        ↓
+CoastTerrain
+   + local carve-only Waterbed
+        ↓
+Applied ground surface
+   + Runtime Water Surface sampler（下一切片）
+        ↓
+Runtime terrain/water sample
+```
+
+Waterbed 不是第二张 broad heightmap。它只在河道 corridor 与显式 lake basin 附近查询局部几何：
+- River：由 RiverBedTarget、实际 CoastTerrain profile、RiverStrength→half-width 共同定义。
+- Lake：由 LakeBedCeiling、Lake.SurfaceElevation 和局部 raster footprint 定义。
+- 所有床面操作 carve-only，不能抬高 broad terrain。
+- River segment 按有向 DAG 构建，并传播 actual sampled outlet height，使汇流口不同 corridor 的重叠不会形成深坑后回升。
+- 查询通过 nearest-macro-node bucket 缩小候选集合，Runtime 不需要每个 block 扫描全局河网。
+
+Broad coast correction 另外增加 homogeneous Macro Cell interior refinement。节点 exact-hit 只是必要条件；四角同类的 Cell 内部也必须留在正确 sea-level 一侧。混合 coastline Cell 和 EnclosedBelowSea 不使用该强制规则。
+
+当前 Applied ground surface 已在两个正式 Seed 上满足：
+- macro applied coast mismatch = 0
+- homogeneous coast interior violations = 0
+- river centerline upslope samples = 0
+- explicit lake bed violations = 0
+- chunk-boundary continuity guard 通过
+
+仍未冻结为 Runtime 最终接口，因为 River 只有 bed / width，还没有 water depth / water-surface rule。下一层应返回统一样本：
+```text
+groundHeight
+waterKind
+waterSurfaceDefined
+waterSurfaceElevation
+```
+其中 Ocean / Lake datum 已明确，River 必须在下一切片定义。

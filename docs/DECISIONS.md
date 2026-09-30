@@ -966,7 +966,7 @@ Phase 6.1b 最终残余审计已完成。剩余 `*Cells` 使用点属于 blocks�
 
 ## D-037：海岸控制点、河床纵剖面与水面必须分层约束
 
-状态：约束模型与 broad coast application 已实施；river/lake bed overlay 尚未完成
+状态：约束模型、broad coast application、river/lake bed overlay 已实施；Runtime river water surface 尚未完成
 
 最终水体协调不能把所有问题都塞进同一个“修正后高度”数组。
 
@@ -977,7 +977,7 @@ Phase 6.1b 最终残余审计已完成。剩余 `*Cells` 使用点属于 blocks�
 4. Ocean / Lake 水面是独立 water-surface datum：Ocean=共享 SeaLevel，Lake=Hydrology Lake.SurfaceElevation。
 5. 显式 Lake 生成 `LakeBedCeiling`，最终湖床必须低于水面并保留 clearance；当前违反点必须显式暴露，不能把水画在地表上方后忽略。
 6. River 当前只定义床面 target，不在缺乏河宽/流量到水深规则时伪造统一水面高度。
-7. Constraint target 为 0 mismatch/upslope 只证明约束可解；Phase 6.2 第三切片已把 CoastTarget 通过 smoothstep correction 真正应用到连续 CoastTerrain，并验证宏观节点/Chunk/Macro 边界连续性。RiverBedTarget / LakeBedCeiling 在进入独立 channel/basin overlay 前，strict-final 仍必须失败。
+7. Constraint target 为 0 mismatch/upslope 只证明约束可解；Phase 6.2 第三切片已把 CoastTarget 真正应用到连续 CoastTerrain，第四切片又把 RiverBedTarget / LakeBedCeiling 作为 carve-only Waterbed 真正应用并验证连续中心线/湖床/Chunk seam。strict-final 现在只应继续等待 Runtime river water-surface/depth 语义，不再由 Raw Terrain 历史 mismatch 阻塞。
 8. Broad correction 必须保留 raw Terrain 作为诊断基线，不允许覆盖原始 806/608、72/126 等问题数字后声称问题消失；WorldModel 需明确区分 raw Terrain 与 applied CoastTerrain。
 
 原因：宽域地形、河床和水面属于三个不同几何对象。混在一个高度场里会导致修河时整片地形被拉低、修海岸时河谷被填平，或为了通过测试而隐藏真实逆坡。
@@ -998,3 +998,38 @@ Phase 6.1b 最终残余审计已完成。剩余 `*Cells` 使用点属于 blocks�
 6. 海岸 correction 应用后必须重新计算 river/lake bed 约束，因为局部床面依赖 broad terrain，不能复用 raw Terrain 上的旧 target。
 
 该策略用于 sparse broad-surface correction；它不适合作为河道宽度/局部 channel 横断面的最终 sampler，River/Lake overlay 仍需独立几何规则。
+
+
+## D-039：Waterbed 必须按河网拓扑传播实际出口高度
+
+状态：Phase 6.2 第四切片已实施
+
+RiverBedTarget 的宏观节点单调不等于连续 local channel 必然单调。局部 profile 会采样真实 CoastTerrain；如果上游 segment 中间遇到更低 broad terrain，carve-only profile 会把实际出口压到低于宏观 endpoint target。若下游 segment 仍从旧 target 开始，相邻 corridor 在汇流处叠加后会出现“额外深坑 → 影响衰减 → 向下游回升”。
+
+因此：
+1. Waterbed 以 Hydrology/Reconciliation 的有向河网 DAG 顺序构建 segment。
+2. 每个 segment 的实际 sampled outlet height 必须传播到 downstream node 的 effective bed。
+3. 下游 segment 从所有上游实际 outlet 的最低约束开始，不能只读原始 macro RiverBedTarget。
+4. Profile 始终 carve-only；传播只能降低 downstream start，不能抬高任何床面。
+5. 正式验收必须沿**实际最终 Waterbed centerline**进行高密度非节点采样；只检查宏观 From/To 节点不够。
+6. River corridor 横向边缘使用 smoothstep 回到 broad terrain，保证局部 carve 连续且不制造硬 bank seam。
+
+正式 Seed 在传播前出现 425 / 813 个连续上坡采样步；传播后均为 0。
+
+---
+
+## D-040：Broad coast 必须验证同类 Macro Cell 内部，不只命中四角节点
+
+状态：Phase 6.2 第四切片已实施
+
+Smoothstep correction 精确命中宏观控制点，但 Raw Terrain 本身是连续 C2 场，四角都在海平面正确一侧并不能证明 Cell 内部没有跨回错误一侧。
+
+规则：
+1. 四角均为外海的 Cell，内部抽样必须保持低于 shared SeaLevel safety margin。
+2. 四角均为正常陆地且不含 EnclosedBelowSea 的 Cell，内部抽样必须保持高于 sea safety margin。
+3. 混合海岸 Cell 不做同类约束，其真实 coastline crossing 由连续 Terrain + sea datum 决定。
+4. 含 EnclosedBelowSea 的 Cell 不强制抬高，避免破坏封闭低地语义。
+5. 发现同类 Cell 内部缺口时，把最大需要的增量/下切量回灌给该 Cell 四个 broad correction 控制点；smoothstep-bilinear 权重和为 1，因此连续场内部获得至少同等安全修正。
+6. refinement 后重新定义 CoastTargetElevation 与统计，不允许文档仍引用 refine 前控制点数量。
+
+该护栏首次运行在 Seed 731894205 找到 160 个正常陆地内部采样点低于海平面，最大 deficit 0.0061282；refinement 后两个正式 Seed 同类 Cell 内部违规均为 0。

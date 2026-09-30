@@ -5,7 +5,7 @@
 ## 当前目标与阶段
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。
 
-**Phase 6.0、6.1a、6.1b 已完成；Phase 6.2 进行中。第一切片已建立统一 GenerateWorld / WorldModel；第二切片建立 Terrain/Water reconciliation 约束层；第三切片已把海岸 broad-surface correction 真正接入连续 `CoastTerrain`，两个正式 Seed 的 applied coast mismatch 均为 0，Chunk/Macro 连续性通过护栏。河/湖床 overlay 尚未应用，因此 raw 806/608 海陆变化与 72/126 逆坡仍保留，coast-only 河网仍有 58/124 条逆坡。下一步应用 RiverBedTarget / LakeBedCeiling。**
+**Phase 6.0、6.1a、6.1b 已完成；Phase 6.2 进行中。第四切片已把 CoastTerrain broad correction 与 carve-only River/Lake Waterbed 真正应用到连续地形：两个正式 Seed 的 applied coast mismatch=0、同类 Cell 内部海陆违规=0、连续河床上坡=0、湖床违规=0，Chunk/Macro 连续性继续通过。Raw Terrain 806/608 与 72/126 仅保留为历史对照。下一步实现 Runtime-facing Ocean/Lake/River 水面采样，尤其是 River 水深/水面规则。**
 
 ## 仓库与基线
 - 仓库：D:\projects\minecraft-geo-world
@@ -25,6 +25,7 @@
 - Phase 6.2 第一切片：0a0b1f2 — feat: add unified world generation pipeline。
 - Phase 6.2 第二切片：5b53ba9 — feat: add terrain water reconciliation constraints。
 - Phase 6.2 第三切片：10da905 — feat: apply continuous coast terrain correction。
+- Phase 6.2 第四切片：continuous local waterbed application（提交号以 git log 获取）。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -83,6 +84,11 @@
 - `terrain.WithHeightCorrection` 以不可变浅拷贝方式把 `CoastCorrection` 挂到连续 Terrain；Raw `Terrain` 继续保留用于历史/诊断，`WorldModel.CoastTerrain` 表示已应用 broad coast correction 的连续地形。
 - GenerateWorld 在构建 CoastTerrain 后重新执行 `EvaluateCoastApplication`，并基于应用后的 broad terrain 重算 RiverBedTarget，避免河床 target 仍依赖旧 raw terrain。
 - Consistency Audit 已增加 applied coast mismatch、节点命中误差、Chunk boundary jump 与 Macro boundary slope mismatch 护栏。
+- 新增 `internal/waterbed`：把基于 CoastTerrain 重算后的 RiverBedTarget / LakeBedCeiling 真正应用成局部 carve-only 连续床面；不修改 broad CoastTerrain，也绝不通过抬高床面修逆坡。
+- River profile 以 Minecraft blocks 的物理步长预采样，并按 RiverStrength 映射局部河道半宽；湖床使用局部 raster footprint + smoothstep 边缘。
+- Waterbed 按河网 DAG 拓扑顺序构建 profile，并把上游“实际 profile 出口高度”传播给下游 segment，消除汇流 corridor 重叠造成的局部深坑后回升。
+- Coast correction 增加 homogeneous macro-cell interior refinement：四角同为外海或同为正常陆地时，对 Cell 内 5 个采样点施加 safety margin；封闭低地和混合海岸 Cell 不被强制。
+- Consistency Audit 新增 Coast interior、Waterbed 连续中心线、Lake bed、Waterbed Chunk seam 护栏；Raw Terrain 指标继续保留，但不再冒充 applied final terrain。
 
 ## 本轮验证
 - go test ./... -count=1：全部通过（包括新的连通性、负坐标、分辨率/范围、Phase 1 物理尺度和全链路回归）。
@@ -110,8 +116,8 @@
 - 详细参数、当前数值和历史对照见 PHASE6.md。
 
 ## 仍未完成（不要误报完成）
-1. Raw 连续 Terrain 仍保留历史海岸问题：两个 Seed 的宏观/最终海陆变化节点为 806、608；但 CoastTerrain 已把宏观控制点应用后 mismatch 真正降为 0。下一步还需更细的水边界/Runtime 采样语义，不能只凭节点控制点宣告完整海岸完成。
-2. 河/湖床 overlay 尚未应用：raw 河网逆坡为 72/908、126/1342；coast-only 后为 58、124。RiverBedTarget 已基于 CoastTerrain 重算并可达 target upslope=0，但仍只是待应用的局部床面约束。
+1. Raw Terrain 的 806/608 海岸变化与 72/126 逆坡继续保留为历史基线；applied CoastTerrain + Waterbed 已不再受这些 raw 指标阻塞。
+2. Runtime-facing 水面采样尚未完成：Ocean=共享 SeaLevel、Lake=显式 Lake.SurfaceElevation 已有 datum；River 目前只有床面/宽度，没有正式 water depth / water surface 规则，因此 strict-final 继续故意失败。
 3. Phase 6.1b 已完成当前已知生成尺度迁移；但“物理尺度稳定”不等于不同采样精度逐 Cell 完全相同。D8 河网、离散边界/分类、量化采样仍允许合理的拓扑差异，后续新增任何空间参数也必须继续遵守 GridGeometry / blocks 规则。
 4. 最终海岸/湖面/生态协调、外围拓扑与四角过渡仍待实现。宏观四邻接海洋与 D8 水文的细化协调属于后续水体约束。
 5. `phase1.Generate` 仍保留 legacy panic wrapper，但正式统一入口已改用 `phase1.GenerateChecked` 返回 error；其它旧 Lab/CLI 尚未全部迁到统一 Generator。
@@ -120,9 +126,9 @@
 
 ## 下一步（6.2）
 1. 统一 `GenerateWorld` / `WorldModel` 调度第一切片已完成；继续把正式 Lab/审计逐步收敛到该入口。
-2. `CoastTargetElevation` 已通过 smoothstep correction 真正接入连续 CoastTerrain，并通过节点命中、Chunk boundary、Macro slope 护栏。
-3. 下一切片把基于 CoastTerrain 重算后的 `RiverBedTarget` 与 `LakeBedCeiling` 作为独立 carve-only 水道/湖床 overlay 接入 Terrain，而不是修改整块 broad terrain；随后重新计算 applied river/lake 一致性。
-4. 保留当前 Consistency audit 的未解决基线作为 6.2 验收门槛；只有 FinalSurfaceMaskChanges / FinalUpslopeEdges 被真实协调后才能宣告可玩世界一致性。
+2. CoastTerrain 与 local Waterbed 已真实接入并通过 applied coast interior / river centerline / lake bed / seam 护栏；Raw Terrain 仅作为历史对照。
+3. 下一切片建立 Runtime-facing Water Surface sampler：Ocean 直接使用共享 SeaLevel，Lake 使用显式 Lake.SurfaceElevation，River 从 bed + strength/width 推导受限水深与连续水面。
+4. strict-final 从现在起不再由 Raw Terrain 历史差异决定，而由 Runtime 水面语义是否完整决定；河流水面完成前继续故意失败。
 5. 6.2 后进入 6.3 WorldModel 版本化保存/重开；6.4 再做 Go→Java→一个 Loader 的早期游戏内验证。
 
 ## 继续工作入口

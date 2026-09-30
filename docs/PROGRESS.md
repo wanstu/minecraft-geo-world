@@ -1122,3 +1122,38 @@ Phase 6.1b 状态：完成。
 测试：sampling / terrain / reconcile / generator 专项回归与 go test ./... 全通过；strict-final 仍按预期失败。
 
 未完成：RiverBedTarget / LakeBedCeiling 尚未应用为局部 bed overlay；最终 Runtime Terrain 和最终 water semantics 尚未形成。
+
+
+## 2026-09-30 — Phase 6.2 第四切片：Local Waterbed 应用
+
+基线：a2ca47a，分支 agent/world-model-foundation。
+
+本切片完成：
+- 新增 internal/waterbed，真实应用 RiverBedTarget / LakeBedCeiling。
+- River carve-only，河宽使用 4..18 blocks 的物理尺度。
+- River profile 以 block 步长采 broad terrain，并按河网 DAG 传播实际 outlet height，避免汇流 overlap 造成深坑后回升。
+- Lake basin 局部 carve 到 bed ceiling，并保留明确 water surface datum。
+- GenerateWorld / WorldModel 加入 Waterbed 阶段。
+- Consistency Audit 改为实际连续中心线高密度采样，检查非节点 river upslope / lake bed / chunk seam。
+- Coast broad correction 增加 homogeneous Cell interior refinement，修复仅节点命中但正常陆地 Cell 内仍跌破海平面的情况。
+- Raw Terrain 历史 mismatch 保留，仅作回归对照。
+
+真实中间失败：
+- 731894205 初次 Waterbed：425 / 258152 steps upslope，max 2.12536e-4。
+- 10400 初次 Waterbed：813 / 388804 steps upslope，max 9.66002e-5。
+- 根因是汇流处相邻 corridor overlap，而非当前 segment profile 自身上坡。
+- DAG actual-outlet propagation 修复后，两 Seed 均 0 upslope。
+- Coast 非节点检查又发现 731894205 正常陆地 Cell 内 160 个采样点低于 sea，max deficit 0.0061282；interior refinement 后两 Seed 均 0。
+
+最终验证：
+- go test ./... -count=1 通过。
+- 731894205：Applied coast mismatch=0，coast interior ocean/land violations=0/0，Waterbed upslope=0，Lake bed violations=0。
+- 10400：Applied coast mismatch=0，coast interior ocean/land violations=0/0，Waterbed upslope=0，Lake bed violations=0。
+- Chunk seam 仍为约 5.59e-8 / 6.30e-8；Macro slope mismatch 仍约 6.56e-6 / 6.75e-6。
+
+未完成：
+- River water depth / water surface。
+- 统一 Runtime-facing Terrain + Water sampler。
+- strict-final 仍必须等待 Runtime 水面语义完成。
+
+下一步：Phase 6.2 第五切片，统一最终 Terrain/Water sampling。
