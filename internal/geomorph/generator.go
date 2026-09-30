@@ -45,9 +45,14 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		return nil, errors.New("geomorph: discrete field size does not match dimensions")
 	}
 
+	geometry, err := resolveInputGeometry(input)
+	if err != nil {
+		return nil, err
+	}
 	cfg = normalizeConfig(cfg)
 	m := &Model{
 		Config:                 cfg,
+		Geometry:               geometry,
 		Width:                  input.Width,
 		Height:                 input.Height,
 		LandMask:               append([]bool(nil), input.LandMask...),
@@ -70,6 +75,26 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	m.spreadAlluvialFans(input)
 	m.computeDeposition()
 	return m, nil
+}
+
+func resolveInputGeometry(input Input) (world.GridGeometry, error) {
+	geometry := input.Geometry
+	if geometry.Width == 0 && geometry.Height == 0 &&
+		geometry.SpanXBlocks == 0 && geometry.SpanZBlocks == 0 &&
+		geometry.OriginX == 0 && geometry.OriginZ == 0 {
+		geometry = world.GridGeometry{
+			Width: input.Width, Height: input.Height,
+			SpanXBlocks: float64(input.Width-1) * world.DefaultMacroSpacingBlocks,
+			SpanZBlocks: float64(input.Height-1) * world.DefaultMacroSpacingBlocks,
+		}
+	}
+	if geometry.Width != input.Width || geometry.Height != input.Height {
+		return world.GridGeometry{}, errors.New("geomorph: geometry dimensions do not match input")
+	}
+	if _, err := geometry.SquareCellSize(); err != nil {
+		return world.GridGeometry{}, err
+	}
+	return geometry, nil
 }
 
 func normalizeConfig(cfg Config) Config {
@@ -150,6 +175,10 @@ func (m *Model) computeUpstreamContext(input Input) {
 		return input.FlowAccumulation[ia] < input.FlowAccumulation[ib]
 	})
 
+	stepScale := m.Geometry.SpacingX() / world.DefaultMacroSpacingBlocks
+	steepDecayPerHop := math.Pow(0.78, stepScale)
+	mountainDecayPerHop := math.Pow(0.82, stepScale)
+
 	for _, i := range order {
 		localSteep := clamp(input.Slope[i]/m.Config.SlopeScale, 0, 1)
 		localMountain := clamp(
@@ -170,11 +199,11 @@ func (m *Model) computeUpstreamContext(input Input) {
 			continue
 		}
 
-		steepMemory := m.UpstreamSteepMemory[i] * 0.78
+		steepMemory := m.UpstreamSteepMemory[i] * steepDecayPerHop
 		if steepMemory > m.UpstreamSteepMemory[to] {
 			m.UpstreamSteepMemory[to] = steepMemory
 		}
-		mountainMemory := m.UpstreamMountainMemory[i] * 0.82
+		mountainMemory := m.UpstreamMountainMemory[i] * mountainDecayPerHop
 		if mountainMemory > m.UpstreamMountainMemory[to] {
 			m.UpstreamMountainMemory[to] = mountainMemory
 		}
@@ -284,20 +313,24 @@ func (m *Model) spreadAlluvialFans(input Input) {
 		dz /= length
 
 		accum := normalizedAccumulation(input.FlowAccumulation[i], input.RiverThreshold, m.Config.AccumulationScale)
-		radius := 2 + int(math.Round(4*accum))
-		if radius < 2 {
-			radius = 2
+		radiusRefCells := 2 + int(math.Round(4*accum))
+		if radiusRefCells < 2 {
+			radiusRefCells = 2
 		}
-		if radius > 7 {
-			radius = 7
+		if radiusRefCells > 7 {
+			radiusRefCells = 7
 		}
+		radiusRef := float64(radiusRefCells)
+		cellSizeBlocks := m.Geometry.SpacingX()
+		radiusBlocks := radiusRef * world.DefaultMacroSpacingBlocks
+		radiusCells := int(math.Ceil(radiusBlocks / cellSizeBlocks))
 
-		for oz := -radius; oz <= radius; oz++ {
+		for oz := -radiusCells; oz <= radiusCells; oz++ {
 			z := z0 + oz
 			if z < 0 || z >= m.Height {
 				continue
 			}
-			for ox := -radius; ox <= radius; ox++ {
+			for ox := -radiusCells; ox <= radiusCells; ox++ {
 				x := x0 + ox
 				if x < 0 || x >= m.Width {
 					continue
@@ -307,20 +340,20 @@ func (m *Model) spreadAlluvialFans(input Input) {
 					continue
 				}
 
-				rx := float64(ox)
-				rz := float64(oz)
-				forward := rx*dx + rz*dz
-				if forward < -0.35 || forward > float64(radius) {
+				rxBlocks := float64(ox) * cellSizeBlocks
+				rzBlocks := float64(oz) * cellSizeBlocks
+				forwardRef := (rxBlocks*dx + rzBlocks*dz) / world.DefaultMacroSpacingBlocks
+				if forwardRef < -0.35 || forwardRef > radiusRef {
 					continue
 				}
-				lateral := math.Abs(rx*dz - rz*dx)
-				halfWidth := 0.75 + 0.70*math.Max(forward, 0)
-				if lateral > halfWidth {
+				lateralRef := math.Abs(rxBlocks*dz-rzBlocks*dx) / world.DefaultMacroSpacingBlocks
+				halfWidthRef := 0.75 + 0.70*math.Max(forwardRef, 0)
+				if lateralRef > halfWidthRef {
 					continue
 				}
 
-				distanceDecay := math.Exp(-math.Max(forward, 0) / math.Max(1.5, float64(radius)*0.75))
-				lateralDecay := math.Exp(-math.Pow(lateral/math.Max(halfWidth*0.72, 0.5), 2))
+				distanceDecay := math.Exp(-math.Max(forwardRef, 0) / math.Max(1.5, radiusRef*0.75))
+				lateralDecay := math.Exp(-math.Pow(lateralRef/math.Max(halfWidthRef*0.72, 0.5), 2))
 
 				slopeNorm := clamp(input.Slope[j]/m.Config.SlopeScale, 0, 1)
 				relief := clamp(input.ReliefIndex[j], 0, 1)

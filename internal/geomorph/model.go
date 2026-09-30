@@ -1,5 +1,7 @@
 package geomorph
 
+import "geoworld/internal/world"
+
 type Config struct {
 	SeaLevelNormalized float64
 	AccumulationScale  float64
@@ -8,8 +10,9 @@ type Config struct {
 }
 
 type Input struct {
-	Width  int
-	Height int
+	Width    int
+	Height   int
+	Geometry world.GridGeometry
 
 	LandMask        []bool
 	Elevation       []float64
@@ -37,9 +40,10 @@ type Input struct {
 }
 
 type Model struct {
-	Config Config
-	Width  int
-	Height int
+	Config   Config
+	Geometry world.GridGeometry
+	Width    int
+	Height   int
 
 	LandMask []bool
 

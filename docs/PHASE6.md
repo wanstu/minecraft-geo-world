@@ -280,3 +280,31 @@ phase1.Generate 仍保留旧的非 error 返回接口：内部产生非法高程
 - go run ./cmd/geoworld-consistency-audit：731894205 / 10400 的全部当前诊断与 6b3b23d 一致；最终连续海岸 / 河床问题仍为 UNRESOLVED。
 
 下一切片：Geomorph 的坡降、上游记忆与河谷 / 冲积扇扩散空间尺度。
+
+
+## Phase 6.1b 第五切片实施结果（2026-09-30）
+
+基线：1dae70c；开发分支：agent/world-model-foundation。
+
+本切片迁移 Geomorph 的 Geometry 契约、上游记忆衰减与冲积扇扩散范围；6.1b 仍未直接宣告整体完成，下一步先做全仓残余尺度审计。
+
+已完成：
+- [x] geomorph.Input / Model 接入 GridGeometry；InputFromModels 继承 Hydrology Geometry。
+- [x] Legacy 手写 Geomorph Input 未提供 Geometry 时兼容解析为 128 blocks/node；Geometry 尺寸不匹配或非等距明确报错。
+- [x] UpstreamSteepMemory / UpstreamMountainMemory 的旧每-hop 衰减 0.78 / 0.82 改为 baseDecay^(nodeSpacing / 128)。
+- [x] 默认 128 blocks/node 时记忆衰减路径与旧算法等价；64 blocks/node 时两个 hop 的累计衰减对应旧一个 128-block hop。
+- [x] 冲积扇旧 2..7 Cell 扩散半径解释为 256..896 blocks。
+- [x] 冲积扇前向 / 横向距离及衰减统一在 128-block reference 坐标计算，并按当前 GridGeometry 重采样。
+- [x] 固定世界范围 128 → 64 blocks/node 回归覆盖 UpstreamSteepMemory、UpstreamMountainMemory、SlopeDrop 与 AlluvialFanWeight。
+- [ ] UpstreamSlope 仍是即时一跳上游统计，但目前不参与 Geomorph 权重决策，只作为诊断字段；是否需要物理窗口化留给后续模型演进，不阻塞本轮核心尺度迁移。
+- [ ] 不要求不同采样精度的 D8 FlowTo 拓扑逐 Cell 相同，只要求已迁移的物理作用尺度不系统漂移。
+
+### 验证
+
+- go test ./internal/geomorph -count=1：通过。
+- go test ./... -count=1：通过。
+- go run ./cmd/geoworld-geomorph-audit：4 Seed / 640×400 通过；floodplain 0.237%–0.519%，alluvial plain 1.716%–2.521%，fan 0.009%–0.093%，canyon 0–0.011%，wide valley 0.201%–0.373%。
+- go run ./cmd/geoworld-mcprofile-audit -count 4：默认 128-block 输出与 1dae70c 基线一致；Unknown=0，平均 confidence 0.691–0.764。
+- go run ./cmd/geoworld-consistency-audit：731894205 / 10400 的全部当前诊断与 1dae70c 一致；最终连续海岸 / 河床问题仍为 UNRESOLVED。
+
+下一步：做 6.1b 全仓残余尺度审计，重点检查 Phase 1 grid-frequency warp/noise、Landform 空间核和其它仍按节点数推导的默认值；审计后再决定是否正式进入 6.2。

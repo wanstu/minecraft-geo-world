@@ -915,3 +915,29 @@ Phase 5 完成第一版。
 - Phase 1 非距离型 grid-frequency warp/noise 评估。
 
 下一步：继续 6.1b Geomorph。
+
+
+## 2026-09-30 — Phase 6.1b 第五切片：Geomorph 物理尺度迁移
+
+基线：1dae70c，分支 agent/world-model-foundation。
+
+本切片完成：
+- Geomorph Input / Model 接入 GridGeometry。
+- UpstreamSteepMemory / UpstreamMountainMemory 每-hop 衰减按 nodeSpacing / 128 解析，保留默认 128-block 结果。
+- 冲积扇旧 2..7 Cell 半径迁为 256..896 blocks，并将前向 / 横向距离衰减改为 reference world scale。
+- 新增 128 / 64 blocks-node 固定物理范围测试，验证上游记忆、SlopeDrop 与冲积扇权重在对应世界坐标一致。
+- Geometry 尺寸错误明确拒绝。
+
+验证：
+- geomorph 单元测试通过。
+- go test ./... -count=1 通过。
+- 4 Seed / 640×400 geomorph audit 通过。
+- 4 Seed Profile / 2 Seed Consistency 最终复验通过，默认 128-block 数值与 1dae70c 一致。
+- 6.2 最终连续海岸 / 河床逆坡问题继续保持 UNRESOLVED。
+
+未完成：
+- UpstreamSlope 即时一跳统计仍是诊断字段，当前不参与权重决策。
+- Phase 1 grid-frequency warp/noise、Landform 空间核及其它模块还需要一次全仓残余尺度审计。
+- 不要求不同宏观精度的 D8 拓扑逐 Cell 相同。
+
+下一步：6.1b 全仓残余尺度审计，然后决定是否进入 6.2。

@@ -10,6 +10,7 @@ func InputFromModels(h *hydrology.Model, e *erosion.Model, l *landform.Model) In
 	return Input{
 		Width:                   h.Width,
 		Height:                  h.Height,
+		Geometry:                h.Geometry,
 		LandMask:                append([]bool(nil), h.LandMask...),
 		Elevation:               append([]float64(nil), e.ErodedElevation...),
 		Slope:                   append([]float64(nil), e.Slope...),

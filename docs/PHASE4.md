@@ -810,6 +810,8 @@ Rolling Plain
 
 并逐步衰减。
 
+Phase 6.1b 起，旧每-hop 衰减 `0.78 / 0.82` 按 `baseDecay^(nodeSpacing/128)` 解析；默认 128 blocks/node 时数值完全不变，在 64 blocks/node 时两个 hop 的总衰减等价于旧一个 128-block hop。这里仍保留旧 D8 hop 的方向量化语义，不强求不同分辨率河网拓扑逐 Cell 相同。
+
 因此山口下游即使已经连续经过几格缓坡，也不会立刻忘掉上游山区背景。
 
 冲积扇展开方向来自真实下游方向：
@@ -818,6 +820,8 @@ Rolling Plain
 - 横向按距离衰减。
 - 只在低坡、较低 Relief 的可沉积地形保留。
 - 湖区显著抑制。
+
+Phase 6.1b 起，旧 `2..7 Cell` 冲积扇扩散半径解释为 256..896 blocks；循环采样半径、前向距离、横向距离和衰减都在 128-block reference 坐标中计算，再映射到当前 GridGeometry。
 
 ### 峡谷
 
@@ -943,6 +947,19 @@ Deposition       0.302 .. 0.318
 
 但固定多 Seed 验收批次中，相关机制不能整体消失。
 
+上述正式尺寸数值是 Phase 4.4 初版历史快照。Phase 6.1a 统一宏观 LandMask、后续 6.1b 统一水文/侵蚀尺度后，当前 4 Seed / 640×400 Geomorph audit 为：
+
+```text
+Floodplain >=0.35             0.237% .. 0.519% land
+Alluvial Plain >=0.30        1.716% .. 2.521%
+Alluvial Fan >=0.20          0.009% .. 0.093%
+Canyon >=0.30                0.000% .. 0.011%
+Wide Valley Floor >=0.45     0.201% .. 0.373%
+Deposition >=0.20            0.149% .. 0.303%
+```
+
+默认 128 blocks/node 下，Phase 6.1b Geomorph 物理尺度迁移保持这组当前基线不变；旧快照保留用于历史追溯。
+
 ### 自动护栏
 
 Geomorph Audit 会直接失败，如果：
@@ -953,6 +970,8 @@ Geomorph Audit 会直接失败，如果：
 - 固定多 Seed 批次中冲积扇机制彻底消失。
 - 固定多 Seed 批次中峡谷机制彻底消失。
 - 任一标准化字段超出 0..1。
+- 固定相同物理范围时，128 / 64 blocks-node 的 UpstreamSteepMemory、UpstreamMountainMemory、SlopeDrop 与冲积扇对应世界坐标权重一致。
+- Geometry 尺寸不匹配明确拒绝。
 
 ### Phase 4 最终连续性复验
 
