@@ -239,6 +239,6 @@ Water surface datum
   └─ River = 后续由河宽/流量/床面规则求解
 ```
 
-`internal/reconcile` 当前在宏观节点层把最终 Terrain、Macro Surface、Hydrology 转换成上述约束。Constraint 模型本身不是 Runtime 最终地形；只有后续 Terrain/channel sampler 实际消费这些 target 后，strict-final 才能从旧原始诊断切换到真正的最终验收。
+`internal/reconcile` 在宏观节点层把 raw Terrain、Macro Surface、Hydrology 转换成上述约束。Phase 6.2 第三切片已经让 broad coast target 被连续 Terrain sampler 真正消费：`WorldModel.Terrain` 保留 raw Terrain，`WorldModel.CoastTerrain` 挂载 smoothstep correction overlay；correction 命中宏观目标且在 Macro Cell 边界的一阶导趋零，不覆盖原始诊断。
 
-当前两个正式 Seed 已证明约束层可把目标 Surface mismatch 与目标 River upslope 都降为 0，但 LakeBedCeiling 仍暴露少量待 carve 湖床节点。这些数字是下一阶段应用层的输入，不是已完成水体实现的证明。
+当前两个正式 Seed 的 applied CoastTerrain 已达到 Surface mismatch=0、node error=0，并通过 Chunk / Macro slope 连续性护栏。RiverBedTarget 在 CoastTerrain 上重新求解后仍能达到 target upslope=0，但它和 LakeBedCeiling 仍只是**待应用的局部床面约束**。下一层必须以 carve-only channel/basin overlay 消费这些 target；不能把 river/lake bed correction 混进 broad coast surface。

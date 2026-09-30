@@ -88,6 +88,40 @@ func (g ScalarGrid) SampleBilinear(worldX, worldZ float64) float64 {
 	return lerp(top, bottom, tz)
 }
 
+// SampleSmoothstepBilinear is an interpolating correction sampler.
+//
+// It keeps the convex-hull/no-overshoot property of bilinear interpolation,
+// passes through every macro control point exactly, and applies smoothstep to
+// both local coordinates. The correction derivative therefore approaches zero
+// on every macro-cell boundary from both sides. This is useful for sparse
+// correction overlays: the original C2 terrain carries the broad slope while
+// the overlay can hit exact control-point constraints without adding a visible
+// first-derivative kink at macro boundaries.
+func (g ScalarGrid) SampleSmoothstepBilinear(worldX, worldZ float64) float64 {
+	gx := (worldX - g.OriginX) / g.CellSize
+	gz := (worldZ - g.OriginZ) / g.CellSize
+
+	gx = clamp(gx, 0, float64(g.Width-1))
+	gz = clamp(gz, 0, float64(g.Height-1))
+
+	x0 := int(math.Floor(gx))
+	z0 := int(math.Floor(gz))
+	x1 := minInt(x0+1, g.Width-1)
+	z1 := minInt(z0+1, g.Height-1)
+
+	tx := smoothstepUnit(gx - float64(x0))
+	tz := smoothstepUnit(gz - float64(z0))
+
+	v00 := g.at(x0, z0)
+	v10 := g.at(x1, z0)
+	v01 := g.at(x0, z1)
+	v11 := g.at(x1, z1)
+
+	top := lerp(v00, v10, tx)
+	bottom := lerp(v01, v11, tx)
+	return lerp(top, bottom, tz)
+}
+
 func (g ScalarGrid) at(x, z int) float64 {
 	return g.Values[z*g.Width+x]
 }
@@ -104,6 +138,11 @@ func clamp(v, lo, hi float64) float64 {
 		return hi
 	}
 	return v
+}
+
+func smoothstepUnit(t float64) float64 {
+	t = clamp(t, 0, 1)
+	return t * t * (3 - 2*t)
 }
 
 func minInt(a, b int) int {

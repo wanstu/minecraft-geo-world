@@ -118,7 +118,7 @@ func TestRiverBedTargetsBecomeMonotonicWithoutRaisingBed(t *testing.T) {
 	}
 	macro := []float64{0.80, 0.70, 0.60, 0.50}
 
-	if err := m.buildRiverConstraints(macro, h); err != nil {
+	if err := m.buildRiverConstraints(macro, h, raw); err != nil {
 		t.Fatal(err)
 	}
 	if m.QualifyingRiverEdges != 3 || m.OriginallyDownhillEdges != 3 {

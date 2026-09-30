@@ -44,8 +44,14 @@ type Model struct {
 
 	RawTerrainElevation  []float64
 	CoastTargetElevation []float64
+	CoastCorrection      []float64
 	RawTerrainSurface    *world.Surface
 	ConstrainedSurface   *world.Surface
+
+	AppliedCoastElevation       []float64
+	AppliedCoastSurface         *world.Surface
+	AppliedCoastSurfaceMismatch int
+	AppliedCoastMaxNodeError    float64
 
 	SurfaceMismatchBefore int
 	SurfaceMismatchAfter  int
@@ -61,8 +67,10 @@ type Model struct {
 
 	LakeBedCeilingDefined []bool
 	LakeBedCeiling        []float64
+	RawLakeBedViolations  int
 	LakeBedViolations     int
 
+	RiverBaseElevation      []float64
 	RiverBedActive          []bool
 	RiverBedTarget          []float64
 	RiverEdges              []RiverEdgeConstraint

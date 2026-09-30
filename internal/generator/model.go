@@ -71,6 +71,7 @@ type WorldModel struct {
 	Ecology        *ecology.Model
 	Profile        *mcprofile.Model
 	Terrain        *terrain.Model
+	CoastTerrain   *terrain.Model
 	Reconciliation *reconcile.Model
 }
 

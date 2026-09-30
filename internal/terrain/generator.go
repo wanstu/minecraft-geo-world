@@ -249,6 +249,11 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		alluvialFan*m.Config.AlluvialFanLift
 
 	final := boundedAdd(base, regionalDetail+depositionLift-valleyCarve-canyonCarve)
+	heightCorrection := 0.0
+	if m.HeightCorrection != nil {
+		heightCorrection = m.HeightCorrection.SampleSmoothstepBilinear(worldX, worldZ)
+		final = clamp(final+heightCorrection, 0, 1)
+	}
 
 	return Sample{
 		BaseElevation:       base,
@@ -268,6 +273,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		DepositionLift:      depositionLift,
 		ValleyCarve:         valleyCarve,
 		CanyonCarve:         canyonCarve,
+		HeightCorrection:    heightCorrection,
 		FinalHeight:         final,
 	}
 }

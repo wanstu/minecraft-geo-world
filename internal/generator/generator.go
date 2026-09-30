@@ -162,6 +162,16 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 	if err != nil {
 		return nil, fmt.Errorf("generator: reconcile: %w", err)
 	}
+	coastTerrain, err := terrain.WithHeightCorrection(t, rec.CoastCorrection)
+	if err != nil {
+		return nil, fmt.Errorf("generator: coast terrain: %w", err)
+	}
+	if err := rec.EvaluateCoastApplication(coastTerrain, w.Surface); err != nil {
+		return nil, fmt.Errorf("generator: evaluate coast terrain: %w", err)
+	}
+	if err := rec.RebuildRiverConstraintsFromTerrain(coastTerrain, w.Elevation, h); err != nil {
+		return nil, fmt.Errorf("generator: rebuild river constraints: %w", err)
+	}
 	reporter.done(StageReconcile)
 
 	model := &WorldModel{
@@ -176,6 +186,7 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 		Ecology:        eco,
 		Profile:        p,
 		Terrain:        t,
+		CoastTerrain:   coastTerrain,
 		Reconciliation: rec,
 	}
 	model.Config = ResolvedConfig{

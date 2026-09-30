@@ -70,6 +70,7 @@ func Build(input Input, cfg Config) (*Model, error) {
 		SeaLevelNormalized:    input.SeaLevelNormalized,
 		RawTerrainElevation:   make([]float64, n),
 		CoastTargetElevation:  make([]float64, n),
+		CoastCorrection:       make([]float64, n),
 		WaterKind:             make([]WaterKind, n),
 		WaterSurfaceDefined:   make([]bool, n),
 		WaterSurfaceElevation: make([]float64, n),
@@ -121,6 +122,7 @@ func Build(input Input, cfg Config) (*Model, error) {
 			target = coastHigh
 		}
 
+		m.CoastCorrection[i] = target - old
 		if target != old {
 			m.CoastTargetElevation[i] = target
 			m.CoastAdjustedNodes++
@@ -148,7 +150,7 @@ func Build(input Input, cfg Config) (*Model, error) {
 	if err := m.buildLakeConstraints(input.Hydrology); err != nil {
 		return nil, err
 	}
-	if err := m.buildRiverConstraints(input.MacroElevation, input.Hydrology); err != nil {
+	if err := m.buildRiverConstraints(input.MacroElevation, input.Hydrology, m.RawTerrainElevation); err != nil {
 		return nil, err
 	}
 	return m, nil
@@ -182,14 +184,35 @@ func (m *Model) buildLakeConstraints(h *hydrology.Model) error {
 		m.LakeBedCeilingDefined[i] = true
 		m.LakeBedCeiling[i] = ceiling
 		if m.RawTerrainElevation[i] > ceiling+1e-12 {
+			m.RawLakeBedViolations++
 			m.LakeBedViolations++
 		}
 	}
 	return nil
 }
 
-func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Model) error {
+func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Model, bedBase []float64) error {
 	n := len(h.FlowTo)
+	if len(macroElevation) != n || len(bedBase) != n {
+		return errors.New("reconcile: river constraint inputs do not match hydrology dimensions")
+	}
+
+	for i := range m.WaterKind {
+		if m.WaterKind[i] == WaterRiver {
+			m.WaterKind[i] = WaterNone
+		}
+	}
+	m.RiverBaseElevation = append(m.RiverBaseElevation[:0], bedBase...)
+	m.RiverBedTarget = append(m.RiverBedTarget[:0], bedBase...)
+	m.RiverBedActive = make([]bool, n)
+	m.RiverEdges = nil
+	m.QualifyingRiverEdges = 0
+	m.OriginallyDownhillEdges = 0
+	m.RawUpslopeRiverEdges = 0
+	m.TargetUpslopeRiverEdges = 0
+	m.RiverBedCarvedNodes = 0
+	m.MaxRiverBedCarve = 0
+
 	edgeTo := make([]int, n)
 	active := make([]bool, n)
 	indegree := make([]int, n)
@@ -218,7 +241,7 @@ func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Mod
 		}
 		m.OriginallyDownhillEdges++
 
-		rawRise := m.RawTerrainElevation[to] - m.RawTerrainElevation[i]
+		rawRise := bedBase[to] - bedBase[i]
 		if rawRise > m.Config.FinalUpslopeEpsilon {
 			m.RawUpslopeRiverEdges++
 		}
@@ -277,12 +300,88 @@ func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Mod
 	}
 
 	for i := range m.RiverBedTarget {
-		if m.RiverBedTarget[i] < m.RawTerrainElevation[i]-1e-12 {
+		if m.RiverBedTarget[i] < bedBase[i]-1e-12 {
 			m.RiverBedCarvedNodes++
 			m.MaxRiverBedCarve = math.Max(
 				m.MaxRiverBedCarve,
-				m.RawTerrainElevation[i]-m.RiverBedTarget[i],
+				bedBase[i]-m.RiverBedTarget[i],
 			)
+		}
+	}
+	return nil
+}
+
+// RebuildRiverConstraintsFromTerrain recomputes the local channel-bed profile
+// after a broad terrain correction has been applied. River bed constraints must
+// follow the actual broad terrain that the channel will cut into, not a stale
+// pre-coast heightfield.
+func (m *Model) RebuildRiverConstraintsFromTerrain(applied *terrain.Model, macroElevation []float64, h *hydrology.Model) error {
+	if applied == nil || !sameGeometry(applied.Geometry, m.Geometry) {
+		return errors.New("reconcile: river base terrain geometry does not match")
+	}
+	n := m.Geometry.Width * m.Geometry.Height
+	bedBase := make([]float64, n)
+	for z := 0; z < m.Geometry.Height; z++ {
+		for x := 0; x < m.Geometry.Width; x++ {
+			i := z*m.Geometry.Width + x
+			wx, wz := m.Geometry.NodePosition(x, z)
+			bedBase[i] = applied.SampleNormalized(wx, wz)
+		}
+	}
+	return m.buildRiverConstraints(macroElevation, h, bedBase)
+}
+
+func (m *Model) EvaluateCoastApplication(applied *terrain.Model, macroSurface *world.Surface) error {
+	if applied == nil {
+		return errors.New("reconcile: applied coast terrain is required")
+	}
+	if !sameGeometry(applied.Geometry, m.Geometry) {
+		return errors.New("reconcile: applied coast terrain geometry does not match")
+	}
+	if macroSurface == nil ||
+		macroSurface.Width != m.Geometry.Width ||
+		macroSurface.Height != m.Geometry.Height ||
+		len(macroSurface.LandMask) != len(m.CoastTargetElevation) {
+		return errors.New("reconcile: applied coast macro surface does not match")
+	}
+
+	n := len(m.CoastTargetElevation)
+	m.AppliedCoastElevation = make([]float64, n)
+	m.AppliedCoastMaxNodeError = 0
+	for z := 0; z < m.Geometry.Height; z++ {
+		for x := 0; x < m.Geometry.Width; x++ {
+			i := z*m.Geometry.Width + x
+			wx, wz := m.Geometry.NodePosition(x, z)
+			h := applied.SampleNormalized(wx, wz)
+			if !finite(h) || h < 0 || h > 1 {
+				return errors.New("reconcile: applied coast terrain sample must be finite and normalized")
+			}
+			m.AppliedCoastElevation[i] = h
+			m.AppliedCoastMaxNodeError = math.Max(
+				m.AppliedCoastMaxNodeError,
+				math.Abs(h-m.CoastTargetElevation[i]),
+			)
+		}
+	}
+
+	surface, err := world.ClassifySurface(
+		m.Geometry.Width,
+		m.Geometry.Height,
+		m.AppliedCoastElevation,
+		m.SeaLevelNormalized,
+	)
+	if err != nil {
+		return fmt.Errorf("reconcile: classify applied coast terrain: %w", err)
+	}
+	m.AppliedCoastSurface = surface
+	m.AppliedCoastSurfaceMismatch = maskMismatchCount(macroSurface.LandMask, surface.LandMask)
+
+	// Lake bed constraints must also be evaluated against the broad terrain that
+	// will actually receive the future basin/channel overlays.
+	m.LakeBedViolations = 0
+	for i, defined := range m.LakeBedCeilingDefined {
+		if defined && m.AppliedCoastElevation[i] > m.LakeBedCeiling[i]+1e-12 {
+			m.LakeBedViolations++
 		}
 	}
 	return nil

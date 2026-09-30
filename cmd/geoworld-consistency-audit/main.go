@@ -14,6 +14,7 @@ import (
 
 	"geoworld/internal/generator"
 	"geoworld/internal/phase1"
+	"geoworld/internal/terrain"
 	"geoworld/internal/world"
 )
 
@@ -32,6 +33,9 @@ type report struct {
 	ConstraintCoastAdjustedNodes, ConstraintCoastRaisedNodes                 int
 	ConstraintCoastCarvedNodes, ConstraintLakeBedViolations                  int
 	ConstraintRiverUpslopeEdges, ConstraintRiverBedCarvedNodes               int
+	AppliedCoastSurfaceMismatches, CoastTerrainUpslopeEdges                  int
+	AppliedCoastMaxNodeError, CoastTerrainMaxNormalizedRise                  float64
+	CoastTerrainChunkJump, CoastTerrainMacroSlopeMismatch                    float64
 }
 
 func checked[T any](value T, err error) T {
@@ -69,6 +73,18 @@ func inspect(seed int64, width, height int, cellSize float64) report {
 		r.ConstraintLakeBedViolations = rec.LakeBedViolations
 		r.ConstraintRiverUpslopeEdges = rec.TargetUpslopeRiverEdges
 		r.ConstraintRiverBedCarvedNodes = rec.RiverBedCarvedNodes
+		r.AppliedCoastSurfaceMismatches = rec.AppliedCoastSurfaceMismatch
+		r.AppliedCoastMaxNodeError = rec.AppliedCoastMaxNodeError
+		r.CoastTerrainUpslopeEdges = rec.RawUpslopeRiverEdges
+		for _, edge := range rec.RiverEdges {
+			if edge.RawTerrainRise > r.CoastTerrainMaxNormalizedRise {
+				r.CoastTerrainMaxNormalizedRise = edge.RawTerrainRise
+			}
+		}
+	}
+	if model.CoastTerrain != nil {
+		r.CoastTerrainChunkJump = auditChunkSeams(model.CoastTerrain, model.Geometry)
+		r.CoastTerrainMacroSlopeMismatch = auditMacroSlopes(model.CoastTerrain, model.Geometry)
 	}
 	final := make([]float64, len(w.Elevation))
 	crustOcean, actualOcean := 0, 0
@@ -129,6 +145,45 @@ func inspect(seed int64, width, height int, cellSize float64) report {
 	return r
 }
 
+func auditChunkSeams(m *terrain.Model, geometry world.GridGeometry) float64 {
+	maxJump := 0.0
+	eps := 1e-4
+	endX := geometry.OriginX + geometry.SpanXBlocks
+	endZ := geometry.OriginZ + geometry.SpanZBlocks
+
+	firstBoundary := math.Floor(geometry.OriginX/16)*16 + 16
+	for firstBoundary <= geometry.OriginX {
+		firstBoundary += 16
+	}
+	stepZ := math.Max(256, geometry.SpanZBlocks/40)
+	for x := firstBoundary; x < endX; x += 512 {
+		for z := geometry.OriginZ; z <= endZ; z += stepZ {
+			at := m.SampleNormalized(x, z)
+			maxJump = math.Max(maxJump, math.Abs(m.SampleNormalized(x-eps, z)-at))
+			maxJump = math.Max(maxJump, math.Abs(m.SampleNormalized(x+eps, z)-at))
+		}
+	}
+	return maxJump
+}
+
+func auditMacroSlopes(m *terrain.Model, geometry world.GridGeometry) float64 {
+	maxMismatch := 0.0
+	cellSize := geometry.SpacingX()
+	h := 0.25
+	endX := geometry.OriginX + geometry.SpanXBlocks
+	endZ := geometry.OriginZ + geometry.SpanZBlocks
+
+	for x := geometry.OriginX + cellSize; x < endX; x += cellSize * 8 {
+		for z := geometry.OriginZ + cellSize; z < endZ-cellSize; z += cellSize * 4 {
+			at := m.SampleNormalized(x, z)
+			leftSlope := (at - m.SampleNormalized(x-h, z)) / h
+			rightSlope := (m.SampleNormalized(x+h, z) - at) / h
+			maxMismatch = math.Max(maxMismatch, math.Abs(leftSlope-rightSlope))
+		}
+	}
+	return maxMismatch
+}
+
 func main() {
 	seedsArg := flag.String("seeds", "731894205,10400", "comma-separated signed 64-bit seeds")
 	width := flag.Int("width", 640, "macro grid nodes X (at least 16)")
@@ -160,7 +215,11 @@ func main() {
 		if r.MacroOceanAtOrAboveSea != 0 ||
 			r.MacroMaskDisagreements != 0 ||
 			r.ConstraintSurfaceMismatches != 0 ||
-			r.ConstraintRiverUpslopeEdges != 0 {
+			r.ConstraintRiverUpslopeEdges != 0 ||
+			r.AppliedCoastSurfaceMismatches != 0 ||
+			r.AppliedCoastMaxNodeError > 1e-10 ||
+			r.CoastTerrainChunkJump > 1e-5 ||
+			r.CoastTerrainMacroSlopeMismatch > 1e-4 {
 			failed = true
 		}
 		if r.FinalSurfaceMaskChanges != 0 || r.FinalUpslopeEdges != 0 {

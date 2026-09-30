@@ -485,3 +485,32 @@ Phase 1 reference-world / coast / tectonics
 - [ ] Ecology / MCProfile 仍消费宏观 Surface，而不是应用约束后的最终水体；同步属于后续 6.2 切片。
 
 下一切片：先把 CoastTargetElevation 以连续且不破坏 Chunk/Macro 连续性的方式接入 Terrain broad surface；随后把 RiverBedTarget / LakeBedCeiling 作为独立局部水道/湖床 overlay 接入。
+
+
+## Phase 6.2 第三切片实施结果（2026-09-30）
+
+基线：2ab028d；开发分支：agent/world-model-foundation。
+
+本切片把第二切片的海岸 control-point target 真正应用到连续 Terrain broad surface；河/湖床仍保持独立，未在本切片冒充完成。
+
+已完成：
+- [x] 新增 `ScalarGrid.SampleSmoothstepBilinear` correction sampler：精确通过宏观控制点、保持凸包无 overshoot，correction 在宏观 Cell 边界的一阶导趋零。
+- [x] 新增 `terrain.WithHeightCorrection`，通过浅拷贝为 Terrain 挂不可变 broad-surface correction grid，不修改 raw Terrain。
+- [x] `WorldModel` 同时保留 raw `Terrain` 与 applied `CoastTerrain`。
+- [x] reconciliation 输出 `CoastCorrection = CoastTargetElevation - RawTerrainElevation`。
+- [x] GenerateWorld 创建 CoastTerrain 后执行 `EvaluateCoastApplication`，验证实际连续采样在宏观节点精确命中 CoastTarget。
+- [x] RiverBedTarget 在 CoastTerrain 应用后重新计算，不再基于过时 raw Terrain。
+- [x] LakeBedViolation 同步改为相对实际 CoastTerrain broad surface 评估，并保留 RawLakeBedViolations 供对照。
+- [x] Consistency Audit 加入 CoastTerrain 的 applied surface mismatch、node error、Chunk seam 和 Macro boundary slope 护栏。
+- [ ] RiverBedTarget / LakeBedCeiling 尚未应用为局部 carve overlay。
+
+### 验证
+
+- `go test ./internal/sampling ./internal/terrain ./internal/reconcile ./internal/generator -count=1`：通过。
+- `go test ./... -count=1`：通过。
+- Seed 731894205 / 640×400 / 128 blocks：AppliedCoastSurfaceMismatch=0，AppliedCoastMaxNodeError=0，ChunkJump=5.59045e-8，MacroSlopeMismatch=6.55886e-6；coast-only river upslope=58；重算 river target carve nodes=110；LakeBedViolation=1。
+- Seed 10400 / 640×400 / 128 blocks：AppliedCoastSurfaceMismatch=0，AppliedCoastMaxNodeError=0，ChunkJump=6.29519e-8，MacroSlopeMismatch=6.74817e-6；coast-only river upslope=124；重算 river target carve nodes=171；LakeBedViolation=7。
+- Raw 历史诊断继续保留：FinalSurfaceMaskChanges=806/608，FinalUpslopeEdges=72/126；这不是 applied CoastTerrain 的失败，而是用于确认校正前问题没有被覆盖或删除。
+- `-strict-final` 仍应失败，因为 river/lake bed overlay 与最终 water/runtime 语义尚未完成。
+
+下一切片：把 CoastTerrain 上重算的 RiverBedTarget 与 LakeBedCeiling 转成 carve-only local bed correction，独立于 broad coast correction；应用后重新审计 river upslope、lake bed、Chunk/Macro 连续性。

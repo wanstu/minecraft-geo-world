@@ -67,6 +67,10 @@ type Model struct {
 	CanyonWeight        sampling.ScalarGrid
 	ValleyFloorWidth    sampling.ScalarGrid
 	DepositionPotential sampling.ScalarGrid
+
+	// HeightCorrection is an optional continuous broad-surface overlay. It is
+	// intentionally separate from river/lake bed geometry.
+	HeightCorrection *sampling.ScalarGrid
 }
 
 type Sample struct {
@@ -86,9 +90,10 @@ type Sample struct {
 	ValleyFloorWidth    float64
 	DepositionPotential float64
 
-	RegionalDetail float64
-	DepositionLift float64
-	ValleyCarve    float64
-	CanyonCarve    float64
-	FinalHeight    float64
+	RegionalDetail   float64
+	DepositionLift   float64
+	ValleyCarve      float64
+	CanyonCarve      float64
+	HeightCorrection float64
+	FinalHeight      float64
 }

@@ -1076,3 +1076,49 @@ Phase 6.1b 状态：完成。
 测试：reconcile/generator 单测与 go test ./... 全通过。
 
 未完成：约束尚未应用到 Terrain.Sample；湖床/河床/海岸连续 overlay、最终生态同步仍待后续切片。
+
+
+## 2026-09-30 — Phase 6.2 第三切片：连续海岸 correction 应用
+
+基线：2ab028d，分支 agent/world-model-foundation。
+
+第二切片只证明 coast / river 约束可解；本切片把 CoastTarget 真正挂到连续 Terrain broad surface。
+
+完成：
+- 新增 smoothstep bilinear correction sampler，命中控制点且 correction 在宏观 Cell 边界斜率趋零。
+- 新增 terrain.WithHeightCorrection；raw Terrain 不变，WorldModel 增加 CoastTerrain。
+- GenerateWorld 实际应用 CoastCorrection，并验证应用后的宏观海陆 mismatch。
+- RiverBedTarget 改为基于 CoastTerrain 重新计算，避免 coast 修正后仍沿用旧 raw terrain 河床基线。
+- Consistency 增加 applied coast node/error/Chunk/Macro 连续性护栏。
+
+验证：
+- 全量 go test ./... -count=1 通过。
+- Seed 731894205：applied coast mismatch=0，node error=0，chunk jump=5.59045e-8，macro slope mismatch=6.55886e-6；coast-only river upslope=58。
+- Seed 10400：applied coast mismatch=0，node error=0，chunk jump=6.29519e-8，macro slope mismatch=6.74817e-6；coast-only river upslope=124。
+- raw 806/608 surface changes 与 72/126 river upslope 继续保留为校正前基线。
+
+未完成：RiverBedTarget / LakeBedCeiling 的局部 bed overlay、连续 water surface/runtime 查询、最终 Ecology/Profile 同步。
+
+下一步：Phase 6.2 第四切片，应用 carve-only river/lake bed overlay。
+
+
+## 2026-09-30 — Phase 6.2 第三切片：连续 CoastTerrain 应用
+
+基线：2ab028d，分支 agent/world-model-foundation。
+
+第二切片只证明海岸 constraint 可解，本切片把它真正接入连续 Terrain。
+
+完成：
+- 新增 smoothstep-bilinear correction sampler：命中控制点、无 overshoot、Macro boundary correction slope 归零。
+- Terrain 增加可选 HeightCorrection 与 WithHeightCorrection，不覆盖 raw Terrain。
+- GenerateWorld 新增独立 CoastTerrain，并反向采样验证 applied surface / node error。
+- 湖床 violation 与 RiverBedTarget 在 CoastTerrain 应用后重新计算，修正依赖顺序。
+- Consistency 增加 CoastTerrain Chunk seam / Macro slope / applied surface 护栏。
+
+正式 Seed：
+- 731894205：Applied coast mismatch=0，node error=0，chunk jump=5.59045e-8，macro slope mismatch=6.55886e-6；river upslope 72→58，重算 bed target carve 110 节点后 target upslope=0。
+- 10400：Applied coast mismatch=0，node error=0，chunk jump=6.29519e-8，macro slope mismatch=6.74817e-6；river upslope 126→124，重算 bed target carve 171 节点后 target upslope=0。
+
+测试：sampling / terrain / reconcile / generator 专项回归与 go test ./... 全通过；strict-final 仍按预期失败。
+
+未完成：RiverBedTarget / LakeBedCeiling 尚未应用为局部 bed overlay；最终 Runtime Terrain 和最终 water semantics 尚未形成。

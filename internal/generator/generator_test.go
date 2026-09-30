@@ -165,6 +165,29 @@ func TestGenerateWorldStoresResolvedConfig(t *testing.T) {
 	if m.Reconciliation.TargetUpslopeRiverEdges != 0 {
 		t.Fatalf("reconciliation target river upslope edges=%d want=0", m.Reconciliation.TargetUpslopeRiverEdges)
 	}
+	if m.CoastTerrain == nil {
+		t.Fatal("world model is missing applied coast terrain")
+	}
+	if m.Reconciliation.AppliedCoastSurfaceMismatch != 0 {
+		t.Fatalf("applied coast surface mismatches=%d want=0", m.Reconciliation.AppliedCoastSurfaceMismatch)
+	}
+	if m.Reconciliation.AppliedCoastMaxNodeError > 1e-10 {
+		t.Fatalf("applied coast node error=%.12g want<=1e-10", m.Reconciliation.AppliedCoastMaxNodeError)
+	}
+	if len(m.Reconciliation.RiverBaseElevation) != cfg.Geometry.Width*cfg.Geometry.Height {
+		t.Fatalf("river base length=%d want=%d", len(m.Reconciliation.RiverBaseElevation), cfg.Geometry.Width*cfg.Geometry.Height)
+	}
+	for _, node := range [][2]int{{0, 0}, {7, 4}, {23, 12}, {47, 29}} {
+		i := node[1]*cfg.Geometry.Width + node[0]
+		x, z := cfg.Geometry.NodePosition(node[0], node[1])
+		got := m.CoastTerrain.SampleNormalized(x, z)
+		if math.Abs(got-m.Reconciliation.AppliedCoastElevation[i]) > 1e-12 {
+			t.Fatalf("coast terrain sample differs from applied coast elevation at %v", node)
+		}
+		if math.Abs(got-m.Reconciliation.RiverBaseElevation[i]) > 1e-12 {
+			t.Fatalf("river constraints were not rebuilt from coast terrain at %v", node)
+		}
+	}
 }
 
 func TestGenerateWorldReportsOrderedProgress(t *testing.T) {

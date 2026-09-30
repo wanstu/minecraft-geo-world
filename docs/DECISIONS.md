@@ -966,7 +966,7 @@ Phase 6.1b 最终残余审计已完成。剩余 `*Cells` 使用点属于 blocks�
 
 ## D-037：海岸控制点、河床纵剖面与水面必须分层约束
 
-状态：Phase 6.2 第二切片已实施约束模型，连续 Terrain 应用尚未完成
+状态：约束模型与 broad coast application 已实施；river/lake bed overlay 尚未完成
 
 最终水体协调不能把所有问题都塞进同一个“修正后高度”数组。
 
@@ -977,6 +977,24 @@ Phase 6.1b 最终残余审计已完成。剩余 `*Cells` 使用点属于 blocks�
 4. Ocean / Lake 水面是独立 water-surface datum：Ocean=共享 SeaLevel，Lake=Hydrology Lake.SurfaceElevation。
 5. 显式 Lake 生成 `LakeBedCeiling`，最终湖床必须低于水面并保留 clearance；当前违反点必须显式暴露，不能把水画在地表上方后忽略。
 6. River 当前只定义床面 target，不在缺乏河宽/流量到水深规则时伪造统一水面高度。
-7. Constraint target 为 0 mismatch/upslope 只证明约束可解；在它真正进入连续 Terrain / channel overlay 前，原始 strict-final 仍必须失败。
+7. Constraint target 为 0 mismatch/upslope 只证明约束可解；Phase 6.2 第三切片已把 CoastTarget 通过 smoothstep correction 真正应用到连续 CoastTerrain，并验证宏观节点/Chunk/Macro 边界连续性。RiverBedTarget / LakeBedCeiling 在进入独立 channel/basin overlay 前，strict-final 仍必须失败。
+8. Broad correction 必须保留 raw Terrain 作为诊断基线，不允许覆盖原始 806/608、72/126 等问题数字后声称问题消失；WorldModel 需明确区分 raw Terrain 与 applied CoastTerrain。
 
 原因：宽域地形、河床和水面属于三个不同几何对象。混在一个高度场里会导致修河时整片地形被拉低、修海岸时河谷被填平，或为了通过测试而隐藏真实逆坡。
+
+
+## D-038：Broad coast correction 使用命中控制点且边界导数归零的连续 overlay
+
+状态：Phase 6.2 第三切片已实施
+
+海岸 broad correction 既必须精确命中 reconciliation 的宏观控制点，又不能因为 correction 本身在 Macro Cell 边界制造新的坡度折线。
+
+因此当前选择 `smoothstep-bilinear correction`：
+1. 四角 correction 值按双线性组合，但局部 tx/tz 先经过 smoothstep。
+2. 它是 interpolating sampler，宏观节点 correction 精确命中，不像 B-Spline 会把控制点当近似控制值。
+3. 权重保持非负且和为 1，修正值不会超出邻域 correction 凸包。
+4. smoothstep 在 0/1 端点导数为 0，因此 correction 在每个 Macro Cell 边界两侧一阶导都趋近 0；原 Terrain 的连续坡度承担边界导数，overlay 不额外制造 kink。
+5. Raw Terrain 不被覆盖；GenerateWorld 另建 CoastTerrain，直到 River/Lake bed overlay 完成并通过 strict-final 后，才允许确定真正最终 Runtime Terrain。
+6. 海岸 correction 应用后必须重新计算 river/lake bed 约束，因为局部床面依赖 broad terrain，不能复用 raw Terrain 上的旧 target。
+
+该策略用于 sparse broad-surface correction；它不适合作为河道宽度/局部 channel 横断面的最终 sampler，River/Lake overlay 仍需独立几何规则。
