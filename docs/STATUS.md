@@ -5,7 +5,7 @@
 ## 当前目标与阶段
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。
 
-**Phase 6.0、6.1a 已完成；Phase 6.1b 进行中。Phase 1、Climate、Erosion、Hydrology、Geomorph、Landform 六个关键空间尺度切片已实现并验证；继续做 6.1b 全仓残余尺度审计，再决定是否进入 6.2。**
+**Phase 6.0、6.1a 已完成；Phase 6.1b 进行中。已完成 Phase 1 首批尺度 + Climate + Erosion + Hydrology + Geomorph + Landform + Phase 1 reference-world 残余迁移；下一步处理 Terrain Geometry / CellSize 脱节，再做最终残余审计。**
 
 ## 仓库与基线
 - 仓库：D:\projects\minecraft-geo-world
@@ -20,6 +20,7 @@
 - Phase 6.1b 第四切片：905c49f — feat: migrate hydrology spatial scales to world units。
 - Phase 6.1b 第五切片：3f8b69a — feat: migrate geomorph spatial scales to world units。
 - Phase 6.1b 第六切片：10e7ed7 — feat: migrate landform spatial scales to world units。
+- Phase 6.1b 第七切片：Phase 1 reference-world residual scale migration（提交号以 git log 获取）。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -56,6 +57,9 @@
 - Landform Input / Model 已接入 GridGeometry；MountainDistance 改为 blocks。
 - `MountainInfluenceCells / ValleyRadiusCells / ValleyDecayCells` 已迁为 blocks；默认值按旧 128 blocks/node reference world 解析，不再直接依赖 Width / Height 节点数。
 - Valley spread 以真实 block 距离判断半径与衰减，MountainInfluence 直接用 block 距离指数衰减。
+- Phase 1 Plate center / plate warp / continent seed / edge bias 已统一在旧 128-block reference-world 坐标中定义；当前节点只负责采样。
+- Phase 1 大陆潜力、CrustThickness 与 Macro Elevation 的固定节点频率已迁为 reference-world 频率；默认 128-block 数值保持不变。
+- Edge ocean buffer 默认宽度先解释为 reference-world 物理宽度，再换算当前网格 Cell 数。
 
 ## 本轮验证
 - go test ./... -count=1：全部通过（包括新的连通性、负坐标、分辨率/范围、Phase 1 物理尺度和全链路回归）。
@@ -72,15 +76,15 @@
 ## 仍未完成（不要误报完成）
 1. 最终连续地形改变海岸：两个 Seed 的宏观/最终海陆变化节点为 806、608；最终海洋标签高于海平面的节点为 336、326。
 2. 最终河床/水面校正未做：同口径河网逆坡连线为 72/908、126/1342。海陆修正不是河网修复，第二个 Seed 该计数还略有增加。
-3. Phase 1 距离型尺度、Climate 海温/水汽/地形抬升尺度、Erosion slope/relief、Hydrology 关键坡降/面积量纲、Geomorph 上游记忆/冲积扇扩散、Landform 山地/河谷空间核已迁移；Phase 1 部分 grid-frequency warp/noise、Terrain 的独立 CellSize 配置及其它模块仍需继续全仓残余尺度审计。D8 拓扑本身也允许随采样精度出现离散差异，因此坐标契约不等于已实现全算法精度无关。
+3. Phase 1 距离型尺度与 reference-world warp/noise、Climate 海温/水汽/地形抬升尺度、Erosion slope/relief、Hydrology 关键坡降/面积量纲、Geomorph 上游记忆/冲积扇扩散、Landform 山地/河谷空间核已迁移；Terrain 仍有独立 CellSizeBlocks / Origin 配置，可能与上游 GridGeometry 脱节，且全仓还需最后一次残余尺度审计。D8 拓扑本身也允许随采样精度出现离散差异，因此坐标契约不等于已实现全算法精度无关。
 4. 最终海岸/湖面/生态协调、外围拓扑与四角过渡仍待实现。宏观四邻接海洋与 D8 水文的细化协调属于后续水体约束。
 5. phase1.Generate 仍保留旧 API 的默认值与 panic 方式；统一入口需要完整配置校验与错误返回。
 6. WorldModel 版本化保存/重开、Java reader/sampler、实际游戏生成均未完成。
 7. 静态原型生成/保存按钮未接入；prototype/generated 仍是先前实验快照，不能代表本轮修改后的实时结果。
 
 ## 下一步（6.1b）
-1. Phase 1、Climate、Erosion、Hydrology、Geomorph、Landform 的关键物理尺度迁移已完成。
-2. 继续 6.1b 全仓残余尺度审计：重点复核 Phase 1 warp/noise、Terrain 的 CellSizeBlocks 与输入 Geometry 关系，以及任何仍按节点数而非物理 Span 推导的生成参数。
+1. Phase 1、Climate、Erosion、Hydrology、Geomorph、Landform 的已知关键物理尺度与 Phase 1 reference-world 残留已完成迁移。
+2. 下一切片迁移 Terrain：Input / Model 直接携带上游 GridGeometry，避免独立 CellSizeBlocks / Origin 与宏观模型错位；legacy 手写输入保留受控兼容。
 3. 每一批都保留固定物理范围下的多分辨率检查；允许离散化误差，但作用距离、坡度量纲和传播距离不能随网格精度系统漂移。
 4. 然后进入 6.2 的 GenerateWorld 与最终水体约束，再做 6.3 保存/重开。
 5. 6.4 提前验证 Go -> Java -> 一个 Loader，完整界面与批量导出随后扩展。

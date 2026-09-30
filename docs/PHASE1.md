@@ -452,3 +452,29 @@ tectonic saturation %    0.000       2.062        8.855
 - 软海洋偏置继续保留，用于避免大陆沿 guard band 形成矩形切边。
 
 Phase 1 至此正式完成。
+
+
+## Phase 6.1b 追加：Reference-world 板块与宏观噪声
+
+Phase 1.6 收口时，板块 warp、大陆种子和若干低频扰动仍以当前宏观节点坐标为输入。它们在默认 128 blocks/node 下表现正常，但相同物理 Span 改为 64 blocks/node 时会缩短实际波长并改变板块几何。
+
+Phase 6.1b 已进一步迁移：
+
+- Plate Center 不再以当前 Width / Height 节点坐标定义，而是在旧 128 blocks/node reference grid 中定义。
+- 当前节点通过 `nodeSpacing / 128` 映射到 reference-world 坐标，再执行 nearest plate 与 plate warp。
+- `warpedPlatePoint` 的 width / height / amplitude 使用物理 Span 对应的 reference grid 尺寸。
+- continent seed center / radius、edge bias 与大陆潜力低频扰动使用同一 reference-world 坐标。
+- CrustThickness 低频扰动与最终 Macro Elevation local roughness 的固定节点频率改成 reference-world 频率。
+- Edge ocean buffer 默认宽度先按 reference grid 解释旧规则，再换算成当前网格 Cell 数。
+
+默认 128 blocks/node 时 reference 坐标与旧节点坐标完全相同，因此旧正式基线不变。
+
+新增固定物理 Span 128 / 64 blocks-node 回归：
+
+- Plate Center 一致。
+- RawPlateID / warped PlateID 在对应世界位置一致。
+- LandPotential 在对应世界位置一致。
+- continent / crust thickness / macro elevation 三类低频噪声一致。
+- Edge ocean buffer 的物理宽度一致。
+
+当前 `go run ./cmd/geoworld-audit` 32 Seed / 320×200 通过；默认 128-block Profile / Consistency 复验保持此前基线。

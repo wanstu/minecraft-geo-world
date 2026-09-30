@@ -941,4 +941,4 @@ STATUS.md 只描述当前基线、进行中、未解决及下一步。原有逐�
 - Geomorph 上游陡坡/山地记忆衰减与冲积扇扩散范围。
 - Landform MountainDistance、MountainInfluence、ValleyRadius、ValleyDecay。
 
-下一步按同一规则做全仓残余尺度审计，重点复核 Phase 1 grid-frequency warp/noise、Terrain CellSizeBlocks 与 Geometry 的关系，以及其它仍按节点数推导的生成参数。
+Phase 1 reference-world plate/continent geometry 与固定节点频率也已按本决策迁移。下一步重点处理 Terrain CellSizeBlocks / Origin 与上游 GridGeometry 的关系，然后做最终全仓残余尺度审计。

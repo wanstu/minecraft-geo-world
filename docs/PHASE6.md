@@ -337,3 +337,29 @@ phase1.Generate 仍保留旧的非 error 返回接口：内部产生非法高程
 - go run ./cmd/geoworld-consistency-audit：731894205 / 10400 的全部当前诊断保持基线；最终连续海岸 / 河床问题仍为 UNRESOLVED。
 
 下一步：继续 6.1b 全仓残余尺度审计，重点检查 Phase 1 warp/noise 与 Terrain CellSizeBlocks / GridGeometry 的关系。
+
+
+## Phase 6.1b 第七切片实施结果（2026-09-30）
+
+基线：92d40be；开发分支：agent/world-model-foundation。
+
+残余尺度审计继续检查 Phase 1，确认 plate warp、continent seed 与三组低频扰动仍以当前宏观节点坐标定义。本切片将这些生成逻辑统一迁到旧 128 blocks/node reference-world 坐标；默认 128-block 世界保持逐值兼容。
+
+已完成：
+- [x] Plate center 使用物理 Span 对应的 128-block reference grid 定义；当前节点先映射到 reference 坐标再执行 nearest plate。
+- [x] warpedPlatePoint 的 width / height / amplitude 使用 reference grid 尺寸；相同物理 Span 下改变节点数不再改变 warp 波长与幅度。
+- [x] continent seed center / radius 与 edge bias 使用 reference-world 坐标。
+- [x] continent potential、CrustThickness、Macro Elevation 三组固定节点频率改为 reference-world 频率。
+- [x] EdgeOceanBufferFraction 默认宽度先在 reference grid 中解析，再换算当前网格 Cell 数。
+- [x] 固定物理 Span 128 → 64 blocks/node 回归覆盖 Plate center、RawPlateID、warped PlateID、LandPotential、三类低频 noise 与 edge buffer 物理宽度。
+- [ ] Terrain 仍允许独立 CellSizeBlocks / Origin，与上游 GridGeometry 可能脱节，下一切片处理。
+
+### 验证
+
+- go test ./internal/phase1 -count=1：通过。
+- go test ./... -count=1：通过。
+- go run ./cmd/geoworld-audit：32 Seed / 320×200 通过；edge-buffer-warnings=0。
+- go run ./cmd/geoworld-mcprofile-audit -count 4：默认 128-block 输出保持当前基线；Unknown=0，平均 confidence 0.691–0.764。
+- go run ./cmd/geoworld-consistency-audit：731894205 / 10400 全部当前诊断保持基线；最终连续海岸 / 河床问题仍为 UNRESOLVED。
+
+下一步：Terrain Input / Model 直接携带 GridGeometry，统一 scalar grid 的 origin / spacing，并保留受控 legacy 兼容入口。

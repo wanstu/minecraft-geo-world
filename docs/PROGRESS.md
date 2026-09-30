@@ -970,3 +970,29 @@ Phase 5 完成第一版。
 - 其它残余空间参数全仓审计。
 
 下一步：继续 6.1b 残余尺度审计。
+
+
+## 2026-09-30 — Phase 6.1b 第七切片：Phase 1 reference-world 残余迁移
+
+基线：92d40be，分支 agent/world-model-foundation。
+
+残余尺度审计发现 Phase 1 仍有两类节点绑定：plate / continent 几何使用当前 Width / Height 坐标，以及 continent potential / crust thickness / final macro elevation 的固定节点频率。
+
+本切片完成：
+- Plate center、plate warp、continent seed center / radius 统一使用旧 128 blocks/node reference-world 坐标。
+- 当前网格节点根据真实 spacing 映射到 reference-world 后参与 nearest plate / warp / continent potential。
+- continent potential、CrustThickness、Macro Elevation 的固定节点频率迁为 reference-world 频率。
+- Edge ocean buffer 的默认物理宽度不再随采样精度改变。
+- 新增固定物理 Span 128 / 64 blocks-node 回归，验证 Plate center、PlateID、LandPotential、noise 与 edge buffer。
+
+验证：
+- phase1 单元测试通过。
+- go test ./... -count=1 通过。
+- 32 Seed phase1 audit 通过，edge-buffer-warnings=0。
+- 4 Seed Profile / 2 Seed Consistency 默认 128-block 基线不变。
+
+未完成：
+- Terrain CellSizeBlocks / Origin 与上游 GridGeometry 的关系。
+- 6.1b 最终全仓残余尺度审计。
+
+下一步：迁移 Terrain Geometry 契约。

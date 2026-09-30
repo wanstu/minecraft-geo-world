@@ -64,6 +64,7 @@ func Generate(cfg Config) *World {
 
 	r := rand.New(rand.NewPCG(uint64(cfg.Seed), uint64(cfg.Seed)^0x9e3779b97f4a7c15))
 	plates := make([]Plate, cfg.PlateCount)
+	referenceWidth, referenceHeight := referenceGridDimensions(geometry)
 
 	for i := range plates {
 		angle := r.Float64() * math.Pi * 2
@@ -71,8 +72,8 @@ func Generate(cfg Config) *World {
 		plates[i] = Plate{
 			ID: i,
 			Center: Vec2{
-				X: r.Float64() * float64(cfg.Width-1),
-				Y: r.Float64() * float64(cfg.Height-1),
+				X: r.Float64() * (referenceWidth - 1),
+				Y: r.Float64() * (referenceHeight - 1),
 			},
 			Velocity: Vec2{
 				X: math.Cos(angle) * speed,
@@ -107,9 +108,9 @@ func Generate(cfg Config) *World {
 	for y := 0; y < cfg.Height; y++ {
 		for x := 0; x < cfg.Width; x++ {
 			i := w.index(x, y)
-			fx, fy := float64(x), float64(y)
+			fx, fy := w.referenceGridCoordinates(x, y)
 			w.RawPlateID[i] = nearestPlate(fx, fy, plates)
-			wx, wy := warpedPlatePoint(fx, fy, cfg)
+			wx, wy := warpedPlatePoint(fx, fy, cfg, geometry)
 			w.PlateID[i] = nearestPlate(wx, wy, plates)
 		}
 	}
@@ -150,9 +151,8 @@ func nearestPlate(x, y float64, plates []Plate) int {
 
 // warpedPlatePoint 对查询坐标做低频连续扭曲，再进行最近板块中心归属。
 // 这样保留连续板块，同时降低标准 Voronoi 的直线和规则多边形感。
-func warpedPlatePoint(x, y float64, cfg Config) (float64, float64) {
-	w := float64(cfg.Width)
-	h := float64(cfg.Height)
+func warpedPlatePoint(x, y float64, cfg Config, geometry world.GridGeometry) (float64, float64) {
+	w, h := referenceGridDimensions(geometry)
 	minSize := math.Min(w, h)
 	amp := minSize * 0.032
 
@@ -181,8 +181,7 @@ func (w *World) generateCrust(r *rand.Rand) {
 
 	seedCount := maxInt(4, w.Config.PlateCount/3)
 	seeds := make([]continentSeed, seedCount)
-	width := float64(w.Config.Width)
-	height := float64(w.Config.Height)
+	width, height := referenceGridDimensions(w.Geometry)
 
 	for i := range seeds {
 		seeds[i] = continentSeed{
@@ -203,7 +202,7 @@ func (w *World) generateCrust(r *rand.Rand) {
 
 	for y := 0; y < w.Config.Height; y++ {
 		for x := 0; x < w.Config.Width; x++ {
-			fx, fy := float64(x), float64(y)
+			fx, fy := w.referenceGridCoordinates(x, y)
 			potential := 0.0
 
 			for _, s := range seeds {
@@ -212,9 +211,7 @@ func (w *World) generateCrust(r *rand.Rand) {
 				potential += s.Weight * math.Exp(-(dx*dx+dy*dy)*0.5)
 			}
 
-			potential += math.Sin(fx*0.031+float64(w.Config.Seed%401)) * 0.10
-			potential += math.Cos(fy*0.037-float64(w.Config.Seed%271)) * 0.08
-			potential += math.Sin((fx+fy)*0.019) * 0.05
+			potential += continentalPotentialNoise(fx, fy, w.Config.Seed)
 
 			// 即使硬缓冲区已经保证外围是海洋，靠近缓冲区的区域仍给予
 			// 连续海洋偏置，避免大陆像被矩形刀切断一样贴着 guard band 生长。
@@ -255,9 +252,28 @@ func (w *World) generateCrust(r *rand.Rand) {
 }
 
 func edgeOceanBufferCells(cfg Config) int {
+	spanX := cfg.SpanXBlocks
+	spanZ := cfg.SpanZBlocks
+	if spanX == 0 {
+		spanX = float64(cfg.Width-1) * DefaultReferenceCellSizeBlocks
+	}
+	if spanZ == 0 {
+		spanZ = float64(cfg.Height-1) * DefaultReferenceCellSizeBlocks
+	}
+	geometry := world.GridGeometry{
+		Width: cfg.Width, Height: cfg.Height,
+		OriginX: cfg.OriginX, OriginZ: cfg.OriginZ,
+		SpanXBlocks: spanX, SpanZBlocks: spanZ,
+	}
+	referenceWidth, referenceHeight := referenceGridDimensions(geometry)
+	referenceMinSize := int(math.Round(math.Min(referenceWidth, referenceHeight)))
+	referenceCells := int(math.Round(float64(referenceMinSize) * cfg.EdgeOceanBufferFraction))
+	referenceCells = clampInt(referenceCells, 2, maxInt(2, referenceMinSize/5))
+
+	cellSizeBlocks := geometry.SpacingX()
+	actualCells := int(math.Ceil(float64(referenceCells)*DefaultReferenceCellSizeBlocks/cellSizeBlocks - 1e-12))
 	minSize := minInt(cfg.Width, cfg.Height)
-	cells := int(math.Round(float64(minSize) * cfg.EdgeOceanBufferFraction))
-	return clampInt(cells, 2, maxInt(2, minSize/5))
+	return clampInt(actualCells, 2, maxInt(2, minSize/5))
 }
 
 // computeCoastDistance calculates signed physical distance to the nearest
@@ -335,8 +351,8 @@ func (w *World) computeCrustThickness() {
 
 			d := math.Max(0, w.CoastDistance[i])
 			interior := 1 - math.Exp(-d/crustInteriorScaleBlocks)
-			lowFreq := math.Sin(float64(x)*0.021+float64(w.Config.Seed%421))*0.025 +
-				math.Cos(float64(y)*0.019-float64(w.Config.Seed%353))*0.02
+			refX, refY := w.referenceGridCoordinates(x, y)
+			lowFreq := crustThicknessNoise(refX, refY, w.Config.Seed)
 			w.CrustThickness[i] = clamp(0.48+interior*0.34+lowFreq, 0.44, 0.88)
 		}
 	}
@@ -825,8 +841,8 @@ func (w *World) computeElevation() {
 			base := w.BaseElevation[i] + w.TectonicInfluence[i]
 
 			// 只提供局部粗糙度，不允许噪声重新决定宏观海陆和构造位置。
-			n := math.Sin(float64(x)*0.071+float64(w.Config.Seed%997)) *
-				math.Cos(float64(y)*0.083-float64(w.Config.Seed%313))
+			refX, refY := w.referenceGridCoordinates(x, y)
+			n := macroElevationNoise(refX, refY, w.Config.Seed)
 			roughness := 0.018
 			if w.Crust[i] == Oceanic {
 				roughness = 0.012
@@ -836,6 +852,32 @@ func (w *World) computeElevation() {
 			w.Elevation[i] = clamp(base, 0, 1)
 		}
 	}
+}
+
+func referenceGridDimensions(geometry world.GridGeometry) (float64, float64) {
+	return geometry.SpanXBlocks/DefaultReferenceCellSizeBlocks + 1,
+		geometry.SpanZBlocks/DefaultReferenceCellSizeBlocks + 1
+}
+
+func (w *World) referenceGridCoordinates(x, y int) (float64, float64) {
+	return float64(x) * w.Geometry.SpacingX() / DefaultReferenceCellSizeBlocks,
+		float64(y) * w.Geometry.SpacingZ() / DefaultReferenceCellSizeBlocks
+}
+
+func continentalPotentialNoise(refX, refY float64, seed int64) float64 {
+	return math.Sin(refX*0.031+float64(seed%401))*0.10 +
+		math.Cos(refY*0.037-float64(seed%271))*0.08 +
+		math.Sin((refX+refY)*0.019)*0.05
+}
+
+func crustThicknessNoise(refX, refY float64, seed int64) float64 {
+	return math.Sin(refX*0.021+float64(seed%421))*0.025 +
+		math.Cos(refY*0.019-float64(seed%353))*0.02
+}
+
+func macroElevationNoise(refX, refY float64, seed int64) float64 {
+	return math.Sin(refX*0.071+float64(seed%997)) *
+		math.Cos(refY*0.083-float64(seed%313))
 }
 
 func (w *World) index(x, y int) int {
