@@ -1,15 +1,18 @@
 package landform
 
+import "geoworld/internal/world"
+
 type Config struct {
-	SeaLevelNormalized     float64
-	MountainInfluenceCells float64
-	ValleyRadiusCells      int
-	ValleyDecayCells       float64
+	SeaLevelNormalized      float64
+	MountainInfluenceBlocks float64
+	ValleyRadiusBlocks      float64
+	ValleyDecayBlocks       float64
 }
 
 type Input struct {
-	Width  int
-	Height int
+	Width    int
+	Height   int
+	Geometry world.GridGeometry
 
 	LandMask        []bool
 	Elevation       []float64
@@ -23,13 +26,15 @@ type Input struct {
 }
 
 type Model struct {
-	Config Config
-	Width  int
-	Height int
+	Config   Config
+	Geometry world.GridGeometry
+	Width    int
+	Height   int
 
 	LandMask []bool
 
-	MountainCore      []float64
+	MountainCore []float64
+	// MountainDistance is a physical world distance in Minecraft blocks.
 	MountainDistance  []float64
 	MountainInfluence []float64
 

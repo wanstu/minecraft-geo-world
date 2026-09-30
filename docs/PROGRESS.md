@@ -941,3 +941,32 @@ Phase 5 完成第一版。
 - 不要求不同宏观精度的 D8 拓扑逐 Cell 相同。
 
 下一步：6.1b 全仓残余尺度审计，然后决定是否进入 6.2。
+
+
+## 2026-09-30 — Phase 6.1b 第六切片：Landform 物理尺度迁移
+
+基线：074e8d7，分支 agent/world-model-foundation。
+
+残余尺度审计发现 Landform 仍以 grid min dimension 推导 MountainInfluence / ValleyRadius / ValleyDecay。Phase 4.2 的旧修复只是“随网格尺寸缩放 Cell 半径”的过渡方案，不是真正世界单位。
+
+本切片完成：
+- Landform Input / Model 接入 GridGeometry。
+- MountainDistance 改为 blocks。
+- MountainInfluenceCells / ValleyRadiusCells / ValleyDecayCells 改为 blocks。
+- 默认值在旧 128 blocks/node reference world 上解释原有规则，再映射到当前 Geometry。
+- Valley spread 按真实 block 半径和衰减计算。
+- 新增固定相同物理 Span 的 128 / 64 blocks-node 回归，验证 MountainDistance、MountainInfluence、ValleyWeight 对应世界坐标一致。
+
+验证：
+- landform 单元测试通过。
+- go test ./... -count=1 通过。
+- 8 Seed landform audit 通过。
+- 4 Seed Profile audit 通过，Unknown=0，平均 confidence 0.691–0.764。
+- 2 Seed Consistency 默认 128-block 数值不变；最终连续海岸 / 河床逆坡问题继续保留。
+
+未完成：
+- Phase 1 grid-frequency warp/noise 评估。
+- Terrain CellSizeBlocks 与 GridGeometry 关系。
+- 其它残余空间参数全仓审计。
+
+下一步：继续 6.1b 残余尺度审计。

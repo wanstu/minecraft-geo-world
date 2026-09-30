@@ -411,7 +411,7 @@ Phase 4.2 验收时发现：
 
 低分辨率时，同样 4～10 Cell 会覆盖更大的世界比例。
 
-已改为根据宏观网格短边解析默认空间尺度。
+Phase 4.2 当时先改为“根据宏观网格短边解析 Cell 半径”，作为尚未存在统一世界物理范围时的过渡修复。
 
 修复后同 Seed：
 
@@ -420,11 +420,21 @@ Phase 4.2 验收时发现：
 240 × 150 → Mountain dominant 12.42%
 ```
 
-因此：
+这个过渡方案能避免固定 4～10 Cell 在不同网格尺寸下产生数量级漂移，但它仍把“节点数量”当成了世界尺寸代理。
 
-> 宏观网格尺寸主要表示采样精度，不应隐式改变区域地貌的物理尺度。
+Phase 6.1b 进一步完成正式迁移：
 
-显式 Config 仍可覆盖默认尺度，方便实验。
+- `MountainInfluenceCells` → `MountainInfluenceBlocks`。
+- `ValleyRadiusCells` → `ValleyRadiusBlocks`。
+- `ValleyDecayCells` → `ValleyDecayBlocks`。
+- MountainDistance 的 D8 距离场直接以 blocks 存储。
+- 默认值先按旧 128 blocks/node reference grid 解释原有规则，再映射到当前 GridGeometry。
+
+因此现在：
+
+> 宏观网格 Width / Height 只表示采样精度；相同物理 Span 下改变节点数，不会再改变山麓影响与河谷扩散的实际距离。
+
+显式 Config 仍可用 blocks 覆盖默认尺度，方便实验。
 
 ### 当前 640 × 400 Seed 731894205
 
@@ -473,8 +483,9 @@ Strong valley overlay  0.64% .. 0.84%
 - ValleyWeight 是 Overlay，不破坏基础权重归一化。
 - 海洋不会获得陆地地貌权重。
 - Relief 小幅变化不会引发权重突变。
-- 默认空间核随宏观网格尺寸变化。
-- 同 Seed 在 240×150 / 640×400 下 Mountain 占比不得再次发生数量级漂移。
+- 默认空间核由物理世界 Span 解析，不随相同 Span 下的节点数变化。
+- 固定相同物理 Span 时，128 / 64 blocks-node 的 MountainDistance、MountainInfluence 与 ValleyWeight 在对应世界坐标一致。
+- 同 Seed 在历史 240×150 / 640×400 默认世界下 Mountain 占比不得再次发生数量级漂移。
 
 ### 当前可视化
 

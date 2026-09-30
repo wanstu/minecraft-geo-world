@@ -57,9 +57,14 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		return nil, errors.New("landform: land mask size does not match dimensions")
 	}
 
-	cfg = normalizeConfig(cfg, input.Width, input.Height)
+	geometry, err := resolveInputGeometry(input)
+	if err != nil {
+		return nil, err
+	}
+	cfg = normalizeConfig(cfg, geometry)
 	m := &Model{
 		Config:             cfg,
+		Geometry:           geometry,
 		Width:              input.Width,
 		Height:             input.Height,
 		LandMask:           append([]bool(nil), input.LandMask...),
@@ -81,25 +86,48 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	return m, nil
 }
 
-func normalizeConfig(cfg Config, width, height int) Config {
+func resolveInputGeometry(input Input) (world.GridGeometry, error) {
+	geometry := input.Geometry
+	if geometry.Width == 0 && geometry.Height == 0 &&
+		geometry.SpanXBlocks == 0 && geometry.SpanZBlocks == 0 &&
+		geometry.OriginX == 0 && geometry.OriginZ == 0 {
+		geometry = world.GridGeometry{
+			Width: input.Width, Height: input.Height,
+			SpanXBlocks: float64(input.Width-1) * world.DefaultMacroSpacingBlocks,
+			SpanZBlocks: float64(input.Height-1) * world.DefaultMacroSpacingBlocks,
+		}
+	}
+	if geometry.Width != input.Width || geometry.Height != input.Height {
+		return world.GridGeometry{}, errors.New("landform: geometry dimensions do not match input")
+	}
+	if _, err := geometry.SquareCellSize(); err != nil {
+		return world.GridGeometry{}, err
+	}
+	return geometry, nil
+}
+
+func normalizeConfig(cfg Config, geometry world.GridGeometry) Config {
 	if cfg.SeaLevelNormalized <= 0 || cfg.SeaLevelNormalized >= 1 {
 		cfg.SeaLevelNormalized = world.DefaultSeaLevelNormalized
 	}
-	minDim := width
-	if height < minDim {
-		minDim = height
+
+	minSpan := math.Min(geometry.SpanXBlocks, geometry.SpanZBlocks)
+	referenceMinDim := minSpan/world.DefaultMacroSpacingBlocks + 1
+
+	if cfg.MountainInfluenceBlocks <= 0 {
+		referenceCells := math.Max(2, referenceMinDim*0.025)
+		cfg.MountainInfluenceBlocks = referenceCells * world.DefaultMacroSpacingBlocks
 	}
-	if cfg.MountainInfluenceCells <= 0 {
-		cfg.MountainInfluenceCells = math.Max(2, float64(minDim)*0.025)
-	}
-	if cfg.ValleyRadiusCells <= 0 {
-		cfg.ValleyRadiusCells = int(math.Round(float64(minDim) * 0.01))
-		if cfg.ValleyRadiusCells < 1 {
-			cfg.ValleyRadiusCells = 1
+	if cfg.ValleyRadiusBlocks <= 0 {
+		referenceCells := int(math.Round(referenceMinDim * 0.01))
+		if referenceCells < 1 {
+			referenceCells = 1
 		}
+		cfg.ValleyRadiusBlocks = float64(referenceCells) * world.DefaultMacroSpacingBlocks
 	}
-	if cfg.ValleyDecayCells <= 0 {
-		cfg.ValleyDecayCells = math.Max(0.75, float64(minDim)*0.0055)
+	if cfg.ValleyDecayBlocks <= 0 {
+		referenceCells := math.Max(0.75, referenceMinDim*0.0055)
+		cfg.ValleyDecayBlocks = referenceCells * world.DefaultMacroSpacingBlocks
 	}
 	return cfg
 }
@@ -132,12 +160,14 @@ func (m *Model) computeMountainContext(input Input) {
 		}
 	}
 
+	cellSizeBlocks := m.Geometry.SpacingX()
 	dirs := []struct {
 		dx, dz int
 		cost   float64
 	}{
-		{1, 0, 1}, {-1, 0, 1}, {0, 1, 1}, {0, -1, 1},
-		{1, 1, math.Sqrt2}, {1, -1, math.Sqrt2}, {-1, 1, math.Sqrt2}, {-1, -1, math.Sqrt2},
+		{1, 0, cellSizeBlocks}, {-1, 0, cellSizeBlocks}, {0, 1, cellSizeBlocks}, {0, -1, cellSizeBlocks},
+		{1, 1, math.Sqrt2 * cellSizeBlocks}, {1, -1, math.Sqrt2 * cellSizeBlocks},
+		{-1, 1, math.Sqrt2 * cellSizeBlocks}, {-1, -1, math.Sqrt2 * cellSizeBlocks},
 	}
 
 	for h.Len() > 0 {
@@ -168,7 +198,7 @@ func (m *Model) computeMountainContext(input Input) {
 		if !m.LandMask[i] || m.MountainDistance[i] >= inf/2 {
 			continue
 		}
-		m.MountainInfluence[i] = math.Exp(-m.MountainDistance[i] / m.Config.MountainInfluenceCells)
+		m.MountainInfluence[i] = math.Exp(-m.MountainDistance[i] / m.Config.MountainInfluenceBlocks)
 	}
 }
 
@@ -240,8 +270,8 @@ func (m *Model) computeWeights(input Input) {
 }
 
 func (m *Model) spreadValleys() {
-	radius := m.Config.ValleyRadiusCells
-	decay := m.Config.ValleyDecayCells
+	cellSizeBlocks := m.Geometry.SpacingX()
+	radiusCells := int(math.Ceil(m.Config.ValleyRadiusBlocks / cellSizeBlocks))
 
 	for z := 0; z < m.Height; z++ {
 		for x := 0; x < m.Width; x++ {
@@ -251,12 +281,12 @@ func (m *Model) spreadValleys() {
 			}
 
 			best := m.ValleyCore[i]
-			for dz := -radius; dz <= radius; dz++ {
+			for dz := -radiusCells; dz <= radiusCells; dz++ {
 				nz := z + dz
 				if nz < 0 || nz >= m.Height {
 					continue
 				}
-				for dx := -radius; dx <= radius; dx++ {
+				for dx := -radiusCells; dx <= radiusCells; dx++ {
 					nx := x + dx
 					if nx < 0 || nx >= m.Width {
 						continue
@@ -266,11 +296,11 @@ func (m *Model) spreadValleys() {
 					if core <= 0 {
 						continue
 					}
-					distance := math.Hypot(float64(dx), float64(dz))
-					if distance > float64(radius) {
+					distanceBlocks := math.Hypot(float64(dx), float64(dz)) * cellSizeBlocks
+					if distanceBlocks > m.Config.ValleyRadiusBlocks {
 						continue
 					}
-					influence := core * math.Exp(-distance/decay)
+					influence := core * math.Exp(-distanceBlocks/m.Config.ValleyDecayBlocks)
 					if influence > best {
 						best = influence
 					}

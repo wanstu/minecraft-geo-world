@@ -8,6 +8,7 @@ import (
 	"geoworld/internal/erosion"
 	"geoworld/internal/hydrology"
 	"geoworld/internal/phase1"
+	"geoworld/internal/world"
 )
 
 func syntheticInput(width, height int) Input {
@@ -151,7 +152,7 @@ func TestMountainCreatesFoothillInfluenceAroundIt(t *testing.T) {
 	in.Slope[neighbor] = 0.035
 	in.TerrainMaturity[neighbor] = 0.65
 
-	m, err := Generate(in, Config{MountainInfluenceCells: 4})
+	m, err := Generate(in, Config{MountainInfluenceBlocks: 4 * world.DefaultMacroSpacingBlocks})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,26 +223,32 @@ func TestWeightResponseIsContinuousAcrossSmallReliefChange(t *testing.T) {
 	}
 }
 
-func TestMacroScaleDefaultsFollowGridResolution(t *testing.T) {
-	lowIn := syntheticInput(240, 150)
-	highIn := syntheticInput(640, 400)
+func TestMacroScaleDefaultsFollowPhysicalSpan(t *testing.T) {
+	coarseIn := syntheticInput(25, 17)
+	coarseIn.Geometry = world.GridGeometry{Width: 25, Height: 17, SpanXBlocks: 3072, SpanZBlocks: 2048}
+	fineIn := syntheticInput(49, 33)
+	fineIn.Geometry = world.GridGeometry{Width: 49, Height: 33, SpanXBlocks: 3072, SpanZBlocks: 2048}
 
-	low, err := Generate(lowIn, Config{})
+	coarse, err := Generate(coarseIn, Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	high, err := Generate(highIn, Config{})
+	fine, err := Generate(fineIn, Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !(low.Config.MountainInfluenceCells < high.Config.MountainInfluenceCells) {
-		t.Fatalf("mountain influence radius did not scale with grid: low=%.2f high=%.2f",
-			low.Config.MountainInfluenceCells, high.Config.MountainInfluenceCells)
+	if math.Abs(coarse.Config.MountainInfluenceBlocks-fine.Config.MountainInfluenceBlocks) > 1e-12 {
+		t.Fatalf("mountain influence changed with resolution: coarse=%.2f fine=%.2f blocks",
+			coarse.Config.MountainInfluenceBlocks, fine.Config.MountainInfluenceBlocks)
 	}
-	if !(low.Config.ValleyRadiusCells < high.Config.ValleyRadiusCells) {
-		t.Fatalf("valley radius did not scale with grid: low=%d high=%d",
-			low.Config.ValleyRadiusCells, high.Config.ValleyRadiusCells)
+	if math.Abs(coarse.Config.ValleyRadiusBlocks-fine.Config.ValleyRadiusBlocks) > 1e-12 {
+		t.Fatalf("valley radius changed with resolution: coarse=%.2f fine=%.2f blocks",
+			coarse.Config.ValleyRadiusBlocks, fine.Config.ValleyRadiusBlocks)
+	}
+	if math.Abs(coarse.Config.ValleyDecayBlocks-fine.Config.ValleyDecayBlocks) > 1e-12 {
+		t.Fatalf("valley decay changed with resolution: coarse=%.2f fine=%.2f blocks",
+			coarse.Config.ValleyDecayBlocks, fine.Config.ValleyDecayBlocks)
 	}
 }
 

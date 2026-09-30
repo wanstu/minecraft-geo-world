@@ -308,3 +308,32 @@ phase1.Generate 仍保留旧的非 error 返回接口：内部产生非法高程
 - go run ./cmd/geoworld-consistency-audit：731894205 / 10400 的全部当前诊断与 1dae70c 一致；最终连续海岸 / 河床问题仍为 UNRESOLVED。
 
 下一步：做 6.1b 全仓残余尺度审计，重点检查 Phase 1 grid-frequency warp/noise、Landform 空间核和其它仍按节点数推导的默认值；审计后再决定是否正式进入 6.2。
+
+
+## Phase 6.1b 第六切片实施结果（2026-09-30）
+
+基线：074e8d7；开发分支：agent/world-model-foundation。
+
+全仓残余尺度审计发现 Landform 仍把宏观节点数当成世界尺寸代理。本切片将山地与河谷空间核正式迁移到 Minecraft blocks；6.1b 仍继续做剩余审计。
+
+已完成：
+- [x] landform.Input / Model 接入 GridGeometry；InputFromWorld 传入 Phase 1 Geometry。
+- [x] Legacy 手写 Landform Input 未提供 Geometry 时兼容解析为 128 blocks/node；Geometry 尺寸不匹配或非等距明确报错。
+- [x] MountainDistance 从 D8 Cell 距离改为 blocks；D8 cardinal / diagonal cost 分别为 node spacing / sqrt(2)×node spacing。
+- [x] MountainInfluenceCells → MountainInfluenceBlocks。
+- [x] ValleyRadiusCells → ValleyRadiusBlocks。
+- [x] ValleyDecayCells → ValleyDecayBlocks。
+- [x] 默认空间核先在旧 128 blocks/node reference world 上解释原有“短边比例”规则，再映射到当前 GridGeometry；相同物理 Span 改 Width / Height 不再改变默认 blocks 半径。
+- [x] Valley spread 用真实 block 距离判断半径和指数衰减。
+- [x] 固定物理范围 128 → 64 blocks/node 回归覆盖 MountainDistance、MountainInfluence、ValleyWeight。
+- [ ] Phase 1 grid-frequency warp/noise、Terrain 独立 CellSizeBlocks 等仍待残余尺度审计。
+
+### 验证
+
+- go test ./internal/landform -count=1：通过。
+- go test ./... -count=1：通过。
+- go run ./cmd/geoworld-landform-audit：8 Seed / 240×150 通过；plain 37.807%–53.272%，hill 17.241%–27.328%，foothill 6.085%–9.554%，mountain 21.978%–31.630%，strong valley 0.222%–0.523%。
+- go run ./cmd/geoworld-mcprofile-audit -count 4：默认 128-block 输出保持当前基线；Unknown=0，平均 confidence 0.691–0.764。
+- go run ./cmd/geoworld-consistency-audit：731894205 / 10400 的全部当前诊断保持基线；最终连续海岸 / 河床问题仍为 UNRESOLVED。
+
+下一步：继续 6.1b 全仓残余尺度审计，重点检查 Phase 1 warp/noise 与 Terrain CellSizeBlocks / GridGeometry 的关系。

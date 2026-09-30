@@ -922,7 +922,7 @@ STATUS.md 只描述当前基线、进行中、未解决及下一步。原有逐�
 
 ## D-035：旧 Cell 空间参数必须通过共享参考物理尺度迁移
 
-状态：Phase 1、Climate、Erosion、Hydrology、Geomorph 第一批已实现；继续做全仓残余尺度审计
+状态：Phase 1、Climate、Erosion、Hydrology、Geomorph、Landform 第一批已实现；继续做全仓残余尺度审计
 
 历史算法大量使用 Cell / iteration 表达作用范围。Phase 6.1b 规定：
 
@@ -939,5 +939,6 @@ STATUS.md 只描述当前基线、进行中、未解决及下一步。原有逐�
 - Erosion Slope / ReliefRadius / LocalRelief。
 - Hydrology FillEpsilon、D8 slope、LocalRunoff 物理面积量纲、MinLakeAreaBlocks2。
 - Geomorph 上游陡坡/山地记忆衰减与冲积扇扩散范围。
+- Landform MountainDistance、MountainInfluence、ValleyRadius、ValleyDecay。
 
-下一步按同一规则做全仓残余尺度审计，重点复核 Phase 1 grid-frequency warp/noise、Landform 空间核及其它仍按节点数推导的默认值。
+下一步按同一规则做全仓残余尺度审计，重点复核 Phase 1 grid-frequency warp/noise、Terrain CellSizeBlocks 与 Geometry 的关系，以及其它仍按节点数推导的生成参数。

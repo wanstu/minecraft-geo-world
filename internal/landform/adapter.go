@@ -11,6 +11,7 @@ func InputFromWorld(world *phase1.World, erosionModel *erosion.Model) Input {
 	return Input{
 		Width:           world.Config.Width,
 		Height:          world.Config.Height,
+		Geometry:        world.Geometry,
 		LandMask:        land,
 		Elevation:       append([]float64(nil), erosionModel.ErodedElevation...),
 		ReliefIndex:     append([]float64(nil), erosionModel.ReliefIndex...),
