@@ -242,3 +242,27 @@ Water surface datum
 `internal/reconcile` 在宏观节点层把 raw Terrain、Macro Surface、Hydrology 转换成上述约束。Phase 6.2 第三切片已经让 broad coast target 被连续 Terrain sampler 真正消费：`WorldModel.Terrain` 保留 raw Terrain，`WorldModel.CoastTerrain` 挂载 smoothstep correction overlay；correction 命中宏观目标且在 Macro Cell 边界的一阶导趋零，不覆盖原始诊断。
 
 当前两个正式 Seed 的 applied CoastTerrain 已达到 Surface mismatch=0、node error=0，并通过 Chunk / Macro slope 连续性护栏。RiverBedTarget 在 CoastTerrain 上重新求解后仍能达到 target upslope=0，但它和 LakeBedCeiling 仍只是**待应用的局部床面约束**。下一层必须以 carve-only channel/basin overlay 消费这些 target；不能把 river/lake bed correction 混进 broad coast surface。
+
+
+## 11. CoastTerrain continuous broad-surface layer
+
+Phase 6.2 第三切片后，Terrain 层明确区分：
+
+```text
+Raw Terrain
+  └─ Phase 4 continuous terrain，保留历史诊断
+        +
+CoastCorrection macro grid
+  └─ smoothstep-bilinear continuous overlay
+        ↓
+CoastTerrain
+  └─ 已满足宏观海岸 broad-surface control points
+        ↓
+River/Lake local bed overlays（下一切片）
+        ↓
+Final Runtime Terrain（尚未命名/冻结）
+```
+
+CoastCorrection 使用 interpolating smoothstep-bilinear，而不是普通 bilinear 或 B-Spline：普通 bilinear 会给 correction 带来 Macro boundary slope kink；B-Spline 则不能保证 correction 在宏观控制点精确命中。当前 sampler 同时满足 exact target、convex hull 与 correction boundary derivative≈0。
+
+GenerateWorld 保留 Raw Terrain 和 CoastTerrain 两份模型，Reconciliation 在 CoastTerrain 应用后重新采样控制点，并重新构建 LakeBed / RiverBed 约束。这样局部水道约束始终建立在真实 broad base 上，不会使用过期高度场。
