@@ -5,7 +5,7 @@
 ## 当前目标与阶段
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。
 
-**Phase 6.0、6.1a、6.1b 已完成；Phase 6.2 进行中。第一切片已建立正式 `GeneratorConfig -> GenerateWorld -> WorldModel` 调度与共享 Seed / Geometry / SeaLevel 契约，Consistency Audit 已切到统一入口；下一步在 WorldModel 上实现最终海岸、水体、河床一致性。**
+**Phase 6.0、6.1a、6.1b 已完成；Phase 6.2 进行中。第一切片已建立统一 GenerateWorld / WorldModel；第二切片已建立 Terrain/Water reconciliation 约束层，能把两个正式 Seed 的目标海岸 mismatch 与河床 target upslope 都降到 0，但约束尚未应用到连续 Terrain，因此旧 806/608 海陆变化与 72/126 逆坡诊断仍真实保留。下一步把约束接入连续 Terrain / 水体采样。**
 
 ## 仓库与基线
 - 仓库：D:\projects\minecraft-geo-world
@@ -23,6 +23,7 @@
 - Phase 6.1b 第七切片：444c3c3 — feat: migrate phase1 reference world scales。
 - Phase 6.1b 第八切片：1a5fb4d — feat: bind terrain sampling to world geometry。
 - Phase 6.2 第一切片：0a0b1f2 — feat: add unified world generation pipeline。
+- Phase 6.2 第二切片：Terrain / Water reconciliation constraints（提交号以 git log 获取）。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -72,6 +73,11 @@
 - `WorldModel.Config` 保存各阶段**实际解析后的 Config**，为 6.3 版本化持久化准备。
 - `GenerateWorld` 支持固定阶段顺序的进度回调与 context 取消；当前取消粒度为阶段边界，不冒充阶段内部抢占。
 - `geoworld-consistency-audit` 已改用统一 `GenerateWorld`，不再手工复制整条流水线。
+- 新增 `internal/reconcile`，把最终 Terrain 与宏观 Surface / Hydrology 的冲突转成显式约束，而不是直接粗暴 clamp 整块地形。
+- 海岸约束输出 `CoastTargetElevation`：宏观海洋控制点保持低于海平面，非封闭宏观陆地控制点保持不被最终 Terrain 淹没；封闭低地仍保留原语义。
+- 水体元数据统一标记 Ocean / Lake / River；Ocean 水面=共享 SeaLevel，显式 Lake 使用 Hydrology Lake.SurfaceElevation，并生成 LakeBedCeiling。
+- 河流约束输出独立 `RiverBedTarget`，仅雕刻河床纵剖面，不把河床 target 冒充成宽域 Terrain control point；多支流按有向拓扑传播，禁止通过抬高河床修逆坡。
+- Reconciliation 作为 GenerateWorld 第 10 阶段并写入 WorldModel；ResolvedConfig 同步保存 reconciliation 参数。
 
 ## 本轮验证
 - go test ./... -count=1：全部通过（包括新的连通性、负坐标、分辨率/范围、Phase 1 物理尺度和全链路回归）。
@@ -88,6 +94,10 @@
 - 6.1b 最终全仓残余搜索已完成：剩余 `*Cells` 均为 blocks→当前网格的运行时采样变量、旧 128 reference 翻译、测试/统计或 Terrain legacy 兼容字段，未发现新的固定节点生成尺度。
 - `internal/generator` 回归：统一流水线与原手工流水线的 Phase1 Elevation、Hydrology FlowTo、MC Profile 及固定点 Terrain 结果一致；统一 SeaLevel=0.47 可贯穿所有相关阶段；非法 Geometry/共享配置冲突返回 error；9 阶段进度顺序与取消通过。
 - Consistency Audit 改用 GenerateWorld 后，731894205 / 10400 的全部默认 128-block 诊断与旧基线逐项一致。
+- Reconciliation 纯单元测试覆盖：全海洋高 Terrain 的海岸 carve、全陆地低 Terrain 的海岸 raise、河床单调向下且绝不抬床、湖面/湖床 ceiling 元数据。
+- Seed 731894205：原始 FinalSurfaceMaskChanges=806、FinalUpslopeEdges=72；constraint 只需调整 665 个海岸控制点（raise 329 / carve 336）即 SurfaceMismatchAfter=0；河床 target 雕刻 98 个节点即 TargetUpslope=0；发现 1 个 LakeBedViolation。
+- Seed 10400：原始 FinalSurfaceMaskChanges=608、FinalUpslopeEdges=126；constraint 调整 510 个海岸控制点（raise 184 / carve 326）即 SurfaceMismatchAfter=0；河床 target 雕刻 162 个节点即 TargetUpslope=0；发现 7 个 LakeBedViolation。
+- Consistency 默认门槛现在也要求 constraint 自身 SurfaceMismatchAfter=0、TargetUpslopeRiverEdges=0；`-strict-final` 仍按未应用约束的真实连续 Terrain 失败。
 - 基线原型引用检查：387 处本地引用，无缺失。
 - 详细参数、当前数值和历史对照见 PHASE6.md。
 
@@ -102,8 +112,8 @@
 
 ## 下一步（6.2）
 1. 统一 `GenerateWorld` / `WorldModel` 调度第一切片已完成；继续把正式 Lab/审计逐步收敛到该入口。
-2. 在统一 WorldModel 上实现最终连续海岸 / 外海 / 封闭低地 / 显式湖泊的一致水面语义。
-3. 修复最终连续 Terrain 对河网造成的逆坡：明确河床纵剖面 / 水面约束，而不是隐藏或删除逆坡边。
+2. Terrain/Water reconciliation 约束数据已建立；下一步把 `CoastTargetElevation` 真正接入连续 Terrain broad surface，并验证非节点位置/Chunk 边界仍连续。
+3. 把 `RiverBedTarget` 与 LakeBedCeiling 作为独立水道/湖床 overlay 接入 Terrain，而不是修改整块宏观地形；随后重新计算最终水面/河床一致性。
 4. 保留当前 Consistency audit 的未解决基线作为 6.2 验收门槛；只有 FinalSurfaceMaskChanges / FinalUpslopeEdges 被真实协调后才能宣告可玩世界一致性。
 5. 6.2 后进入 6.3 WorldModel 版本化保存/重开；6.4 再做 Go→Java→一个 Loader 的早期游戏内验证。
 

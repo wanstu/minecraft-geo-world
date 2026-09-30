@@ -448,3 +448,40 @@ Phase 1 reference-world / coast / tectonics
 - [ ] 最终连续海岸、水位、湖面、河床纵剖面和最终生态同步仍未实现；Consistency 继续明确输出 UNRESOLVED。
 
 下一切片：在 WorldModel 上建立最终地形/水体协调数据，先解决最终海岸与外海/封闭低地语义，再处理河床纵剖面和湖面/溢流口。
+
+
+## Phase 6.2 第二切片实施结果（2026-09-30）
+
+基线：395c1cd；开发分支：agent/world-model-foundation。
+
+目标：把当前最终 Terrain / 宏观 Surface / Hydrology 之间的冲突转换成明确、可测试、可消费的约束数据，先建立正确的数据边界，再把约束应用到连续 Terrain。
+
+已完成：
+- [x] 新增 `internal/reconcile` 与 GenerateWorld 第 10 阶段 `reconcile`。
+- [x] 在每个宏观节点采样当前连续 Terrain，保存 RawTerrainElevation 与其 RawTerrainSurface。
+- [x] 海岸约束生成 `CoastTargetElevation`：宏观 ocean 节点若被 Terrain 抬出海面则下压到 sea-margin；非封闭宏观 land 节点若被 Terrain 压入海面则抬到 sea+margin；原本合法的 EnclosedBelowSea 不强行填平。
+- [x] 对 CoastTargetElevation 再做外海连通分类，保存 SurfaceMismatchBefore / After、raise / carve 数量与最大调整幅度。
+- [x] 统一水体元数据：Ocean 使用共享 SeaLevel；显式 Lake 使用 Hydrology Lake.SurfaceElevation；River 单独标记但当前不伪造水面高度。
+- [x] 显式湖泊生成 `LakeBedCeiling = lake surface - clearance`，统计当前最终 Terrain 高于可蓄水湖床 ceiling 的节点。
+- [x] 河流生成独立 `RiverBedTarget`：只对当前审计口径的非湖泊强河流、且原宏观高程确实向下的 FlowTo 边建立约束。
+- [x] 河床目标按 DAG 拓扑向下传播，必要时只 carve 下游床面，绝不 raise 上游/下游来隐藏逆坡；多支流汇合后统一满足所有上游约束。
+- [x] Reconciliation.Config 进入 Generator Config / ResolvedConfig；WorldModel 挂接 Reconciliation Model。
+- [x] Consistency Audit 输出 constraint 诊断，并把 constraint surface mismatch / target river upslope 非零视为默认失败。
+- [x] `-strict-final` 仍检查真实未应用约束的连续 Terrain，不因目标层为 0 就提前通过。
+
+### 验证
+
+- `go test ./internal/reconcile ./internal/generator -count=1`：通过。
+- `go test ./... -count=1`：通过。
+- 纯单元测试：全海洋/高 Terrain 能生成 ocean carve target 并恢复 Surface；全陆地/低 Terrain 能生成 land raise target；3-edge 河流 raw 逆坡经过 RiverBedTarget 后单调向下且不抬床；Lake water surface / bed ceiling 正确暴露。
+- Seed 731894205 / 640×400 / 128：Raw FinalSurfaceMaskChanges=806；CoastTarget 调整 665 节点（raise 329 / carve 336）后 SurfaceMismatchAfter=0。Raw FinalUpslopeEdges=72；RiverBedTarget carve 98 节点后 TargetUpslope=0。LakeBedViolations=1。
+- Seed 10400 / 640×400 / 128：Raw FinalSurfaceMaskChanges=608；CoastTarget 调整 510 节点（raise 184 / carve 326）后 SurfaceMismatchAfter=0。Raw FinalUpslopeEdges=126；RiverBedTarget carve 162 节点后 TargetUpslope=0。LakeBedViolations=7。
+
+### 明确未完成
+
+- [ ] CoastTargetElevation 目前是宏观控制点目标，尚未替换 Terrain 的连续 broad surface；节点之间、Chunk 边界、海岸带仍未重新验收。
+- [ ] RiverBedTarget 尚未作为局部 channel overlay 应用；真实 Terrain.SampleNormalized 仍会报告旧逆坡。
+- [ ] LakeBedCeiling 只暴露约束，尚未 carve 湖盆；湖面/溢流口还未与最终连续 Terrain 复验。
+- [ ] Ecology / MCProfile 仍消费宏观 Surface，而不是应用约束后的最终水体；同步属于后续 6.2 切片。
+
+下一切片：先把 CoastTargetElevation 以连续且不破坏 Chunk/Macro 连续性的方式接入 Terrain broad surface；随后把 RiverBedTarget / LakeBedCeiling 作为独立局部水道/湖床 overlay 接入。

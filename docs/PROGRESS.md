@@ -1053,3 +1053,26 @@ Phase 6.1b 状态：完成。
 仍未完成：最终连续海岸、水体、湖面、河床纵剖面与生态同步。
 
 下一步：Phase 6.2 第二切片建立最终 Terrain / Water reconciliation 数据与约束。
+
+
+## 2026-09-30 — Phase 6.2 第二切片：Terrain / Water reconciliation 约束
+
+基线：395c1cd，分支 agent/world-model-foundation。
+
+本切片没有直接改连续 Terrain，而是先把当前海岸/水体/河床冲突变成可执行约束数据。
+
+完成：
+- 新增 internal/reconcile，作为 GenerateWorld 第 10 阶段。
+- 保存最终 Terrain 宏观节点采样、RawTerrainSurface 与 CoastTargetElevation。
+- 海洋控制点被抬高时生成 carve target；非封闭陆地被压低时生成 raise target；合法封闭低地不填平。
+- Ocean / Lake / River 水体类型统一标记；Ocean / Lake 有明确水面，Lake 生成 bed ceiling。
+- 强河流生成独立 RiverBedTarget，按 FlowTo DAG 只向下 carve，处理多支流汇合。
+- Consistency Audit 新增 constraint 诊断并对 constraint 自身失败设默认护栏；strict-final 仍检查真实连续 Terrain。
+
+正式 Seed 结果：
+- 731894205：raw surface mismatch 806；constraint 调整 665 节点后 0。raw upslope 72；carve 98 河床节点后 target upslope 0。LakeBedViolations=1。
+- 10400：raw surface mismatch 608；constraint 调整 510 节点后 0。raw upslope 126；carve 162 河床节点后 target upslope 0。LakeBedViolations=7。
+
+测试：reconcile/generator 单测与 go test ./... 全通过。
+
+未完成：约束尚未应用到 Terrain.Sample；湖床/河床/海岸连续 overlay、最终生态同步仍待后续切片。

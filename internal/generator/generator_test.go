@@ -153,6 +153,18 @@ func TestGenerateWorldStoresResolvedConfig(t *testing.T) {
 	if m.Config.Terrain.CellSizeBlocks != cfg.Geometry.SpacingX() {
 		t.Fatalf("resolved terrain spacing %.12f want %.12f", m.Config.Terrain.CellSizeBlocks, cfg.Geometry.SpacingX())
 	}
+	if m.Config.Reconcile.CoastMarginNormalized <= 0 || m.Config.Reconcile.MinRiverBedDropNormalized <= 0 {
+		t.Fatal("resolved reconciliation defaults were not retained")
+	}
+	if m.Reconciliation == nil {
+		t.Fatal("world model is missing reconciliation stage")
+	}
+	if m.Reconciliation.SurfaceMismatchAfter != 0 {
+		t.Fatalf("reconciliation surface mismatches=%d want=0", m.Reconciliation.SurfaceMismatchAfter)
+	}
+	if m.Reconciliation.TargetUpslopeRiverEdges != 0 {
+		t.Fatalf("reconciliation target river upslope edges=%d want=0", m.Reconciliation.TargetUpslopeRiverEdges)
+	}
 }
 
 func TestGenerateWorldReportsOrderedProgress(t *testing.T) {

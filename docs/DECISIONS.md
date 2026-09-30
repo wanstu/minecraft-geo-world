@@ -962,3 +962,21 @@ Phase 6.1b 最终残余审计已完成。剩余 `*Cells` 使用点属于 blocks�
 7. 当前 context 取消只保证阶段边界可取消；若未来阶段耗时需要更细粒度，必须把 context 继续传入阶段内部，而不是声称已经支持即时取消。
 
 该决定不等于 6.2 水体一致性已完成；它只是为最终海岸、湖面、河床校正建立唯一因果链。
+
+
+## D-037：海岸控制点、河床纵剖面与水面必须分层约束
+
+状态：Phase 6.2 第二切片已实施约束模型，连续 Terrain 应用尚未完成
+
+最终水体协调不能把所有问题都塞进同一个“修正后高度”数组。
+
+规定：
+1. `CoastTargetElevation` 是宽域 Terrain 的宏观控制点目标，用于保持外海连通和宏观海陆身份；它可以 raise / carve broad surface control point。
+2. 合法 `EnclosedBelowSea` 不因海岸修复被强行抬到海面以上；其是否成为湖泊由 Hydrology 决定。
+3. `RiverBedTarget` 是局部 channel bed 纵剖面，必须独立于 broad Terrain control point；修复逆坡时只能 carve，不通过抬高河床制造假下坡。
+4. Ocean / Lake 水面是独立 water-surface datum：Ocean=共享 SeaLevel，Lake=Hydrology Lake.SurfaceElevation。
+5. 显式 Lake 生成 `LakeBedCeiling`，最终湖床必须低于水面并保留 clearance；当前违反点必须显式暴露，不能把水画在地表上方后忽略。
+6. River 当前只定义床面 target，不在缺乏河宽/流量到水深规则时伪造统一水面高度。
+7. Constraint target 为 0 mismatch/upslope 只证明约束可解；在它真正进入连续 Terrain / channel overlay 前，原始 strict-final 仍必须失败。
+
+原因：宽域地形、河床和水面属于三个不同几何对象。混在一个高度场里会导致修河时整片地形被拉低、修海岸时河谷被填平，或为了通过测试而隐藏真实逆坡。

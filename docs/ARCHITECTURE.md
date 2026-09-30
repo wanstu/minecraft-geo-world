@@ -217,3 +217,28 @@ WorldModel
 - Context 取消当前位于阶段边界。需要阶段内部即时取消时，context 必须进入相应算法循环。
 
 下一步架构对象将是最终 Terrain / Water reconciliation 数据：它必须同时引用最终连续 Terrain、宏观 Surface、Hydrology Flow/Lake 信息，并产出可被 Ecology/Profile/Runtime 一致消费的最终水陆语义。
+
+
+## 10. Terrain / Water Reconciliation 分层
+
+Phase 6.2 不再把“最终高度”视为唯一水体几何。当前 reconciliation 明确分三层：
+
+```text
+Broad Terrain control points
+  └─ CoastTargetElevation
+       负责外海连通 / 宏观海陆身份
+
+Local channel / basin bed
+  ├─ RiverBedTarget
+  └─ LakeBedCeiling
+       负责河床纵剖面 / 湖盆容水
+
+Water surface datum
+  ├─ Ocean = shared SeaLevel
+  ├─ Lake  = Lake.SurfaceElevation
+  └─ River = 后续由河宽/流量/床面规则求解
+```
+
+`internal/reconcile` 当前在宏观节点层把最终 Terrain、Macro Surface、Hydrology 转换成上述约束。Constraint 模型本身不是 Runtime 最终地形；只有后续 Terrain/channel sampler 实际消费这些 target 后，strict-final 才能从旧原始诊断切换到真正的最终验收。
+
+当前两个正式 Seed 已证明约束层可把目标 Surface mismatch 与目标 River upslope 都降为 0，但 LakeBedCeiling 仍暴露少量待 carve 湖床节点。这些数字是下一阶段应用层的输入，不是已完成水体实现的证明。

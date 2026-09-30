@@ -9,6 +9,7 @@ import (
 	"geoworld/internal/landform"
 	"geoworld/internal/mcprofile"
 	"geoworld/internal/phase1"
+	"geoworld/internal/reconcile"
 	"geoworld/internal/terrain"
 	"geoworld/internal/world"
 )
@@ -31,6 +32,7 @@ type Config struct {
 	Geomorph  geomorph.Config
 	Ecology   ecology.Config
 	Terrain   terrain.Config
+	Reconcile reconcile.Config
 }
 
 // ResolvedConfig records the values actually used after every stage has applied
@@ -49,6 +51,7 @@ type ResolvedConfig struct {
 	Geomorph  geomorph.Config
 	Ecology   ecology.Config
 	Terrain   terrain.Config
+	Reconcile reconcile.Config
 }
 
 // WorldModel is the unified in-memory result. Phase 6.3 will define which
@@ -59,15 +62,16 @@ type WorldModel struct {
 	Geometry world.GridGeometry
 	Surface  *world.Surface
 
-	Phase1    *phase1.World
-	Climate   *climate.Model
-	Hydrology *hydrology.Model
-	Erosion   *erosion.Model
-	Landform  *landform.Model
-	Geomorph  *geomorph.Model
-	Ecology   *ecology.Model
-	Profile   *mcprofile.Model
-	Terrain   *terrain.Model
+	Phase1         *phase1.World
+	Climate        *climate.Model
+	Hydrology      *hydrology.Model
+	Erosion        *erosion.Model
+	Landform       *landform.Model
+	Geomorph       *geomorph.Model
+	Ecology        *ecology.Model
+	Profile        *mcprofile.Model
+	Terrain        *terrain.Model
+	Reconciliation *reconcile.Model
 }
 
 // Stage identifies one deterministic pipeline boundary for progress reporting.
@@ -83,6 +87,7 @@ const (
 	StageEcology   Stage = "ecology"
 	StageProfile   Stage = "mcprofile"
 	StageTerrain   Stage = "terrain"
+	StageReconcile Stage = "reconcile"
 )
 
 var orderedStages = [...]Stage{
@@ -95,6 +100,7 @@ var orderedStages = [...]Stage{
 	StageEcology,
 	StageProfile,
 	StageTerrain,
+	StageReconcile,
 }
 
 type Progress struct {

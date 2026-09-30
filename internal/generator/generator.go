@@ -14,6 +14,7 @@ import (
 	"geoworld/internal/landform"
 	"geoworld/internal/mcprofile"
 	"geoworld/internal/phase1"
+	"geoworld/internal/reconcile"
 	"geoworld/internal/terrain"
 	"geoworld/internal/world"
 )
@@ -147,18 +148,35 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 	}
 	reporter.done(StageTerrain)
 
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	rec, err := reconcile.Build(reconcile.Input{
+		Geometry:           w.Geometry,
+		SeaLevelNormalized: w.Surface.SeaLevelNormalized,
+		MacroSurface:       w.Surface,
+		MacroElevation:     w.Elevation,
+		Hydrology:          h,
+		Terrain:            t,
+	}, resolved.Reconcile)
+	if err != nil {
+		return nil, fmt.Errorf("generator: reconcile: %w", err)
+	}
+	reporter.done(StageReconcile)
+
 	model := &WorldModel{
-		Geometry:  w.Geometry,
-		Surface:   w.Surface,
-		Phase1:    w,
-		Climate:   c,
-		Hydrology: h,
-		Erosion:   e,
-		Landform:  l,
-		Geomorph:  g,
-		Ecology:   eco,
-		Profile:   p,
-		Terrain:   t,
+		Geometry:       w.Geometry,
+		Surface:        w.Surface,
+		Phase1:         w,
+		Climate:        c,
+		Hydrology:      h,
+		Erosion:        e,
+		Landform:       l,
+		Geomorph:       g,
+		Ecology:        eco,
+		Profile:        p,
+		Terrain:        t,
+		Reconciliation: rec,
 	}
 	model.Config = ResolvedConfig{
 		Seed:               resolved.Seed,
@@ -172,6 +190,7 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 		Geomorph:           g.Config,
 		Ecology:            eco.Config,
 		Terrain:            t.Config,
+		Reconcile:          rec.Config,
 	}
 	return model, nil
 }

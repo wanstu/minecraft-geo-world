@@ -28,6 +28,10 @@ type report struct {
 	FinalOceanLabelAboveSea, FinalLandLabelBelowSea, FinalSurfaceMaskChanges int
 	NonLakeStrongRiverEdges, OriginallyDownhillEdges, FinalUpslopeEdges      int
 	MaxNormalizedRise                                                        float64
+	ConstraintSurfaceMismatches                                              int
+	ConstraintCoastAdjustedNodes, ConstraintCoastRaisedNodes                 int
+	ConstraintCoastCarvedNodes, ConstraintLakeBedViolations                  int
+	ConstraintRiverUpslopeEdges, ConstraintRiverBedCarvedNodes               int
 }
 
 func checked[T any](value T, err error) T {
@@ -57,6 +61,15 @@ func inspect(seed int64, width, height int, cellSize float64) report {
 	p := model.Profile
 	t := model.Terrain
 	r := report{Seed: seed, Width: width, Height: height, CellSizeBlocks: cellSize, SeaLevelNormalized: model.Config.SeaLevelNormalized}
+	if rec := model.Reconciliation; rec != nil {
+		r.ConstraintSurfaceMismatches = rec.SurfaceMismatchAfter
+		r.ConstraintCoastAdjustedNodes = rec.CoastAdjustedNodes
+		r.ConstraintCoastRaisedNodes = rec.CoastRaisedNodes
+		r.ConstraintCoastCarvedNodes = rec.CoastCarvedNodes
+		r.ConstraintLakeBedViolations = rec.LakeBedViolations
+		r.ConstraintRiverUpslopeEdges = rec.TargetUpslopeRiverEdges
+		r.ConstraintRiverBedCarvedNodes = rec.RiverBedCarvedNodes
+	}
 	final := make([]float64, len(w.Elevation))
 	crustOcean, actualOcean := 0, 0
 	masks := [][]bool{c.LandMask, h.LandMask, e.LandMask, l.LandMask, g.LandMask, eco.LandMask, p.LandMask}
@@ -144,7 +157,10 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		if r.MacroOceanAtOrAboveSea != 0 || r.MacroMaskDisagreements != 0 {
+		if r.MacroOceanAtOrAboveSea != 0 ||
+			r.MacroMaskDisagreements != 0 ||
+			r.ConstraintSurfaceMismatches != 0 ||
+			r.ConstraintRiverUpslopeEdges != 0 {
 			failed = true
 		}
 		if r.FinalSurfaceMaskChanges != 0 || r.FinalUpslopeEdges != 0 {
