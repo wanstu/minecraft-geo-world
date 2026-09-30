@@ -25,7 +25,7 @@
 - Phase 6.2 第一切片：0a0b1f2 — feat: add unified world generation pipeline。
 - Phase 6.2 第二切片：5b53ba9 — feat: add terrain water reconciliation constraints。
 - Phase 6.2 第三切片：10da905 — feat: apply continuous coast terrain correction。
-- Phase 6.2 第四切片：continuous local waterbed application（提交号以 git log 获取）。
+- Phase 6.2 第四切片：1869592 — feat: apply continuous river and lake waterbed。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
