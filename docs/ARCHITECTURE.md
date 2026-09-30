@@ -183,3 +183,37 @@ Runtime 启动已有世界时：
 - 宏观模型与最终采样地形允许尺度不同，但最终海岸、河床、水面、湖泊和群系必须一致。
 - 统一生成入口必须验证依赖与一致性，而非仅组装多个 Model。
 - 完整实施和验收见 PHASE6.md。
+
+
+## 9. Phase 6.2 当前统一生成入口
+
+当前正式生成因果链：
+
+```text
+generator.Config
+  ├─ Seed
+  ├─ GridGeometry
+  ├─ SeaLevelNormalized
+  └─ stage configs
+        ↓
+GenerateWorld(ctx, config, progress)
+        ↓
+Phase1 → Climate → Hydrology → Erosion → Landform → Geomorph
+       → Ecology → MCProfile → Terrain
+        ↓
+WorldModel
+  ├─ resolved Config
+  ├─ shared Geometry / Surface
+  └─ current stage models
+```
+
+当前原则：
+
+- Seed / Geometry / SeaLevel 只有顶层一份正式真相源。
+- 阶段级重复字段若显式填写，只能用于兼容性检查，不能覆盖顶层共享值。
+- `WorldModel.Config` 保存每个阶段最终实际使用的参数，为 Phase 6.3 manifest / persistence 准备。
+- 当前 WorldModel 暂时挂完整阶段模型，方便 Phase 6.2 做跨阶段一致性校正；这不是未来持久化格式承诺。
+- 正式跨阶段审计逐步改用 GenerateWorld；单阶段 Lab 仍可直接调用模块用于算法实验。
+- Context 取消当前位于阶段边界。需要阶段内部即时取消时，context 必须进入相应算法循环。
+
+下一步架构对象将是最终 Terrain / Water reconciliation 数据：它必须同时引用最终连续 Terrain、宏观 Surface、Hydrology Flow/Lake 信息，并产出可被 Ecology/Profile/Runtime 一致消费的最终水陆语义。

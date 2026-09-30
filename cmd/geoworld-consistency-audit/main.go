@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,15 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"geoworld/internal/climate"
-	"geoworld/internal/ecology"
-	"geoworld/internal/erosion"
-	"geoworld/internal/geomorph"
-	"geoworld/internal/hydrology"
-	"geoworld/internal/landform"
-	"geoworld/internal/mcprofile"
+	"geoworld/internal/generator"
 	"geoworld/internal/phase1"
-	"geoworld/internal/terrain"
 	"geoworld/internal/world"
 )
 
@@ -44,21 +38,25 @@ func checked[T any](value T, err error) T {
 }
 
 func inspect(seed int64, width, height int, cellSize float64) report {
-	w := phase1.Generate(phase1.Config{
-		Seed: seed, Width: width, Height: height,
+	geometry := world.GridGeometry{
+		Width: width, Height: height,
 		SpanXBlocks: float64(width-1) * cellSize,
 		SpanZBlocks: float64(height-1) * cellSize,
-		PlateCount:  18, OceanFraction: .68,
-	})
-	c := checked(climate.Generate(climate.InputFromPhase1(w), climate.Config{}))
-	h := checked(hydrology.Generate(hydrology.InputFromWorld(w, c), hydrology.Config{}))
-	e := checked(erosion.Generate(erosion.InputFromWorld(w, c, h), erosion.Config{}))
-	l := checked(landform.Generate(landform.InputFromWorld(w, e), landform.Config{}))
-	g := checked(geomorph.Generate(geomorph.InputFromModels(h, e, l), geomorph.Config{}))
-	eco := checked(ecology.Generate(ecology.InputFromModels(c, h, e, l, g), ecology.Config{}))
-	p := checked(mcprofile.Generate(mcprofile.InputFromModels(eco, l, g)))
-	t := checked(terrain.Generate(terrain.InputFromModels(e, l, g), terrain.Config{Seed: seed}))
-	r := report{Seed: seed, Width: width, Height: height, CellSizeBlocks: cellSize, SeaLevelNormalized: w.Surface.SeaLevelNormalized}
+	}
+	model := checked(generator.GenerateWorld(context.Background(), generator.Config{
+		Seed: seed, Geometry: geometry,
+		PlateCount: 18, OceanFraction: .68,
+	}, nil))
+	w := model.Phase1
+	c := model.Climate
+	h := model.Hydrology
+	e := model.Erosion
+	l := model.Landform
+	g := model.Geomorph
+	eco := model.Ecology
+	p := model.Profile
+	t := model.Terrain
+	r := report{Seed: seed, Width: width, Height: height, CellSizeBlocks: cellSize, SeaLevelNormalized: model.Config.SeaLevelNormalized}
 	final := make([]float64, len(w.Elevation))
 	crustOcean, actualOcean := 0, 0
 	masks := [][]bool{c.LandMask, h.LandMask, e.LandMask, l.LandMask, g.LandMask, eco.LandMask, p.LandMask}

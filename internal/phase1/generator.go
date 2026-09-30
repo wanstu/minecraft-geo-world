@@ -32,6 +32,16 @@ const (
 )
 
 func Generate(cfg Config) *World {
+	w, err := GenerateChecked(cfg)
+	if err != nil {
+		panic(err)
+	}
+	return w
+}
+
+// GenerateChecked is the formal error-returning Phase 1 entry point used by the
+// unified generator. Generate remains as the legacy panic wrapper.
+func GenerateChecked(cfg Config) (*World, error) {
 	if cfg.Width <= 0 {
 		cfg.Width = 320
 	}
@@ -40,6 +50,9 @@ func Generate(cfg Config) *World {
 	}
 	if cfg.PlateCount < 2 {
 		cfg.PlateCount = 18
+	}
+	if cfg.SeaLevelNormalized <= 0 || cfg.SeaLevelNormalized >= 1 {
+		cfg.SeaLevelNormalized = world.DefaultSeaLevelNormalized
 	}
 	if cfg.OceanFraction <= 0 || cfg.OceanFraction >= 1 {
 		cfg.OceanFraction = 0.68
@@ -59,7 +72,7 @@ func Generate(cfg Config) *World {
 		SpanXBlocks: cfg.SpanXBlocks, SpanZBlocks: cfg.SpanZBlocks,
 	}
 	if _, err := geometry.SquareCellSize(); err != nil {
-		panic(err) // Generate keeps the legacy non-error API until Phase 6.2.
+		return nil, err
 	}
 
 	r := rand.New(rand.NewPCG(uint64(cfg.Seed), uint64(cfg.Seed)^0x9e3779b97f4a7c15))
@@ -127,12 +140,12 @@ func Generate(cfg Config) *World {
 	w.computeElevation()
 	// All downstream stages share this macro surface. Final continuous terrain
 	// requires a separate coastline/water reconciliation in Phase 6.2.
-	surface, err := world.ClassifySurface(cfg.Width, cfg.Height, w.Elevation, world.DefaultSeaLevelNormalized)
+	surface, err := world.ClassifySurface(cfg.Width, cfg.Height, w.Elevation, cfg.SeaLevelNormalized)
 	if err != nil {
-		panic(err) // Generate's legacy API cannot return errors; generated heights must satisfy this contract.
+		return nil, err
 	}
 	w.Surface = surface
-	return w
+	return w, nil
 }
 
 func nearestPlate(x, y float64, plates []Plate) int {

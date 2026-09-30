@@ -1026,3 +1026,30 @@ Phase 6.1b 状态：完成。
 仍明确未完成：最终连续海岸 / 湖面 / 河床逆坡属于 6.2，不能用 6.1b 的尺度稳定性代替。
 
 下一步：Phase 6.2 — GenerateWorld / WorldModel 与最终水体一致性。
+
+
+## 2026-09-30 — Phase 6.2 第一切片：统一 GenerateWorld / WorldModel
+
+基线：0bd8cff，分支 agent/world-model-foundation。
+
+本切片建立正式统一调度层，不修改现有地理算法输出。
+
+完成：
+- 新增 internal/generator Config / ResolvedConfig / WorldModel / GenerateWorld。
+- Seed / GridGeometry / SeaLevelNormalized 提升为顶层共享契约。
+- Phase 1 新增 GenerateChecked error API，legacy Generate 继续兼容。
+- 阶段 SeaLevel、Terrain seed / legacy geometry 与顶层冲突时拒绝。
+- 9 阶段固定进度回调；context 可在阶段边界取消。
+- WorldModel 收集各阶段实际解析后的 Config，作为后续持久化输入。
+- Consistency Audit 改用 GenerateWorld。
+
+验证：
+- generator + phase1 单测通过。
+- go test ./... -count=1 通过。
+- 与旧手工流水线关键字段/采样结果一致。
+- SeaLevel=0.47 共享传播回归通过。
+- Consistency 两个正式 Seed 默认诊断逐项保持 6.1b 基线。
+
+仍未完成：最终连续海岸、水体、湖面、河床纵剖面与生态同步。
+
+下一步：Phase 6.2 第二切片建立最终 Terrain / Water reconciliation 数据与约束。

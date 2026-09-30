@@ -944,3 +944,21 @@ STATUS.md 只描述当前基线、进行中、未解决及下一步。原有逐�
 - Terrain GridGeometry / ScalarGrid sampling / world Origin；CellSizeBlocks / Origin Config 仅作受控 legacy 兼容。
 
 Phase 6.1b 最终残余审计已完成。剩余 `*Cells` 使用点属于 blocks→当前采样网格的运行时换算、128-block reference 翻译、测试/统计或 legacy 兼容，而不是新的固定节点生成尺度。该决策继续约束 6.2 之后的所有新增空间参数。
+
+
+## D-036：正式生成入口只有一个共享 Seed / Geometry / SeaLevel 真相源
+
+状态：Phase 6.2 第一切片已实施
+
+正式世界生成必须经过 `internal/generator.GenerateWorld`。Seed、GridGeometry、SeaLevelNormalized 是顶层共享世界契约，不允许阶段级配置静默覆盖。
+
+规则：
+1. 顶层 Config 解析一次共享默认值与合法范围；阶段配置只描述阶段自身参数。
+2. Climate / Hydrology / Erosion / Landform / Geomorph 若显式提供 SeaLevel，只允许与顶层值一致，否则拒绝。
+3. Terrain 的 seed / CellSize / Origin legacy 字段不能成为第二套真相源；正式路径从顶层 Seed / Geometry 派生。
+4. Phase 1 正式入口使用 error-returning `GenerateChecked`；legacy `Generate` 仅作兼容 wrapper。
+5. WorldModel 必须保存各阶段实际解析后的 Config，后续持久化使用 resolved config，而不是调用方稀疏输入。
+6. Consistency Audit 等正式跨阶段验证优先消费统一 Generator，避免多个 CLI 复制调度顺序后逐渐分叉。
+7. 当前 context 取消只保证阶段边界可取消；若未来阶段耗时需要更细粒度，必须把 context 继续传入阶段内部，而不是声称已经支持即时取消。
+
+该决定不等于 6.2 水体一致性已完成；它只是为最终海岸、湖面、河床校正建立唯一因果链。

@@ -411,3 +411,40 @@ Phase 1 reference-world / coast / tectonics
 - 后续新增任何 distance / radius / step / wavelength 参数都必须以 GridGeometry / Minecraft blocks 为正式语义，不能重新引入“Cell 就是世界单位”的隐式假设。
 
 下一阶段：**Phase 6.2 — GenerateWorld / WorldModel 与最终水体一致性。**
+
+
+## Phase 6.2 第一切片实施结果（2026-09-30）
+
+基线：0bd8cff；开发分支：agent/world-model-foundation。
+
+目标：先建立唯一正式调度入口和共享世界契约，再在该 WorldModel 上做海岸/水体/河床校正，避免继续由多个 CLI 各自复制一条流水线。
+
+已完成：
+- [x] 新增 `internal/generator.Config`、`ResolvedConfig`、`WorldModel`、`GenerateWorld`。
+- [x] 顶层 Seed / GridGeometry / SeaLevelNormalized 作为共享单一真相源；PlateCount / OceanFraction / EdgeOceanBufferFraction 在统一入口解析默认值并验证。
+- [x] 阶段级 Climate / Hydrology / Erosion / Landform / Geomorph SeaLevel 若与顶层值冲突，统一入口直接返回 error。
+- [x] Terrain seed 与 legacy CellSize / Origin 不允许绕过顶层 Seed / Geometry。
+- [x] Phase 1 增加 `GenerateChecked` error API；旧 `Generate` 保留为兼容 panic wrapper。
+- [x] GenerateWorld 按固定顺序执行 Phase1→Climate→Hydrology→Erosion→Landform→Geomorph→Ecology→MCProfile→Terrain。
+- [x] WorldModel 挂接当前完整阶段模型，并把每个阶段**实际解析后的 Config**回收到 `ResolvedConfig`；6.3 再定义真正持久化字段，不把所有 Lab 暂态数组直接当存档格式。
+- [x] 进度回调暴露 9 个明确阶段；支持 context 取消，当前粒度为阶段边界。
+- [x] `geoworld-consistency-audit` 改用 GenerateWorld，不再手工复制整条生成链。
+
+### 回归与验证
+
+- `go test ./internal/generator ./internal/phase1 -count=1`：通过。
+- `go test ./... -count=1`：通过。
+- 统一 GenerateWorld 与旧手工流水线在相同配置下：Phase1 Elevation、Hydrology FlowTo、MC Profile、固定世界坐标 Terrain 采样一致。
+- 非默认 SeaLevelNormalized=0.47 可从 Phase1 Surface 贯穿 Climate / Hydrology / Erosion / Landform / Geomorph 的实际解析 Config。
+- Geometry / SeaLevel / Terrain seed / legacy geometry 冲突均返回 error；已取消 context 在开始生成前返回 context.Canceled。
+- 9 个 Progress 事件顺序、Completed / Total 值固定并有测试。
+- Consistency Audit 改走统一入口后，Seed 731894205 / 10400、640×400、128 blocks/node 的全部当前诊断与 6.1b 基线逐项一致。
+
+### 当前边界
+
+- [ ] Context 取消尚不是单阶段内部的抢占式取消；Climate/Hydrology 等长阶段目前在阶段结束后才观察取消。
+- [ ] 旧 Lab/Audit 尚未全部迁移统一 Generator，当前先迁最关键的 Consistency Audit。
+- [ ] WorldModel 现在仍挂接完整阶段模型，持久化 schema 与 runtime 最小字段属于 6.3。
+- [ ] 最终连续海岸、水位、湖面、河床纵剖面和最终生态同步仍未实现；Consistency 继续明确输出 UNRESOLVED。
+
+下一切片：在 WorldModel 上建立最终地形/水体协调数据，先解决最终海岸与外海/封闭低地语义，再处理河床纵剖面和湖面/溢流口。

@@ -74,6 +74,10 @@ type Config struct {
 	SpanXBlocks float64
 	SpanZBlocks float64
 
+	// SeaLevelNormalized controls macro Surface inundation. It is a normalized
+	// terrain datum, not Minecraft Y. Zero preserves the shared default.
+	SeaLevelNormalized float64
+
 	// OceanFraction currently controls oceanic crust area, not inundated ocean area.
 	OceanFraction           float64
 	EdgeOceanBufferFraction float64
