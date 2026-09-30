@@ -20,7 +20,7 @@
 - Phase 6.1b 第四切片：905c49f — feat: migrate hydrology spatial scales to world units。
 - Phase 6.1b 第五切片：3f8b69a — feat: migrate geomorph spatial scales to world units。
 - Phase 6.1b 第六切片：10e7ed7 — feat: migrate landform spatial scales to world units。
-- Phase 6.1b 第七切片：Phase 1 reference-world residual scale migration（提交号以 git log 获取）。
+- Phase 6.1b 第七切片：444c3c3 — feat: migrate phase1 reference world scales。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
