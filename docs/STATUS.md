@@ -17,7 +17,7 @@
 - Phase 6.1b 第一切片：1439bcb — feat: migrate phase1 spatial scales to world units。
 - Phase 6.1b 第二切片：6a3ecf0 — feat: migrate climate spatial scales to world units。
 - Phase 6.1b 第三切片：6b3b23d — feat: migrate erosion spatial scales to world units。
-- Phase 6.1b 第四切片：fd2cd7a — feat: migrate hydrology spatial scales to world units。
+- Phase 6.1b 第四切片：905c49f — feat: migrate hydrology spatial scales to world units。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
