@@ -10,6 +10,7 @@ func InputFromModels(erosionModel *erosion.Model, landformModel *landform.Model,
 	return Input{
 		Width:               erosionModel.Width,
 		Height:              erosionModel.Height,
+		Geometry:            erosionModel.Geometry,
 		BaseElevation:       append([]float64(nil), erosionModel.ErodedElevation...),
 		RollingPlainWeight:  append([]float64(nil), landformModel.RollingPlainWeight...),
 		HillWeight:          append([]float64(nil), landformModel.HillWeight...),

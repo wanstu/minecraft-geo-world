@@ -25,8 +25,8 @@ func RenderAll(m *Model, outDir string, cfg RenderConfig) error {
 		return err
 	}
 
-	widthWorld := float64(m.BaseElevation.Width-1) * m.Config.CellSizeBlocks
-	heightWorld := float64(m.BaseElevation.Height-1) * m.Config.CellSizeBlocks
+	widthWorld := m.Geometry.SpanXBlocks
+	heightWorld := m.Geometry.SpanZBlocks
 
 	finalImg := image.NewRGBA(image.Rect(0, 0, cfg.WidthPx, cfg.HeightPx))
 	detailImg := image.NewRGBA(image.Rect(0, 0, cfg.WidthPx, cfg.HeightPx))
@@ -40,9 +40,9 @@ func RenderAll(m *Model, outDir string, cfg RenderConfig) error {
 	)
 
 	for py := 0; py < cfg.HeightPx; py++ {
-		z := float64(py) / float64(maxInt(cfg.HeightPx-1, 1)) * heightWorld
+		z := m.Geometry.OriginZ + float64(py)/float64(maxInt(cfg.HeightPx-1, 1))*heightWorld
 		for px := 0; px < cfg.WidthPx; px++ {
-			x := float64(px) / float64(maxInt(cfg.WidthPx-1, 1)) * widthWorld
+			x := m.Geometry.OriginX + float64(px)/float64(maxInt(cfg.WidthPx-1, 1))*widthWorld
 			s := m.Sample(x, z)
 
 			finalImg.SetRGBA(px, py, elevationColor(s.FinalHeight))

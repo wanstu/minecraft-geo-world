@@ -117,7 +117,7 @@
 - [x] 各 adapter 传递共享的宏观 LandMask，不再从 Crust 重建。
 - [x] 出露海洋地壳参与陆地气候、地貌与生态，输入切片不反向修改上游模型。
 - [x] 持久保留一致性审计命令。
-- [ ] 所有旧空间参数迁移（6.1b）。
+- [x] 所有当前已知旧空间参数迁移（6.1b）；最终残余审计已完成，后续新增空间参数继续遵守 GridGeometry / blocks 规则。
 - [ ] 最终海岸、河床、水面与湖泊协调（6.2）。
 - [ ] 统一入口、存取闭环及游戏验证。
 
@@ -363,3 +363,51 @@ phase1.Generate 仍保留旧的非 error 返回接口：内部产生非法高程
 - go run ./cmd/geoworld-consistency-audit：731894205 / 10400 全部当前诊断保持基线；最终连续海岸 / 河床问题仍为 UNRESOLVED。
 
 下一步：Terrain Input / Model 直接携带 GridGeometry，统一 scalar grid 的 origin / spacing，并保留受控 legacy 兼容入口。
+
+
+## Phase 6.1b 第八切片实施结果（2026-09-30）
+
+基线：24d124b；开发分支：agent/world-model-foundation。
+
+本切片解决 Terrain 独立 `CellSizeBlocks / Origin` 可能与上游世界 Geometry 脱节的问题，并完成 6.1b 最终残余尺度审计。
+
+已完成：
+- [x] `terrain.Input` / `terrain.Model` 接入 `GridGeometry`；正式 `InputFromModels` 继承 Erosion Geometry。
+- [x] Terrain ScalarGrid 全部改用 `sampling.NewScalarGridWithGeometry`。
+- [x] `CellSizeBlocks / OriginX / OriginZ` 只保留 legacy 兼容；Input 未提供 Geometry 时才允许用它们构造兼容 Geometry，默认 128 blocks/node。
+- [x] Geometry 已提供时，legacy cell size / origin 与 Geometry 冲突会明确失败，禁止静默错位。
+- [x] Terrain Render 按 Geometry Origin + Span 采样，非零 Origin 不再错误从 0 开始渲染。
+- [x] Terrain Lab / Audit 的 `-cell-size` 从 Phase 1 设置整条世界 Span；Consistency audit 同样使用整条 Geometry 并通过 `NodePosition()` 采最终地形。
+- [x] 固定相同物理范围 128 / 64 blocks-node、非零 Origin 回归覆盖 BaseElevation、RegionalDetail、FinalHeight。
+- [x] 最终全仓残余尺度搜索已完成；剩余 `*Cells` 均属于 blocks→当前采样网格的运行时变量、128-block reference 翻译、测试/统计或 legacy 兼容字段，未发现新的固定节点生成尺度。
+
+### 验证
+
+- `go test ./internal/terrain -count=1`：通过。
+- `go test ./... -count=1`：通过。
+- `go run ./cmd/geoworld-terrain-audit`：4 Seed / 640×400 / 128 blocks 通过；最大 |regional detail| 0.03314–0.03689，chunk epsilon jump 1.12e-7–1.48e-7，macro slope mismatch 2.26e-6–6.12e-6。
+- 默认 `geoworld-consistency-audit`：731894205 / 10400 所有当前诊断保持 6.1b 前基线；最终连续海岸 / 河床问题仍为 UNRESOLVED。
+- 非默认 `cell-size=64` 的 Phase1→Terrain Consistency 路径可完整运行，MacroMaskDisagreements=0，验证命令层 Geometry 已统一。
+
+## Phase 6.1b 收口
+
+状态：**完成**。
+
+当前已迁移并验证的空间尺度链：
+
+```text
+Phase 1 reference-world / coast / tectonics
+→ Climate transport / distance / orographic gradient
+→ Hydrology D8 slope / runoff area / lake area
+→ Erosion slope / relief radius
+→ Landform mountain / valley kernels
+→ Geomorph upstream memory / alluvial-fan spreading
+→ Terrain geometry / sampling / origin
+```
+
+收口边界：
+- 物理尺度稳定不等于不同采样精度逐 Cell 完全相同；D8 河网、离散边界和分类仍允许合理的量化/拓扑差异。
+- 6.1b 不处理最终连续 Terrain 改变海岸、湖面或河床逆坡，这些仍是 Phase 6.2 的独立验收问题。
+- 后续新增任何 distance / radius / step / wavelength 参数都必须以 GridGeometry / Minecraft blocks 为正式语义，不能重新引入“Cell 就是世界单位”的隐式假设。
+
+下一阶段：**Phase 6.2 — GenerateWorld / WorldModel 与最终水体一致性。**

@@ -44,7 +44,12 @@ func checked[T any](value T, err error) T {
 }
 
 func inspect(seed int64, width, height int, cellSize float64) report {
-	w := phase1.Generate(phase1.Config{Seed: seed, Width: width, Height: height, PlateCount: 18, OceanFraction: .68})
+	w := phase1.Generate(phase1.Config{
+		Seed: seed, Width: width, Height: height,
+		SpanXBlocks: float64(width-1) * cellSize,
+		SpanZBlocks: float64(height-1) * cellSize,
+		PlateCount:  18, OceanFraction: .68,
+	})
 	c := checked(climate.Generate(climate.InputFromPhase1(w), climate.Config{}))
 	h := checked(hydrology.Generate(hydrology.InputFromWorld(w, c), hydrology.Config{}))
 	e := checked(erosion.Generate(erosion.InputFromWorld(w, c, h), erosion.Config{}))
@@ -52,7 +57,7 @@ func inspect(seed int64, width, height int, cellSize float64) report {
 	g := checked(geomorph.Generate(geomorph.InputFromModels(h, e, l), geomorph.Config{}))
 	eco := checked(ecology.Generate(ecology.InputFromModels(c, h, e, l, g), ecology.Config{}))
 	p := checked(mcprofile.Generate(mcprofile.InputFromModels(eco, l, g)))
-	t := checked(terrain.Generate(terrain.InputFromModels(e, l, g), terrain.Config{Seed: seed, CellSizeBlocks: cellSize}))
+	t := checked(terrain.Generate(terrain.InputFromModels(e, l, g), terrain.Config{Seed: seed}))
 	r := report{Seed: seed, Width: width, Height: height, CellSizeBlocks: cellSize, SeaLevelNormalized: w.Surface.SeaLevelNormalized}
 	final := make([]float64, len(w.Elevation))
 	crustOcean, actualOcean := 0, 0
@@ -79,7 +84,8 @@ func inspect(seed int64, width, height int, cellSize float64) report {
 				break
 			}
 		}
-		final[i] = t.SampleNormalized(float64(i%width)*cellSize, float64(i/width)*cellSize)
+		x, z := w.Geometry.NodePosition(i%width, i/width)
+		final[i] = t.SampleNormalized(x, z)
 		if !land && final[i] >= r.SeaLevelNormalized {
 			r.FinalOceanLabelAboveSea++
 		}

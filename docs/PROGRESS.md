@@ -996,3 +996,33 @@ Phase 5 完成第一版。
 - 6.1b 最终全仓残余尺度审计。
 
 下一步：迁移 Terrain Geometry 契约。
+
+
+## 2026-09-30 — Phase 6.1b 第八切片：Terrain Geometry 与收口
+
+基线：24d124b，分支 agent/world-model-foundation。
+
+残余审计最后确认 Terrain 仍可单独指定 CellSizeBlocks / Origin，存在和上游 Geometry 脱节的风险。本切片完成正式 Geometry 绑定，并结束 6.1b。
+
+本切片完成：
+- Terrain Input / Model 接入 GridGeometry，正式 adapter 继承 Erosion Geometry。
+- ScalarGrid 全部由 `NewScalarGridWithGeometry` 创建。
+- legacy CellSizeBlocks / Origin 只在 Input 未提供 Geometry 时作为兼容入口；与显式 Geometry 冲突时直接报错。
+- Render 支持非零 Origin。
+- Terrain Lab / Audit / Consistency 的 cell-size 从 Phase 1 定义整个流水线 Geometry。
+- Consistency 用 Geometry.NodePosition 采最终 Terrain。
+- 新增非零 Origin 的 128 / 64 blocks-node 固定物理范围回归。
+- 最终全仓残余尺度搜索完成，未发现新的固定节点生成尺度。
+
+验证：
+- terrain 单元测试通过。
+- go test ./... -count=1 通过。
+- 4 Seed Terrain audit 通过；|detail| 0.03314–0.03689，chunk jump 1.12e-7–1.48e-7，macro slope mismatch 2.26e-6–6.12e-6。
+- 默认 2 Seed Consistency 与既有基线完全一致。
+- cell-size=64 的非默认完整 Consistency 路径成功，跨模块 MacroMaskDisagreements=0。
+
+Phase 6.1b 状态：完成。
+
+仍明确未完成：最终连续海岸 / 湖面 / 河床逆坡属于 6.2，不能用 6.1b 的尺度稳定性代替。
+
+下一步：Phase 6.2 — GenerateWorld / WorldModel 与最终水体一致性。

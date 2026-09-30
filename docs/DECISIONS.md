@@ -922,7 +922,7 @@ STATUS.md 只描述当前基线、进行中、未解决及下一步。原有逐�
 
 ## D-035：旧 Cell 空间参数必须通过共享参考物理尺度迁移
 
-状态：Phase 1、Climate、Erosion、Hydrology、Geomorph、Landform 第一批已实现；继续做全仓残余尺度审计
+状态：Phase 6.1b 当前范围已完成；后续新增空间参数继续强制执行
 
 历史算法大量使用 Cell / iteration 表达作用范围。Phase 6.1b 规定：
 
@@ -940,5 +940,7 @@ STATUS.md 只描述当前基线、进行中、未解决及下一步。原有逐�
 - Hydrology FillEpsilon、D8 slope、LocalRunoff 物理面积量纲、MinLakeAreaBlocks2。
 - Geomorph 上游陡坡/山地记忆衰减与冲积扇扩散范围。
 - Landform MountainDistance、MountainInfluence、ValleyRadius、ValleyDecay。
+- Phase 1 reference-world plate/continent geometry、edge buffer 与固定节点频率。
+- Terrain GridGeometry / ScalarGrid sampling / world Origin；CellSizeBlocks / Origin Config 仅作受控 legacy 兼容。
 
-Phase 1 reference-world plate/continent geometry 与固定节点频率也已按本决策迁移。下一步重点处理 Terrain CellSizeBlocks / Origin 与上游 GridGeometry 的关系，然后做最终全仓残余尺度审计。
+Phase 6.1b 最终残余审计已完成。剩余 `*Cells` 使用点属于 blocks→当前采样网格的运行时换算、128-block reference 翻译、测试/统计或 legacy 兼容，而不是新的固定节点生成尺度。该决策继续约束 6.2 之后的所有新增空间参数。

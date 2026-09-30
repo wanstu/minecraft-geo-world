@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"geoworld/internal/sampling"
+	"geoworld/internal/world"
 )
 
 func Generate(input Input, cfg Config) (*Model, error) {
@@ -35,63 +36,68 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		}
 	}
 
-	cfg = normalizeConfig(cfg)
+	geometry, err := resolveInputGeometry(input, cfg)
+	if err != nil {
+		return nil, err
+	}
+	cfg = normalizeConfig(cfg, geometry)
 
-	base, err := scalarGrid(input.Width, input.Height, cfg, input.BaseElevation)
+	base, err := scalarGrid(geometry, input.BaseElevation)
 	if err != nil {
 		return nil, err
 	}
-	plain, err := scalarGrid(input.Width, input.Height, cfg, input.RollingPlainWeight)
+	plain, err := scalarGrid(geometry, input.RollingPlainWeight)
 	if err != nil {
 		return nil, err
 	}
-	hill, err := scalarGrid(input.Width, input.Height, cfg, input.HillWeight)
+	hill, err := scalarGrid(geometry, input.HillWeight)
 	if err != nil {
 		return nil, err
 	}
-	foothill, err := scalarGrid(input.Width, input.Height, cfg, input.FoothillWeight)
+	foothill, err := scalarGrid(geometry, input.FoothillWeight)
 	if err != nil {
 		return nil, err
 	}
-	mountain, err := scalarGrid(input.Width, input.Height, cfg, input.MountainWeight)
+	mountain, err := scalarGrid(geometry, input.MountainWeight)
 	if err != nil {
 		return nil, err
 	}
-	plateau, err := scalarGrid(input.Width, input.Height, cfg, input.PlateauWeight)
+	plateau, err := scalarGrid(geometry, input.PlateauWeight)
 	if err != nil {
 		return nil, err
 	}
-	valley, err := scalarGrid(input.Width, input.Height, cfg, input.ValleyWeight)
+	valley, err := scalarGrid(geometry, input.ValleyWeight)
 	if err != nil {
 		return nil, err
 	}
-	floodplain, err := scalarGrid(input.Width, input.Height, cfg, input.FloodplainWeight)
+	floodplain, err := scalarGrid(geometry, input.FloodplainWeight)
 	if err != nil {
 		return nil, err
 	}
-	alluvialPlain, err := scalarGrid(input.Width, input.Height, cfg, input.AlluvialPlainWeight)
+	alluvialPlain, err := scalarGrid(geometry, input.AlluvialPlainWeight)
 	if err != nil {
 		return nil, err
 	}
-	alluvialFan, err := scalarGrid(input.Width, input.Height, cfg, input.AlluvialFanWeight)
+	alluvialFan, err := scalarGrid(geometry, input.AlluvialFanWeight)
 	if err != nil {
 		return nil, err
 	}
-	canyon, err := scalarGrid(input.Width, input.Height, cfg, input.CanyonWeight)
+	canyon, err := scalarGrid(geometry, input.CanyonWeight)
 	if err != nil {
 		return nil, err
 	}
-	valleyFloor, err := scalarGrid(input.Width, input.Height, cfg, input.ValleyFloorWidth)
+	valleyFloor, err := scalarGrid(geometry, input.ValleyFloorWidth)
 	if err != nil {
 		return nil, err
 	}
-	deposition, err := scalarGrid(input.Width, input.Height, cfg, input.DepositionPotential)
+	deposition, err := scalarGrid(geometry, input.DepositionPotential)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Model{
 		Config:              cfg,
+		Geometry:            geometry,
 		BaseElevation:       base,
 		RollingPlainWeight:  plain,
 		HillWeight:          hill,
@@ -108,10 +114,46 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	}, nil
 }
 
-func normalizeConfig(cfg Config) Config {
-	if cfg.CellSizeBlocks <= 0 {
-		cfg.CellSizeBlocks = 128
+func resolveInputGeometry(input Input, cfg Config) (world.GridGeometry, error) {
+	geometry := input.Geometry
+	if geometry.Width == 0 && geometry.Height == 0 &&
+		geometry.SpanXBlocks == 0 && geometry.SpanZBlocks == 0 &&
+		geometry.OriginX == 0 && geometry.OriginZ == 0 {
+		cellSize := cfg.CellSizeBlocks
+		if cellSize <= 0 {
+			cellSize = world.DefaultMacroSpacingBlocks
+		}
+		geometry = world.GridGeometry{
+			Width: input.Width, Height: input.Height,
+			OriginX: cfg.OriginX, OriginZ: cfg.OriginZ,
+			SpanXBlocks: float64(input.Width-1) * cellSize,
+			SpanZBlocks: float64(input.Height-1) * cellSize,
+		}
 	}
+	if geometry.Width != input.Width || geometry.Height != input.Height {
+		return world.GridGeometry{}, errors.New("terrain: geometry dimensions do not match input")
+	}
+	cellSize, err := geometry.SquareCellSize()
+	if err != nil {
+		return world.GridGeometry{}, err
+	}
+	if cfg.CellSizeBlocks > 0 && math.Abs(cfg.CellSizeBlocks-cellSize) > 1e-9 {
+		return world.GridGeometry{}, errors.New("terrain: config cell size conflicts with input geometry")
+	}
+	if cfg.OriginX != 0 && math.Abs(cfg.OriginX-geometry.OriginX) > 1e-9 {
+		return world.GridGeometry{}, errors.New("terrain: config origin X conflicts with input geometry")
+	}
+	if cfg.OriginZ != 0 && math.Abs(cfg.OriginZ-geometry.OriginZ) > 1e-9 {
+		return world.GridGeometry{}, errors.New("terrain: config origin Z conflicts with input geometry")
+	}
+	return geometry, nil
+}
+
+func normalizeConfig(cfg Config, geometry world.GridGeometry) Config {
+	cfg.CellSizeBlocks = geometry.SpacingX()
+	cfg.OriginX = geometry.OriginX
+	cfg.OriginZ = geometry.OriginZ
+
 	if cfg.PlainAmplitude <= 0 {
 		cfg.PlainAmplitude = 0.0035
 	}
@@ -142,15 +184,8 @@ func normalizeConfig(cfg Config) Config {
 	return cfg
 }
 
-func scalarGrid(width, height int, cfg Config, values []float64) (sampling.ScalarGrid, error) {
-	return sampling.NewScalarGrid(
-		width,
-		height,
-		cfg.CellSizeBlocks,
-		cfg.OriginX,
-		cfg.OriginZ,
-		values,
-	)
+func scalarGrid(geometry world.GridGeometry, values []float64) (sampling.ScalarGrid, error) {
+	return sampling.NewScalarGridWithGeometry(geometry, values)
 }
 
 func (m *Model) SampleNormalized(worldX, worldZ float64) float64 {

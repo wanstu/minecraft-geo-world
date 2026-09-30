@@ -1,10 +1,15 @@
 package terrain
 
-import "geoworld/internal/sampling"
+import (
+	"geoworld/internal/sampling"
+	"geoworld/internal/world"
+)
 
 type Config struct {
 	Seed int64
 
+	// Legacy compatibility only. Formal model adapters provide Input.Geometry.
+	// When Geometry is present, non-zero legacy values must agree with it.
 	CellSizeBlocks float64
 	OriginX        float64
 	OriginZ        float64
@@ -22,8 +27,9 @@ type Config struct {
 }
 
 type Input struct {
-	Width  int
-	Height int
+	Width    int
+	Height   int
+	Geometry world.GridGeometry
 
 	BaseElevation []float64
 
@@ -43,7 +49,8 @@ type Input struct {
 }
 
 type Model struct {
-	Config Config
+	Config   Config
+	Geometry world.GridGeometry
 
 	BaseElevation sampling.ScalarGrid
 

@@ -5,7 +5,7 @@
 ## 当前目标与阶段
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。
 
-**Phase 6.0、6.1a 已完成；Phase 6.1b 进行中。已完成 Phase 1 首批尺度 + Climate + Erosion + Hydrology + Geomorph + Landform + Phase 1 reference-world 残余迁移；下一步处理 Terrain Geometry / CellSize 脱节，再做最终残余审计。**
+**Phase 6.0、6.1a、6.1b 已完成。Phase 1 / Climate / Erosion / Hydrology / Landform / Geomorph / Terrain 的已知空间尺度与 Geometry 契约已完成迁移并通过最终残余审计；下一步正式进入 Phase 6.2：统一 GenerateWorld / WorldModel 与最终海岸、水体、河床一致性。**
 
 ## 仓库与基线
 - 仓库：D:\projects\minecraft-geo-world
@@ -21,6 +21,7 @@
 - Phase 6.1b 第五切片：3f8b69a — feat: migrate geomorph spatial scales to world units。
 - Phase 6.1b 第六切片：10e7ed7 — feat: migrate landform spatial scales to world units。
 - Phase 6.1b 第七切片：444c3c3 — feat: migrate phase1 reference world scales。
+- Phase 6.1b 第八切片：Terrain Geometry binding + 6.1b closeout（提交号以 git log 获取）。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -60,6 +61,10 @@
 - Phase 1 Plate center / plate warp / continent seed / edge bias 已统一在旧 128-block reference-world 坐标中定义；当前节点只负责采样。
 - Phase 1 大陆潜力、CrustThickness 与 Macro Elevation 的固定节点频率已迁为 reference-world 频率；默认 128-block 数值保持不变。
 - Edge ocean buffer 默认宽度先解释为 reference-world 物理宽度，再换算当前网格 Cell 数。
+- Terrain Input / Model 现在直接携带上游 GridGeometry；正式 adapter 继承 Erosion Geometry，ScalarGrid 全部通过 `NewScalarGridWithGeometry` 创建。
+- Terrain 的 `CellSizeBlocks / OriginX / OriginZ` 仅保留为 legacy 手写输入兼容；正式 Geometry 存在时若 legacy 配置冲突会明确报错，不允许静默错位。
+- Terrain Render 使用 Geometry 的 Origin + Span，非零世界原点不再被错误当成 0 起点。
+- Terrain Lab / Audit / Consistency 的 `cell-size` 现在从 Phase 1 定义整条世界 Geometry，不再只改变最终 Terrain 采样层。
 
 ## 本轮验证
 - go test ./... -count=1：全部通过（包括新的连通性、负坐标、分辨率/范围、Phase 1 物理尺度和全链路回归）。
@@ -70,24 +75,28 @@
 - 8 Seed / 240×150 Hydrology audit：通过；河流陆地占比 2.212%–3.374%，填洼 0.615%–7.212%，最大 Strahler 2–3，显式湖泊 0–5。
 - 4 Seed / 640×400 Geomorph audit：通过；河漫滩 0.237%–0.519%，冲积平原 1.716%–2.521%，冲积扇 0.009%–0.093%，峡谷 0–0.011%，宽谷底 0.201%–0.373%。
 - 8 Seed / 240×150 Landform audit：通过；平原 37.807%–53.272%，丘陵 17.241%–27.328%，山麓 6.085%–9.554%，山地 21.978%–31.630%，强河谷 0.222%–0.523%。
+- 4 Seed / 640×400 Terrain audit：通过；`|regional detail|` 0.03314–0.03689，chunk epsilon jump 1.12e-7–1.48e-7，macro slope mismatch 2.26e-6–6.12e-6。
+- Terrain 固定物理范围 128 / 64 blocks-node 回归：非零 Origin 下 BaseElevation / RegionalDetail / FinalHeight 在对应世界坐标一致；legacy Geometry 冲突明确拒绝。
+- 非默认 `cell-size=64` 的完整 Consistency 命令可贯穿 Phase1→Terrain，跨模块 LandMask disagreement=0，证明命令层 Geometry 不再脱节。
+- 6.1b 最终全仓残余搜索已完成：剩余 `*Cells` 均为 blocks→当前网格的运行时采样变量、旧 128 reference 翻译、测试/统计或 Terrain legacy 兼容字段，未发现新的固定节点生成尺度。
 - 基线原型引用检查：387 处本地引用，无缺失。
 - 详细参数、当前数值和历史对照见 PHASE6.md。
 
 ## 仍未完成（不要误报完成）
 1. 最终连续地形改变海岸：两个 Seed 的宏观/最终海陆变化节点为 806、608；最终海洋标签高于海平面的节点为 336、326。
 2. 最终河床/水面校正未做：同口径河网逆坡连线为 72/908、126/1342。海陆修正不是河网修复，第二个 Seed 该计数还略有增加。
-3. Phase 1 距离型尺度与 reference-world warp/noise、Climate 海温/水汽/地形抬升尺度、Erosion slope/relief、Hydrology 关键坡降/面积量纲、Geomorph 上游记忆/冲积扇扩散、Landform 山地/河谷空间核已迁移；Terrain 仍有独立 CellSizeBlocks / Origin 配置，可能与上游 GridGeometry 脱节，且全仓还需最后一次残余尺度审计。D8 拓扑本身也允许随采样精度出现离散差异，因此坐标契约不等于已实现全算法精度无关。
+3. Phase 6.1b 已完成当前已知生成尺度迁移；但“物理尺度稳定”不等于不同采样精度逐 Cell 完全相同。D8 河网、离散边界/分类、量化采样仍允许合理的拓扑差异，后续新增任何空间参数也必须继续遵守 GridGeometry / blocks 规则。
 4. 最终海岸/湖面/生态协调、外围拓扑与四角过渡仍待实现。宏观四邻接海洋与 D8 水文的细化协调属于后续水体约束。
 5. phase1.Generate 仍保留旧 API 的默认值与 panic 方式；统一入口需要完整配置校验与错误返回。
 6. WorldModel 版本化保存/重开、Java reader/sampler、实际游戏生成均未完成。
 7. 静态原型生成/保存按钮未接入；prototype/generated 仍是先前实验快照，不能代表本轮修改后的实时结果。
 
-## 下一步（6.1b）
-1. Phase 1、Climate、Erosion、Hydrology、Geomorph、Landform 的已知关键物理尺度与 Phase 1 reference-world 残留已完成迁移。
-2. 下一切片迁移 Terrain：Input / Model 直接携带上游 GridGeometry，避免独立 CellSizeBlocks / Origin 与宏观模型错位；legacy 手写输入保留受控兼容。
-3. 每一批都保留固定物理范围下的多分辨率检查；允许离散化误差，但作用距离、坡度量纲和传播距离不能随网格精度系统漂移。
-4. 然后进入 6.2 的 GenerateWorld 与最终水体约束，再做 6.3 保存/重开。
-5. 6.4 提前验证 Go -> Java -> 一个 Loader，完整界面与批量导出随后扩展。
+## 下一步（6.2）
+1. 建立正式 `GenerateWorld` / `WorldModel`，集中解析 Seed、Geometry、海平面和各阶段配置，消除当前 CLI 手工串联模块的重复调度。
+2. 在统一 WorldModel 上实现最终连续海岸 / 外海 / 封闭低地 / 显式湖泊的一致水面语义。
+3. 修复最终连续 Terrain 对河网造成的逆坡：明确河床纵剖面 / 水面约束，而不是隐藏或删除逆坡边。
+4. 保留当前 Consistency audit 的未解决基线作为 6.2 验收门槛；只有 FinalSurfaceMaskChanges / FinalUpslopeEdges 被真实协调后才能宣告可玩世界一致性。
+5. 6.2 后进入 6.3 WorldModel 版本化保存/重开；6.4 再做 Go→Java→一个 Loader 的早期游戏内验证。
 
 ## 继续工作入口
 先读 STATUS -> PHASE6 -> DECISIONS；查历史读 PROGRESS 和 PHASE1–5。每个开发切片保留验证口径、结果、剩余风险并提交。

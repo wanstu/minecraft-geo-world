@@ -27,6 +27,8 @@ func main() {
 		Seed:          *seed,
 		Width:         *width,
 		Height:        *height,
+		SpanXBlocks:   float64(*width-1) * *cellSize,
+		SpanZBlocks:   float64(*height-1) * *cellSize,
 		PlateCount:    18,
 		OceanFraction: 0.68,
 	})
@@ -51,8 +53,7 @@ func main() {
 		log.Fatal(err)
 	}
 	m, err := terrain.Generate(terrain.InputFromModels(e, l, g), terrain.Config{
-		Seed:           *seed,
-		CellSizeBlocks: *cellSize,
+		Seed: *seed,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -68,8 +69,8 @@ func main() {
 	sumH := 0.0
 	samples := 0
 
-	worldWidth := float64(*width-1) * *cellSize
-	worldHeight := float64(*height-1) * *cellSize
+	worldWidth := world.Geometry.SpanXBlocks
+	worldHeight := world.Geometry.SpanZBlocks
 
 	for z := 0.0; z <= worldHeight; z += *cellSize / 2 {
 		for x := 0.0; x <= worldWidth; x += *cellSize / 2 {

@@ -600,6 +600,8 @@ Plateau < Hill
 
 不读取 Chunk 坐标。
 
+Phase 6.1b 起，Terrain 正式输入直接继承上游 `GridGeometry`。`CellSizeBlocks / OriginX / OriginZ` 不再是正式流水线的独立真相源，只保留给 legacy 手写 Input；如果显式 Geometry 与 legacy Config 冲突，会直接报错而不是静默生成错位地形。所有 ScalarGrid 都通过 `NewScalarGridWithGeometry` 创建。
+
 ### 噪声连续性
 
 Regional Detail 使用：
@@ -655,6 +657,18 @@ clamp(base + detail, 0, 1)
 
 因此不会为了防越界而整体降低山地细节振幅。
 
+### Geometry 与世界原点
+
+Phase 6.1b 进一步修正了 Terrain 的坐标契约：
+
+- `terrain.Input` / `terrain.Model` 携带 `GridGeometry`。
+- 正式 `InputFromModels` 继承 Erosion Geometry。
+- Render 使用 `OriginX / OriginZ + Span`，不再假设世界从 `(0,0)` 开始。
+- Terrain Lab / Audit 的 `-cell-size` 从 Phase 1 就设置整个世界 Span，不能再只改变最终采样层。
+- Consistency audit 使用 `Geometry.NodePosition()` 采最终地形，避免手算坐标与模型 Geometry 脱节。
+
+新增 128 / 64 blocks-node 固定物理范围回归，并使用非零 Origin 验证 BaseElevation、RegionalDetail、FinalHeight 在相同世界坐标保持一致。
+
 ### 当前测试 Seed 731894205
 
 正式网格：
@@ -685,21 +699,23 @@ Max Macro Boundary slope mismatch
 
 ### 4 Seed 正式尺寸审计
 
-640 × 400 / 128 blocks per macro cell：
+640 × 400 / 128 blocks per macro cell，Phase 6.1b Terrain Geometry 迁移后当前结果：
 
 ```text
 Maximum |Regional Detail|
 0.03314 .. 0.03689
 
 Maximum Valley Carve
-0.00441 .. 0.00558
+0.00484 .. 0.00560
 
 Chunk Boundary epsilon jump
-1.13e-7 .. 1.48e-7
+1.12e-7 .. 1.48e-7
 
 Macro Boundary slope mismatch
-2.26e-6 .. 6.13e-6
+2.26e-6 .. 6.12e-6
 ```
+
+默认 128-block 世界的 Consistency 基线保持不变。另用 `cell-size=64` 跑完整 Phase1→Terrain Consistency 路径已成功，跨模块 LandMask disagreement=0，用于确认命令层不再只改变 Terrain 自己的采样间距。
 
 审计护栏：
 
