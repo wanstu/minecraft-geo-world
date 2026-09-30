@@ -6,6 +6,7 @@ import (
 
 	"geoworld/internal/climate"
 	"geoworld/internal/phase1"
+	"geoworld/internal/world"
 )
 
 func makeBorderOceanInput(width, height int, landElevation float64) Input {
@@ -325,7 +326,7 @@ func TestExplicitLakeHasOutletAndMetadata(t *testing.T) {
 
 	m, err := Generate(in, Config{
 		LakePotentialThreshold: 0.05,
-		MinLakeCells:           1,
+		MinLakeAreaBlocks2:     world.DefaultMacroSpacingBlocks * world.DefaultMacroSpacingBlocks,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -430,7 +431,7 @@ func TestExplicitLakeIDsAreContiguous(t *testing.T) {
 	}
 	m, err := Generate(in, Config{
 		LakePotentialThreshold: 0.05,
-		MinLakeCells:           1,
+		MinLakeAreaBlocks2:     world.DefaultMacroSpacingBlocks * world.DefaultMacroSpacingBlocks,
 	})
 	if err != nil {
 		t.Fatal(err)

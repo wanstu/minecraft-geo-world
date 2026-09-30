@@ -251,3 +251,32 @@ phase1.Generate 仍保留旧的非 error 返回接口：内部产生非法高程
 - 默认 128-block 公式在 slope scale=1、Relief radius 整数 Cell 时与旧路径等价；4 Seed Profile 与 2 Seed Consistency 最终复验均通过，数值与 6a3ecf0 基线一致。
 
 下一切片：Hydrology 的距离/坡降量纲，然后 Geomorph / 河谷扩散。
+
+
+## Phase 6.1b 第四切片实施结果（2026-09-30）
+
+基线：6b3b23d；开发分支：agent/world-model-foundation。
+
+本切片迁移 Hydrology 的几何契约、D8 坡降、填洼 epsilon、径流面积量纲与最小湖泊面积；6.1b 仍未整体完成。
+
+已完成：
+- [x] hydrology.Input / Model 接入 GridGeometry；InputFromWorld 传入 Phase 1 的真实 Geometry。
+- [x] Legacy 手写 Hydrology Input 未提供 Geometry 时兼容解析为 128 blocks/node；Geometry 尺寸不匹配或非等距明确报错。
+- [x] Priority Flood 的 FillEpsilon 按实际节点间距缩放；相同物理排水路径不会因为网格加密而累计更多人工高程。
+- [x] D8 Flow Direction 的最陡坡降与 downstreamSlope 按实际物理距离计算，再归一到旧 128-block reference slope 量纲。
+- [x] LocalRunoff 的累加贡献乘以 Cell 相对 reference cell 的物理面积比例；64 blocks/node 的单 Cell 贡献为 128 blocks/node 的 1/4。
+- [x] MinLakeCells 迁为 MinLakeAreaBlocks2；默认保持旧 2×(128×128) blocks² 最小湖泊面积。
+- [x] Lake metadata 增加 AreaBlocks2。
+- [x] 固定物理范围 128 → 64 blocks/node 回归覆盖 FillEpsilon 累积、downstream slope、本地径流面积缩放与最小湖泊面积。
+- [ ] D8 流向拓扑本身仍允许随采样精度出现离散差异；本切片不伪装成“不同分辨率河网逐 Cell 完全相同”。
+- [ ] Geomorph 的坡降、上游记忆和扩散尺度仍待下一切片。
+
+### 验证
+
+- go test ./internal/hydrology -count=1：通过。
+- go test ./... -count=1：通过。
+- go run ./cmd/geoworld-hydrology-audit：8 Seed / 240×150 通过；river land 2.212%–3.374%，filled land 0.615%–7.212%，max Strahler order 2–3，explicit lakes 0–5。
+- go run ./cmd/geoworld-mcprofile-audit -count 4：默认 128-block 输出与 6b3b23d 基线一致；Unknown=0，平均 confidence 0.691–0.764。
+- go run ./cmd/geoworld-consistency-audit：731894205 / 10400 的全部当前诊断与 6b3b23d 一致；最终连续海岸 / 河床问题仍为 UNRESOLVED。
+
+下一切片：Geomorph 的坡降、上游记忆与河谷 / 冲积扇扩散空间尺度。

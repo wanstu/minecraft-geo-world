@@ -17,6 +17,7 @@ func InputFromWorld(world *phase1.World, climateModel *climate.Model) Input {
 	return Input{
 		Width:               world.Config.Width,
 		Height:              world.Config.Height,
+		Geometry:            world.Geometry,
 		Elevation:           append([]float64(nil), world.Elevation...),
 		LandMask:            land,
 		AnnualPrecipMM:      append([]float64(nil), precip...),

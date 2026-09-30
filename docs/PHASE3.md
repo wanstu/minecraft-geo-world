@@ -329,6 +329,8 @@ FillDepth 会继续用于湖泊候选。
 
 每个陆地 Cell 优先选择 FilledElevation 上最陡下降方向。
 
+Phase 6.1b 起，D8 方向的坡降按真实 GridGeometry 节点间距计算，并归一回旧 128-block reference slope 量纲；Priority Flood 的 FillEpsilon 则按节点间距缩放，同时保留旧 D8 每 hop 同 epsilon 的兼容语义，避免提高采样精度后同一物理尺度路径累计更多人工抬升。
+
 若出现极端平坦数值情况，则回退到 Priority Flood 的父节点，保证：
 
 - 无死路。
@@ -347,9 +349,12 @@ runoff coefficient
 = base
 + rainfall seasonality boost
 
+Phase 3 初版：
 LocalRunoff
 = effective precipitation × coefficient
 ```
+
+Phase 6.1b 起，实际累加贡献再乘以 Cell 物理面积相对于 128×128 blocks reference cell 的面积比例。这样相同面积流域在 64 blocks/node 时虽然 Cell 数约增为 4 倍，但每个 Cell 的贡献约为 1/4，不会仅因分辨率提高而凭空增加总径流。
 
 当前默认：
 
@@ -566,6 +571,7 @@ LakePotential 已进一步聚合成连续 Lake：
 
 - LakeID
 - CellCount
+- AreaBlocks2
 - SurfaceElevation
 - MaxDepth
 - SpillOutlet
@@ -573,6 +579,8 @@ LakePotential 已进一步聚合成连续 Lake：
 - InflowAccumulation
 
 相邻且满足阈值的湖泊候选 Cell 会形成同一个 LakeID。
+
+Phase 6.1b 起，最小湖泊门槛由 `MinLakeCells` 迁为 `MinLakeAreaBlocks2`。默认面积保持旧 2 个 128×128 blocks Cell 的物理含义；提高宏观精度后需要更多小 Cell 才能达到同一最小湖泊面积。
 
 当前 12 Seed / 240 × 150：
 
@@ -630,6 +638,23 @@ Largest lake cells              76 .. 318
 Max explicit lake depth         0.080 .. 0.145
 ```
 
+上述 12 Seed 数值是 Phase 3.4 历史快照。Phase 6.1a 统一宏观 LandMask 后，当前 Phase 6.1b 的 8 Seed / 240×150 水文审计为：
+
+```text
+River land %                    2.212 .. 3.374
+Filled land %                   0.615 .. 7.212
+Lake candidate land %           0.000 .. 4.949
+Wetland candidate land %        1.872 .. 5.233
+Major river basins             14 .. 42
+Max normalized fill depth       0.011 .. 0.145
+Max Strahler river order        2 .. 3
+Seasonal-dominant river cells   1.657% .. 39.766%
+Explicit lakes                  0 .. 5
+Largest lake cells              0 .. 271
+```
+
+Phase 6.1b 的 Hydrology 物理尺度迁移在默认 128 blocks/node 下保持这组当前基线不变。某个审计 Seed 可以没有显式湖泊；正式机制护栏仍由单元测试与固定批次共同覆盖，不能为了凑数量强行造湖。
+
 ### 自动护栏
 
 新增多 Seed 回归验证：
@@ -640,6 +665,8 @@ Max explicit lake depth         0.080 .. 0.145
 - 显式湖泊数量不能为 0 或异常泛滥。
 - Lake SpillOutlet 必须有效并指向湖区外。
 - 最大湖泊面积存在上限护栏。
+- Phase 6.1b 固定世界范围 128 / 64 blocks-node 回归覆盖 Priority-Flood epsilon 累积、D8 downstream slope、本地径流面积缩放和最小湖泊物理面积。
+- Geometry 尺寸不匹配会明确拒绝，不允许静默使用错误世界尺度。
 
 ### 当前可视化
 

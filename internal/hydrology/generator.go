@@ -56,9 +56,14 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		}
 	}
 
+	geometry, err := resolveInputGeometry(input)
+	if err != nil {
+		return nil, err
+	}
 	cfg = normalizeConfig(cfg)
 	m := &Model{
 		Config:                  cfg,
+		Geometry:                geometry,
 		Width:                   input.Width,
 		Height:                  input.Height,
 		LandMask:                append([]bool(nil), input.LandMask...),
@@ -97,6 +102,26 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	return m, nil
 }
 
+func resolveInputGeometry(input Input) (world.GridGeometry, error) {
+	geometry := input.Geometry
+	if geometry.Width == 0 && geometry.Height == 0 &&
+		geometry.SpanXBlocks == 0 && geometry.SpanZBlocks == 0 &&
+		geometry.OriginX == 0 && geometry.OriginZ == 0 {
+		geometry = world.GridGeometry{
+			Width: input.Width, Height: input.Height,
+			SpanXBlocks: float64(input.Width-1) * world.DefaultMacroSpacingBlocks,
+			SpanZBlocks: float64(input.Height-1) * world.DefaultMacroSpacingBlocks,
+		}
+	}
+	if geometry.Width != input.Width || geometry.Height != input.Height {
+		return world.GridGeometry{}, errors.New("hydrology: geometry dimensions do not match input")
+	}
+	if _, err := geometry.SquareCellSize(); err != nil {
+		return world.GridGeometry{}, err
+	}
+	return geometry, nil
+}
+
 func normalizeConfig(cfg Config) Config {
 	if cfg.SeaLevelNormalized <= 0 || cfg.SeaLevelNormalized >= 1 {
 		cfg.SeaLevelNormalized = world.DefaultSeaLevelNormalized
@@ -128,8 +153,8 @@ func normalizeConfig(cfg Config) Config {
 	if cfg.LakePotentialThreshold <= 0 || cfg.LakePotentialThreshold >= 1 {
 		cfg.LakePotentialThreshold = 0.35
 	}
-	if cfg.MinLakeCells <= 0 {
-		cfg.MinLakeCells = 2
+	if cfg.MinLakeAreaBlocks2 <= 0 {
+		cfg.MinLakeAreaBlocks2 = 2 * world.DefaultMacroSpacingBlocks * world.DefaultMacroSpacingBlocks
 	}
 	return cfg
 }
@@ -188,7 +213,8 @@ func (m *Model) fillDepressions() []int {
 
 			original := m.OriginalElevation[ni]
 			filled := original
-			minDrainLevel := item.level + m.Config.FillEpsilon
+			stepScale := m.Geometry.SpacingX() / world.DefaultMacroSpacingBlocks
+			minDrainLevel := item.level + m.Config.FillEpsilon*stepScale
 			if filled < minDrainLevel {
 				filled = minDrainLevel
 			}
@@ -252,7 +278,8 @@ func (m *Model) computeFlowDirection(parent []int) {
 				if drop <= 0 {
 					continue
 				}
-				slope := drop / d.dist
+				referenceDistance := d.dist * m.Geometry.SpacingX() / world.DefaultMacroSpacingBlocks
+				slope := drop / referenceDistance
 				if slope > bestSlope+1e-15 || (math.Abs(slope-bestSlope) <= 1e-15 && (best < 0 || ni < best)) {
 					bestSlope = slope
 					best = ni
@@ -286,7 +313,8 @@ func (m *Model) runoffField(precip, seasonality []float64, lossMM float64) []flo
 		coefficient := m.Config.BaseRunoffCoefficient +
 			m.Config.SeasonalityRunoffBoost*clamp(seasonality[i], 0, 1)
 		coefficient = clamp(coefficient, 0.05, 0.95)
-		local[i] = effective * coefficient
+		cellScale := m.Geometry.SpacingX() / world.DefaultMacroSpacingBlocks
+		local[i] = effective * coefficient * cellScale * cellScale
 	}
 	return local
 }
@@ -468,7 +496,8 @@ func (m *Model) downstreamSlope(i int) float64 {
 	if !m.LandMask[to] {
 		drop = m.FilledElevation[i] - m.Config.SeaLevelNormalized
 	}
-	return math.Max(0, drop/dist)
+	referenceDistance := dist * m.Geometry.SpacingX() / world.DefaultMacroSpacingBlocks
+	return math.Max(0, drop/referenceDistance)
 }
 
 func quantileSorted(values []float64, q float64) float64 {
@@ -602,7 +631,8 @@ func (m *Model) identifyLakes() {
 			}
 		}
 
-		if len(component) < m.Config.MinLakeCells {
+		componentAreaBlocks2 := float64(len(component)) * m.Geometry.SpacingX() * m.Geometry.SpacingZ()
+		if componentAreaBlocks2+1e-9 < m.Config.MinLakeAreaBlocks2 {
 			continue
 		}
 
@@ -643,6 +673,7 @@ func (m *Model) identifyLakes() {
 		m.Lakes = append(m.Lakes, Lake{
 			ID:                 id,
 			CellCount:          len(component),
+			AreaBlocks2:        componentAreaBlocks2,
 			SurfaceElevation:   surface,
 			MaxDepth:           maxDepth,
 			SpillOutlet:        outlet,

@@ -888,3 +888,30 @@ Phase 5 完成第一版。
 - Phase 1 非距离型 grid-frequency warp/noise 评估。
 
 下一步：继续 6.1b Hydrology。
+
+
+## 2026-09-30 — Phase 6.1b 第四切片：Hydrology 物理尺度迁移
+
+基线：6b3b23d，分支 agent/world-model-foundation。
+
+本切片完成：
+- Hydrology Input / Model 接入 GridGeometry。
+- Priority Flood FillEpsilon 按真实节点间距缩放。
+- D8 Flow Direction / downstream slope 改为物理距离量纲，并保持旧 128-block reference slope 的阈值语义。
+- LocalRunoff 按 Cell 物理面积缩放，避免加密网格后相同流域的累积流量按 Cell 数膨胀。
+- MinLakeCells 改为 MinLakeAreaBlocks2，Lake 增加 AreaBlocks2。
+- 新增 128 / 64 blocks-node 固定物理范围测试，覆盖 epsilon、坡降、径流面积和最小湖泊面积。
+
+验证：
+- hydrology 单元测试通过。
+- go test ./... -count=1 通过。
+- 8 Seed hydrology audit 通过。
+- 4 Seed Profile / 2 Seed Consistency 最终复验通过，默认 128-block 数值与 6b3b23d 一致。
+- 6.2 的最终连续海岸 / 河床逆坡诊断继续保留，没有被本切片隐藏。
+
+未完成：
+- D8 河网拓扑在不同采样精度下仍允许合理的离散差异。
+- Geomorph 的坡降 / 上游记忆 / 扩散空间尺度。
+- Phase 1 非距离型 grid-frequency warp/noise 评估。
+
+下一步：继续 6.1b Geomorph。

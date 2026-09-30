@@ -922,7 +922,7 @@ STATUS.md 只描述当前基线、进行中、未解决及下一步。原有逐�
 
 ## D-035：旧 Cell 空间参数必须通过共享参考物理尺度迁移
 
-状态：Phase 1 与 Climate 第一批已实现；其余阶段继续迁移
+状态：Phase 1、Climate、Erosion、Hydrology 第一批已实现；Geomorph 等继续迁移
 
 历史算法大量使用 Cell / iteration 表达作用范围。Phase 6.1b 规定：
 
@@ -937,5 +937,6 @@ STATUS.md 只描述当前基线、进行中、未解决及下一步。原有逐�
 - Phase 1 CoastDistance、构造影响半径及相关海岸/海盆阈值。
 - Climate OceanDistance / CoastalTempDecay、SST 传播、水汽传播、默认 MoistureIterations 与 Orographic Lift 梯度。
 - Erosion Slope / ReliefRadius / LocalRelief。
+- Hydrology FillEpsilon、D8 slope、LocalRunoff 物理面积量纲、MinLakeAreaBlocks2。
 
-Hydrology / Geomorph 继续按同一规则处理。
+Geomorph 继续按同一规则处理。
