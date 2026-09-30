@@ -23,7 +23,7 @@
 - Phase 6.1b 第七切片：444c3c3 — feat: migrate phase1 reference world scales。
 - Phase 6.1b 第八切片：1a5fb4d — feat: bind terrain sampling to world geometry。
 - Phase 6.2 第一切片：0a0b1f2 — feat: add unified world generation pipeline。
-- Phase 6.2 第二切片：Terrain / Water reconciliation constraints（提交号以 git log 获取）。
+- Phase 6.2 第二切片：5b53ba9 — feat: add terrain water reconciliation constraints。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
