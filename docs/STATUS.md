@@ -29,6 +29,8 @@
 - Phase 6.2 第五切片：11e93ee — feat: add runtime water surface sampling。
 - Phase 6.2 第六切片：7f8722f — feat: align runtime profiles with final water semantics。
 - Phase 6.3 第一切片：0b830de — feat: add versioned world model persistence。
+- Phase 6.3 第二切片（部分）：8cd95b9 — feat: add safe model replacement and inspection。
+- 交互测试工具：0a10067 — feat: add interactive geoworld tester。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -137,16 +139,18 @@
 1. Raw Terrain 的 806/608 海岸变化与 72/126 逆坡继续保留为历史基线；applied CoastTerrain + Waterbed + WorldSample + RuntimeProfile 已不再受这些 raw 指标阻塞。
 2. Phase 6.1b 已完成当前已知生成尺度迁移；但“物理尺度稳定”不等于不同采样精度逐 Cell 完全相同。D8 河网、离散边界/分类、量化采样仍允许合理的拓扑差异，后续新增任何空间参数也必须继续遵守 GridGeometry / blocks 规则。
 3. `phase1.Generate` 仍保留 legacy panic wrapper，但正式统一入口已改用 `phase1.GenerateChecked` 返回 error；其它旧 Lab/CLI 尚未全部迁到统一 Generator，这不再阻塞 Phase 6.2 最终 Runtime 契约。
-4. WorldModel V1 create-only 保存/重开已完成第一切片；尚未完成安全的“替换已有模型”策略、独立 manifest inspect/migrate、跨语言 Java reader/sampler 和实际游戏生成。
-5. 静态原型生成/保存按钮未接入；prototype/generated 仍是先前实验快照，不能代表本轮修改后的实时结果。
+4. WorldModel V1 保存/重开、Windows/Unix 安全替换、manifest inspect/validate 已完成；尚未完成 migrate、跨语言 Java reader/sampler 和实际游戏生成。
+5. 已新增 GeoWorld Tester 本地 Web 工具，可直接生成、看最终地形/水体/群系/Profile、点击采样、保存与重开模型；MOD/Loader 暂后置，优先通过该工具做人工验收。
+6. 静态 prototype 仍是先前实验快照；实时验证请使用 `open-geoworld-tester.cmd`，不要再把 prototype/generated 当当前世界结果。
 
 ## 下一步（6.3）
 1. 第一切片已完成：最小 Runtime schema、schema/generator version、checksum、create-only 原子发布、Load 校验与 Runtime 重建已经落地。
-2. 第二切片补“更新已有模型”的安全替换策略；不得通过先删除旧文件再 rename 的方式伪装原子更新，需明确 crash/rollback 行为。
-3. 增加独立 manifest inspect / validate API 与命令，让 UI/Java 工具无需完整加载所有 payload 就能先判断版本、Geometry、Seed、文件完整性。
-4. 扩展 golden vectors：固定海岸、河口、湖泊、负坐标、Macro/Chunk 边界、外围与角落，形成后续 Java reader 的跨语言样本文件。
-5. 评估 V1 gzip+JSON 在更大世界上的大小/加载成本；若需要 binary field encoding，应通过 schemaVersion 升级，不静默改变 V1 解释。
-6. 6.3 完成后进入 6.4：Go model → Java reader/sampler → 一个 Loader 的早期游戏内小世界验证。
+2. 第二切片的安全替换与 manifest inspect / validate 已完成并提交；继续补 migrate / golden vectors，不再阻塞人工测试。
+3. **优先完善 GeoWorld Tester**：先让人工验证成为主入口，包括生成参数、最终地形 / 水体 / 群系 / Profile 图层、坐标采样、保存 / 更新 / 重开模型；发现视觉或语义问题时从 Tester 直接复现。
+4. 扩展 Tester 图层与问题诊断：后续优先加入河网 / 湖泊 / 海岸约束状态、宏观阶段对照与异常高亮，而不是先做 MOD UI。
+5. 再扩展 cross-language golden vectors：固定海岸、河口、湖泊、负坐标、Macro/Chunk 边界、外围与角落，为 Java reader 准备。
+6. 评估 V1 gzip+JSON 在更大世界上的大小/加载成本；若需要 binary field encoding，应通过 schemaVersion 升级，不静默改变 V1 解释。
+7. **MOD / Loader 后置**：只有当前 Tester 中的最终世界结果通过人工验收后，再进入 Go model → Java reader/sampler → 一个 Loader。
 
 ## 继续工作入口
 先读 STATUS -> PHASE6 -> DECISIONS；查历史读 PROGRESS 和 PHASE1–5。每个开发切片保留验证口径、结果、剩余风险并提交。

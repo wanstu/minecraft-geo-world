@@ -46,7 +46,7 @@ GeoWorld 只在中央有限区域生成完整地理世界：
 
 ## 当前阶段
 
-当前 Core 的板块、气候、水文、侵蚀、连续地形、生态与 Minecraft 生成 Profile 已完成算法第一版。Phase 6.1a 已完成坐标契约与宏观海陆语义分离；接下来迁移旧算法的空间尺度，补齐最终地形/水体/生态一致性，再建立真实生成和保存/重开入口。首次单 Loader 游戏验证提前到完整 UI 和批量导出之前。
+当前 Core 已完成板块、气候、水文、侵蚀、连续地形、最终水体、生态 / Minecraft Profile 与 Runtime 一致性闭环；Phase 6.2 已完成。Phase 6.3 正在做版本化模型保存/重开与测试工具。MOD / Loader 接入暂后置，先通过交互测试器把世界生成、保存和视觉验收做好。
 
 原型入口：
 
@@ -71,6 +71,22 @@ GeoWorld 只在中央有限区域生成完整地理世界：
 - `docs/SAMPLING.md`：连续世界坐标采样与 Chunk 无缝原则。
 - `docs/PRODUCT.md`：产品边界。
 
+
+## 交互测试器（推荐）
+
+Windows 直接双击：
+
+`open-geoworld-tester.cmd`
+
+或在仓库根目录运行：
+
+```text
+go run ./cmd/geoworld-tester
+```
+
+默认打开 `http://127.0.0.1:8788`。当前可直接测试：Seed / 网格 / 板块 / 海洋比例重新生成、最终地形 / 水体 / 群系 / Profile 图层、地图点击 Runtime 采样、模型保存/更新与重开。
+
+默认 `320×200` 适合快速测试；需要正式基线时可改 `640×400`。
 
 ## 查看静态原型
 
@@ -107,4 +123,4 @@ go run ./cmd/geoworld-mcprofile-audit -count 4
 go run ./cmd/geoworld-consistency-audit
 ```
 
-一致性审计会区分已通过的宏观约束与仍待实现的最终海岸/河床约束。当前加上 -strict-final 应失败，原因和指标见 docs/PHASE6.md。prototype/generated 是先前实验的静态快照；本轮未批量覆盖历史图片，当前输出以审计为准。
+一致性审计已区分 Raw Terrain 历史基线与最终 Runtime；当前 `go run ./cmd/geoworld-consistency-audit -strict-final` 应通过两个正式 Seed 的 Ground / Water / Profile 验收。`prototype/generated` 是早期实验静态快照；当前可视化优先使用交互测试器。

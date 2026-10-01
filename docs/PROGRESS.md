@@ -1228,3 +1228,28 @@ Phase 6.2 正式完成。下一步 Phase 6.3：最小持久化 schema、原子�
 - 640×400 / Seed 731894205：7,631,145 bytes，payload=37,323,242 bytes，RiverSegments=908，LakeNodes=1322，484 samples mismatch=0，Save≈2.13s，Load≈1.55s。
 
 下一步：safe replace、manifest inspect/validate、cross-language golden vectors。
+
+## 2026-10-01 — GeoWorld Tester：优先提供可人工验证入口
+
+功能提交：0a10067；相关持久化增强：8cd95b9。
+
+用户反馈当前开发虽然底层审计进展较多，但缺少可直接操作和观察的测试入口，因此暂停 MOD / Java reader 优先级，先完成本地 Web Tester。
+
+已完成：
+- 新增 `cmd/geoworld-tester`，静态前端嵌入 Go 可执行程序，不依赖 Node。
+- Seed / Width / Height / CellSize / PlateCount / OceanFraction 可直接重新生成真实 WorldModel。
+- 生成进度读取 GenerateWorld 13 stages。
+- 最终地形 / 水体 / Biome / Profile confidence 四个实时图层。
+- 地图点击查询最终 Runtime Ground / Water / EcoRegion / Biome / Terrain / Surface / Vegetation / semantic flags。
+- 模型保存 / 更新 / 已保存模型列表 / 重开。
+- Windows 根目录新增 `open-geoworld-tester.cmd`，默认打开 `http://127.0.0.1:8788`。
+- worldmodelio 同步完成安全 replace 与 manifest Inspect / Validate。
+
+真实 E2E：
+- 120×80 Seed 731894205：生成约 0.31s；Final layer PNG 成功。
+- (0,0) Runtime：Savanna / Rolling Plain / Ground=0.5030537260440189，semantic fallback/mismatch=false。
+- 保存 `_tester-e2e.geoworld` 成功；文件约 287 KB。
+- 重开约 56ms；(0,0) 采样逐字段一致。
+- go test ./... -count=1 全通过。
+
+后续优先完善 Tester 图层/异常诊断；MOD/Loader 后置到人工世界验收之后。
