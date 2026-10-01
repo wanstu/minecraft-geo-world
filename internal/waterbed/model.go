@@ -34,6 +34,13 @@ type RiverSegment struct {
 	// Profile is a carve-only, monotonically non-increasing centerline bed from
 	// From to To. It is sampled from the actual broad terrain, not only endpoints.
 	Profile []float64
+
+	// ReceiverSurface is the downstream lake/ocean datum reachable from this
+	// segment. It is propagated upstream through the river DAG so Runtime water
+	// can form a flat backwater where the natural shallow river surface would
+	// otherwise sit below the receiving waterbody.
+	ReceiverSurfaceDefined bool
+	ReceiverSurface        float64
 }
 
 type LakeNode struct {
@@ -67,8 +74,11 @@ type Sample struct {
 	BaseHeight  float64
 	FinalHeight float64
 
-	RiverCarve float64
-	LakeCarve  float64
+	RiverCarve                  float64
+	RiverWeight                 float64
+	RiverReceiverSurfaceDefined bool
+	RiverReceiverSurface        float64
+	LakeCarve                   float64
 
 	WaterKind             reconcile.WaterKind
 	WaterSurfaceDefined   bool

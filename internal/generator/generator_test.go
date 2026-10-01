@@ -159,6 +159,9 @@ func TestGenerateWorldStoresResolvedConfig(t *testing.T) {
 	if m.Config.Waterbed.MinRiverHalfWidthBlocks <= 0 || m.Config.Waterbed.MaxRiverHalfWidthBlocks <= 0 || m.Config.Waterbed.RiverProfileStepBlocks <= 0 {
 		t.Fatal("resolved waterbed defaults were not retained")
 	}
+	if m.Config.WorldSample.RiverCenterDepthNormalized <= 0 || m.Config.WorldSample.OceanEligibilityThreshold <= 0 {
+		t.Fatal("resolved worldsample defaults were not retained")
+	}
 	if m.Reconciliation == nil {
 		t.Fatal("world model is missing reconciliation stage")
 	}
@@ -173,6 +176,9 @@ func TestGenerateWorldStoresResolvedConfig(t *testing.T) {
 	}
 	if m.Waterbed == nil {
 		t.Fatal("world model is missing local waterbed stage")
+	}
+	if m.Runtime == nil {
+		t.Fatal("world model is missing runtime terrain/water sampler")
 	}
 	wd := m.Waterbed.Audit(16, m.Config.Reconcile.FinalUpslopeEpsilon)
 	if wd.RiverUpslopeSteps != 0 || wd.LakeBedViolations != 0 {

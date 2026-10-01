@@ -14,6 +14,7 @@ import (
 
 	"geoworld/internal/generator"
 	"geoworld/internal/phase1"
+	"geoworld/internal/reconcile"
 	"geoworld/internal/terrain"
 	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
@@ -44,6 +45,15 @@ type report struct {
 	WaterbedMaxRiseSegment, WaterbedMaxRiseFrom, WaterbedMaxRiseTo                 int
 	WaterbedMaxRiseT, WaterbedMaxRiseOwnProfileRise                                float64
 	WaterbedMaxRisePreviousOverlaps, WaterbedMaxRiseCurrentOverlaps                int
+	RuntimeOceanNodeViolations, RuntimeEnclosedOceanLeaks                          int
+	RuntimeLakeNodeViolations, RuntimeRiverUndefinedSteps                          int
+	RuntimeRiverDrySteps, RuntimeRiverSurfaceUpslopeSteps                          int
+	RuntimeMaxRiverSurfaceRise                                                     float64
+	RuntimeMaxRisePreviousKind, RuntimeMaxRiseCurrentKind                          int
+	RuntimeMaxRiseSegment                                                          int
+	RuntimeMaxRiseT, RuntimeMaxRisePreviousSurface, RuntimeMaxRiseCurrentSurface   float64
+	RuntimeMaxRiseReceiverDefined                                                  bool
+	RuntimeMaxRiseReceiverSurface, RuntimeMaxRiseRiverWeight                       float64
 }
 
 func checked[T any](value T, err error) T {
@@ -114,6 +124,25 @@ func inspect(seed int64, width, height int, cellSize float64) report {
 		r.WaterbedLakeBedViolations = d.LakeBedViolations
 		r.WaterbedMaxLakeBedExcess = d.MaxLakeBedExcess
 		r.WaterbedChunkJump = auditWaterbedChunkSeams(model.Waterbed, model.Geometry)
+	}
+	if model.Runtime != nil {
+		d := auditRuntimeWater(model)
+		r.RuntimeOceanNodeViolations = d.oceanNodeViolations
+		r.RuntimeEnclosedOceanLeaks = d.enclosedOceanLeaks
+		r.RuntimeLakeNodeViolations = d.lakeNodeViolations
+		r.RuntimeRiverUndefinedSteps = d.riverUndefinedSteps
+		r.RuntimeRiverDrySteps = d.riverDrySteps
+		r.RuntimeRiverSurfaceUpslopeSteps = d.riverSurfaceUpslopeSteps
+		r.RuntimeMaxRiverSurfaceRise = d.maxRiverSurfaceRise
+		r.RuntimeMaxRisePreviousKind = int(d.maxRisePreviousKind)
+		r.RuntimeMaxRiseCurrentKind = int(d.maxRiseCurrentKind)
+		r.RuntimeMaxRiseSegment = d.maxRiseSegment
+		r.RuntimeMaxRiseT = d.maxRiseT
+		r.RuntimeMaxRisePreviousSurface = d.maxRisePreviousSurface
+		r.RuntimeMaxRiseCurrentSurface = d.maxRiseCurrentSurface
+		r.RuntimeMaxRiseReceiverDefined = d.maxRiseReceiverDefined
+		r.RuntimeMaxRiseReceiverSurface = d.maxRiseReceiverSurface
+		r.RuntimeMaxRiseRiverWeight = d.maxRiseRiverWeight
 	}
 	final := make([]float64, len(w.Elevation))
 	crustOcean, actualOcean := 0, 0
@@ -216,6 +245,114 @@ func auditWaterbedChunkSeams(m *waterbed.Model, geometry world.GridGeometry) flo
 	return maxJump
 }
 
+type runtimeWaterDiagnostics struct {
+	oceanNodeViolations      int
+	enclosedOceanLeaks       int
+	lakeNodeViolations       int
+	riverUndefinedSteps      int
+	riverDrySteps            int
+	riverSurfaceUpslopeSteps int
+	maxRiverSurfaceRise      float64
+	maxRisePreviousKind      reconcile.WaterKind
+	maxRiseCurrentKind       reconcile.WaterKind
+	maxRiseSegment           int
+	maxRiseT                 float64
+	maxRisePreviousSurface   float64
+	maxRiseCurrentSurface    float64
+	maxRiseReceiverDefined   bool
+	maxRiseReceiverSurface   float64
+	maxRiseRiverWeight       float64
+}
+
+func auditRuntimeWater(model *generator.WorldModel) runtimeWaterDiagnostics {
+	var d runtimeWaterDiagnostics
+	if model == nil || model.Runtime == nil || model.Surface == nil ||
+		model.Hydrology == nil || model.Reconciliation == nil || model.Waterbed == nil {
+		return d
+	}
+
+	geometry := model.Geometry
+	sea := model.Config.SeaLevelNormalized
+	for i, land := range model.Surface.LandMask {
+		x, z := geometry.NodePosition(i%geometry.Width, i/geometry.Width)
+		s := model.Runtime.Sample(x, z)
+
+		if !land {
+			if s.WaterKind != reconcile.WaterOcean ||
+				!s.WaterSurfaceDefined ||
+				math.Abs(s.WaterSurfaceElevation-sea) > 1e-12 ||
+				s.WaterDepth <= 0 {
+				d.oceanNodeViolations++
+			}
+		}
+		if model.Surface.EnclosedBelowSea[i] && s.WaterKind == reconcile.WaterOcean {
+			d.enclosedOceanLeaks++
+		}
+		if model.Hydrology.LakeID[i] > 0 {
+			if s.WaterKind != reconcile.WaterLake ||
+				!s.WaterSurfaceDefined ||
+				s.WaterDepth <= 0 {
+				d.lakeNodeViolations++
+			}
+		}
+	}
+
+	epsilon := model.Reconciliation.Config.FinalUpslopeEpsilon
+	for segID, seg := range model.Waterbed.Rivers {
+		steps := 16
+		if n := len(seg.Profile) - 1; n > steps {
+			steps = n
+		}
+		var prevSurface float64
+		var prevKind reconcile.WaterKind
+		var prevReceiverDefined bool
+		var prevReceiverSurface float64
+		var prevRiverWeight float64
+		havePrev := false
+		for j := 0; j <= steps; j++ {
+			t := float64(j) / float64(steps)
+			x := seg.X0 + (seg.X1-seg.X0)*t
+			z := seg.Z0 + (seg.Z1-seg.Z0)*t
+			ground := model.Waterbed.Sample(x, z)
+			s := model.Runtime.Sample(x, z)
+
+			if !s.WaterSurfaceDefined || s.WaterKind == reconcile.WaterNone {
+				d.riverUndefinedSteps++
+				havePrev = false
+				continue
+			}
+			if s.WaterDepth <= 1e-12 {
+				d.riverDrySteps++
+			}
+			if havePrev {
+				rise := s.WaterSurfaceElevation - prevSurface
+				if rise > epsilon {
+					d.riverSurfaceUpslopeSteps++
+					if rise > d.maxRiverSurfaceRise {
+						d.maxRiverSurfaceRise = rise
+						d.maxRisePreviousKind = prevKind
+						d.maxRiseCurrentKind = s.WaterKind
+						d.maxRiseSegment = segID
+						d.maxRiseT = t
+						d.maxRisePreviousSurface = prevSurface
+						d.maxRiseCurrentSurface = s.WaterSurfaceElevation
+						d.maxRiseReceiverDefined = prevReceiverDefined
+						d.maxRiseReceiverSurface = prevReceiverSurface
+						d.maxRiseRiverWeight = prevRiverWeight
+					}
+				}
+			}
+			prevSurface = s.WaterSurfaceElevation
+			prevKind = s.WaterKind
+			prevReceiverDefined = ground.RiverReceiverSurfaceDefined
+			prevReceiverSurface = ground.RiverReceiverSurface
+			prevRiverWeight = ground.RiverWeight
+			havePrev = true
+		}
+	}
+	return d
+}
+
 func auditMacroSlopes(m *terrain.Model, geometry world.GridGeometry) float64 {
 	maxMismatch := 0.0
 	cellSize := geometry.SpacingX()
@@ -300,7 +437,7 @@ func main() {
 	width := flag.Int("width", 640, "macro grid nodes X (at least 16)")
 	height := flag.Int("height", 400, "macro grid nodes Z (at least 16)")
 	cellSize := flag.Float64("cell-size", 128, "blocks per node interval")
-	strict := flag.Bool("strict-final", false, "fail until Runtime-facing river water-surface/depth semantics are implemented")
+	strict := flag.Bool("strict-final", false, "also require all Runtime-facing ocean/lake/river water checks to pass")
 	flag.Parse()
 	geometry := world.GridGeometry{Width: *width, Height: *height, SpanXBlocks: float64(*width-1) * *cellSize, SpanZBlocks: float64(*height-1) * *cellSize}
 	if err := geometry.Validate(); err != nil || *width < 16 || *height < 16 {
@@ -316,7 +453,7 @@ func main() {
 		}
 		seeds = append(seeds, seed)
 	}
-	failed, rawBaselineDifferences := false, false
+	failed, runtimeFailed, rawBaselineDifferences := false, false, false
 	for _, seed := range seeds {
 		r := inspect(seed, *width, *height, *cellSize)
 		if err := json.NewEncoder(os.Stdout).Encode(r); err != nil {
@@ -338,21 +475,25 @@ func main() {
 			r.WaterbedChunkJump > 1e-5 {
 			failed = true
 		}
+		if r.RuntimeOceanNodeViolations != 0 ||
+			r.RuntimeEnclosedOceanLeaks != 0 ||
+			r.RuntimeLakeNodeViolations != 0 ||
+			r.RuntimeRiverUndefinedSteps != 0 ||
+			r.RuntimeRiverDrySteps != 0 ||
+			r.RuntimeRiverSurfaceUpslopeSteps != 0 {
+			runtimeFailed = true
+		}
 		if r.FinalSurfaceMaskChanges != 0 || r.FinalUpslopeEdges != 0 {
 			rawBaselineDifferences = true
 		}
 	}
 	if rawBaselineDifferences {
-		fmt.Fprintln(os.Stderr, "RAW BASELINE: uncorrected Terrain still retains the historical coast/river mismatches; applied CoastTerrain + Waterbed are audited separately above.")
+		fmt.Fprintln(os.Stderr, "RAW BASELINE: uncorrected Terrain retains historical coast/river mismatches by design; applied CoastTerrain + Waterbed + Runtime are the final-world checks.")
 	}
-	// Phase 6.2 has now applied broad coast and local bed geometry, but the
-	// Runtime-facing water-surface sampler is not complete yet: ocean/lake datum
-	// exists, while river water depth/surface still needs an explicit rule.
-	runtimeWaterSurfaceIncomplete := true
-	if runtimeWaterSurfaceIncomplete {
-		fmt.Fprintln(os.Stderr, "UNRESOLVED: Runtime river water-surface/depth semantics are not implemented yet; -strict-final remains intentionally failing.")
+	if runtimeFailed {
+		fmt.Fprintln(os.Stderr, "FINAL RUNTIME: ocean/lake/river water semantics still contain violations.")
 	}
-	if failed || (*strict && runtimeWaterSurfaceIncomplete) {
+	if failed || (*strict && runtimeFailed) {
 		os.Exit(1)
 	}
 }

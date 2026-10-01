@@ -148,6 +148,17 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 		return nil, errors.New("waterbed: river graph contains a cycle")
 	}
 
+	for i := range m.Rivers {
+		surface, ok, err := downstreamReceiverSurface(m.Rivers[i].To, rec, hydro)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			m.Rivers[i].ReceiverSurfaceDefined = true
+			m.Rivers[i].ReceiverSurface = surface
+		}
+	}
+
 	spacing := base.Geometry.SpacingX()
 	inner := spacing * 0.40
 	outer := spacing * 0.60
@@ -173,6 +184,27 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 		id := len(m.Lakes)
 		m.Lakes = append(m.Lakes, node)
 		m.indexLake(id, node)
+	}
+
+	// A channel can geometrically pass through the rendered lake footprint even
+	// when its Hydrology FlowTo chain does not point directly at that lake node.
+	// Treat any such spatial intersection as the same receiving-water backwater
+	// constraint so Runtime does not jump upward from shallow river water to the
+	// lake datum at the footprint boundary.
+	for i := range m.Rivers {
+		seg := &m.Rivers[i]
+		for _, lake := range m.Lakes {
+			if !segmentIntersectsSquare(
+				seg.X0, seg.Z0, seg.X1, seg.Z1,
+				lake.X, lake.Z, lake.OuterRadius,
+			) {
+				continue
+			}
+			if !seg.ReceiverSurfaceDefined || lake.WaterSurface > seg.ReceiverSurface {
+				seg.ReceiverSurfaceDefined = true
+				seg.ReceiverSurface = lake.WaterSurface
+			}
+		}
 	}
 
 	return m, nil
@@ -204,6 +236,14 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		}
 		bed := sampleRiverProfile(seg, t)
 		weight := 1 - smoothstep(0, seg.HalfWidth, distance)
+		if weight > sample.RiverWeight {
+			sample.RiverWeight = weight
+		}
+		if seg.ReceiverSurfaceDefined &&
+			(!sample.RiverReceiverSurfaceDefined || seg.ReceiverSurface > sample.RiverReceiverSurface) {
+			sample.RiverReceiverSurfaceDefined = true
+			sample.RiverReceiverSurface = seg.ReceiverSurface
+		}
 		candidate := baseHeight - math.Max(0, baseHeight-bed)*weight
 		if candidate < finalHeight {
 			finalHeight = candidate
@@ -339,6 +379,38 @@ func sampleRiverProfile(seg RiverSegment, t float64) float64 {
 	return lerp(seg.Profile[i0], seg.Profile[i1], f)
 }
 
+func downstreamReceiverSurface(start int, rec *reconcile.Model, hydro *hydrology.Model) (float64, bool, error) {
+	n := len(hydro.FlowTo)
+	if start < 0 || start >= n {
+		return 0, false, errors.New("waterbed: receiver search start is out of range")
+	}
+	node := start
+	for steps := 0; steps < n; steps++ {
+		to := hydro.FlowTo[node]
+		if to < 0 {
+			return 0, false, nil
+		}
+		if to >= n {
+			return 0, false, errors.New("waterbed: receiver search flow target is out of range")
+		}
+		if to == node {
+			return 0, false, errors.New("waterbed: receiver search encountered self cycle")
+		}
+		node = to
+		if rec.WaterSurfaceDefined[node] {
+			switch rec.WaterKind[node] {
+			case reconcile.WaterLake, reconcile.WaterOcean:
+				surface := rec.WaterSurfaceElevation[node]
+				if !finite(surface) || surface < 0 || surface > 1 {
+					return 0, false, errors.New("waterbed: invalid downstream receiver surface")
+				}
+				return surface, true, nil
+			}
+		}
+	}
+	return 0, false, errors.New("waterbed: receiver search exceeded flow graph length")
+}
+
 func riverHalfWidth(cfg Config, threshold, strength float64) float64 {
 	denom := math.Max(1e-9, 1-threshold)
 	t := clamp((strength-threshold)/denom, 0, 1)
@@ -360,6 +432,35 @@ func pointSegment(px, pz, x0, z0, x1, z1 float64) (float64, float64) {
 	qx := x0 + t*dx
 	qz := z0 + t*dz
 	return t, math.Hypot(px-qx, pz-qz)
+}
+
+func segmentIntersectsSquare(x0, z0, x1, z1, cx, cz, radius float64) bool {
+	minX, maxX := cx-radius, cx+radius
+	minZ, maxZ := cz-radius, cz+radius
+	dx, dz := x1-x0, z1-z0
+	tMin, tMax := 0.0, 1.0
+
+	clipAxis := func(p, d, lo, hi float64) bool {
+		if math.Abs(d) <= 1e-18 {
+			return p >= lo && p <= hi
+		}
+		a := (lo - p) / d
+		b := (hi - p) / d
+		if a > b {
+			a, b = b, a
+		}
+		if a > tMin {
+			tMin = a
+		}
+		if b < tMax {
+			tMax = b
+		}
+		return tMin <= tMax
+	}
+
+	return clipAxis(x0, dx, minX, maxX) &&
+		clipAxis(z0, dz, minZ, maxZ) &&
+		tMax >= 0 && tMin <= 1
 }
 
 func smoothstep(edge0, edge1, x float64) float64 {

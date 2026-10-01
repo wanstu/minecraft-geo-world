@@ -13,6 +13,7 @@ import (
 	"geoworld/internal/terrain"
 	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
+	"geoworld/internal/worldsample"
 )
 
 // Config is the single formal input for the world-generation pipeline.
@@ -26,15 +27,16 @@ type Config struct {
 	OceanFraction           float64
 	EdgeOceanBufferFraction float64
 
-	Climate   climate.Config
-	Hydrology hydrology.Config
-	Erosion   erosion.Config
-	Landform  landform.Config
-	Geomorph  geomorph.Config
-	Ecology   ecology.Config
-	Terrain   terrain.Config
-	Reconcile reconcile.Config
-	Waterbed  waterbed.Config
+	Climate     climate.Config
+	Hydrology   hydrology.Config
+	Erosion     erosion.Config
+	Landform    landform.Config
+	Geomorph    geomorph.Config
+	Ecology     ecology.Config
+	Terrain     terrain.Config
+	Reconcile   reconcile.Config
+	Waterbed    waterbed.Config
+	WorldSample worldsample.Config
 }
 
 // ResolvedConfig records the values actually used after every stage has applied
@@ -45,16 +47,17 @@ type ResolvedConfig struct {
 	Geometry           world.GridGeometry
 	SeaLevelNormalized float64
 
-	Phase1    phase1.Config
-	Climate   climate.Config
-	Hydrology hydrology.Config
-	Erosion   erosion.Config
-	Landform  landform.Config
-	Geomorph  geomorph.Config
-	Ecology   ecology.Config
-	Terrain   terrain.Config
-	Reconcile reconcile.Config
-	Waterbed  waterbed.Config
+	Phase1      phase1.Config
+	Climate     climate.Config
+	Hydrology   hydrology.Config
+	Erosion     erosion.Config
+	Landform    landform.Config
+	Geomorph    geomorph.Config
+	Ecology     ecology.Config
+	Terrain     terrain.Config
+	Reconcile   reconcile.Config
+	Waterbed    waterbed.Config
+	WorldSample worldsample.Config
 }
 
 // WorldModel is the unified in-memory result. Phase 6.3 will define which
@@ -77,23 +80,25 @@ type WorldModel struct {
 	CoastTerrain   *terrain.Model
 	Reconciliation *reconcile.Model
 	Waterbed       *waterbed.Model
+	Runtime        *worldsample.Model
 }
 
 // Stage identifies one deterministic pipeline boundary for progress reporting.
 type Stage string
 
 const (
-	StagePhase1    Stage = "phase1"
-	StageClimate   Stage = "climate"
-	StageHydrology Stage = "hydrology"
-	StageErosion   Stage = "erosion"
-	StageLandform  Stage = "landform"
-	StageGeomorph  Stage = "geomorph"
-	StageEcology   Stage = "ecology"
-	StageProfile   Stage = "mcprofile"
-	StageTerrain   Stage = "terrain"
-	StageReconcile Stage = "reconcile"
-	StageWaterbed  Stage = "waterbed"
+	StagePhase1      Stage = "phase1"
+	StageClimate     Stage = "climate"
+	StageHydrology   Stage = "hydrology"
+	StageErosion     Stage = "erosion"
+	StageLandform    Stage = "landform"
+	StageGeomorph    Stage = "geomorph"
+	StageEcology     Stage = "ecology"
+	StageProfile     Stage = "mcprofile"
+	StageTerrain     Stage = "terrain"
+	StageReconcile   Stage = "reconcile"
+	StageWaterbed    Stage = "waterbed"
+	StageWorldSample Stage = "worldsample"
 )
 
 var orderedStages = [...]Stage{
@@ -108,6 +113,7 @@ var orderedStages = [...]Stage{
 	StageTerrain,
 	StageReconcile,
 	StageWaterbed,
+	StageWorldSample,
 }
 
 type Progress struct {

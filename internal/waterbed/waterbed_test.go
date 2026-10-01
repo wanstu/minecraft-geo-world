@@ -283,3 +283,57 @@ func TestConfluencePropagatesActualUpstreamOutlet(t *testing.T) {
 		t.Fatalf("confluence introduced %d upslope steps, max rise %.12g", d.RiverUpslopeSteps, d.MaxRiverRise)
 	}
 }
+
+func TestDiagonalRiverSeesSquareLakeReceiver(t *testing.T) {
+	g := testGeometry()
+	base := testTerrain(t, g, 0.55)
+	n := g.Width * g.Height
+
+	rec := &reconcile.Model{
+		Geometry:              g,
+		Config:                reconcile.Config{RiverStrengthThreshold: 0.30},
+		RiverBaseElevation:    filled(n, 0.55),
+		RiverBedTarget:        filled(n, 0.55),
+		LakeBedCeilingDefined: make([]bool, n),
+		LakeBedCeiling:        make([]float64, n),
+		WaterKind:             make([]reconcile.WaterKind, n),
+		WaterSurfaceDefined:   make([]bool, n),
+		WaterSurfaceElevation: make([]float64, n),
+		RiverEdges: []reconcile.RiverEdgeConstraint{{
+			From: 0, To: 4, RiverStrength: 1,
+		}},
+	}
+	rec.RiverBedTarget[0] = 0.54
+	rec.RiverBedTarget[4] = 0.52
+
+	// Node 1 is at (128,0). The diagonal segment 0 -> 4 passes through the
+	// square lake footprint near (64,64): Chebyshev distance=64 blocks while
+	// Euclidean distance is about 90.5 blocks. With the default 76.8-block lake
+	// outer radius, circle-based intersection misses it but the raster footprint
+	// correctly contains it.
+	lake := 1
+	rec.LakeBedCeilingDefined[lake] = true
+	rec.LakeBedCeiling[lake] = 0.50
+	rec.WaterKind[lake] = reconcile.WaterLake
+	rec.WaterSurfaceDefined[lake] = true
+	rec.WaterSurfaceElevation[lake] = 0.60
+
+	h := emptyHydrology(g)
+	h.FlowTo[0] = 4
+	h.LakeID[lake] = 1
+
+	m, err := Build(base, rec, h, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Rivers) != 1 {
+		t.Fatalf("river segments=%d want=1", len(m.Rivers))
+	}
+	seg := m.Rivers[0]
+	if !seg.ReceiverSurfaceDefined {
+		t.Fatal("diagonal river did not inherit intersected lake receiver surface")
+	}
+	if math.Abs(seg.ReceiverSurface-0.60) > 1e-12 {
+		t.Fatalf("receiver surface=%.12f want=0.60", seg.ReceiverSurface)
+	}
+}

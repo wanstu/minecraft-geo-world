@@ -18,6 +18,7 @@ import (
 	"geoworld/internal/terrain"
 	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
+	"geoworld/internal/worldsample"
 )
 
 // GenerateWorld executes the formal world-generation pipeline.
@@ -184,6 +185,15 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 	}
 	reporter.done(StageWaterbed)
 
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	runtimeModel, err := worldsample.Build(w.Surface, wb, resolved.WorldSample)
+	if err != nil {
+		return nil, fmt.Errorf("generator: worldsample: %w", err)
+	}
+	reporter.done(StageWorldSample)
+
 	model := &WorldModel{
 		Geometry:       w.Geometry,
 		Surface:        w.Surface,
@@ -199,6 +209,7 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 		CoastTerrain:   coastTerrain,
 		Reconciliation: rec,
 		Waterbed:       wb,
+		Runtime:        runtimeModel,
 	}
 	model.Config = ResolvedConfig{
 		Seed:               resolved.Seed,
@@ -214,6 +225,7 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 		Terrain:            t.Config,
 		Reconcile:          rec.Config,
 		Waterbed:           wb.Config,
+		WorldSample:        runtimeModel.Config,
 	}
 	return model, nil
 }
