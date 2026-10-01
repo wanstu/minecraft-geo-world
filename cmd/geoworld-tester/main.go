@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -18,6 +17,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -198,25 +198,35 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		SpanXBlocks: float64(req.Width-1) * req.CellSize,
 		SpanZBlocks: float64(req.Height-1) * req.CellSize,
 	}
-	model, err := generator.GenerateWorld(context.Background(), generator.Config{
-		Seed:          req.Seed,
-		Geometry:      g,
-		PlateCount:    req.PlateCount,
-		OceanFraction: req.OceanFraction,
-	}, func(p generator.Progress) {
-		s.mu.Lock()
-		s.stage = p.Stage
-		s.completed = p.Completed
-		s.total = p.Total
-		s.mu.Unlock()
-	})
+	var model *generator.WorldModel
+	var err error
+	func() {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				log.Printf("generation panic: %v\n%s", recovered, debug.Stack())
+				err = fmt.Errorf("generation panic: %v", recovered)
+			}
+		}()
+		model, err = generator.GenerateWorld(r.Context(), generator.Config{
+			Seed:          req.Seed,
+			Geometry:      g,
+			PlateCount:    req.PlateCount,
+			OceanFraction: req.OceanFraction,
+		}, func(p generator.Progress) {
+			s.mu.Lock()
+			s.stage = p.Stage
+			s.completed = p.Completed
+			s.total = p.Total
+			s.mu.Unlock()
+		})
+	}()
 	duration := time.Since(start)
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.generating = false
 	if err != nil {
+		s.mu.Lock()
+		s.generating = false
 		s.lastError = err.Error()
+		s.mu.Unlock()
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
@@ -231,7 +241,11 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		generatedAt: time.Now(),
 		duration:    duration,
 	}
+	s.mu.Lock()
+	s.generating = false
+	s.lastError = ""
 	s.active = active
+	s.mu.Unlock()
 	writeJSON(w, http.StatusOK, activeSummary(active))
 }
 

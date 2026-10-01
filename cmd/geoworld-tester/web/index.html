@@ -12,7 +12,10 @@
     <strong>GeoWorld Tester</strong>
     <span class="muted">真实 Generator / Runtime 测试工具</span>
   </div>
-  <div id="topStatus" class="pill">未生成</div>
+  <div class="header-status">
+    <div id="backendStatus" class="pill">后端检查中</div>
+    <div id="topStatus" class="pill">未生成</div>
+  </div>
 </header>
 <div class="layout">
   <aside class="panel controls">
@@ -22,26 +25,27 @@
       <label>网格宽<input id="width" type="number" value="320" min="16" max="1024"></label>
       <label>网格高<input id="height" type="number" value="200" min="16" max="1024"></label>
     </div>
-    <label>精度
+    <label>采样间距
       <select id="cellSize">
-        <option value="128">128 blocks / node（标准）</option>
-        <option value="64">64 blocks / node（高精度）</option>
+        <option value="128">128 方块 / 点（标准，范围更大）</option>
+        <option value="64">64 方块 / 点（更细，范围减半）</option>
       </select>
     </label>
+    <div id="rangePreview" class="muted small"></div>
     <div class="two">
       <label>板块数<input id="plates" type="number" value="18" min="2"></label>
       <label>海洋比例<input id="ocean" type="number" value="0.68" min="0.1" max="0.9" step="0.01"></label>
     </div>
     <button id="generate" class="primary">生成世界</button>
     <div class="progress"><i id="progressBar"></i></div>
-    <div id="progressText" class="muted small">默认 320×200，适合快速测试</div>
+    <div id="progressText" class="muted small">默认参数适合快速检查世界结构</div>
 
     <hr>
     <h2>模型</h2>
-    <label>保存名称<input id="modelName" placeholder="seed-731894205"></label>
-    <button id="save">保存 / 更新模型</button>
+    <label>保存名称<input id="modelName" placeholder="生成后自动填写"></label>
+    <button id="save" disabled>保存 / 更新模型</button>
     <label>已保存模型<select id="models"><option value="">暂无</option></select></label>
-    <button id="load">重新打开模型</button>
+    <button id="load" disabled>重新打开模型</button>
     <div id="modelMessage" class="muted small"></div>
 
     <hr>
@@ -54,15 +58,16 @@
       <button class="layer active" data-layer="final">最终地形</button>
       <button class="layer" data-layer="water">水体</button>
       <button class="layer" data-layer="biome">群系</button>
-      <button class="layer" data-layer="profile">Profile 置信度</button>
-      <span class="muted small">点击地图查看真实 Runtime 采样</span>
+      <button class="layer" data-layer="profile">配置置信度</button>
+      <span class="muted small">点击地图查看该坐标的最终结果</span>
     </div>
     <div id="mapWrap" class="map-wrap empty">
       <img id="map" alt="GeoWorld map">
       <div id="emptyHint">设置参数后点击“生成世界”</div>
+      <div id="mapNotice" class="map-notice" hidden></div>
       <div id="cursor"></div>
     </div>
-    <div class="footnote">这不是静态原型：地图来自当前 <code>GenerateWorld → CoastTerrain → Waterbed → WorldSample → RuntimeProfile</code>。</div>
+    <div class="footnote">这里显示的是最终 Runtime 结果；生成失败时不会把旧地图冒充成新结果。</div>
   </main>
 
   <aside class="panel inspector">
