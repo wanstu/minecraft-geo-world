@@ -966,7 +966,7 @@ Phase 6.1b 最终残余审计已完成。剩余 `*Cells` 使用点属于 blocks�
 
 ## D-037：海岸控制点、河床纵剖面与水面必须分层约束
 
-状态：约束模型、broad coast application、river/lake bed overlay、Runtime Ground/Water sampler 均已实施；Ecology/Profile 最终语义同步待收口
+状态：约束模型、broad coast application、river/lake bed overlay、Runtime Ground/Water sampler 与 Runtime Profile 均已实施；Phase 6.2 已收口
 
 最终水体协调不能把所有问题都塞进同一个“修正后高度”数组。
 
@@ -1058,3 +1058,21 @@ Smoothstep correction 精确命中宏观控制点，但 Raw Terrain 本身是连
 - Lake node violations = 0
 - River undefined/dry steps = 0
 - River water-surface upslope steps = 0
+
+
+## D-042：Runtime Profile 选择必须服从最终水陆语义，但局部河湖不重写宏观生态
+
+状态：Phase 6.2 第六切片已实施
+
+Ecology / MCProfile 是宏观气候与地貌分类，不应因为最终 block 坐标落进一条局部河道或一个湖泊就重跑整套 Climate/Ecology；但连续 mixed coast 也不能直接使用最近宏观节点，导致 Ocean water 上出现 terrestrial biome/profile。
+
+规则：
+1. Runtime Profile 是独立解析层，消费最终 WorldSample 与已有宏观 Ecology / MCProfile。
+2. Ocean 坐标必须从所在 Macro Cell 的 ocean corners 中选择 profile；结果必须是 ocean biome family、TerrainOcean、VegetationNone。
+3. River / Lake / dry land 坐标从 land corners 选择 terrestrial profile；局部河湖的 WaterKind 独立携带，不能把其生态强制改成 Ocean。
+4. 离散 profile 不做数值插值；当前使用 smoothstep-bilinear corner weights，只在目标语义侧选择权重最大的 corner，避免发明不存在的离散中间标签。
+5. 若所在 Cell 找不到目标语义侧 corner，必须暴露 SemanticFallback；正式 Runtime audit 要求 fallback=0。
+6. SemanticMismatch / Unknown 必须进入 strict-final。
+7. mixed coast、外围边界和角落必须使用连续世界坐标审计，不能只验证宏观节点。
+
+两个正式 Seed 已达到 fallback=0、semantic mismatch=0、Unknown=0；外围 8304 个采样点/Seed 全部为 Ocean 且 Profile 一致。

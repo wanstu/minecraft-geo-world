@@ -201,12 +201,14 @@ GenerateWorld(ctx, config, progress)
 Phase1 → Climate → Hydrology → Erosion → Landform → Geomorph
        → Ecology → MCProfile → Terrain
        → Reconcile → CoastTerrain → Waterbed → WorldSample
+       → RuntimeProfile
         ↓
 WorldModel
   ├─ resolved Config
   ├─ shared Geometry / Surface
   ├─ raw / applied ground layers
-  └─ Runtime Ground/Water sampler
+  ├─ Runtime Ground/Water sampler
+  └─ Runtime biome/profile resolver
 ```
 
 当前原则：
@@ -218,7 +220,7 @@ WorldModel
 - 正式跨阶段审计逐步改用 GenerateWorld；单阶段 Lab 仍可直接调用模块用于算法实验。
 - Context 取消当前位于阶段边界。需要阶段内部即时取消时，context 必须进入相应算法循环。
 
-下一步架构对象将是最终 Terrain / Water reconciliation 数据：它必须同时引用最终连续 Terrain、宏观 Surface、Hydrology Flow/Lake 信息，并产出可被 Ecology/Profile/Runtime 一致消费的最终水陆语义。
+Phase 6.2 已完成 Terrain / Water reconciliation、WorldSample 与 RuntimeProfile 的最终消费链。下一步架构对象是 Phase 6.3 的最小可持久化 World Model schema：只保存重建 Runtime 所需的数据、解析配置、版本和校验信息，不把全部 Lab 暂态数组直接序列化。
 
 
 ## 10. Terrain / Water Reconciliation 分层
@@ -338,3 +340,25 @@ WorldSample.Sample(x,z)
 - Receiver detection 同时使用 Hydrology FlowTo 与 river segment / square lake raster footprint 的空间相交，保证几何判定与实际 lake sampler 一致。
 
 `geoworld-consistency-audit -strict-final` 直接验收这一层；Raw Terrain 的历史 coast/river mismatch 不再决定 final-world pass/fail。
+
+
+## 14. Runtime Profile resolver
+
+Phase 6.2 第六切片把最终 Runtime 链补成：
+
+WorldSample Ground/Water + Macro Ecology / MCProfile → RuntimeProfile.Sample(x,z) → WaterKind + Ground/Water + Biome/Terrain/Surface/Vegetation Profile
+
+RuntimeProfile 不重新计算气候或生态。它解决的是连续坐标与宏观离散标签之间的语义选择：
+
+- Ocean：从当前 Macro Cell 的 ocean corners 选择权重最高的 profile。
+- River / Lake / dry land：从 land corners 选择权重最高的 terrestrial profile。
+- corner 权重使用与连续采样一致的 smoothstep-bilinear 局部权重，但离散标签本身不插值。
+- SemanticFallback 表示目标语义侧没有可用 corner；SemanticMismatch 表示最终选择仍与 Runtime water side 冲突。
+- strict-final 要求两个字段均为 0，并要求 Unknown=0。
+
+这样可以同时满足：
+- mixed coast 的真实 coastline crossing 决定 Ocean/land 语义；
+- 河流/湖泊保留周边 terrestrial climate/ecology，而不是被错误变成 Ocean biome；
+- Runtime/Profile 的最终消费接口不需要重新跑全球模型。
+
+Phase 6.2 到此完成。Phase 6.3 将在此 Runtime 契约上定义持久化最小字段，而不是序列化所有中间 Lab 数据。

@@ -671,3 +671,59 @@ Runtime water semantics 的最小闭环已经完成并通过 strict-final，但 
 - [ ] WorldModel 持久化 schema、保存/重开属于 Phase 6.3。
 
 下一切片：收口 Ecology / MCProfile 与 Runtime 水陆/水体语义，并补 mixed coast / outer-boundary final sampling audit；通过后再判断 Phase 6.2 是否可正式结束。
+
+
+## Phase 6.2 第六切片实施结果（2026-10-01）
+
+功能提交：7f8722f — feat: align runtime profiles with final water semantics；开发分支：agent/world-model-foundation。
+
+目标：不重跑宏观 Climate/Ecology，而是在最终连续 Runtime 坐标上解决离散 Ecology / MC Profile 与 Ocean/Lake/River/Ground 语义的最后一层对齐，并补 mixed coast 与模型外围验收。
+
+已完成：
+- [x] 新增 internal/runtimeprofile；它组合 WorldSample、Ecology 与 MCProfile，不修改宏观生态算法。
+- [x] RuntimeProfile.Sample(x,z) 先读取最终 WorldSample.WaterKind，再从所在 Macro Cell 四角选择同一 land/ocean 语义侧的 Profile。
+- [x] Ocean Runtime 必须选择 ocean macro profile：Ocean biome family、TerrainOcean、VegetationNone。
+- [x] River / Lake / dry land 继续选择 terrestrial macro profile；局部有水不等于 Ocean biome，河湖保留周边陆地生态语义。
+- [x] 暴露 SemanticFallback 与 SemanticMismatch；正常 final-world 采样不允许依赖 fallback。
+- [x] GenerateWorld 增加 runtimeprofile 阶段，WorldModel 挂接 RuntimeProfile；当前正式流水线共 13 个阶段。
+- [x] Consistency Audit 扫描全部宏观节点、mixed coast Cell 内 5 点与完整模型外围 1/4-Cell 间隔点。
+- [x] Runtime Profile fallback / semantic mismatch / Unknown、boundary non-ocean / profile mismatch 全部进入 strict-final。
+
+### 正式验证
+
+go test ./... -count=1：全部通过。
+
+go run ./cmd/geoworld-consistency-audit -strict-final：
+- Seed 731894205：RuntimeProfileSamples=274809，Fallbacks=0，SemanticMismatches=0，Unknown=0，MixedCoastSamples=10505 全通过；BoundarySamples=8304，BoundaryNonOcean=0，BoundaryProfileMismatches=0。
+- Seed 10400：RuntimeProfileSamples=275984，Fallbacks=0，SemanticMismatches=0，Unknown=0，MixedCoastSamples=11680 全通过；BoundarySamples=8304，BoundaryNonOcean=0，BoundaryProfileMismatches=0。
+- 两个 Seed 原有 Runtime Ocean/Lake/River water violations 继续全 0。
+
+go run ./cmd/geoworld-mcprofile-audit -count 4：
+- average confidence 0.691–0.764
+- low-confidence land 0.086%–0.216%
+- Unknown=0
+- 与第五切片前宏观 Profile 基线一致。
+
+## Phase 6.2 收口
+
+状态：**完成**。
+
+Phase 6.2 最终形成的正式 Runtime 因果链：
+
+GenerateWorld → Raw Terrain → CoastTerrain → Waterbed Ground → WorldSample Ground/Water → RuntimeProfile biome/profile resolver
+
+收口条件：
+- shared Seed / GridGeometry / SeaLevel 单一真相源：通过。
+- applied coast macro node + homogeneous interior：通过。
+- continuous river bed / lake bed：通过。
+- Runtime Ocean/Lake/River water surface：通过。
+- River→Lake/Ocean receiver/backwater：通过。
+- mixed coast Runtime water/profile semantics：通过。
+- model outer boundary / corners：外围连续采样全部 Ocean 且 Profile 一致。
+- Runtime Profile Unknown=0 / semantic fallback=0 / mismatch=0。
+- strict-final 两个正式 Seed 通过。
+- 全仓测试通过。
+
+Raw Terrain 806/608 的 coast changes 与 72/126 的 river upslope 保留为校正前历史诊断，不代表最终 Runtime 仍存在这些问题。
+
+下一阶段：**Phase 6.3 — 版本化 WorldModel 保存/重开**。先定义最小持久化 schema、原子保存、版本/损坏校验和 save→reopen golden samples；之后 Phase 6.4 才进入 Go→Java reader/sampler 与一个 Loader 的早期游戏验证。

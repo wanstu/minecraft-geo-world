@@ -1187,3 +1187,24 @@ Phase 6.1b 状态：完成。
 - Phase 6.3 持久化 schema 与 save/reopen。
 
 下一步：Phase 6.2 第六切片，收口生态/Profile 与最终 Runtime 语义。
+
+
+## 2026-10-01 — Phase 6.2 第六切片：Runtime Profile 与阶段收口
+
+功能提交：7f8722f。
+
+完成：
+- 新增 internal/runtimeprofile，不重跑宏观 Ecology；最终坐标按 WorldSample water semantics 选择同一 land/ocean 侧的 MC Profile。
+- Ocean 强制 ocean family / TerrainOcean / VegetationNone。
+- River/Lake 保留 terrestrial Ecology/Profile，不把局部水体误当 Ocean biome。
+- GenerateWorld 正式流水线扩展到 13 stages，WorldModel 增加 RuntimeProfile。
+- Consistency Audit 增加 macro node、mixed coast、完整外围 Runtime Profile 扫描。
+- strict-final 纳入 Runtime Profile fallback / mismatch / Unknown 与 boundary non-ocean / mismatch。
+
+正式结果：
+- Seed 731894205：274809 RuntimeProfile samples，fallback=0，semantic mismatch=0，Unknown=0；mixed coast 10505 点全通过；boundary 8304 点全 Ocean 且 profile mismatch=0。
+- Seed 10400：275984 RuntimeProfile samples，fallback=0，semantic mismatch=0，Unknown=0；mixed coast 11680 点全通过；boundary 8304 点全 Ocean 且 profile mismatch=0。
+- go test ./... -count=1 全通过。
+- 4 Seed MC Profile audit 保持旧基线，Unknown=0。
+
+Phase 6.2 正式完成。下一步 Phase 6.3：最小持久化 schema、原子保存、版本校验、重开复现。
