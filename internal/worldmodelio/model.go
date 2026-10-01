@@ -41,6 +41,11 @@ type Manifest struct {
 	SeaLevelNormalized float64            `json:"seaLevelNormalized"`
 }
 
+type Inspection struct {
+	Manifest  Manifest `json:"manifest"`
+	FileBytes int64    `json:"fileBytes"`
+}
+
 // RuntimeModel is the reopened, Runtime-ready subset of generator.WorldModel.
 // Expensive Phase1..Geomorph debug/intermediate models are intentionally absent.
 type RuntimeModel struct {

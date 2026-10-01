@@ -171,6 +171,108 @@ func TestLoadRejectsUnsupportedVersions(t *testing.T) {
 	})
 }
 
+func TestReplaceExistingTargetPublishesCompleteNewModel(t *testing.T) {
+	first := testGeneratedWorld(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "replace.geoworld")
+	if err := Save(path, first); err != nil {
+		t.Fatal(err)
+	}
+
+	g := first.Geometry
+	second, err := generator.GenerateWorld(context.Background(), generator.Config{
+		Seed:          10400,
+		Geometry:      g,
+		PlateCount:    12,
+		OceanFraction: 0.68,
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Replace(path, second); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reopened.Manifest.Seed != second.Config.Seed {
+		t.Fatalf("reopened seed=%d want=%d", reopened.Manifest.Seed, second.Config.Seed)
+	}
+
+	x, z := g.NodePosition(17, 11)
+	want := second.RuntimeProfile.Sample(x+31.25, z+47.5)
+	got := reopened.RuntimeProfile.Sample(x+31.25, z+47.5)
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("replacement runtime sample mismatch\ngot=%+v\nwant=%+v", got, want)
+	}
+
+	temps, err := filepath.Glob(filepath.Join(dir, ".replace.geoworld.tmp-*"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(temps) != 0 {
+		t.Fatalf("replacement left temporary files: %v", temps)
+	}
+}
+
+func TestReplaceMissingTargetDoesNotCreateFile(t *testing.T) {
+	model := testGeneratedWorld(t)
+	path := filepath.Join(t.TempDir(), "missing.geoworld")
+	if err := Replace(path, model); err == nil {
+		t.Fatal("expected replace of missing target to fail")
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("replace unexpectedly created target: %v", err)
+	}
+}
+
+func TestInspectAndValidateSeparateHeaderFromPayloadIntegrity(t *testing.T) {
+	model := testGeneratedWorld(t)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "valid.geoworld")
+	if err := Save(path, model); err != nil {
+		t.Fatal(err)
+	}
+
+	inspection, err := Inspect(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inspection.Manifest.Seed != model.Config.Seed || inspection.FileBytes <= 0 {
+		t.Fatalf("unexpected inspection: %+v", inspection)
+	}
+	validated, err := Validate(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(validated, inspection) {
+		t.Fatalf("validate inspection differs\ninspect=%+v\nvalidate=%+v", inspection, validated)
+	}
+
+	env, err := readEnvelope(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env.Payload.Surface.LandMask[0] = !env.Payload.Surface.LandMask[0]
+	corrupt := filepath.Join(dir, "corrupt-payload.geoworld")
+	writeEnvelopeForTest(t, corrupt, env)
+
+	// Inspect stops after the manifest, so payload corruption does not prevent
+	// version/seed/geometry discovery.
+	corruptInspection, err := Inspect(corrupt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if corruptInspection.Manifest != inspection.Manifest {
+		t.Fatalf("corrupt file manifest changed: %+v", corruptInspection.Manifest)
+	}
+	if _, err := Validate(corrupt); !errors.Is(err, ErrChecksumMismatch) {
+		t.Fatalf("validate error=%v want ErrChecksumMismatch", err)
+	}
+}
+
 func TestSaveRejectsIncompleteWorldModel(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "incomplete.geoworld")
 	if err := Save(path, &generator.WorldModel{}); err == nil {

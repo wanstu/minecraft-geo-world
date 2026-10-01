@@ -29,16 +29,68 @@ import (
 // written same-directory temporary file, so a failed save cannot leave a
 // partially-written target or destroy an existing model.
 func Save(path string, model *generator.WorldModel) error {
-	if path == "" {
-		return errors.New("worldmodelio: empty save path")
-	}
-	p, err := snapshotFromWorldModel(model)
+	env, err := envelopeFromWorldModel(path, model)
 	if err != nil {
 		return err
 	}
+	tmpPath, cleanup, err := writeCompletedTemp(path, env)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	if err := os.Link(tmpPath, path); err != nil {
+		if errors.Is(err, fs.ErrExist) {
+			return ErrTargetExists
+		}
+		return fmt.Errorf("worldmodelio: publish completed model: %w", err)
+	}
+	return nil
+}
+
+// Replace atomically publishes a complete model over an existing target. The
+// old target remains untouched until the fully-written same-directory
+// temporary file has been flushed and closed. Platform-specific replacement is
+// used for the final filesystem operation; callers never delete the old model
+// first.
+func Replace(path string, model *generator.WorldModel) error {
+	if path == "" {
+		return errors.New("worldmodelio: empty save path")
+	}
+	if _, err := os.Stat(path); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return fmt.Errorf("worldmodelio: replace target does not exist: %w", err)
+		}
+		return fmt.Errorf("worldmodelio: inspect replace target: %w", err)
+	}
+
+	env, err := envelopeFromWorldModel(path, model)
+	if err != nil {
+		return err
+	}
+	tmpPath, cleanup, err := writeCompletedTemp(path, env)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	if err := replaceCompletedFile(tmpPath, path); err != nil {
+		return fmt.Errorf("worldmodelio: replace completed model: %w", err)
+	}
+	return nil
+}
+
+func envelopeFromWorldModel(path string, model *generator.WorldModel) (fileEnvelope, error) {
+	if path == "" {
+		return fileEnvelope{}, errors.New("worldmodelio: empty save path")
+	}
+	p, err := snapshotFromWorldModel(model)
+	if err != nil {
+		return fileEnvelope{}, err
+	}
 	payloadJSON, err := json.Marshal(p)
 	if err != nil {
-		return fmt.Errorf("worldmodelio: encode payload checksum: %w", err)
+		return fileEnvelope{}, fmt.Errorf("worldmodelio: encode payload checksum: %w", err)
 	}
 	sum := sha256.Sum256(payloadJSON)
 
@@ -54,47 +106,144 @@ func Save(path string, model *generator.WorldModel) error {
 		Geometry:           model.Geometry,
 		SeaLevelNormalized: model.Config.SeaLevelNormalized,
 	}
-	env := fileEnvelope{Manifest: manifest, Payload: p}
+	return fileEnvelope{Manifest: manifest, Payload: p}, nil
+}
 
+func writeCompletedTemp(path string, env fileEnvelope) (string, func(), error) {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("worldmodelio: create save directory: %w", err)
+		return "", nil, fmt.Errorf("worldmodelio: create save directory: %w", err)
 	}
 	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
 	if err != nil {
-		return fmt.Errorf("worldmodelio: create temporary file: %w", err)
+		return "", nil, fmt.Errorf("worldmodelio: create temporary file: %w", err)
 	}
 	tmpPath := tmp.Name()
 	cleanup := func() {
 		_ = tmp.Close()
 		_ = os.Remove(tmpPath)
 	}
-	defer cleanup()
 
 	gz := gzip.NewWriter(tmp)
 	enc := json.NewEncoder(gz)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(env); err != nil {
 		_ = gz.Close()
-		return fmt.Errorf("worldmodelio: encode model: %w", err)
+		cleanup()
+		return "", nil, fmt.Errorf("worldmodelio: encode model: %w", err)
 	}
 	if err := gz.Close(); err != nil {
-		return fmt.Errorf("worldmodelio: finalize compression: %w", err)
+		cleanup()
+		return "", nil, fmt.Errorf("worldmodelio: finalize compression: %w", err)
 	}
 	if err := tmp.Sync(); err != nil {
-		return fmt.Errorf("worldmodelio: sync temporary file: %w", err)
+		cleanup()
+		return "", nil, fmt.Errorf("worldmodelio: sync temporary file: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("worldmodelio: close temporary file: %w", err)
+		cleanup()
+		return "", nil, fmt.Errorf("worldmodelio: close temporary file: %w", err)
 	}
+	return tmpPath, cleanup, nil
+}
 
-	if err := os.Link(tmpPath, path); err != nil {
-		if errors.Is(err, fs.ErrExist) {
-			return ErrTargetExists
-		}
-		return fmt.Errorf("worldmodelio: publish completed model: %w", err)
+func Inspect(path string) (Inspection, error) {
+	if path == "" {
+		return Inspection{}, errors.New("worldmodelio: empty inspect path")
 	}
-	return nil
+	info, err := os.Stat(path)
+	if err != nil {
+		return Inspection{}, fmt.Errorf("worldmodelio: inspect model file: %w", err)
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return Inspection{}, fmt.Errorf("worldmodelio: open model: %w", err)
+	}
+	defer f.Close()
+
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return Inspection{}, fmt.Errorf("worldmodelio: open compressed model: %w", err)
+	}
+	defer gz.Close()
+
+	dec := json.NewDecoder(gz)
+	start, err := dec.Token()
+	if err != nil {
+		return Inspection{}, fmt.Errorf("worldmodelio: read envelope start: %w", err)
+	}
+	if d, ok := start.(json.Delim); !ok || d != '{' {
+		return Inspection{}, errors.New("worldmodelio: invalid envelope")
+	}
+	if !dec.More() {
+		return Inspection{}, errors.New("worldmodelio: empty envelope")
+	}
+	key, err := dec.Token()
+	if err != nil {
+		return Inspection{}, fmt.Errorf("worldmodelio: read manifest key: %w", err)
+	}
+	if key != "manifest" {
+		return Inspection{}, errors.New("worldmodelio: manifest must be the first envelope field")
+	}
+	var manifest Manifest
+	if err := dec.Decode(&manifest); err != nil {
+		return Inspection{}, fmt.Errorf("worldmodelio: decode manifest: %w", err)
+	}
+	if err := validateManifest(manifest); err != nil {
+		return Inspection{}, err
+	}
+	return Inspection{Manifest: manifest, FileBytes: info.Size()}, nil
+}
+
+// Validate verifies file-level version/header/checksum and payload/config
+// contracts without rebuilding Terrain/Waterbed/Runtime indexes.
+func Validate(path string) (Inspection, error) {
+	inspection, err := Inspect(path)
+	if err != nil {
+		return Inspection{}, err
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return Inspection{}, fmt.Errorf("worldmodelio: open model: %w", err)
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return Inspection{}, fmt.Errorf("worldmodelio: open compressed model: %w", err)
+	}
+	defer gz.Close()
+
+	var raw struct {
+		Manifest Manifest        `json:"manifest"`
+		Payload  json.RawMessage `json:"payload"`
+	}
+	dec := json.NewDecoder(gz)
+	if err := dec.Decode(&raw); err != nil {
+		return Inspection{}, fmt.Errorf("worldmodelio: decode validation envelope: %w", err)
+	}
+	var trailing any
+	if err := dec.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return Inspection{}, errors.New("worldmodelio: multiple JSON values in model file")
+		}
+		return Inspection{}, fmt.Errorf("worldmodelio: trailing model data: %w", err)
+	}
+	if raw.Manifest != inspection.Manifest {
+		return Inspection{}, errors.New("worldmodelio: manifest changed during validation")
+	}
+	sum := sha256.Sum256(raw.Payload)
+	if inspection.Manifest.PayloadBytes != int64(len(raw.Payload)) ||
+		inspection.Manifest.PayloadSHA256 != hex.EncodeToString(sum[:]) {
+		return Inspection{}, ErrChecksumMismatch
+	}
+	var p payload
+	if err := json.Unmarshal(raw.Payload, &p); err != nil {
+		return Inspection{}, fmt.Errorf("worldmodelio: decode validation payload: %w", err)
+	}
+	if err := validateEnvelopeContracts(fileEnvelope{Manifest: inspection.Manifest, Payload: p}); err != nil {
+		return Inspection{}, err
+	}
+	return inspection, nil
 }
 
 func Load(path string) (*RuntimeModel, error) {
