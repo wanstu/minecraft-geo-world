@@ -200,11 +200,13 @@ GenerateWorld(ctx, config, progress)
         ↓
 Phase1 → Climate → Hydrology → Erosion → Landform → Geomorph
        → Ecology → MCProfile → Terrain
+       → Reconcile → CoastTerrain → Waterbed → WorldSample
         ↓
 WorldModel
   ├─ resolved Config
   ├─ shared Geometry / Surface
-  └─ current stage models
+  ├─ raw / applied ground layers
+  └─ Runtime Ground/Water sampler
 ```
 
 当前原则：
@@ -236,12 +238,12 @@ Local channel / basin bed
 Water surface datum
   ├─ Ocean = shared SeaLevel
   ├─ Lake  = Lake.SurfaceElevation
-  └─ River = 后续由河宽/流量/床面规则求解
+  └─ River = center depth × RiverWeight + receiver backwater floor
 ```
 
 `internal/reconcile` 在宏观节点层把 raw Terrain、Macro Surface、Hydrology 转换成上述约束。Phase 6.2 第三切片已经让 broad coast target 被连续 Terrain sampler 真正消费：`WorldModel.Terrain` 保留 raw Terrain，`WorldModel.CoastTerrain` 挂载 smoothstep correction overlay；correction 命中宏观目标且在 Macro Cell 边界的一阶导趋零，不覆盖原始诊断。
 
-当前两个正式 Seed 的 applied CoastTerrain 已达到 Surface mismatch=0、node error=0，并通过 Chunk / Macro slope 连续性护栏。RiverBedTarget 在 CoastTerrain 上重新求解后仍能达到 target upslope=0，但它和 LakeBedCeiling 仍只是**待应用的局部床面约束**。下一层必须以 carve-only channel/basin overlay 消费这些 target；不能把 river/lake bed correction 混进 broad coast surface。
+当前两个正式 Seed 的 applied CoastTerrain 已达到 Surface mismatch=0、node error=0，并通过 Chunk / Macro slope 连续性护栏。RiverBedTarget / LakeBedCeiling 已由 carve-only Waterbed 实际消费；Waterbed Ground 再由 WorldSample 叠加独立 Ocean/Lake/River 水面。宽域地形、局部床面与水面仍保持三个不同几何对象。
 
 
 ## 11. CoastTerrain continuous broad-surface layer
@@ -258,9 +260,11 @@ CoastCorrection macro grid
 CoastTerrain
   └─ 已满足宏观海岸 broad-surface control points
         ↓
-River/Lake local bed overlays（下一切片）
+Waterbed Ground
+  └─ carve-only River/Lake local beds
         ↓
-Final Runtime Terrain（尚未命名/冻结）
+WorldSample Runtime
+  └─ Ground + Ocean/Lake/River water surface
 ```
 
 CoastCorrection 使用 interpolating smoothstep-bilinear，而不是普通 bilinear 或 B-Spline：普通 bilinear 会给 correction 带来 Macro boundary slope kink；B-Spline 则不能保证 correction 在宏观控制点精确命中。当前 sampler 同时满足 exact target、convex hull 与 correction boundary derivative≈0。
@@ -279,10 +283,10 @@ Raw Terrain
 CoastTerrain
    + local carve-only Waterbed
         ↓
-Applied ground surface
-   + Runtime Water Surface sampler（下一切片）
+Applied Ground
+   + WorldSample water semantics
         ↓
-Runtime terrain/water sample
+Runtime Ground/Water sample
 ```
 
 Waterbed 不是第二张 broad heightmap。它只在河道 corridor 与显式 lake basin 附近查询局部几何：
@@ -301,11 +305,36 @@ Broad coast correction 另外增加 homogeneous Macro Cell interior refinement�
 - explicit lake bed violations = 0
 - chunk-boundary continuity guard 通过
 
-仍未冻结为 Runtime 最终接口，因为 River 只有 bed / width，还没有 water depth / water-surface rule。下一层应返回统一样本：
+Phase 6.2 第五切片已冻结当前最小 Runtime Ground/Water 查询接口；Waterbed 仍只负责 Ground 与 receiver metadata，水面由 WorldSample 独立求解。正式两个 Seed 已通过 Runtime strict-final。
+
+
+## 13. Runtime Ground / Water sample
+
+Phase 6.2 第五切片后，正式 Runtime-facing 查询由 `internal/worldsample` 提供。它不重新生成宏观模型，而是组合已应用的 Ground 与水面语义。
+
 ```text
-groundHeight
-waterKind
-waterSurfaceDefined
-waterSurfaceElevation
+WorldSample.Sample(x,z)
+  ├─ GroundHeight
+  ├─ WaterKind
+  ├─ WaterSurfaceDefined
+  ├─ WaterSurfaceElevation
+  ├─ WaterDepth
+  ├─ OceanEligibility
+  └─ RiverWeight
 ```
-其中 Ocean / Lake datum 已明确，River 必须在下一切片定义。
+
+分层约束：
+- Raw Terrain：保留算法原始连续地形和历史诊断。
+- CoastTerrain：只负责 broad coast correction。
+- Waterbed Ground：只负责 carve-only river/lake local bed；不能用水位抬高 Ground。
+- WorldSample：最后叠加 Ocean / Lake / River 水面，不回写 Ground。
+
+水体语义：
+- Ocean = shared SeaLevel，但必须满足 continuous ocean eligibility 且 Ground below sea。
+- EnclosedBelowSea 默认不进海；只有 Hydrology 显式 Lake 才产生内陆水面。
+- Lake = Hydrology Lake.SurfaceElevation。
+- River 基础水深 = center depth × RiverWeight；RiverWeight 向 bank 平滑衰减。
+- River 若进入 Lake/Ocean，receiver datum 作为 backwater floor，只提高 channel 内 WaterDepth。
+- Receiver detection 同时使用 Hydrology FlowTo 与 river segment / square lake raster footprint 的空间相交，保证几何判定与实际 lake sampler 一致。
+
+`geoworld-consistency-audit -strict-final` 直接验收这一层；Raw Terrain 的历史 coast/river mismatch 不再决定 final-world pass/fail。

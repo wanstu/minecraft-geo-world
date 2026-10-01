@@ -1,11 +1,11 @@
 # GeoWorld 项目状态
 
-更新时间：2026-09-30。当前状态以本文件为入口；历史逐阶段记录完整保存在 [PROGRESS.md](PROGRESS.md)。
+更新时间：2026-10-01。当前状态以本文件为入口；历史逐阶段记录完整保存在 [PROGRESS.md](PROGRESS.md)。
 
 ## 当前目标与阶段
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。
 
-**Phase 6.0、6.1a、6.1b 已完成；Phase 6.2 进行中。第四切片已把 CoastTerrain broad correction 与 carve-only River/Lake Waterbed 真正应用到连续地形：两个正式 Seed 的 applied coast mismatch=0、同类 Cell 内部海陆违规=0、连续河床上坡=0、湖床违规=0，Chunk/Macro 连续性继续通过。Raw Terrain 806/608 与 72/126 仅保留为历史对照。下一步实现 Runtime-facing Ocean/Lake/River 水面采样，尤其是 River 水深/水面规则。**
+**Phase 6.0、6.1a、6.1b 已完成；Phase 6.2 进行中。第五切片已建立最终 Runtime-facing Ground/Water sampler：Ocean/Lake/River 水面语义已统一，河流回水约束处理入湖/入海受纳水位；两个正式 Seed 的 `-strict-final` 已通过，Runtime Ocean/Lake/River 违规均为 0。Raw Terrain 806/608 与 72/126 继续仅作校正前历史对照。下一步收口 Ecology/Profile 与最终 Runtime 水陆语义同步，并补混合海岸/外围过渡验收。**
 
 ## 仓库与基线
 - 仓库：D:\projects\minecraft-geo-world
@@ -26,6 +26,7 @@
 - Phase 6.2 第二切片：5b53ba9 — feat: add terrain water reconciliation constraints。
 - Phase 6.2 第三切片：10da905 — feat: apply continuous coast terrain correction。
 - Phase 6.2 第四切片：1869592 — feat: apply continuous river and lake waterbed。
+- Phase 6.2 第五切片：11e93ee — feat: add runtime water surface sampling。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -88,7 +89,11 @@
 - River profile 以 Minecraft blocks 的物理步长预采样，并按 RiverStrength 映射局部河道半宽；湖床使用局部 raster footprint + smoothstep 边缘。
 - Waterbed 按河网 DAG 拓扑顺序构建 profile，并把上游“实际 profile 出口高度”传播给下游 segment，消除汇流 corridor 重叠造成的局部深坑后回升。
 - Coast correction 增加 homogeneous macro-cell interior refinement：四角同为外海或同为正常陆地时，对 Cell 内 5 个采样点施加 safety margin；封闭低地和混合海岸 Cell 不被强制。
-- Consistency Audit 新增 Coast interior、Waterbed 连续中心线、Lake bed、Waterbed Chunk seam 护栏；Raw Terrain 指标继续保留，但不再冒充 applied final terrain。
+- 新增 `internal/worldsample` Runtime-facing sampler：统一返回 GroundHeight、WaterKind、WaterSurfaceElevation、WaterDepth、OceanEligibility、RiverWeight。
+- Ocean 水面固定为共享 SeaLevel；封闭低地不会因为低于海平面自动变海；显式 Lake 使用 Hydrology Lake.SurfaceElevation。
+- River 水深默认由中心深度×RiverWeight 向岸边平滑衰减；若河段下游进入 Lake/Ocean，Waterbed 传播 receiver datum，Runtime 以 backwater floor 提高河内水深而不改变 Ground。
+- Receiver 搜索同时覆盖 Hydrology FlowTo 受纳水体和河段与 square lake footprint 的几何相交，避免 D8 对角河道从湖格角部进入时漏掉湖面回水。
+- Consistency Audit 新增 Coast interior、Waterbed 连续中心线、Lake bed、Runtime Ocean/Lake/River 水面与 strict-final 护栏；Raw Terrain 指标继续保留，但不再冒充 applied final terrain。
 
 ## 本轮验证
 - go test ./... -count=1：全部通过（包括新的连通性、负坐标、分辨率/范围、Phase 1 物理尺度和全链路回归）。
@@ -111,13 +116,13 @@
 - Consistency 默认门槛要求 constraint 自身 SurfaceMismatchAfter=0、TargetUpslopeRiverEdges=0，并要求 applied coast mismatch=0、节点误差≤1e-10、Chunk jump≤1e-5、Macro slope mismatch≤1e-4。
 - Seed 731894205：CoastTerrain applied mismatch=0、节点误差=0、Chunk jump=5.59045e-8、Macro slope mismatch=6.55886e-6；coast-only river upslope=58，重算 river target 需 carve 110 个节点，LakeBedViolation=1。
 - Seed 10400：CoastTerrain applied mismatch=0、节点误差=0、Chunk jump=6.29519e-8、Macro slope mismatch=6.74817e-6；coast-only river upslope=124，重算 river target 需 carve 171 个节点，LakeBedViolation=7。
-- Raw baseline 806/608 FinalSurfaceMaskChanges 与 72/126 FinalUpslopeEdges 仍保留；`-strict-final` 仍应失败，因为河/湖床 overlay 尚未应用。
+- Raw baseline 806/608 FinalSurfaceMaskChanges 与 72/126 FinalUpslopeEdges 仍保留；它们现在明确只是 Raw Terrain 历史基线，不再参与最终 Runtime 成败判定。
 - 基线原型引用检查：387 处本地引用，无缺失。
 - 详细参数、当前数值和历史对照见 PHASE6.md。
 
 ## 仍未完成（不要误报完成）
 1. Raw Terrain 的 806/608 海岸变化与 72/126 逆坡继续保留为历史基线；applied CoastTerrain + Waterbed 已不再受这些 raw 指标阻塞。
-2. Runtime-facing 水面采样尚未完成：Ocean=共享 SeaLevel、Lake=显式 Lake.SurfaceElevation 已有 datum；River 目前只有床面/宽度，没有正式 water depth / water surface 规则，因此 strict-final 继续故意失败。
+2. Runtime-facing Ground/Water sampling 已完成当前最小闭环并通过 strict-final；尚未完成的是 Ecology / MC Profile 与最终 Runtime 水陆/水体语义的正式同步验收。
 3. Phase 6.1b 已完成当前已知生成尺度迁移；但“物理尺度稳定”不等于不同采样精度逐 Cell 完全相同。D8 河网、离散边界/分类、量化采样仍允许合理的拓扑差异，后续新增任何空间参数也必须继续遵守 GridGeometry / blocks 规则。
 4. 最终海岸/湖面/生态协调、外围拓扑与四角过渡仍待实现。宏观四邻接海洋与 D8 水文的细化协调属于后续水体约束。
 5. `phase1.Generate` 仍保留 legacy panic wrapper，但正式统一入口已改用 `phase1.GenerateChecked` 返回 error；其它旧 Lab/CLI 尚未全部迁到统一 Generator。
@@ -127,8 +132,8 @@
 ## 下一步（6.2）
 1. 统一 `GenerateWorld` / `WorldModel` 调度第一切片已完成；继续把正式 Lab/审计逐步收敛到该入口。
 2. CoastTerrain 与 local Waterbed 已真实接入并通过 applied coast interior / river centerline / lake bed / seam 护栏；Raw Terrain 仅作为历史对照。
-3. 下一切片建立 Runtime-facing Water Surface sampler：Ocean 直接使用共享 SeaLevel，Lake 使用显式 Lake.SurfaceElevation，River 从 bed + strength/width 推导受限水深与连续水面。
-4. strict-final 从现在起不再由 Raw Terrain 历史差异决定，而由 Runtime 水面语义是否完整决定；河流水面完成前继续故意失败。
+3. 下一切片收口 Ecology / MC Profile：确认最终 Runtime Ocean/Lake/River 与 biome/profile 标签不会互相矛盾，并明确哪些标签允许在局部河湖 overlay 上保持宏观陆地生态。
+4. `-strict-final` 现在检查真实 Runtime Ocean/Lake/River；两个正式 Seed 已通过。继续补 mixed coast cell、模型外围与角落的最终采样验收，不再用 Raw Terrain 历史差异阻塞。
 5. 6.2 后进入 6.3 WorldModel 版本化保存/重开；6.4 再做 Go→Java→一个 Loader 的早期游戏内验证。
 
 ## 继续工作入口

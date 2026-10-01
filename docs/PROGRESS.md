@@ -1157,3 +1157,33 @@ Phase 6.1b 状态：完成。
 - strict-final 仍必须等待 Runtime 水面语义完成。
 
 下一步：Phase 6.2 第五切片，统一最终 Terrain/Water sampling。
+
+
+## 2026-10-01 — Phase 6.2 第五切片：Runtime Water Surface / WorldSample
+
+功能提交：11e93ee，分支 agent/world-model-foundation。
+
+本切片完成最终 Ground/Water Runtime 最小闭环：
+- 新增 internal/worldsample，统一 GroundHeight / WaterKind / WaterSurface / WaterDepth。
+- Ocean 使用 shared SeaLevel + continuous ocean eligibility；EnclosedBelowSea 不自动灌海。
+- Lake 使用 Hydrology Lake.SurfaceElevation。
+- River 使用 center depth × RiverWeight，并支持 receiver backwater floor。
+- Waterbed 沿 Hydrology FlowTo 传播 downstream Lake/Ocean datum，同时识别 river segment 与 square lake footprint 的空间相交。
+- 修复 D8 对角河道穿过 lake raster corner 时 Euclidean 圆形判定漏掉 receiver 的问题。
+- Consistency Audit 把 Runtime Ocean/Lake/River 纳入 strict-final。
+- Raw Terrain 历史 mismatch 继续保留，但不再冒充 applied final world。
+
+真实回归：
+- Runtime River water-surface upslope：9 → 1 → 0。
+- 两个正式 Seed 的 Runtime Ocean node / enclosed ocean leak / Lake node / River undefined / River dry / River water-surface upslope 全部为 0。
+- Waterbed centerline upslope=0；LakeBedViolations=0。
+- homogeneous coast interior ocean/land violations=0。
+- go test ./... -count=1 全通过。
+- geoworld-consistency-audit -strict-final 两个正式 Seed 通过。
+
+未完成：
+- Ecology / MCProfile 与最终 Runtime water semantics 的一致性验收。
+- Mixed coast cell / model outer boundary / corners 的 final Runtime sampling audit。
+- Phase 6.3 持久化 schema 与 save/reopen。
+
+下一步：Phase 6.2 第六切片，收口生态/Profile 与最终 Runtime 语义。

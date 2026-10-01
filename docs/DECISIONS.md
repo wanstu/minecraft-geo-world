@@ -966,7 +966,7 @@ Phase 6.1b 最终残余审计已完成。剩余 `*Cells` 使用点属于 blocks�
 
 ## D-037：海岸控制点、河床纵剖面与水面必须分层约束
 
-状态：约束模型、broad coast application、river/lake bed overlay 已实施；Runtime river water surface 尚未完成
+状态：约束模型、broad coast application、river/lake bed overlay、Runtime Ground/Water sampler 均已实施；Ecology/Profile 最终语义同步待收口
 
 最终水体协调不能把所有问题都塞进同一个“修正后高度”数组。
 
@@ -976,8 +976,8 @@ Phase 6.1b 最终残余审计已完成。剩余 `*Cells` 使用点属于 blocks�
 3. `RiverBedTarget` 是局部 channel bed 纵剖面，必须独立于 broad Terrain control point；修复逆坡时只能 carve，不通过抬高河床制造假下坡。
 4. Ocean / Lake 水面是独立 water-surface datum：Ocean=共享 SeaLevel，Lake=Hydrology Lake.SurfaceElevation。
 5. 显式 Lake 生成 `LakeBedCeiling`，最终湖床必须低于水面并保留 clearance；当前违反点必须显式暴露，不能把水画在地表上方后忽略。
-6. River 当前只定义床面 target，不在缺乏河宽/流量到水深规则时伪造统一水面高度。
-7. Constraint target 为 0 mismatch/upslope 只证明约束可解；Phase 6.2 第三切片已把 CoastTarget 真正应用到连续 CoastTerrain，第四切片又把 RiverBedTarget / LakeBedCeiling 作为 carve-only Waterbed 真正应用并验证连续中心线/湖床/Chunk seam。strict-final 现在只应继续等待 Runtime river water-surface/depth 语义，不再由 Raw Terrain 历史 mismatch 阻塞。
+6. River 水面由 Runtime 层独立求解：基础水深来自 center depth × RiverWeight；若下游进入 Lake/Ocean，则 receiver datum 作为 backwater floor，只增加河道内水深，不抬高 Ground。
+7. Constraint target 为 0 mismatch/upslope 只证明约束可解；Phase 6.2 第三/四/五切片已经依次把 CoastTarget、River/Lake Waterbed、Runtime Water Surface 真正应用。`-strict-final` 现在检查最终 Runtime Ocean/Lake/River 语义，Raw Terrain 历史 mismatch 只保留诊断意义。
 8. Broad correction 必须保留 raw Terrain 作为诊断基线，不允许覆盖原始 806/608、72/126 等问题数字后声称问题消失；WorldModel 需明确区分 raw Terrain 与 applied CoastTerrain。
 
 原因：宽域地形、河床和水面属于三个不同几何对象。混在一个高度场里会导致修河时整片地形被拉低、修海岸时河谷被填平，或为了通过测试而隐藏真实逆坡。
@@ -994,7 +994,7 @@ Phase 6.1b 最终残余审计已完成。剩余 `*Cells` 使用点属于 blocks�
 2. 它是 interpolating sampler，宏观节点 correction 精确命中，不像 B-Spline 会把控制点当近似控制值。
 3. 权重保持非负且和为 1，修正值不会超出邻域 correction 凸包。
 4. smoothstep 在 0/1 端点导数为 0，因此 correction 在每个 Macro Cell 边界两侧一阶导都趋近 0；原 Terrain 的连续坡度承担边界导数，overlay 不额外制造 kink。
-5. Raw Terrain 不被覆盖；GenerateWorld 另建 CoastTerrain，直到 River/Lake bed overlay 完成并通过 strict-final 后，才允许确定真正最终 Runtime Terrain。
+5. Raw Terrain 不被覆盖；GenerateWorld 另建 CoastTerrain，再叠加 carve-only Waterbed Ground，最后由 WorldSample 返回独立 Ground + Water。strict-final 验证最终 Runtime，而不是把任一中间高度场冒充最终世界。
 6. 海岸 correction 应用后必须重新计算 river/lake bed 约束，因为局部床面依赖 broad terrain，不能复用 raw Terrain 上的旧 target。
 
 该策略用于 sparse broad-surface correction；它不适合作为河道宽度/局部 channel 横断面的最终 sampler，River/Lake overlay 仍需独立几何规则。
@@ -1033,3 +1033,28 @@ Smoothstep correction 精确命中宏观控制点，但 Raw Terrain 本身是连
 6. refinement 后重新定义 CoastTargetElevation 与统计，不允许文档仍引用 refine 前控制点数量。
 
 该护栏首次运行在 Seed 731894205 找到 160 个正常陆地内部采样点低于海平面，最大 deficit 0.0061282；refinement 后两个正式 Seed 同类 Cell 内部违规均为 0。
+
+
+## D-041：Runtime 水面必须独立于 Ground，并显式处理受纳水体回水
+
+状态：Phase 6.2 第五切片已实施
+
+最终世界不能再用“一个高度值”同时代表地表和水面。正式 Runtime 查询必须分别返回 Ground 与 Water。
+
+规则：
+1. `WorldSample` 是 Runtime-facing 最终采样层；至少返回 GroundHeight、WaterKind、WaterSurfaceDefined、WaterSurfaceElevation、WaterDepth。
+2. Ocean 水面固定使用 shared SeaLevel，但必须同时满足 continuous ocean eligibility 与 Ground below sea；宏观 `EnclosedBelowSea` 不因高度低就自动成为海洋。
+3. 显式 Lake 使用 Hydrology `Lake.SurfaceElevation`；Lake datum 与 lake bed 分离，Ground 必须真实低于水面后才暴露水体。
+4. River 基础水深由 `RiverCenterDepthNormalized × RiverWeight` 给出；RiverWeight 同时承担横向 bank taper，不允许把固定水深扩散到整个 broad surface。
+5. 若河段最终进入 Lake/Ocean，receiver datum 是该河段的 backwater floor；它只能增加 channel 内 WaterDepth，不能抬高 Waterbed Ground。
+6. Receiver detection 不能只依赖 Hydrology FlowTo。实际 Runtime lake footprint 是 square raster footprint，因此 river segment 与该 square 的几何交叠也必须算作 receiver；不能用不一致的 Euclidean circle 近似。
+7. River→Lake/Ocean 过渡必须沿最终 Runtime water surface 做非节点连续采样；河床单调并不能自动证明水面单调。
+8. Raw Terrain、CoastTerrain、Waterbed Ground、WorldSample Runtime 是四个不同层级。历史 Raw mismatch 数字必须保留，但 final-world pass/fail 只能看 applied Ground/Water。
+9. `geoworld-consistency-audit -strict-final` 必须对 Runtime Ocean/Lake/River 语义真实失败/通过，不允许硬编码“未完成”或通过。
+
+正式两个 Seed 在该规则下均达到：
+- Runtime Ocean node violations = 0
+- Enclosed ocean leaks = 0
+- Lake node violations = 0
+- River undefined/dry steps = 0
+- River water-surface upslope steps = 0

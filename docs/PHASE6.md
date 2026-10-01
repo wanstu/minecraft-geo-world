@@ -1,6 +1,6 @@
 # Phase 6 — 统一世界模型与最小 Generator
 
-更新时间：2026-09-30。当前进度以 STATUS.md 为准；本文保留评审依据、实施顺序与验收契约。
+更新时间：2026-10-01。当前进度以 STATUS.md 为准；本文保留评审依据、实施顺序与验收契约。
 
 ## 目标与边界
 
@@ -584,3 +584,90 @@ Seed 10400：
 - [ ] `-strict-final` 应继续失败，直到 Runtime river water-surface/depth 语义完成；Raw Terrain 历史 mismatch 不再是 strict-final 的失败理由。
 
 下一切片：建立统一 Runtime-facing Terrain/Water sampler，Ocean=shared SeaLevel、Lake=Lake.SurfaceElevation、River=bed + explicit depth/surface rule，并把 strict-final 门槛迁到该 sampler。
+
+
+## Phase 6.2 第五切片实施结果（2026-10-01）
+
+功能提交：11e93ee — feat: add runtime water surface sampling；开发分支：agent/world-model-foundation。
+
+目标：在已经通过 broad coast 与 local Waterbed 验收的 Ground 之上，建立唯一 Runtime-facing Ground/Water sampler，并把 Ocean / Lake / River 的水面语义真正纳入 strict-final，而不是继续停留在床面或约束层。
+
+已完成：
+- [x] 新增 internal/worldsample，Runtime 查询统一返回 GroundHeight、WaterKind、WaterSurfaceDefined、WaterSurfaceElevation、WaterDepth、OceanEligibility、RiverWeight。
+- [x] Ocean 水面使用 shared SeaLevel；只有连续 ocean eligibility 命中且 Ground 位于海平面以下才生成 Ocean。
+- [x] EnclosedBelowSea 不因低于海平面自动进海；没有 Hydrology Lake 时保持 dry land。
+- [x] 显式 Lake 使用 Hydrology / Reconciliation 的 Lake.SurfaceElevation，实际 Ground 低于 datum 后才生成水体。
+- [x] River 使用中心深度 × RiverWeight 的连续横断面水深，向 bank 平滑衰减至 0。
+- [x] Waterbed 为每条 RiverSegment 追踪 downstream receiver datum：沿 Hydrology FlowTo 寻找首个 Lake / Ocean，并把该 datum 作为 Runtime backwater floor。
+- [x] 河段如果几何上穿过显式 lake square raster footprint，即使 FlowTo 不直接进入该 lake node，也继承其 Lake.SurfaceElevation；对角 D8 河段穿湖格角部的场景已有回归测试。
+- [x] Receiver floor 只增加 channel 内 WaterDepth，不改变 Ground；RiverWeight 继续控制横向衰减，避免把 lake/ocean datum 扩散成 broad terrain flooding。
+- [x] Consistency Audit 增加 Runtime Ocean node、enclosed-lowland ocean leak、Lake node、River undefined/dry、River water-surface upslope 等指标。
+- [x] -strict-final 不再硬编码失败；它现在真正对 Runtime-facing water semantics 做失败判定。
+- [x] Raw Terrain 806/608 FinalSurfaceMaskChanges 与 72/126 FinalUpslopeEdges 继续保留为校正前历史对照，不参与 applied final-world 成败判定。
+
+### 真实问题与修复
+
+第一次把 Runtime River 水面接上后，Ground 河床已经连续单调，但 Seed 731894205 的 River centerline 仍有 9 个 water-surface upslope step，最大 rise 0.0182783。诊断显示最大点是 River → Lake 切换，不是 bed profile 上坡。
+
+第一轮沿 Hydrology 下游传播 receiver datum 后，上坡点降到 1；最后一个点的 previous river receiver 只有 Ocean 0.5，而实际进入的 Lake datum 为 0.510675。根因是 lake footprint 在 Waterbed 中使用 square/Chebyshev raster footprint，而构建期交叠检测误用了 Euclidean 圆形距离。
+
+修复后用线段与 axis-aligned square footprint 相交判定，并增加真实 D8 对角回归：
+- River segment：(0,0) → (128,128)
+- Lake cell center：(128,0)
+- lake outer radius：76.8 blocks
+- 线段会穿过 square footprint 角部，但到中心的 Euclidean 最近距离约 90.5 blocks。
+
+修复后两个正式 Seed 的 Runtime River water-surface upslope 均为 0。
+
+### 最终 strict-final 验证
+
+命令：
+
+```text
+go test ./... -count=1
+go run ./cmd/geoworld-consistency-audit -strict-final
+```
+
+结果：全部通过。
+
+Seed 731894205 / 640×400 / 128：
+- AppliedCoastSurfaceMismatches = 0
+- CoastInteriorOceanAboveSea = 0
+- CoastInteriorLandBelowSea = 0
+- WaterbedRiverUpslopeSteps = 0 / 258152 samples
+- WaterbedLakeBedViolations = 0
+- RuntimeOceanNodeViolations = 0
+- RuntimeEnclosedOceanLeaks = 0
+- RuntimeLakeNodeViolations = 0
+- RuntimeRiverUndefinedSteps = 0
+- RuntimeRiverDrySteps = 0
+- RuntimeRiverSurfaceUpslopeSteps = 0
+- RuntimeMaxRiverSurfaceRise = 0
+- CoastTerrain Chunk jump = 5.59045e-8
+- Waterbed Chunk jump = 5.59045e-8
+
+Seed 10400 / 640×400 / 128：
+- AppliedCoastSurfaceMismatches = 0
+- CoastInteriorOceanAboveSea = 0
+- CoastInteriorLandBelowSea = 0
+- WaterbedRiverUpslopeSteps = 0 / 388804 samples
+- WaterbedLakeBedViolations = 0
+- RuntimeOceanNodeViolations = 0
+- RuntimeEnclosedOceanLeaks = 0
+- RuntimeLakeNodeViolations = 0
+- RuntimeRiverUndefinedSteps = 0
+- RuntimeRiverDrySteps = 0
+- RuntimeRiverSurfaceUpslopeSteps = 0
+- RuntimeMaxRiverSurfaceRise = 0
+- CoastTerrain Chunk jump = 6.29519e-8
+- Waterbed Chunk jump = 6.29519e-8
+
+### 当前 6.2 边界
+
+Runtime water semantics 的最小闭环已经完成并通过 strict-final，但 Phase 6.2 仍保持进行中，不提前收口：
+- [ ] Ecology / MCProfile 当前仍主要消费 macro Surface / stage model，需要确认与 Runtime Ocean/Lake/River 的最终语义不会互相矛盾。
+- [ ] Mixed coast cell 的真实 coastline crossing、模型外围与四角需要补 final Runtime sampling 验收；homogeneous cell interior 已通过。
+- [ ] 旧 Lab/Audit 仍未全部迁到 GenerateWorld；正式一致性入口已经统一，单阶段实验工具可以后续逐步收敛。
+- [ ] WorldModel 持久化 schema、保存/重开属于 Phase 6.3。
+
+下一切片：收口 Ecology / MCProfile 与 Runtime 水陆/水体语义，并补 mixed coast / outer-boundary final sampling audit；通过后再判断 Phase 6.2 是否可正式结束。
