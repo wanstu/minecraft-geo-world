@@ -15,6 +15,7 @@ import (
 	"geoworld/internal/mcprofile"
 	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
+	"geoworld/internal/runtimeprofile"
 	"geoworld/internal/terrain"
 	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
@@ -194,6 +195,15 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 	}
 	reporter.done(StageWorldSample)
 
+	if err := checkContext(ctx); err != nil {
+		return nil, err
+	}
+	runtimeProfile, err := runtimeprofile.Build(w.Geometry, eco, p, runtimeModel)
+	if err != nil {
+		return nil, fmt.Errorf("generator: runtimeprofile: %w", err)
+	}
+	reporter.done(StageRuntimeProfile)
+
 	model := &WorldModel{
 		Geometry:       w.Geometry,
 		Surface:        w.Surface,
@@ -210,6 +220,7 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 		Reconciliation: rec,
 		Waterbed:       wb,
 		Runtime:        runtimeModel,
+		RuntimeProfile: runtimeProfile,
 	}
 	model.Config = ResolvedConfig{
 		Seed:               resolved.Seed,

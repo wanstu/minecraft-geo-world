@@ -12,7 +12,9 @@ import (
 	"strconv"
 	"strings"
 
+	"geoworld/internal/ecology"
 	"geoworld/internal/generator"
+	"geoworld/internal/mcprofile"
 	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/terrain"
@@ -54,6 +56,10 @@ type report struct {
 	RuntimeMaxRiseT, RuntimeMaxRisePreviousSurface, RuntimeMaxRiseCurrentSurface   float64
 	RuntimeMaxRiseReceiverDefined                                                  bool
 	RuntimeMaxRiseReceiverSurface, RuntimeMaxRiseRiverWeight                       float64
+	RuntimeProfileSamples, RuntimeProfileFallbacks                                 int
+	RuntimeProfileSemanticMismatches, RuntimeProfileUnknown                        int
+	RuntimeProfileMixedCoastSamples, RuntimeBoundarySamples                        int
+	RuntimeBoundaryNonOcean, RuntimeBoundaryProfileMismatches                      int
 }
 
 func checked[T any](value T, err error) T {
@@ -143,6 +149,17 @@ func inspect(seed int64, width, height int, cellSize float64) report {
 		r.RuntimeMaxRiseReceiverDefined = d.maxRiseReceiverDefined
 		r.RuntimeMaxRiseReceiverSurface = d.maxRiseReceiverSurface
 		r.RuntimeMaxRiseRiverWeight = d.maxRiseRiverWeight
+	}
+	if model.RuntimeProfile != nil {
+		d := auditRuntimeProfile(model)
+		r.RuntimeProfileSamples = d.samples
+		r.RuntimeProfileFallbacks = d.fallbacks
+		r.RuntimeProfileSemanticMismatches = d.semanticMismatches
+		r.RuntimeProfileUnknown = d.unknown
+		r.RuntimeProfileMixedCoastSamples = d.mixedCoastSamples
+		r.RuntimeBoundarySamples = d.boundarySamples
+		r.RuntimeBoundaryNonOcean = d.boundaryNonOcean
+		r.RuntimeBoundaryProfileMismatches = d.boundaryProfileMismatches
 	}
 	final := make([]float64, len(w.Elevation))
 	crustOcean, actualOcean := 0, 0
@@ -353,6 +370,116 @@ func auditRuntimeWater(model *generator.WorldModel) runtimeWaterDiagnostics {
 	return d
 }
 
+type runtimeProfileDiagnostics struct {
+	samples                   int
+	fallbacks                 int
+	semanticMismatches        int
+	unknown                   int
+	mixedCoastSamples         int
+	boundarySamples           int
+	boundaryNonOcean          int
+	boundaryProfileMismatches int
+}
+
+func auditRuntimeProfile(model *generator.WorldModel) runtimeProfileDiagnostics {
+	var d runtimeProfileDiagnostics
+	if model == nil || model.RuntimeProfile == nil || model.Surface == nil {
+		return d
+	}
+
+	check := func(x, z float64, mixedCoast, boundary bool) {
+		s := model.RuntimeProfile.Sample(x, z)
+		d.samples++
+		if mixedCoast {
+			d.mixedCoastSamples++
+		}
+		if boundary {
+			d.boundarySamples++
+			if s.World.WaterKind != reconcile.WaterOcean {
+				d.boundaryNonOcean++
+			}
+		}
+
+		if s.SemanticFallback {
+			d.fallbacks++
+		}
+		if s.SemanticMismatch {
+			d.semanticMismatches++
+			if boundary {
+				d.boundaryProfileMismatches++
+			}
+		}
+		if s.EcoRegion == ecology.RegionUnknown ||
+			s.BiomeFamily == mcprofile.BiomeUnknown ||
+			s.TerrainVariant == mcprofile.TerrainUnknown ||
+			s.SurfaceProfile == mcprofile.SurfaceUnknown ||
+			s.VegetationProfile == mcprofile.VegetationUnknown {
+			d.unknown++
+		}
+	}
+
+	g := model.Geometry
+	for z := 0; z < g.Height; z++ {
+		for x := 0; x < g.Width; x++ {
+			wx, wz := g.NodePosition(x, z)
+			check(wx, wz, false, false)
+		}
+	}
+
+	offsets := [][2]float64{
+		{0.25, 0.25},
+		{0.75, 0.25},
+		{0.50, 0.50},
+		{0.25, 0.75},
+		{0.75, 0.75},
+	}
+	spacingX, spacingZ := g.SpacingX(), g.SpacingZ()
+	for z := 0; z < g.Height-1; z++ {
+		for x := 0; x < g.Width-1; x++ {
+			ids := [4]int{
+				z*g.Width + x,
+				z*g.Width + x + 1,
+				(z+1)*g.Width + x,
+				(z+1)*g.Width + x + 1,
+			}
+			landCount := 0
+			for _, i := range ids {
+				if model.Surface.LandMask[i] {
+					landCount++
+				}
+			}
+			if landCount == 0 || landCount == 4 {
+				continue
+			}
+			for _, off := range offsets {
+				wx := g.OriginX + (float64(x)+off[0])*spacingX
+				wz := g.OriginZ + (float64(z)+off[1])*spacingZ
+				check(wx, wz, true, false)
+			}
+		}
+	}
+
+	edgeOffsets := []float64{0, 0.25, 0.5, 0.75}
+	endX := g.OriginX + g.SpanXBlocks
+	endZ := g.OriginZ + g.SpanZBlocks
+	for x := 0; x < g.Width-1; x++ {
+		for _, off := range edgeOffsets {
+			wx := g.OriginX + (float64(x)+off)*spacingX
+			check(wx, g.OriginZ, false, true)
+			check(wx, endZ, false, true)
+		}
+	}
+	for z := 0; z < g.Height-1; z++ {
+		for _, off := range edgeOffsets {
+			wz := g.OriginZ + (float64(z)+off)*spacingZ
+			check(g.OriginX, wz, false, true)
+			check(endX, wz, false, true)
+		}
+	}
+
+	return d
+}
+
 func auditMacroSlopes(m *terrain.Model, geometry world.GridGeometry) float64 {
 	maxMismatch := 0.0
 	cellSize := geometry.SpacingX()
@@ -480,7 +607,12 @@ func main() {
 			r.RuntimeLakeNodeViolations != 0 ||
 			r.RuntimeRiverUndefinedSteps != 0 ||
 			r.RuntimeRiverDrySteps != 0 ||
-			r.RuntimeRiverSurfaceUpslopeSteps != 0 {
+			r.RuntimeRiverSurfaceUpslopeSteps != 0 ||
+			r.RuntimeProfileFallbacks != 0 ||
+			r.RuntimeProfileSemanticMismatches != 0 ||
+			r.RuntimeProfileUnknown != 0 ||
+			r.RuntimeBoundaryNonOcean != 0 ||
+			r.RuntimeBoundaryProfileMismatches != 0 {
 			runtimeFailed = true
 		}
 		if r.FinalSurfaceMaskChanges != 0 || r.FinalUpslopeEdges != 0 {
@@ -491,7 +623,7 @@ func main() {
 		fmt.Fprintln(os.Stderr, "RAW BASELINE: uncorrected Terrain retains historical coast/river mismatches by design; applied CoastTerrain + Waterbed + Runtime are the final-world checks.")
 	}
 	if runtimeFailed {
-		fmt.Fprintln(os.Stderr, "FINAL RUNTIME: ocean/lake/river water semantics still contain violations.")
+		fmt.Fprintln(os.Stderr, "FINAL RUNTIME: ground/water/profile or outer-boundary semantics still contain violations.")
 	}
 	if failed || (*strict && runtimeFailed) {
 		os.Exit(1)

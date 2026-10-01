@@ -280,3 +280,77 @@ func TestPhase1GenerateCheckedReturnsGeometryError(t *testing.T) {
 		t.Fatal("expected GenerateChecked to return invalid geometry error")
 	}
 }
+
+func TestGenerateWorldRuntimeProfileMatchesFinalSemantics(t *testing.T) {
+	cfg := testConfig(731894205)
+	m, err := GenerateWorld(context.Background(), cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.RuntimeProfile == nil {
+		t.Fatal("world model is missing runtime profile sampler")
+	}
+
+	check := func(label string, x, z float64) {
+		s := m.RuntimeProfile.Sample(x, z)
+		if s.SemanticFallback {
+			t.Fatalf("%s used semantic fallback at %.2f,%.2f", label, x, z)
+		}
+		if s.SemanticMismatch {
+			t.Fatalf("%s profile contradicts runtime water=%v sourceLand=%v biome=%v terrain=%v",
+				label, s.World.WaterKind, s.SourceLand, s.BiomeFamily, s.TerrainVariant)
+		}
+		if s.EcoRegion == ecology.RegionUnknown ||
+			s.BiomeFamily == mcprofile.BiomeUnknown ||
+			s.TerrainVariant == mcprofile.TerrainUnknown ||
+			s.SurfaceProfile == mcprofile.SurfaceUnknown ||
+			s.VegetationProfile == mcprofile.VegetationUnknown {
+			t.Fatalf("%s returned unknown runtime profile: %+v", label, s)
+		}
+	}
+
+	for z := 0; z < cfg.Geometry.Height; z++ {
+		for x := 0; x < cfg.Geometry.Width; x++ {
+			wx, wz := cfg.Geometry.NodePosition(x, z)
+			check("macro-node", wx, wz)
+		}
+	}
+
+	offsets := [][2]float64{
+		{0.25, 0.25},
+		{0.75, 0.25},
+		{0.50, 0.50},
+		{0.25, 0.75},
+		{0.75, 0.75},
+	}
+	mixedCells := 0
+	spacing := cfg.Geometry.SpacingX()
+	for z := 0; z < cfg.Geometry.Height-1; z++ {
+		for x := 0; x < cfg.Geometry.Width-1; x++ {
+			ids := [4]int{
+				z*cfg.Geometry.Width + x,
+				z*cfg.Geometry.Width + x + 1,
+				(z+1)*cfg.Geometry.Width + x,
+				(z+1)*cfg.Geometry.Width + x + 1,
+			}
+			land := 0
+			for _, i := range ids {
+				if m.Surface.LandMask[i] {
+					land++
+				}
+			}
+			if land == 0 || land == 4 {
+				continue
+			}
+			mixedCells++
+			for _, off := range offsets {
+				wx := cfg.Geometry.OriginX + (float64(x)+off[0])*spacing
+				wz := cfg.Geometry.OriginZ + (float64(z)+off[1])*spacing
+				check("mixed-coast", wx, wz)
+			}
+		}
+	}
+	if mixedCells == 0 {
+		t.Fatal("test world did not contain a mixed coast cell")
+	}
+}

@@ -10,6 +10,7 @@ import (
 	"geoworld/internal/mcprofile"
 	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
+	"geoworld/internal/runtimeprofile"
 	"geoworld/internal/terrain"
 	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
@@ -81,24 +82,26 @@ type WorldModel struct {
 	Reconciliation *reconcile.Model
 	Waterbed       *waterbed.Model
 	Runtime        *worldsample.Model
+	RuntimeProfile *runtimeprofile.Model
 }
 
 // Stage identifies one deterministic pipeline boundary for progress reporting.
 type Stage string
 
 const (
-	StagePhase1      Stage = "phase1"
-	StageClimate     Stage = "climate"
-	StageHydrology   Stage = "hydrology"
-	StageErosion     Stage = "erosion"
-	StageLandform    Stage = "landform"
-	StageGeomorph    Stage = "geomorph"
-	StageEcology     Stage = "ecology"
-	StageProfile     Stage = "mcprofile"
-	StageTerrain     Stage = "terrain"
-	StageReconcile   Stage = "reconcile"
-	StageWaterbed    Stage = "waterbed"
-	StageWorldSample Stage = "worldsample"
+	StagePhase1         Stage = "phase1"
+	StageClimate        Stage = "climate"
+	StageHydrology      Stage = "hydrology"
+	StageErosion        Stage = "erosion"
+	StageLandform       Stage = "landform"
+	StageGeomorph       Stage = "geomorph"
+	StageEcology        Stage = "ecology"
+	StageProfile        Stage = "mcprofile"
+	StageTerrain        Stage = "terrain"
+	StageReconcile      Stage = "reconcile"
+	StageWaterbed       Stage = "waterbed"
+	StageWorldSample    Stage = "worldsample"
+	StageRuntimeProfile Stage = "runtimeprofile"
 )
 
 var orderedStages = [...]Stage{
@@ -114,6 +117,7 @@ var orderedStages = [...]Stage{
 	StageReconcile,
 	StageWaterbed,
 	StageWorldSample,
+	StageRuntimeProfile,
 }
 
 type Progress struct {
