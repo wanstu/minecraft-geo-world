@@ -727,3 +727,59 @@ GenerateWorld → Raw Terrain → CoastTerrain → Waterbed Ground → WorldSamp
 Raw Terrain 806/608 的 coast changes 与 72/126 的 river upslope 保留为校正前历史诊断，不代表最终 Runtime 仍存在这些问题。
 
 下一阶段：**Phase 6.3 — 版本化 WorldModel 保存/重开**。先定义最小持久化 schema、原子保存、版本/损坏校验和 save→reopen golden samples；之后 Phase 6.4 才进入 Go→Java reader/sampler 与一个 Loader 的早期游戏验证。
+
+## Phase 6.3 第一切片实施结果（2026-10-01）
+
+功能提交：0b830de — feat: add versioned world model persistence；开发分支：agent/world-model-foundation。
+
+目标：先完成最小 Runtime World Model 的版本化保存/重开闭环，不把 Phase1→Geomorph 全部 Lab 暂态数组固化成长期文件格式。
+
+### V1 文件格式
+
+- 外层：gzip + JSON envelope。
+- manifest：magic=geoworld-model、schemaVersion=1、generatorVersion=phase6.3-v1、fileEncoding=gzip+json、checksumAlgorithm=sha256、Seed、GridGeometry、SeaLevelNormalized、payloadBytes、payloadSha256。
+- payload：ResolvedConfig、Macro Surface、应用后的 CoastTerrain 采样网格、Waterbed RiverSegment/LakeNode、Runtime 所需最小 Ecology / MCProfile 离散字段。
+- 不保存 Phase1 / Climate / Hydrology / Erosion / Landform / Geomorph 的完整调试模型；重开 Runtime 不重新运行全球模拟。
+
+### 保存/加载语义
+
+- Save 先在目标同目录写完整临时文件并 fsync，再通过 hard-link publish 到最终路径。
+- V1 是 create-only：目标已存在时返回 ErrTargetExists；不先删除旧文件，不用“删旧→rename”伪装原子保存。
+- Load 必须验证 magic / schema / generator version / checksum / Geometry / SeaLevel / ResolvedConfig 契约。
+- 未知 schema 与未知 generator version 明确拒绝；payload checksum mismatch 明确拒绝。
+- waterbed.Restore 从持久化河段/湖节点重建 spatial buckets；WorldSample 和 RuntimeProfile 在加载时重新构建。
+
+### 回归
+
+- Save→Load 后 RuntimeProfile.Sample 在固定负坐标、Chunk/Macro 边界、mixed coast、真实 river/lake 位置逐字段完全一致。
+- Waterbed Audit 保存前/重开后完全一致。
+- 已有 target 保存失败后原文件字节保持不变。
+- checksum corruption / unsupported schema / unsupported generator version 全部被拒绝。
+- 不完整 WorldModel 不创建目标文件。
+- go test ./... -count=1 全部通过。
+
+### 正式文件审计
+
+320×200 / Seed 731894205：
+- FileBytes = 1,820,161
+- PayloadBytes = 9,036,003
+- 484 samples，Mismatches=0
+- 本次开发机：Generate≈3.20s / Save≈0.51s / Load≈0.40s
+
+640×400 / Seed 731894205：
+- FileBytes = 7,631,145
+- PayloadBytes = 37,323,242
+- RiverSegments=908，LakeNodes=1322
+- 484 samples，Mismatches=0
+- 本次开发机：Generate≈22.10s / Save≈2.13s / Load≈1.55s
+
+以上耗时仅作为当前开发机基线，不是性能 SLA。
+
+### 当前边界
+
+- [ ] V1 尚不提供覆盖已有目标的更新保存；下一切片必须单独定义 crash-safe replace / rollback 语义。
+- [ ] 还缺独立 manifest inspect/validate API；当前 Load 会完整解码 payload。
+- [ ] 跨语言 golden vectors 尚未输出为独立文件，Java reader 仍属于 Phase 6.4 前置。
+- [ ] gzip+JSON 是否继续作为长期大世界编码，需要基于更大模型与 Java reader 实测后决定；若切 binary encoding 必须升级 schemaVersion。
+
+下一切片：安全 replace、manifest inspect/validate、跨语言 golden vector 文件。

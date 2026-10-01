@@ -1208,3 +1208,23 @@ Phase 6.1b 状态：完成。
 - 4 Seed MC Profile audit 保持旧基线，Unknown=0。
 
 Phase 6.2 正式完成。下一步 Phase 6.3：最小持久化 schema、原子保存、版本校验、重开复现。
+
+## 2026-10-01 — Phase 6.3 第一切片：Versioned World Model persistence
+
+功能提交：0b830de。
+
+完成：
+- 新增 internal/worldmodelio，V1 = gzip+JSON envelope + SHA-256 payload checksum。
+- manifest 保存 schemaVersion=1、generatorVersion=phase6.3-v1、Seed、Geometry、SeaLevel、encoding/checksum 元数据。
+- payload 只保存 Runtime 重建需要的 ResolvedConfig / Surface / CoastTerrain grids / Waterbed river+lake geometry / minimal Ecology+MCProfile。
+- 新增 waterbed.Restore，加载时重建 buckets，不重新跑 Hydrology/Reconciliation。
+- Save 使用 same-directory completed temp + hard-link publish；目标存在即 ErrTargetExists，原完整文件不变。
+- Load 明确拒绝 checksum mismatch、未知 schema、未知 generator version 和共享契约冲突。
+- 新增 geoworld-model-audit。
+
+验证：
+- worldmodelio unit tests 与 go test ./... 全通过。
+- 320×200：1,820,161 bytes，484 samples mismatch=0，Save≈0.51s，Load≈0.40s。
+- 640×400 / Seed 731894205：7,631,145 bytes，payload=37,323,242 bytes，RiverSegments=908，LakeNodes=1322，484 samples mismatch=0，Save≈2.13s，Load≈1.55s。
+
+下一步：safe replace、manifest inspect/validate、cross-language golden vectors。

@@ -5,7 +5,7 @@
 ## 当前目标与阶段
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。
 
-**Phase 6.0、6.1a、6.1b、6.2 已完成。第六切片已新增 Runtime Profile 解析层，在连续 mixed coast / River / Lake / Ocean 坐标上让最终水体语义与宏观 Ecology / MC Profile 对齐；两个正式 Seed 的增强版 `-strict-final` 全部通过，Runtime Ground/Water/Profile、mixed coast 与模型外围均 0 违规。Raw Terrain 806/608 与 72/126 继续仅作校正前历史对照。下一阶段进入 Phase 6.3：WorldModel 版本化保存、原子写入与重开复现。**
+**Phase 6.0、6.1a、6.1b、6.2 已完成；Phase 6.3 进行中。第一切片已实现 versioned World Model 持久化与 Runtime 重开：gzip+JSON envelope、schemaVersion/generatorVersion、SHA-256 payload 校验、create-only 原子发布、版本/损坏拒绝，以及不重跑 Phase1→Geomorph 的 Runtime 恢复。正式 Seed 731894205 / 640×400 保存后文件约 7.63 MB，重开 484 个跨海岸/河/湖/边界样点 0 mismatch。下一步继续补可更新保存策略、manifest inspect 与更完整 golden vectors。**
 
 ## 仓库与基线
 - 仓库：D:\projects\minecraft-geo-world
@@ -28,6 +28,7 @@
 - Phase 6.2 第四切片：1869592 — feat: apply continuous river and lake waterbed。
 - Phase 6.2 第五切片：11e93ee — feat: add runtime water surface sampling。
 - Phase 6.2 第六切片：7f8722f — feat: align runtime profiles with final water semantics。
+- Phase 6.3 第一切片：0b830de — feat: add versioned world model persistence。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -97,6 +98,10 @@
 - Consistency Audit 新增 Coast interior、Waterbed 连续中心线、Lake bed、Runtime Ocean/Lake/River 水面与 strict-final 护栏；Raw Terrain 指标继续保留，但不再冒充 applied final terrain。
 - 新增 `internal/runtimeprofile`：连续 Runtime 坐标先读取最终 `WorldSample.WaterKind`，再从所在 Macro Cell 四角中选择同一 land/ocean 语义侧的 Ecology/MC Profile；Ocean 必须得到 ocean family / ocean terrain / no vegetation，River/Lake 保留周边陆地生态而不被误判成 Ocean。
 - Runtime Profile 明确暴露 `SemanticFallback` / `SemanticMismatch`；mixed coast 与模型外围被纳入 `-strict-final`，防止连续 coastline crossing 与离散 biome/profile 脱节。
+- 新增 `internal/worldmodelio`：首版文件格式为 gzip+JSON envelope，manifest 固定包含 magic / schemaVersion / generatorVersion / Geometry / SeaLevel / payload SHA-256；payload 保存 resolved config 与重建 Runtime 所需的最小字段，不序列化 Phase1→Geomorph 全部 Lab 暂态数组。
+- 保存采用同目录完整临时文件 + hard-link publish；V1 对已存在目标明确返回 `ErrTargetExists`，不会先删除或覆盖旧完整模型。Load 对 schema/generator version、checksum、Geometry/SeaLevel/config 契约、字段长度和 Runtime enum/confidence 做校验。
+- `waterbed.Restore` 只从持久化 RiverSegment/LakeNode 重建 spatial buckets；WorldSample / RuntimeProfile 在加载时重建，不重新运行全球模拟。
+- 新增 `geoworld-model-audit`，可真实 Generate→Save→释放生成图→Load→固定样点逐字段比较。
 
 ## 本轮验证
 - go test ./... -count=1：全部通过（包括新的连通性、负坐标、分辨率/范围、Phase 1 物理尺度和全链路回归）。
@@ -122,6 +127,9 @@
 - Raw baseline 806/608 FinalSurfaceMaskChanges 与 72/126 FinalUpslopeEdges 仍保留；它们现在明确只是 Raw Terrain 历史基线，不再参与最终 Runtime 成败判定。
 - Phase 6.2 最终 strict audit（731894205 / 10400，640×400，128 blocks/node）：Runtime Ocean/Lake/River water violations 全 0；Runtime Profile fallback / semantic mismatch / Unknown 全 0；mixed-coast samples=10505 / 11680 全通过；外围 samples=8304 / 8304，non-ocean=0，profile mismatch=0。
 - 4 Seed / 640×400 MC Profile audit 在 Runtime Profile 接入后保持原基线：average confidence 0.691–0.764，low-confidence 0.086%–0.216%，Unknown=0。
+- Phase 6.3 persistence unit tests：Save→Load Runtime 样点逐字段完全一致；已有 target 保存返回 ErrTargetExists 且原文件字节不变；payload checksum mismatch、未知 schema、未知 generator version 均明确拒绝；不完整 WorldModel 不产生目标文件。
+- `geoworld-model-audit -width 320 -height 200`：文件 1,820,161 bytes，payload 9,036,003 bytes，484 samples mismatch=0；Generate≈3.20s / Save≈0.51s / Load≈0.40s（本次开发机实测，仅作当前基线）。
+- `geoworld-model-audit -width 640 -height 400`：Seed 731894205，文件 7,631,145 bytes，payload 37,323,242 bytes，RiverSegments=908，LakeNodes=1322，484 samples mismatch=0；Generate≈22.10s / Save≈2.13s / Load≈1.55s（本次开发机实测，仅作当前基线）。
 - 基线原型引用检查：387 处本地引用，无缺失。
 - 详细参数、当前数值和历史对照见 PHASE6.md。
 
@@ -129,15 +137,16 @@
 1. Raw Terrain 的 806/608 海岸变化与 72/126 逆坡继续保留为历史基线；applied CoastTerrain + Waterbed + WorldSample + RuntimeProfile 已不再受这些 raw 指标阻塞。
 2. Phase 6.1b 已完成当前已知生成尺度迁移；但“物理尺度稳定”不等于不同采样精度逐 Cell 完全相同。D8 河网、离散边界/分类、量化采样仍允许合理的拓扑差异，后续新增任何空间参数也必须继续遵守 GridGeometry / blocks 规则。
 3. `phase1.Generate` 仍保留 legacy panic wrapper，但正式统一入口已改用 `phase1.GenerateChecked` 返回 error；其它旧 Lab/CLI 尚未全部迁到统一 Generator，这不再阻塞 Phase 6.2 最终 Runtime 契约。
-4. WorldModel 版本化保存/重开、Java reader/sampler、实际游戏生成均未完成。
+4. WorldModel V1 create-only 保存/重开已完成第一切片；尚未完成安全的“替换已有模型”策略、独立 manifest inspect/migrate、跨语言 Java reader/sampler 和实际游戏生成。
 5. 静态原型生成/保存按钮未接入；prototype/generated 仍是先前实验快照，不能代表本轮修改后的实时结果。
 
 ## 下一步（6.3）
-1. 定义最小可持久化 World Model schema：schemaVersion、generatorVersion、resolved config、Geometry/SeaLevel、Runtime 必需宏观字段与校验信息；不要直接把所有 Lab 暂态数组原样落盘。
-2. 实现原子保存：先写临时文件、完成校验后替换目标；生成/保存失败不得破坏已有完整模型。
-3. 实现重开与版本检查；未知 schema/generator 版本明确拒绝或进入显式迁移，不静默按当前默认值解释旧模型。
-4. 增加固定 golden sample：保存前与重开后 Ground/Water/RuntimeProfile 在海岸、河口、湖泊、负坐标、Macro/Chunk 边界与外围完全一致。
-5. 6.3 完成后进入 6.4：Go model → Java reader/sampler → 一个 Loader 的早期游戏内小世界验证。
+1. 第一切片已完成：最小 Runtime schema、schema/generator version、checksum、create-only 原子发布、Load 校验与 Runtime 重建已经落地。
+2. 第二切片补“更新已有模型”的安全替换策略；不得通过先删除旧文件再 rename 的方式伪装原子更新，需明确 crash/rollback 行为。
+3. 增加独立 manifest inspect / validate API 与命令，让 UI/Java 工具无需完整加载所有 payload 就能先判断版本、Geometry、Seed、文件完整性。
+4. 扩展 golden vectors：固定海岸、河口、湖泊、负坐标、Macro/Chunk 边界、外围与角落，形成后续 Java reader 的跨语言样本文件。
+5. 评估 V1 gzip+JSON 在更大世界上的大小/加载成本；若需要 binary field encoding，应通过 schemaVersion 升级，不静默改变 V1 解释。
+6. 6.3 完成后进入 6.4：Go model → Java reader/sampler → 一个 Loader 的早期游戏内小世界验证。
 
 ## 继续工作入口
 先读 STATUS -> PHASE6 -> DECISIONS；查历史读 PROGRESS 和 PHASE1–5。每个开发切片保留验证口径、结果、剩余风险并提交。

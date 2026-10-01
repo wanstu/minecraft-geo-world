@@ -1076,3 +1076,20 @@ Ecology / MCProfile 是宏观气候与地貌分类，不应因为最终 block �
 7. mixed coast、外围边界和角落必须使用连续世界坐标审计，不能只验证宏观节点。
 
 两个正式 Seed 已达到 fallback=0、semantic mismatch=0、Unknown=0；外围 8304 个采样点/Seed 全部为 Ocean 且 Profile 一致。
+
+## D-043：持久化只保存 Runtime 最小模型，并把版本/校验作为文件契约
+
+状态：Phase 6.3 第一切片已实施
+
+WorldModel 内存对象用于生成与调试，不等于长期存档 schema。持久化格式必须只保存重建 Runtime 所需的稳定字段。
+
+规则：
+1. V1 不序列化 Phase1→Geomorph 全部中间模型；保存 ResolvedConfig、Macro Surface、applied CoastTerrain grids、Waterbed river/lake geometry、最小 Ecology/MCProfile。
+2. 文件 manifest 必须含 schemaVersion 与 generatorVersion；任一未知版本都拒绝加载，不能套用当前默认值猜测旧模型。
+3. payload 必须有 SHA-256 校验；损坏模型在构建 Runtime 前拒绝。
+4. CoastTerrain 采样网格与 Terrain config 是 Runtime 连续高度的正式持久化输入；Waterbed spatial buckets 属于可重建索引，不进入文件。
+5. WorldSample 与 RuntimeProfile 是可由持久化字段重建的 Runtime 层，不重复保存派生 cache。
+6. V1 Save 是 create-only。目标已存在时必须失败并保留原文件；在定义可靠的 replace/rollback 语义之前，不允许先删除旧文件。
+7. 当前外层 gzip+JSON 优先换取跨语言可读性与版本可控性；若未来切换 binary field encoding 必须升级 schemaVersion，不得静默改变 V1。
+
+正式 640×400 文件约 7.63 MB，重开固定 484 样点 0 mismatch。

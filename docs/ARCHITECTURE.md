@@ -362,3 +362,34 @@ RuntimeProfile 不重新计算气候或生态。它解决的是连续坐标与�
 - Runtime/Profile 的最终消费接口不需要重新跑全球模型。
 
 Phase 6.2 到此完成。Phase 6.3 将在此 Runtime 契约上定义持久化最小字段，而不是序列化所有中间 Lab 数据。
+
+## 15. Phase 6.3 persisted Runtime model
+
+Phase 6.3 不持久化整个 generator.WorldModel。首版文件只保存可以重建最终 Runtime 的最小有向依赖：
+
+ResolvedConfig + GridGeometry + SeaLevel
+  + Macro Surface
+  + CoastTerrain scalar grids + height correction
+  + Waterbed RiverSegments / LakeNodes
+  + minimal Ecology / MCProfile
+        ↓
+Load
+        ↓
+rebuild Waterbed spatial buckets
+        ↓
+WorldSample.Build
+        ↓
+RuntimeProfile.Build
+
+V1 envelope：
+- gzip+JSON，便于 Go/Java 都有成熟标准库处理。
+- manifest 独立记录 magic、schemaVersion、generatorVersion、Seed、Geometry、SeaLevel、payload byte count、SHA-256。
+- payload checksum 通过后才允许恢复 Runtime。
+- schemaVersion 解释字段布局；generatorVersion 解释生成语义。二者职责分开。
+
+保存发布策略：
+- 同目录临时文件完整写入并 fsync。
+- create-only V1 使用 hard-link publish；目标存在则失败，因此不会出现部分目标文件，也不会破坏已有完整文件。
+- 覆盖已有模型属于后续独立 replace protocol，必须明确 crash recovery / rollback，不采用先删除旧目标的方案。
+
+当前 640×400 正式 Seed 的 V1 文件约 7.63 MB，重开 Runtime 484 个固定样点逐字段一致。
