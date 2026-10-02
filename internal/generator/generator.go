@@ -55,6 +55,8 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 		PlateCount:              resolved.PlateCount,
 		OceanFraction:           resolved.OceanFraction,
 		EdgeOceanBufferFraction: resolved.EdgeOceanBufferFraction,
+		ContinentFragmentation:  resolved.ContinentFragmentation,
+		ContinentSeparation:     resolved.ContinentSeparation,
 	}
 	w, err := phase1.GenerateChecked(phase1Cfg)
 	if err != nil {
@@ -283,7 +285,20 @@ func resolveTopLevelConfig(cfg Config) (resolvedTopLevel, error) {
 		cfg.EdgeOceanBufferFraction <= 0 || cfg.EdgeOceanBufferFraction >= 0.20 {
 		return resolvedTopLevel{}, errors.New("generator: edge ocean buffer fraction must be finite and between 0 and 0.20")
 	}
-
+	if cfg.ContinentFragmentation == 0 {
+		cfg.ContinentFragmentation = phase1.DefaultContinentFragmentation
+	}
+	if math.IsNaN(cfg.ContinentFragmentation) || math.IsInf(cfg.ContinentFragmentation, 0) ||
+		cfg.ContinentFragmentation <= 0 || cfg.ContinentFragmentation > 1 {
+		return resolvedTopLevel{}, errors.New("generator: continent fragmentation must be finite and inside (0,1]")
+	}
+	if cfg.ContinentSeparation == 0 {
+		cfg.ContinentSeparation = phase1.DefaultContinentSeparation
+	}
+	if math.IsNaN(cfg.ContinentSeparation) || math.IsInf(cfg.ContinentSeparation, 0) ||
+		cfg.ContinentSeparation <= 0 || cfg.ContinentSeparation > 1 {
+		return resolvedTopLevel{}, errors.New("generator: continent separation must be finite and inside (0,1]")
+	}
 	if err := rejectSeaLevelConflict("climate", cfg.Climate.SeaLevelNormalized, cfg.SeaLevelNormalized); err != nil {
 		return resolvedTopLevel{}, err
 	}

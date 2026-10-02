@@ -136,8 +136,19 @@ function updateRangePreview(){
   $('rangePreview').textContent=`当前覆盖约 ${Math.round(sx).toLocaleString()} × ${Math.round(sz).toLocaleString()} 方块；间距越小，细节越密，但同样网格覆盖范围越小。`;
 }
 
+function updateContinentLabels(){
+  $('fragmentationValue').textContent=Number($('fragmentation').value).toFixed(2);
+  $('separationValue').textContent=Number($('separation').value).toFixed(2);
+}
+
 ['width','height','cellSize'].forEach(id=>$(id).addEventListener('input',updateRangePreview));
+['fragmentation','separation'].forEach(id=>$(id).addEventListener('input',updateContinentLabels));
 $('modelName').addEventListener('input',()=>{modelNameTouched=true});
+$('randomSeed').addEventListener('click',()=>{
+  const values=new Uint32Array(1);
+  crypto.getRandomValues(values);
+  $('seed').value=String((values[0]&0x7fffffff)||1);
+});
 
 $('generate').onclick=async()=>{
   const previous=active;
@@ -158,7 +169,9 @@ $('generate').onclick=async()=>{
       height:Number($('height').value),
       cellSize:Number($('cellSize').value),
       plateCount:Number($('plates').value),
-      oceanFraction:Number($('ocean').value)
+      oceanFraction:Number($('ocean').value),
+      continentFragmentation:Number($('fragmentation').value),
+      continentSeparation:Number($('separation').value)
     })});
     active=next;
     $('progressBar').style.width='100%';
@@ -273,7 +286,12 @@ $('load').onclick=async()=>{
     $('height').value=active.geometry.Height;
     const cell=active.geometry.Width>1?active.geometry.SpanXBlocks/(active.geometry.Width-1):0;
     if(cell===64||cell===128)$('cellSize').value=String(cell);
+    $('plates').value=active.plateCount;
+    $('ocean').value=active.oceanFraction;
+    $('fragmentation').value=active.continentFragmentation||0.35;
+    $('separation').value=active.continentSeparation||0.65;
     updateRangePreview();
+    updateContinentLabels();
     $('topStatus').textContent='已重开';
     $('progressText').textContent=`模型重开完成 · ${active.durationMs}ms`;
     $('modelName').value=name;
@@ -318,6 +336,13 @@ function renderStats(){
     ${kv('网格',g.Width+' × '+g.Height)}
     ${kv('采样间距',Math.round(cell)+' 方块 / 点')}
     ${kv('世界范围',Math.round(g.SpanXBlocks)+' × '+Math.round(g.SpanZBlocks)+' 方块')}
+    ${kv('板块数',active.plateCount)}
+    ${kv('洋壳比例',Number(active.oceanFraction).toFixed(2))}
+    ${kv('大陆破碎度',Number(active.continentFragmentation).toFixed(2))}
+    ${kv('大陆分离度',Number(active.continentSeparation).toFixed(2))}
+    ${kv('主要陆块',active.majorLandComponents)}
+    ${kv('全部陆块',active.landComponents)}
+    ${kv('最大陆块占比',(Number(active.largestLandShare)*100).toFixed(1)+'%')}
     ${kv('河段',active.riverSegments)}
     ${kv('湖泊节点',active.lakeNodes)}
   </div>`;
@@ -369,6 +394,7 @@ function escapeAttr(s){return escapeHtml(s)}
 window.addEventListener('beforeunload',()=>{if(mapObjectURL)URL.revokeObjectURL(mapObjectURL)});
 
 updateRangePreview();
+updateContinentLabels();
 updateActionState();
 refreshModels();
 refreshStatus();

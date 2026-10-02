@@ -16,6 +16,13 @@ h2{font-size:14px;margin:0 0 12px;color:#fff}
 label{display:block;color:#9eacb4;font-size:12px;margin:0 0 10px}
 input,select{width:100%;margin-top:5px;background:#0d1215;border:1px solid #34414a;color:#e7eef2;padding:8px;border-radius:4px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seed-control{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:end}
+.seed-control input{margin-top:5px}
+.seed-control button{height:35px;white-space:nowrap}
+.parameter-help{margin:-4px 0 10px}
+.range-label{position:relative;margin-bottom:4px}
+.range-label b{float:right;color:#dce5ea;font-weight:600}
+.range-label input[type="range"]{padding:0;height:24px;accent-color:#55a77c}
 button{background:#222b31;border:1px solid #3c4951;color:#dce5ea;padding:8px 10px;border-radius:4px;cursor:pointer}
 button:hover{border-color:#64747e}
 button.primary{width:100%;background:#2d6750;border-color:#4b8a6c;color:#fff;font-weight:600}

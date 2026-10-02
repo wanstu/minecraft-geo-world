@@ -27,6 +27,8 @@ type Config struct {
 	PlateCount              int
 	OceanFraction           float64
 	EdgeOceanBufferFraction float64
+	ContinentFragmentation  float64
+	ContinentSeparation     float64
 
 	Climate     climate.Config
 	Hydrology   hydrology.Config

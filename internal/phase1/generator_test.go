@@ -414,6 +414,155 @@ func TestMultipleSeedsPhase1Invariants(t *testing.T) {
 	}
 }
 
+func TestContinentSeparationControlsContinentalDistribution(t *testing.T) {
+	seeds := []int64{1, 2, 3, 5, 42, 123456, 731894205, 20261001}
+	measure := func(separation float64) (avgMajor, avgLargest float64) {
+		totalMajor := 0
+		totalLargest := 0.0
+		for _, seed := range seeds {
+			cfg := testConfig()
+			cfg.Seed = seed
+			cfg.ContinentFragmentation = DefaultContinentFragmentation
+			cfg.ContinentSeparation = separation
+			w := Generate(cfg)
+			major, largest := continentalComponentStats(w)
+			totalMajor += major
+			totalLargest += largest
+		}
+		return float64(totalMajor) / float64(len(seeds)), totalLargest / float64(len(seeds))
+	}
+
+	compactMajor, compactLargest := measure(0.15)
+	separatedMajor, separatedLargest := measure(0.90)
+	if separatedMajor < compactMajor+0.75 {
+		t.Fatalf("continent separation has too little effect on major components: compact %.2f separated %.2f", compactMajor, separatedMajor)
+	}
+	if separatedLargest > compactLargest-0.12 {
+		t.Fatalf("continent separation has too little effect on largest share: compact %.3f separated %.3f", compactLargest, separatedLargest)
+	}
+}
+
+func TestContinentFragmentationControlsCoastComplexity(t *testing.T) {
+	seeds := []int64{1, 2, 3, 5, 42, 123456, 731894205, 20261001}
+	measure := func(fragmentation float64) float64 {
+		total := 0.0
+		for _, seed := range seeds {
+			cfg := testConfig()
+			cfg.Seed = seed
+			cfg.ContinentFragmentation = fragmentation
+			cfg.ContinentSeparation = DefaultContinentSeparation
+			w := Generate(cfg)
+			land := 0
+			for _, crust := range w.Crust {
+				if crust == Continental {
+					land++
+				}
+			}
+			total += float64(continentalPerimeter(w)) / float64(land)
+		}
+		return total / float64(len(seeds))
+	}
+
+	smooth := measure(0.10)
+	fragmented := measure(1.00)
+	if fragmented < smooth*1.05 {
+		t.Fatalf("continent fragmentation has too little effect on coast complexity: smooth %.5f fragmented %.5f", smooth, fragmented)
+	}
+}
+
+func continentalComponentStats(w *World) (major int, largestShare float64) {
+	seen := make([]bool, len(w.Crust))
+	queue := make([]int, 0, 256)
+	totalLand := 0
+	for _, crust := range w.Crust {
+		if crust == Continental {
+			totalLand++
+		}
+	}
+	majorThreshold := totalLand / 20
+	if majorThreshold < 1 {
+		majorThreshold = 1
+	}
+	largest := 0
+	for start, crust := range w.Crust {
+		if crust != Continental || seen[start] {
+			continue
+		}
+		seen[start] = true
+		queue = queue[:0]
+		queue = append(queue, start)
+		size := 0
+		for head := 0; head < len(queue); head++ {
+			i := queue[head]
+			size++
+			x, y := i%w.Config.Width, i/w.Config.Width
+			if x > 0 {
+				n := i - 1
+				if w.Crust[n] == Continental && !seen[n] {
+					seen[n] = true
+					queue = append(queue, n)
+				}
+			}
+			if x+1 < w.Config.Width {
+				n := i + 1
+				if w.Crust[n] == Continental && !seen[n] {
+					seen[n] = true
+					queue = append(queue, n)
+				}
+			}
+			if y > 0 {
+				n := i - w.Config.Width
+				if w.Crust[n] == Continental && !seen[n] {
+					seen[n] = true
+					queue = append(queue, n)
+				}
+			}
+			if y+1 < w.Config.Height {
+				n := i + w.Config.Width
+				if w.Crust[n] == Continental && !seen[n] {
+					seen[n] = true
+					queue = append(queue, n)
+				}
+			}
+		}
+		if size >= majorThreshold {
+			major++
+		}
+		if size > largest {
+			largest = size
+		}
+	}
+	if totalLand > 0 {
+		largestShare = float64(largest) / float64(totalLand)
+	}
+	return major, largestShare
+}
+
+func continentalPerimeter(w *World) int {
+	perimeter := 0
+	for y := 0; y < w.Config.Height; y++ {
+		for x := 0; x < w.Config.Width; x++ {
+			i := w.index(x, y)
+			if w.Crust[i] != Continental {
+				continue
+			}
+			if x == 0 || w.Crust[i-1] != Continental {
+				perimeter++
+			}
+			if x+1 == w.Config.Width || w.Crust[i+1] != Continental {
+				perimeter++
+			}
+			if y == 0 || w.Crust[i-w.Config.Width] != Continental {
+				perimeter++
+			}
+			if y+1 == w.Config.Height || w.Crust[i+w.Config.Width] != Continental {
+				perimeter++
+			}
+		}
+	}
+	return perimeter
+}
+
 func BenchmarkGenerate640x400(b *testing.B) {
 	cfg := Config{
 		Seed:          731894205,

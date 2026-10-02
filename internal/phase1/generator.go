@@ -60,6 +60,14 @@ func GenerateChecked(cfg Config) (*World, error) {
 	if cfg.EdgeOceanBufferFraction <= 0 || cfg.EdgeOceanBufferFraction >= 0.20 {
 		cfg.EdgeOceanBufferFraction = 0.04
 	}
+	if cfg.ContinentFragmentation <= 0 || cfg.ContinentFragmentation > 1 ||
+		math.IsNaN(cfg.ContinentFragmentation) || math.IsInf(cfg.ContinentFragmentation, 0) {
+		cfg.ContinentFragmentation = DefaultContinentFragmentation
+	}
+	if cfg.ContinentSeparation <= 0 || cfg.ContinentSeparation > 1 ||
+		math.IsNaN(cfg.ContinentSeparation) || math.IsInf(cfg.ContinentSeparation, 0) {
+		cfg.ContinentSeparation = DefaultContinentSeparation
+	}
 	if cfg.SpanXBlocks == 0 {
 		cfg.SpanXBlocks = float64(cfg.Width-1) * DefaultReferenceCellSizeBlocks
 	}
@@ -193,22 +201,8 @@ func (w *World) generateCrust(r *rand.Rand) {
 	}
 
 	seedCount := maxInt(4, w.Config.PlateCount/3)
-	seeds := make([]continentSeed, seedCount)
 	width, height := referenceGridDimensions(w.Geometry)
-
-	for i := range seeds {
-		seeds[i] = continentSeed{
-			Center: Vec2{
-				X: width * (0.14 + r.Float64()*0.72),
-				Y: height * (0.14 + r.Float64()*0.72),
-			},
-			Radius: Vec2{
-				X: width * (0.09 + r.Float64()*0.12),
-				Y: height * (0.10 + r.Float64()*0.15),
-			},
-			Weight: 0.75 + r.Float64()*0.55,
-		}
-	}
+	seeds := generateContinentSeeds(r, seedCount, width, height, w.Config.ContinentSeparation)
 
 	bufferCells := edgeOceanBufferCells(w.Config)
 	candidates := make([]landCandidate, 0, w.Config.Width*w.Config.Height)
@@ -216,15 +210,29 @@ func (w *World) generateCrust(r *rand.Rand) {
 	for y := 0; y < w.Config.Height; y++ {
 		for x := 0; x < w.Config.Width; x++ {
 			fx, fy := w.referenceGridCoordinates(x, y)
-			potential := 0.0
-
+			strongest := 0.0
+			second := 0.0
 			for _, s := range seeds {
 				dx := (fx - s.Center.X) / s.Radius.X
 				dy := (fy - s.Center.Y) / s.Radius.Y
-				potential += s.Weight * math.Exp(-(dx*dx+dy*dy)*0.5)
+				score := s.Weight * math.Exp(-(dx*dx+dy*dy)*0.5)
+				if score > strongest {
+					second = strongest
+					strongest = score
+				} else if score > second {
+					second = score
+				}
 			}
 
-			potential += continentalPotentialNoise(fx, fy, w.Config.Seed)
+			blend := math.Pow(1-w.Config.ContinentSeparation, 2) * 0.75
+			potential := strongest + second*blend
+			if strongest > 1e-9 && second > 0 {
+				overlap := second / strongest
+				potential -= w.Config.ContinentSeparation * 0.12 * math.Pow(overlap, 3)
+			}
+			potential += continentalPotentialNoise(fx, fy, w.Config.Seed) * (0.45 + 0.45*w.Config.ContinentFragmentation)
+			fragmentAmplitude := 0.005 + 0.52*math.Pow(w.Config.ContinentFragmentation, 1.60)
+			potential += continentalFragmentNoise(fx, fy, w.Config.Seed) * fragmentAmplitude
 
 			// 即使硬缓冲区已经保证外围是海洋，靠近缓冲区的区域仍给予
 			// 连续海洋偏置，避免大陆像被矩形刀切断一样贴着 guard band 生长。
@@ -262,6 +270,54 @@ func (w *World) generateCrust(r *rand.Rand) {
 	for i := 0; i < landCount; i++ {
 		w.Crust[candidates[i].index] = Continental
 	}
+}
+
+func generateContinentSeeds(r *rand.Rand, count int, width, height, separation float64) []continentSeed {
+	seeds := make([]continentSeed, 0, count)
+	minDimension := math.Min(width, height)
+	minDistance := minDimension * (0.07 + separation*0.20)
+	marginX := width * 0.12
+	marginY := height * 0.12
+
+	for len(seeds) < count {
+		var best Vec2
+		bestDistance := -1.0
+		for attempt := 0; attempt < 64; attempt++ {
+			candidate := Vec2{
+				X: marginX + r.Float64()*(width-2*marginX),
+				Y: marginY + r.Float64()*(height-2*marginY),
+			}
+			nearest := math.Inf(1)
+			for _, existing := range seeds {
+				d := math.Hypot(candidate.X-existing.Center.X, candidate.Y-existing.Center.Y)
+				if d < nearest {
+					nearest = d
+				}
+			}
+			if len(seeds) == 0 {
+				nearest = math.Inf(1)
+			}
+			if nearest > bestDistance {
+				best = candidate
+				bestDistance = nearest
+			}
+			if nearest >= minDistance {
+				best = candidate
+				break
+			}
+		}
+
+		shrink := 1 - separation*0.20
+		seeds = append(seeds, continentSeed{
+			Center: best,
+			Radius: Vec2{
+				X: width * (0.075 + r.Float64()*0.105) * shrink,
+				Y: height * (0.085 + r.Float64()*0.125) * shrink,
+			},
+			Weight: 0.82 + r.Float64()*0.42,
+		})
+	}
+	return seeds
 }
 
 func edgeOceanBufferCells(cfg Config) int {
@@ -881,6 +937,15 @@ func continentalPotentialNoise(refX, refY float64, seed int64) float64 {
 	return math.Sin(refX*0.031+float64(seed%401))*0.10 +
 		math.Cos(refY*0.037-float64(seed%271))*0.08 +
 		math.Sin((refX+refY)*0.019)*0.05
+}
+
+func continentalFragmentNoise(refX, refY float64, seed int64) float64 {
+	phaseA := float64((seed%911)+911) / 911 * math.Pi * 2
+	phaseB := float64((seed%613)+613) / 613 * math.Pi * 2
+	return math.Sin(refX*0.118+refY*0.041+phaseA)*0.30 +
+		math.Cos(refY*0.151-refX*0.033+phaseB)*0.24 +
+		math.Sin((refX-refY)*0.219+phaseA*0.63)*0.24 +
+		math.Cos(refX*0.071+refY*0.281-phaseB*0.47)*0.22
 }
 
 func crustThicknessNoise(refX, refY float64, seed int64) float64 {

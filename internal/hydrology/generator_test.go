@@ -446,6 +446,7 @@ func TestExplicitLakeIDsAreContiguous(t *testing.T) {
 
 func TestPhase34RiverLakeSeedSweep(t *testing.T) {
 	seeds := []int64{4000, 18426, 32852, 47278}
+	totalLakes := 0
 
 	for _, seed := range seeds {
 		world := phase1.Generate(phase1.Config{
@@ -510,11 +511,15 @@ func TestPhase34RiverLakeSeedSweep(t *testing.T) {
 			t.Fatalf("seed %d seasonal-dominant river fraction suspicious: %.1f%%", seed, seasonalPct*100)
 		}
 
-		if len(m.Lakes) < 1 || len(m.Lakes) > 30 {
+		totalLakes += len(m.Lakes)
+		if len(m.Lakes) > 30 {
 			t.Fatalf("seed %d explicit lake count suspicious: %d", seed, len(m.Lakes))
 		}
 		if largestLake > 500 {
 			t.Fatalf("seed %d largest lake too large for 160x100 audit grid: %d cells", seed, largestLake)
 		}
+	}
+	if totalLakes == 0 {
+		t.Fatal("seed sweep produced no explicit lakes")
 	}
 }

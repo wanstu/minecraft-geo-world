@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"geoworld/internal/generator"
+	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
 	"geoworld/internal/world"
@@ -35,16 +36,23 @@ import (
 var webFiles embed.FS
 
 type activeWorld struct {
-	seed        int64
-	geometry    world.GridGeometry
-	sample      func(float64, float64) runtimeprofile.Sample
-	riverCount  int
-	lakeCount   int
-	source      string
-	model       *generator.WorldModel
-	reopened    *worldmodelio.RuntimeModel
-	generatedAt time.Time
-	duration    time.Duration
+	seed                   int64
+	geometry               world.GridGeometry
+	sample                 func(float64, float64) runtimeprofile.Sample
+	riverCount             int
+	lakeCount              int
+	plateCount             int
+	oceanFraction          float64
+	continentFragmentation float64
+	continentSeparation    float64
+	landComponents         int
+	majorLandComponents    int
+	largestLandShare       float64
+	source                 string
+	model                  *generator.WorldModel
+	reopened               *worldmodelio.RuntimeModel
+	generatedAt            time.Time
+	duration               time.Duration
 }
 
 type appState struct {
@@ -59,12 +67,14 @@ type appState struct {
 }
 
 type generateRequest struct {
-	Seed          int64   `json:"seed"`
-	Width         int     `json:"width"`
-	Height        int     `json:"height"`
-	CellSize      float64 `json:"cellSize"`
-	PlateCount    int     `json:"plateCount"`
-	OceanFraction float64 `json:"oceanFraction"`
+	Seed                   int64   `json:"seed"`
+	Width                  int     `json:"width"`
+	Height                 int     `json:"height"`
+	CellSize               float64 `json:"cellSize"`
+	PlateCount             int     `json:"plateCount"`
+	OceanFraction          float64 `json:"oceanFraction"`
+	ContinentFragmentation float64 `json:"continentFragmentation"`
+	ContinentSeparation    float64 `json:"continentSeparation"`
 }
 
 type saveRequest struct {
@@ -100,7 +110,11 @@ func main() {
 		log.Fatal(err)
 	}
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.FS(staticFS)))
+	staticHandler := http.FileServer(http.FS(staticFS))
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		staticHandler.ServeHTTP(w, r)
+	}))
 	mux.HandleFunc("/api/status", state.handleStatus)
 	mux.HandleFunc("/api/generate", state.handleGenerate)
 	mux.HandleFunc("/api/sample", state.handleSample)
@@ -208,10 +222,12 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 			}
 		}()
 		model, err = generator.GenerateWorld(r.Context(), generator.Config{
-			Seed:          req.Seed,
-			Geometry:      g,
-			PlateCount:    req.PlateCount,
-			OceanFraction: req.OceanFraction,
+			Seed:                   req.Seed,
+			Geometry:               g,
+			PlateCount:             req.PlateCount,
+			OceanFraction:          req.OceanFraction,
+			ContinentFragmentation: req.ContinentFragmentation,
+			ContinentSeparation:    req.ContinentSeparation,
 		}, func(p generator.Progress) {
 			s.mu.Lock()
 			s.stage = p.Stage
@@ -230,16 +246,24 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
+	landComponents, majorLandComponents, largestLandShare := summarizeLand(model.Surface)
 	active := &activeWorld{
-		seed:        model.Config.Seed,
-		geometry:    model.Geometry,
-		sample:      model.RuntimeProfile.Sample,
-		riverCount:  len(model.Waterbed.Rivers),
-		lakeCount:   len(model.Waterbed.Lakes),
-		source:      "generated",
-		model:       model,
-		generatedAt: time.Now(),
-		duration:    duration,
+		seed:                   model.Config.Seed,
+		geometry:               model.Geometry,
+		sample:                 model.RuntimeProfile.Sample,
+		riverCount:             len(model.Waterbed.Rivers),
+		lakeCount:              len(model.Waterbed.Lakes),
+		plateCount:             model.Config.Phase1.PlateCount,
+		oceanFraction:          model.Config.Phase1.OceanFraction,
+		continentFragmentation: model.Config.Phase1.ContinentFragmentation,
+		continentSeparation:    model.Config.Phase1.ContinentSeparation,
+		landComponents:         landComponents,
+		majorLandComponents:    majorLandComponents,
+		largestLandShare:       largestLandShare,
+		source:                 "generated",
+		model:                  model,
+		generatedAt:            time.Now(),
+		duration:               duration,
 	}
 	s.mu.Lock()
 	s.generating = false
@@ -376,16 +400,32 @@ func (s *appState) handleLoad(w http.ResponseWriter, r *http.Request, modelDir s
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	landComponents, majorLandComponents, largestLandShare := summarizeLand(model.Surface)
+	fragmentation := model.Config.Phase1.ContinentFragmentation
+	if fragmentation == 0 {
+		fragmentation = phase1.DefaultContinentFragmentation
+	}
+	separation := model.Config.Phase1.ContinentSeparation
+	if separation == 0 {
+		separation = phase1.DefaultContinentSeparation
+	}
 	active := &activeWorld{
-		seed:        model.Manifest.Seed,
-		geometry:    model.Geometry,
-		sample:      model.RuntimeProfile.Sample,
-		riverCount:  len(model.Waterbed.Rivers),
-		lakeCount:   len(model.Waterbed.Lakes),
-		source:      "reopened",
-		reopened:    model,
-		generatedAt: time.Now(),
-		duration:    time.Since(start),
+		seed:                   model.Manifest.Seed,
+		geometry:               model.Geometry,
+		sample:                 model.RuntimeProfile.Sample,
+		riverCount:             len(model.Waterbed.Rivers),
+		lakeCount:              len(model.Waterbed.Lakes),
+		plateCount:             model.Config.Phase1.PlateCount,
+		oceanFraction:          model.Config.Phase1.OceanFraction,
+		continentFragmentation: fragmentation,
+		continentSeparation:    separation,
+		landComponents:         landComponents,
+		majorLandComponents:    majorLandComponents,
+		largestLandShare:       largestLandShare,
+		source:                 "reopened",
+		reopened:               model,
+		generatedAt:            time.Now(),
+		duration:               time.Since(start),
 	}
 	s.mu.Lock()
 	s.active = active
@@ -429,13 +469,92 @@ func handleModels(w http.ResponseWriter, r *http.Request, modelDir string) {
 
 func activeSummary(a *activeWorld) map[string]any {
 	return map[string]any{
-		"seed":          a.seed,
-		"geometry":      a.geometry,
-		"riverSegments": a.riverCount,
-		"lakeNodes":     a.lakeCount,
-		"source":        a.source,
-		"durationMs":    a.duration.Milliseconds(),
+		"seed":                   a.seed,
+		"geometry":               a.geometry,
+		"riverSegments":          a.riverCount,
+		"lakeNodes":              a.lakeCount,
+		"plateCount":             a.plateCount,
+		"oceanFraction":          a.oceanFraction,
+		"continentFragmentation": a.continentFragmentation,
+		"continentSeparation":    a.continentSeparation,
+		"landComponents":         a.landComponents,
+		"majorLandComponents":    a.majorLandComponents,
+		"largestLandShare":       a.largestLandShare,
+		"source":                 a.source,
+		"durationMs":             a.duration.Milliseconds(),
 	}
+}
+
+func summarizeLand(surface *world.Surface) (components, major int, largestShare float64) {
+	if surface == nil || surface.Width <= 0 || surface.Height <= 0 || len(surface.LandMask) == 0 {
+		return 0, 0, 0
+	}
+	seen := make([]bool, len(surface.LandMask))
+	queue := make([]int, 0, 256)
+	totalLand := 0
+	for _, land := range surface.LandMask {
+		if land {
+			totalLand++
+		}
+	}
+	if totalLand == 0 {
+		return 0, 0, 0
+	}
+	majorThreshold := totalLand / 50
+	if majorThreshold < 16 {
+		majorThreshold = 16
+	}
+	largest := 0
+	for start, land := range surface.LandMask {
+		if !land || seen[start] {
+			continue
+		}
+		components++
+		seen[start] = true
+		queue = queue[:0]
+		queue = append(queue, start)
+		size := 0
+		for head := 0; head < len(queue); head++ {
+			i := queue[head]
+			size++
+			x, z := i%surface.Width, i/surface.Width
+			if x > 0 {
+				n := i - 1
+				if surface.LandMask[n] && !seen[n] {
+					seen[n] = true
+					queue = append(queue, n)
+				}
+			}
+			if x+1 < surface.Width {
+				n := i + 1
+				if surface.LandMask[n] && !seen[n] {
+					seen[n] = true
+					queue = append(queue, n)
+				}
+			}
+			if z > 0 {
+				n := i - surface.Width
+				if surface.LandMask[n] && !seen[n] {
+					seen[n] = true
+					queue = append(queue, n)
+				}
+			}
+			if z+1 < surface.Height {
+				n := i + surface.Width
+				if surface.LandMask[n] && !seen[n] {
+					seen[n] = true
+					queue = append(queue, n)
+				}
+			}
+		}
+		if size >= majorThreshold {
+			major++
+		}
+		if size > largest {
+			largest = size
+		}
+	}
+	return components, major, float64(largest) / float64(totalLand)
 }
 
 func sampleJSON(x, z float64, s runtimeprofile.Sample) map[string]any {

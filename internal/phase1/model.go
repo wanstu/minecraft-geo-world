@@ -61,6 +61,11 @@ type Plate struct {
 
 const DefaultReferenceCellSizeBlocks = world.DefaultMacroSpacingBlocks
 
+const (
+	DefaultContinentFragmentation = 0.35
+	DefaultContinentSeparation    = 0.65
+)
+
 type Config struct {
 	Seed       int64
 	Width      int
@@ -81,6 +86,15 @@ type Config struct {
 	// OceanFraction currently controls oceanic crust area, not inundated ocean area.
 	OceanFraction           float64
 	EdgeOceanBufferFraction float64
+
+	// ContinentFragmentation controls how strongly coastlines and continental
+	// interiors are broken up by medium-scale shape noise. Zero uses the default.
+	ContinentFragmentation float64
+
+	// ContinentSeparation controls how strongly independent continental nuclei
+	// repel each other and how strongly overlap corridors are suppressed.
+	// Zero uses the default.
+	ContinentSeparation float64
 }
 
 type World struct {
