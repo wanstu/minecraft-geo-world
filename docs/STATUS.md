@@ -38,6 +38,7 @@
 - Tester 大陆预设：a7c8018 — feat: add continent generation presets。
 - Cross-language Runtime golden vectors：0323155 — feat: add cross-language runtime golden vectors。
 - World Model 持久化内存审计：f297574 — feat: measure world model persistence memory。
+- Java V1 Runtime Reader：fd6436e — feat: add java v1 runtime reader。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -122,6 +123,8 @@
 - Golden V1 JSON 使用独立的 lowerCamelCase Geometry/Source 契约，不直接暴露 Go struct JSON 命名；记录 golden format/version、World Model schema/generator version、`1e-9` 浮点容差、固定生成参数以及每个命名坐标的完整 Runtime Sample。当前 15 个样点覆盖四角、四边、负 X/Z 16-block Chunk 边界、世界原点、Macro 节点与 Cell 内部、mixed coast、带 receiver surface 的 River 下游段和 Lake 节点中心。
 - Golden 生成命令默认拒绝覆盖已有产物，只有显式 `-force` 才可再生；README 明确要求不要手改 JSON 数值让测试通过。Go 回归同时验证“fresh generation → golden JSON”和“committed .geoworld Load → golden JSON”，后者就是未来 Java 端需要复刻的验收方式。
 - `geoworld-model-audit` 已增强持久化成本审计：除 Generate/Save/Load 时间、文件/payload 大小和 Runtime 样点 mismatch 外，现记录 Generate 峰值/分配、Save 基线 Heap/峰值/额外峰值、Load 峰值/GC 后常驻/总分配以及 gzip 文件与 JSON payload 比例。内存峰值通过 5ms 周期采样 Go `MemStats`，用于规模趋势基线，不作为精确 profiler 替代。
+- 新增 `java/runtime-reader`：零第三方依赖、Java 21 编译目标的 World Model V1 reader/sampler。Reader 校验 gzip+JSON manifest、schema/generator version、payload bytes 与 SHA-256；按 Go `encoding/json` 规则解码 `[]uint8` 派生枚举的 Base64 字符串；恢复 CoastTerrain cubic B-spline + value-noise/fBm、HeightCorrection、River/Lake Waterbed、WorldSample 与 RuntimeProfile 四角语义选择。Java 不重新运行 Phase1→Geomorph 全球生成算法。
+- Java reader 暴露任意世界坐标 `sample(x,z)` 的最终 Ground/Water/Profile 结果，不硬编码 golden 坐标；`verify-golden.cmd` 可在无 Gradle/Maven 环境下直接 `javac --release 21` 编译并对拍现有 cross-language fixture。
 
 ## 本轮验证
 - go test ./... -count=1：全部通过（包括新的连通性、负坐标、分辨率/范围、Phase 1 物理尺度和全链路回归）。
@@ -175,13 +178,16 @@
   - 1024×640：文件 21,060,187 B / payload 98,599,884 B，Save 5.16s，Load 3.71s，Load 峰值 469.2 MB，常驻 266.1 MB；Save 在约 732.9 MB 已生成模型 Heap 基线上额外峰值约 729.0 MB。
 - 六档 gzip 文件 / JSON payload 比例稳定在约 0.21～0.216，说明 V1 磁盘压缩效果良好；当前主要规模风险不是文件大小，而是 JSON 编解码临时 Heap 与总分配。320×200 / 640×400 对 Tester 仍可用；60 万+ 宏节点模型若要频繁在游戏侧加载，应评估新的 schemaVersion（二进制字段编码/更低临时内存），不能静默改变 V1。
 - 内存审计增强后再次执行 `go test ./... -count=1`，全仓通过。
+- Java V1 reader 通过提交的 `runtime-v1.geoworld + runtime-v1.json` 真实跨语言验收：15/15 cases 全部通过，float tolerance=`1e-9`。覆盖四角/四边、负坐标 Chunk 边界、原点、Macro node/cell interior、mixed coast、River backwater、Lake center；WaterKind、Biome/Profile、SourceNode/SourceWeight、SemanticFallback/Mismatch 均与 Go golden 一致。
+- Java 验收中特别确认 V1 的 Ecology/Profile `[]uint8` 字段在 Go JSON 中是 Base64 字符串而非数字数组；Java reader 已按该实际格式实现，避免后续 Minecraft 群系读取静默错位。
+- `java\\runtime-reader\\verify-golden.cmd` 在当前 JDK 27 上以 `--release 21` 编译并运行成功，不依赖 Gradle/Maven。
 - 详细参数、当前数值和历史对照见 PHASE6.md。
 
 ## 仍未完成（不要误报完成）
 1. Raw Terrain 的 806/608 海岸变化与 72/126 逆坡继续保留为历史基线；applied CoastTerrain + Waterbed + WorldSample + RuntimeProfile 已不再受这些 raw 指标阻塞。
 2. Phase 6.1b 已完成当前已知生成尺度迁移；但“物理尺度稳定”不等于不同采样精度逐 Cell 完全相同。D8 河网、离散边界/分类、量化采样仍允许合理的拓扑差异，后续新增任何空间参数也必须继续遵守 GridGeometry / blocks 规则。
 3. `phase1.Generate` 仍保留 legacy panic wrapper，但正式统一入口已改用 `phase1.GenerateChecked` 返回 error；其它旧 Lab/CLI 尚未全部迁到统一 Generator，这不再阻塞 Phase 6.2 最终 Runtime 契约。
-4. WorldModel V1 保存/重开、Windows/Unix 安全替换、manifest inspect/validate 与首版 cross-language golden vectors 已完成；尚未完成 migrate、Java reader/sampler 和实际游戏生成。
+4. WorldModel V1 保存/重开、Windows/Unix 安全替换、manifest inspect/validate、cross-language golden vectors 与最小 Java V1 reader/sampler 已完成；尚未完成 migrate、Minecraft 世界存档/Loader 实际游戏生成。
 5. 已新增 GeoWorld Tester 本地 Web 工具，可直接生成、看最终地形/水体/群系/Profile、点击采样、保存与重开模型；MOD/Loader 暂后置，优先通过该工具做人工验收。
 6. 静态 prototype 仍是先前实验快照；实时验证请使用 `open-geoworld-tester.cmd`，不要再把 prototype/generated 当当前世界结果。
 
@@ -191,8 +197,8 @@
 3. **优先完善 GeoWorld Tester**：先让人工验证成为主入口，包括生成参数、最终地形 / 水体 / 群系 / Profile 图层、坐标采样、保存 / 更新 / 重开模型；发现视觉或语义问题时从 Tester 直接复现。
 4. Tester 的河网 / 湖泊 / 海陆骨架 / Raw Terrain / 海岸约束、最终异常位置高亮、默认大陆多 Seed 统计与大陆预设均已完成；继续以 Tester 人工验收为主入口，发现视觉 / 语义问题优先在这里复现，不先做 MOD UI。
 5. Cross-language golden vectors V1 已完成，固定海岸、River 下游/受纳语义、Lake、负坐标、Macro/Chunk 边界、外围与角落均已有机器可读基线；Java reader/sampler 后续必须以这组 fixture 对拍。
-6. V1 gzip+JSON 的文件体积、Save/Load 时间与峰值内存规模评估已完成到 1024×640。结论：V1 继续保留为稳定兼容基线和 golden 输入；磁盘压缩无需急于更换，但 JSON 临时内存对 60 万+ 宏节点不理想。下一步在真正写 Loader 前，先做**最小 Java V1 reader/sampler**读取现有 golden fixture，以跨语言正确性为先；之后再用同一 golden 契约评估 schema v2/binary 是否值得实现。
-7. **MOD / Loader 后置**：Java V1 reader/sampler 先作为纯模型工具验证，不接游戏 Loader；只有跨语言 golden 全通过且 Tester 世界结果继续稳定后，再进入一个 Loader。
+6. V1 gzip+JSON 的规模评估与最小 Java V1 reader/sampler 均已完成，cross-language golden 15/15 通过。下一步进入 **Phase 6.4 的最小 Minecraft 世界输出链路**：先做版本隔离的 NBT + Anvil Region 写出层，再接一个明确 Minecraft 版本的 Chunk/level.dat adapter；目标是输出出生点附近小范围可直接进入的世界存档，而不是先做完整 MOD UI。
+7. **Loader 继续后置**：世界存档 writer 与 Minecraft 版本 adapter 先验证“GeoWorld → 可进入的 Vanilla save”；只有小范围真实世界通过游戏验收后，再决定一个 Loader 做按需 Chunk 生成。
 
 ## 继续工作入口
 先读 STATUS -> PHASE6 -> DECISIONS；查历史读 PROGRESS 和 PHASE1–5。每个开发切片保留验证口径、结果、剩余风险并提交。
