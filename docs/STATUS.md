@@ -35,6 +35,7 @@
 - 多大陆与可调形态：a4e3353 — feat: add controllable multi-continent generation。
 - Tester 诊断图层：3d7fff7 — feat: add tester diagnostic map layers。
 - Tester 最终异常定位：d78aa47 — feat: add tester anomaly localization。
+- Tester 大陆预设：a7c8018 — feat: add continent generation presets。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -114,6 +115,7 @@
 - Tester 当前世界统计已区分中间 Reconciliation 诊断与最终 Waterbed / Runtime 审计：Raw 海陆冲突、海岸校正、Raw 河流逆坡和“海岸后湖床待挖”只表示生成中间状态；最终海岸冲突、最终河床逆坡、最终湖床违规、Runtime 宏观节点回退、Runtime 宏观节点冲突单独计算并在模型重开后重新审计。
 - Tester 新增“最终异常”图层与右侧异常列表。海岸冲突 / 河床逆坡 / 湖床违规 / Runtime 宏观节点 fallback / semantic mismatch 使用与正式最终模型一致的数据重新定位；异常点可直接点击，自动切到异常图层、移动地图光标并打开该坐标的 Runtime 检查。总数完整统计，位置列表最多保留 250 个并明确标记截断，避免异常风暴拖垮页面。
 - 最终异常报告只依赖持久化 Runtime 模型中的 Surface / CoastTerrain / Waterbed / RuntimeProfile，不依赖生成态 Lab 暂存数组，因此刚生成与保存后重开使用同一套异常口径；已加入自动回归保证生成态与重开态报告逐字段一致。
+- Tester 新增大陆预设：默认世界 / 超级大陆 / 多大陆 / 破碎大陆 / 群岛世界 / 自定义。预设没有新增生成算法或模型字段，只映射现有洋壳比例、ContinentFragmentation、ContinentSeparation；手动修改任一参数会自动切到“自定义”，重开模型时按持久化数值自动识别匹配的预设。
 
 ## 本轮验证
 - go test ./... -count=1：全部通过（包括新的连通性、负坐标、分辨率/范围、Phase 1 物理尺度和全链路回归）。
@@ -148,6 +150,14 @@
 - 最终异常定位通过 BSK 真实浏览器验收：默认 Seed 731894205、320×200、128 blocks/node 显示海岸 / 河床 / 湖床 / Runtime 回退 / Runtime 冲突全 0；保存临时模型后重开仍保持全 0，Raw / 海岸约束仍正确禁用而最终异常图层保持可用。
 - 为验证非零路径，临时构造了一个结构合法但宏观 Profile 语义故意错误的测试模型：Tester 重开后识别出 `Runtime 节点冲突 = 1`，列表定位到 `(-3008, -3136)`；BSK 点击异常后自动切换最终异常图层、显示紫色标记、移动光标，并在坐标检查中展示“来源陆地=是 / Biome=Warm Ocean / Terrain=Ocean / 语义冲突=是”。临时故障模型与截图随后已删除，不进入仓库或正式模型集。
 - 新增 `TestAnomalyReportMatchesAfterModelReopen`：报告在 Generate→Save→Load 后逐字段一致，并逐项对齐 Reconciliation / Waterbed / Runtime 宏观节点现有审计计数。最终异常定位完成后再次执行 `go test ./... -count=1`，全仓通过。
+- 大陆默认参数与预设使用 Phase 1 正式 Surface 做 64 Seed 固定基线（Seed 1..64，320×200，128 blocks/node），不是按截图主观命名：
+  - 默认世界 `ocean=.68 / fragmentation=.35 / separation=.65`：平均主要陆块 2.61、全部陆块 6.14、最大陆块占比 69.9%；主要陆块分布 1/2/3/4/5/6 个分别为 9/24/18/10/2/1 个 Seed，证明默认世界没有重新锁死成固定一块大陆。
+  - 超级大陆 `.50 / .05 / .05`：平均主要陆块 1.23、最大陆块占比 96.8%；50/64 达到“主要陆块=1 且最大陆块≥85%”。
+  - 多大陆 `.68 / .30 / .90`：平均主要陆块 3.48、全部陆块 7.08、最大陆块占比 57.0%；54/64 达到“主要陆块≥2 且最大陆块≤80%”。
+  - 破碎大陆 `.68 / .75 / .75`：平均主要陆块 2.69、全部陆块 8.86、最大陆块占比 70.1%，用于强调半岛 / 海峡 / 次级陆块，而不是保证消灭大型大陆。
+  - 群岛世界 `.90 / .95 / .95`：平均主要陆块 6.73、全部陆块 15.61、最大陆块占比 33.4%；62/64 达到“全部陆块≥10 且最大陆块≤65%”。
+- 大陆预设通过 BSK 真实 UI A/B：同 Seed 731894205 下，超级大陆生成结果为主要陆块 1 / 全部陆块 3 / 最大陆块 100.0%；群岛世界为 7 / 20 / 51.0%。手动把群岛洋壳 0.90 改成 0.89 后预设立即变为自定义；保存群岛模型、切成超级大陆、再重开保存模型后，UI 自动恢复并识别为群岛世界。临时验收模型已删除。
+- 预设完成后执行 `node --check cmd/geoworld-tester/web/app.js` 与 `go test ./... -count=1`，全部通过。
 - 详细参数、当前数值和历史对照见 PHASE6.md。
 
 ## 仍未完成（不要误报完成）
@@ -162,8 +172,8 @@
 1. 第一切片已完成：最小 Runtime schema、schema/generator version、checksum、create-only 原子发布、Load 校验与 Runtime 重建已经落地。
 2. 第二切片的安全替换与 manifest inspect / validate 已完成并提交；继续补 migrate / golden vectors，不再阻塞人工测试。
 3. **优先完善 GeoWorld Tester**：先让人工验证成为主入口，包括生成参数、最终地形 / 水体 / 群系 / Profile 图层、坐标采样、保存 / 更新 / 重开模型；发现视觉或语义问题时从 Tester 直接复现。
-4. Tester 的河网 / 湖泊 / 海陆骨架 / Raw Terrain / 海岸约束以及最终异常位置高亮与定位已完成；下一步优先做**默认大陆参数的多 Seed 分布统计和可复用预设**（超级大陆 / 多大陆 / 破碎大陆 / 群岛世界，仍只映射现有参数，不另造算法），而不是先做 MOD UI。
-5. 再扩展 cross-language golden vectors：固定海岸、河口、湖泊、负坐标、Macro/Chunk 边界、外围与角落，为 Java reader 准备。
+4. Tester 的河网 / 湖泊 / 海陆骨架 / Raw Terrain / 海岸约束、最终异常位置高亮、默认大陆多 Seed 统计与大陆预设均已完成；继续以 Tester 人工验收为主入口，发现视觉 / 语义问题优先在这里复现，不先做 MOD UI。
+5. 下一步扩展 cross-language golden vectors：固定海岸、河口、湖泊、负坐标、Macro/Chunk 边界、外围与角落，为后续 Java reader/sampler 准备；这一步仍属于模型工具链，不进入 Loader/MOD UI。
 6. 评估 V1 gzip+JSON 在更大世界上的大小/加载成本；若需要 binary field encoding，应通过 schemaVersion 升级，不静默改变 V1 解释。
 7. **MOD / Loader 后置**：只有当前 Tester 中的最终世界结果通过人工验收后，再进入 Go model → Java reader/sampler → 一个 Loader。
 
