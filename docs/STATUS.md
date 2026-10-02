@@ -37,6 +37,7 @@
 - Tester 最终异常定位：d78aa47 — feat: add tester anomaly localization。
 - Tester 大陆预设：a7c8018 — feat: add continent generation presets。
 - Cross-language Runtime golden vectors：0323155 — feat: add cross-language runtime golden vectors。
+- World Model 持久化内存审计：f297574 — feat: measure world model persistence memory。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -120,6 +121,7 @@
 - 新增 `internal/goldenvectors` 与 `cmd/geoworld-golden-vectors`。固定 fixture 为 Seed 731894205、48×30、Origin=(-3072,-2048)、128 blocks/node、PlateCount=12、OceanFraction=.68；提交 `testdata/runtime-v1.geoworld` 与 `runtime-v1.json`，作为未来 Java Runtime reader/sampler 的跨语言对拍协议。
 - Golden V1 JSON 使用独立的 lowerCamelCase Geometry/Source 契约，不直接暴露 Go struct JSON 命名；记录 golden format/version、World Model schema/generator version、`1e-9` 浮点容差、固定生成参数以及每个命名坐标的完整 Runtime Sample。当前 15 个样点覆盖四角、四边、负 X/Z 16-block Chunk 边界、世界原点、Macro 节点与 Cell 内部、mixed coast、带 receiver surface 的 River 下游段和 Lake 节点中心。
 - Golden 生成命令默认拒绝覆盖已有产物，只有显式 `-force` 才可再生；README 明确要求不要手改 JSON 数值让测试通过。Go 回归同时验证“fresh generation → golden JSON”和“committed .geoworld Load → golden JSON”，后者就是未来 Java 端需要复刻的验收方式。
+- `geoworld-model-audit` 已增强持久化成本审计：除 Generate/Save/Load 时间、文件/payload 大小和 Runtime 样点 mismatch 外，现记录 Generate 峰值/分配、Save 基线 Heap/峰值/额外峰值、Load 峰值/GC 后常驻/总分配以及 gzip 文件与 JSON payload 比例。内存峰值通过 5ms 周期采样 Go `MemStats`，用于规模趋势基线，不作为精确 profiler 替代。
 
 ## 本轮验证
 - go test ./... -count=1：全部通过（包括新的连通性、负坐标、分辨率/范围、Phase 1 物理尺度和全链路回归）。
@@ -164,6 +166,15 @@
 - 预设完成后执行 `node --check cmd/geoworld-tester/web/app.js` 与 `go test ./... -count=1`，全部通过。
 - Golden V1 生成结果：`runtime-v1.geoworld` 64,462 bytes，payload 222,325 bytes，manifest payload SHA-256=`147bf084f6a66a0f4b22587d83dd9b954111725f61b6374c4ec9dd8cbea875fe`；`runtime-v1.json` 共 15 cases。`geoworld-model-inspect -validate` 通过；`river_backwater` 实际为 River，`lake_center` 实际为 Lake，负坐标 Chunk case 的 X/Z 均为负且对齐 16 blocks。
 - Golden 生成命令不带 `-force` 时对已有产物返回失败，不会误覆盖基线；`go test ./internal/goldenvectors -count=1` 与随后 `go test ./... -count=1` 全部通过。
+- V1 gzip+JSON 规模审计（Seed 731894205、128 blocks/node，均完整 Generate→Save→释放生成图→Load→Runtime 样点对拍，mismatch=0）：
+  - 160×100：文件 471,130 B / payload 2,208,211 B，Save 104ms，Load 66ms，Load 峰值 Heap 14.7 MB，GC 后常驻 7.9 MB。
+  - 320×200：文件 1,912,437 B / payload 9,113,850 B，Save 445ms，Load 312ms，Load 峰值 50.1 MB，常驻 30.2 MB。
+  - 480×300：文件 4,691,493 B / payload 21,675,319 B，Save 1.09s，Load 713ms，Load 峰值 111.9 MB，常驻 63.3 MB。
+  - 640×400：文件 8,372,984 B / payload 38,806,873 B，Save 2.24s，Load 1.59s，Load 峰值 248.3 MB，常驻 119.3 MB。
+  - 800×500：文件 13,007,883 B / payload 60,626,095 B，Save 3.66s，Load 2.36s，Load 峰值 309.4 MB，常驻 148.3 MB。
+  - 1024×640：文件 21,060,187 B / payload 98,599,884 B，Save 5.16s，Load 3.71s，Load 峰值 469.2 MB，常驻 266.1 MB；Save 在约 732.9 MB 已生成模型 Heap 基线上额外峰值约 729.0 MB。
+- 六档 gzip 文件 / JSON payload 比例稳定在约 0.21～0.216，说明 V1 磁盘压缩效果良好；当前主要规模风险不是文件大小，而是 JSON 编解码临时 Heap 与总分配。320×200 / 640×400 对 Tester 仍可用；60 万+ 宏节点模型若要频繁在游戏侧加载，应评估新的 schemaVersion（二进制字段编码/更低临时内存），不能静默改变 V1。
+- 内存审计增强后再次执行 `go test ./... -count=1`，全仓通过。
 - 详细参数、当前数值和历史对照见 PHASE6.md。
 
 ## 仍未完成（不要误报完成）
@@ -180,8 +191,8 @@
 3. **优先完善 GeoWorld Tester**：先让人工验证成为主入口，包括生成参数、最终地形 / 水体 / 群系 / Profile 图层、坐标采样、保存 / 更新 / 重开模型；发现视觉或语义问题时从 Tester 直接复现。
 4. Tester 的河网 / 湖泊 / 海陆骨架 / Raw Terrain / 海岸约束、最终异常位置高亮、默认大陆多 Seed 统计与大陆预设均已完成；继续以 Tester 人工验收为主入口，发现视觉 / 语义问题优先在这里复现，不先做 MOD UI。
 5. Cross-language golden vectors V1 已完成，固定海岸、River 下游/受纳语义、Lake、负坐标、Macro/Chunk 边界、外围与角落均已有机器可读基线；Java reader/sampler 后续必须以这组 fixture 对拍。
-6. **下一步优先评估 V1 gzip+JSON 在更大世界上的大小、保存/加载时间和峰值内存成本**；若确实需要 binary field encoding，应通过新的 schemaVersion 升级，不静默改变 V1 解释。完成这一评估后再决定 Java reader 的具体格式实现。
-7. **MOD / Loader 后置**：只有当前 Tester 中的最终世界结果通过人工验收后，再进入 Go model → Java reader/sampler → 一个 Loader。
+6. V1 gzip+JSON 的文件体积、Save/Load 时间与峰值内存规模评估已完成到 1024×640。结论：V1 继续保留为稳定兼容基线和 golden 输入；磁盘压缩无需急于更换，但 JSON 临时内存对 60 万+ 宏节点不理想。下一步在真正写 Loader 前，先做**最小 Java V1 reader/sampler**读取现有 golden fixture，以跨语言正确性为先；之后再用同一 golden 契约评估 schema v2/binary 是否值得实现。
+7. **MOD / Loader 后置**：Java V1 reader/sampler 先作为纯模型工具验证，不接游戏 Loader；只有跨语言 golden 全通过且 Tester 世界结果继续稳定后，再进入一个 Loader。
 
 ## 继续工作入口
 先读 STATUS -> PHASE6 -> DECISIONS；查历史读 PROGRESS 和 PHASE1–5。每个开发切片保留验证口径、结果、剩余风险并提交。
