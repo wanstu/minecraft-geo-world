@@ -34,6 +34,7 @@
 - Tester 运行状态/断线可用性修复：ba4aa3d — fix: make geoworld tester runtime state explicit。
 - 多大陆与可调形态：a4e3353 — feat: add controllable multi-continent generation。
 - Tester 诊断图层：3d7fff7 — feat: add tester diagnostic map layers。
+- Tester 最终异常定位：d78aa47 — feat: add tester anomaly localization。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -110,7 +111,9 @@
 - Phase 1 大陆核生成已从多个高斯势能直接叠加改为独立大陆核主导，并引入 `ContinentFragmentation` / `ContinentSeparation` 两个正式 Config；默认分别为 0.35 / 0.65。
 - Tester 增加随机 Seed、大陆破碎度、大陆平均分离度；生成结果直接显示主要陆块数、全部陆块数与最大陆块占比，并随模型保存/重开恢复参数。
 - Tester 新增 Raw 地形、海陆骨架、海岸约束、河网、湖泊诊断图层。海陆骨架 / 河网 / 湖泊直接读取正式 Surface / Waterbed，因此保存重开后仍可查看；Raw 地形 / 海岸约束依赖未持久化的生成中间模型，只在刚生成世界启用，重开模型时会自动禁用并回到最终地形。
-- Tester 当前世界统计已区分中间 Reconciliation 诊断与最终 Waterbed / Runtime 审计：Raw 海陆冲突、海岸校正、Raw 河流逆坡和“海岸后湖床待挖”只表示生成中间状态；最终河床逆坡、最终湖床违规、Runtime 节点回退、Runtime 节点冲突单独计算并在模型重开后重新审计。
+- Tester 当前世界统计已区分中间 Reconciliation 诊断与最终 Waterbed / Runtime 审计：Raw 海陆冲突、海岸校正、Raw 河流逆坡和“海岸后湖床待挖”只表示生成中间状态；最终海岸冲突、最终河床逆坡、最终湖床违规、Runtime 宏观节点回退、Runtime 宏观节点冲突单独计算并在模型重开后重新审计。
+- Tester 新增“最终异常”图层与右侧异常列表。海岸冲突 / 河床逆坡 / 湖床违规 / Runtime 宏观节点 fallback / semantic mismatch 使用与正式最终模型一致的数据重新定位；异常点可直接点击，自动切到异常图层、移动地图光标并打开该坐标的 Runtime 检查。总数完整统计，位置列表最多保留 250 个并明确标记截断，避免异常风暴拖垮页面。
+- 最终异常报告只依赖持久化 Runtime 模型中的 Surface / CoastTerrain / Waterbed / RuntimeProfile，不依赖生成态 Lab 暂存数组，因此刚生成与保存后重开使用同一套异常口径；已加入自动回归保证生成态与重开态报告逐字段一致。
 
 ## 本轮验证
 - go test ./... -count=1：全部通过（包括新的连通性、负坐标、分辨率/范围、Phase 1 物理尺度和全链路回归）。
@@ -142,6 +145,9 @@
 - 基线原型引用检查：387 处本地引用，无缺失。
 - Tester 诊断图层通过 BSK 真实浏览器操作验收（不是 curl/API 替代）：生成 → 切换海陆骨架 / 河网 / 湖泊 / Raw 地形 / 海岸约束 → 保存 → 重开 → 再切持久化图层。Seed 731894205、320×200、128 blocks/node：Raw 海陆冲突 410 → 约束后 0 → 应用后 0；Raw 河流逆坡 10 → 目标 0；海岸后湖床待挖 2，但最终 Waterbed 审计为河床逆坡 0 / 湖床违规 0；Runtime 宏观节点 fallback 0 / semantic mismatch 0。模型重开后这四项最终审计仍为 0，Raw / 海岸约束自动禁用。
 - 诊断图层完成后再次执行 `go test ./... -count=1`，全仓通过。
+- 最终异常定位通过 BSK 真实浏览器验收：默认 Seed 731894205、320×200、128 blocks/node 显示海岸 / 河床 / 湖床 / Runtime 回退 / Runtime 冲突全 0；保存临时模型后重开仍保持全 0，Raw / 海岸约束仍正确禁用而最终异常图层保持可用。
+- 为验证非零路径，临时构造了一个结构合法但宏观 Profile 语义故意错误的测试模型：Tester 重开后识别出 `Runtime 节点冲突 = 1`，列表定位到 `(-3008, -3136)`；BSK 点击异常后自动切换最终异常图层、显示紫色标记、移动光标，并在坐标检查中展示“来源陆地=是 / Biome=Warm Ocean / Terrain=Ocean / 语义冲突=是”。临时故障模型与截图随后已删除，不进入仓库或正式模型集。
+- 新增 `TestAnomalyReportMatchesAfterModelReopen`：报告在 Generate→Save→Load 后逐字段一致，并逐项对齐 Reconciliation / Waterbed / Runtime 宏观节点现有审计计数。最终异常定位完成后再次执行 `go test ./... -count=1`，全仓通过。
 - 详细参数、当前数值和历史对照见 PHASE6.md。
 
 ## 仍未完成（不要误报完成）
@@ -156,7 +162,7 @@
 1. 第一切片已完成：最小 Runtime schema、schema/generator version、checksum、create-only 原子发布、Load 校验与 Runtime 重建已经落地。
 2. 第二切片的安全替换与 manifest inspect / validate 已完成并提交；继续补 migrate / golden vectors，不再阻塞人工测试。
 3. **优先完善 GeoWorld Tester**：先让人工验证成为主入口，包括生成参数、最终地形 / 水体 / 群系 / Profile 图层、坐标采样、保存 / 更新 / 重开模型；发现视觉或语义问题时从 Tester 直接复现。
-4. Tester 的河网 / 湖泊 / 海陆骨架 / Raw Terrain / 海岸约束图层已完成；下一步优先做**异常位置高亮与定位**（最终 coast mismatch、river upslope、lake bed、Runtime fallback / mismatch），并补默认大陆参数的多 Seed 分布统计和可复用预设，而不是先做 MOD UI。
+4. Tester 的河网 / 湖泊 / 海陆骨架 / Raw Terrain / 海岸约束以及最终异常位置高亮与定位已完成；下一步优先做**默认大陆参数的多 Seed 分布统计和可复用预设**（超级大陆 / 多大陆 / 破碎大陆 / 群岛世界，仍只映射现有参数，不另造算法），而不是先做 MOD UI。
 5. 再扩展 cross-language golden vectors：固定海岸、河口、湖泊、负坐标、Macro/Chunk 边界、外围与角落，为 Java reader 准备。
 6. 评估 V1 gzip+JSON 在更大世界上的大小/加载成本；若需要 binary field encoding，应通过 schemaVersion 升级，不静默改变 V1 解释。
 7. **MOD / Loader 后置**：只有当前 Tester 中的最终世界结果通过人工验收后，再进入 Go model → Java reader/sampler → 一个 Loader。
