@@ -56,6 +56,7 @@ Remove-Item $mainOut -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force $mainOut | Out-Null
 $mainSources = @()
 $mainSources += Get-ChildItem (Join-Path $repo "java\runtime-reader\src\main\java") -Recurse -Filter *.java | ForEach-Object { $_.FullName }
+$mainSources += Get-ChildItem (Join-Path $repo "java\minecraft-v26_3-common\src\main\java") -Recurse -Filter *.java | ForEach-Object { $_.FullName }
 $mainSources += Get-ChildItem (Join-Path $PSScriptRoot "src\main\java") -Recurse -Filter *.java | ForEach-Object { $_.FullName }
 & javac --release 21 -encoding UTF-8 -d $mainOut $mainSources
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

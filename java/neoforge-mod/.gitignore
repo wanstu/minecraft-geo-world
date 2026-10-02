@@ -35,6 +35,7 @@ bin/
 ### Minecraft Modding ###
 run/
 !**/src/**/run/
+geoworld-cache/
 **/src/generated/**/.cache/
 repo/
 !**/src/**/repo/

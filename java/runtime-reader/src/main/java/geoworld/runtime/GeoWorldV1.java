@@ -398,10 +398,16 @@ public final class GeoWorldV1 {
             "payload.waterbed"
         );
         List<RiverSegment> rivers = parseRivers(
-            Json.array(Json.required(waterbedObject, "rivers"), "waterbed.rivers")
+            Json.arrayOrEmpty(
+                Json.required(waterbedObject, "rivers"),
+                "waterbed.rivers"
+            )
         );
         List<LakeNode> lakes = parseLakes(
-            Json.array(Json.required(waterbedObject, "lakes"), "waterbed.lakes")
+            Json.arrayOrEmpty(
+                Json.required(waterbedObject, "lakes"),
+                "waterbed.lakes"
+            )
         );
         validateWaterbed(manifest.geometry(), rivers, lakes);
 

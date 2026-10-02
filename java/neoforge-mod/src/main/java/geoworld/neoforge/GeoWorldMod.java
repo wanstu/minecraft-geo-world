@@ -1,6 +1,7 @@
 package geoworld.neoforge;
 
 import com.mojang.logging.LogUtils;
+import geoworld.neoforge.worldgen.GeoWorldRegistries;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.Mod;
@@ -15,6 +16,7 @@ public final class GeoWorldMod {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public GeoWorldMod(IEventBus modEventBus) {
+        GeoWorldRegistries.register(modEventBus);
         NeoForge.EVENT_BUS.register(this);
         LOGGER.info("GeoWorld NeoForge bridge loaded");
     }

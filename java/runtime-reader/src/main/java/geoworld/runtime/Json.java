@@ -78,6 +78,13 @@ final class Json {
         return (List<Object>) list;
     }
 
+    static List<Object> arrayOrEmpty(Object value, String name) {
+        if (value == null) {
+            return List.of();
+        }
+        return array(value, name);
+    }
+
     static String string(Map<String, Object> object, String key) {
         Object value = required(object, key);
         if (!(value instanceof String s)) {
@@ -329,7 +336,10 @@ final class Json {
 
             String text = source.substring(start, pos);
             try {
-                return floating ? Double.parseDouble(text) : Long.parseLong(text);
+                if (floating) {
+                    return Double.parseDouble(text);
+                }
+                return Long.parseLong(text);
             } catch (NumberFormatException e) {
                 throw error("invalid numeric value");
             }

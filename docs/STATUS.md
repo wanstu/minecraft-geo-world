@@ -197,22 +197,25 @@
 ## 仍未完成（不要误报完成）
 1. Raw Terrain 的 806/608 海岸变化与 72/126 逆坡继续保留为历史基线；applied CoastTerrain + Waterbed + WorldSample + RuntimeProfile 已不再受这些 raw 指标阻塞。
 2. Phase 6.1b 已完成当前已知生成尺度迁移；但“物理尺度稳定”不等于不同采样精度逐 Cell 完全相同。D8 河网、离散边界/分类、量化采样仍允许合理的拓扑差异，后续新增任何空间参数也必须继续遵守 GridGeometry / blocks 规则。
-3. `phase1.Generate` 仍保留 legacy panic wrapper，但正式统一入口已改用 `phase1.GenerateChecked` 返回 error；其它旧 Lab/CLI 尚未全部迁到统一 Generator，这不再阻塞 Phase 6.2 最终 Runtime 契约。
-4. WorldModel V1 保存/重开、Windows/Unix 安全替换、manifest inspect/validate、cross-language golden vectors、最小 Java V1 reader/sampler、Minecraft 26.3 Preview save writer 与客户端真实进入世界验收已完成；尚未完成 migrate，以及 NeoForge 按需 Chunk 生成。
-5. 已新增 GeoWorld Tester 本地 Web 工具，可直接生成、看最终地形/水体/群系/Profile、点击采样、保存与重开模型；MOD/Loader 暂后置，优先通过该工具做人工验收。
-6. 静态 prototype 仍是先前实验快照；实时验证请使用 `open-geoworld-tester.cmd`，不要再把 prototype/generated 当当前世界结果。
+3. `phase1.Generate` 仍保留 legacy panic wrapper，但正式统一入口已改用 `phase1.GenerateChecked` 返回 error；其它旧 Lab/CLI 尚未全部迁到统一 Generator，这不再阻塞最终 Runtime 契约。
+4. WorldModel V1、cross-language golden、Java Runtime reader、Vanilla 26.3 Preview writer 与真实客户端进入验收已完成；migrate 仍未做。
+5. NeoForge 26.3 已进入真实动态 worldgen 阶段：`geoworld:geoworld` WorldPreset、PresetEditor、参数页、Go engine bridge、Java 预览、BiomeSource、ChunkGenerator codec/registry 与 bundled native engine 均已实现并通过构建；但本次陆地出生点修复和自动 save binding 尚需重启客户端后再做一次真实新世界验收。
+6. 当前 GeoWorld Runtime 对模型范围外坐标采用 clamp 到最近边缘；由于模型外围本身设计为海洋缓冲，第一版表现为边缘海洋继续延伸，不会再切回 vanilla，但“模型外无限深海/平滑扩展”仍需后续正式设计。
+7. 静态 Vanilla Preview 继续保留为 QA 快照工具；正式无限探索路线已经转为 NeoForge 按需 ChunkGenerator。
 
-## 下一步（6.4 / NeoForge）
-1. Vanilla Preview 已完成客户端真实进入验收；当前发现的核心限制不是 NBT/Chunk 文件格式，而是有限预生成范围之外仍由 vanilla worldgen 接管。
-2. **正式进入 NeoForge 26.3 通用 MOD**：目标产物固定为一个可复用的 `geoworld-neoforge-26.3.jar`，不是每张地图重新编译 MOD。
-3. 存档导出需要携带 GeoWorld 标记与该世界自己的 `.geoworld` 模型；MOD 只有在世界明确绑定 GeoWorld 时才接管生成，普通 Minecraft 世界不受影响。
-4. NeoForge 第一阶段已完成：`java/neoforge-mod` 基于官方 26.3 ModDevGradle MDK，锁定 Minecraft 26.3 / NeoForge 26.3.0.40-beta / Java 25；`build.cmd` 优先使用 `D:\\tools\\jdk\\jdk-25_windows-x64_bin\\jdk-25.0.4.1`，真实 `BUILD SUCCESSFUL`。MOD JAR 已包含共享 Java V1 Runtime Reader、GeoWorld binding 检测和 server lifecycle 模型加载；普通世界无 binding 时不介入，binding/model 不一致时明确失败。
-5. Tester/Preview 导出的世界现在会携带 `data/geoworld/geoworld.properties` + `data/geoworld/world.geoworld`，`verify-storage.cmd` 已把 binding/model 一致性纳入回归。
-6. NeoForge 26.3 创建世界源码已确认正式扩展点：自定义 `WORLD_PRESET` 可进入原版“世界类型”列表，NeoForge `RegisterPresetEditorsEvent` / `PresetEditorManager` 可给第三方 preset 注册“自定义”编辑器，无需 Mixin 劫持原版按钮。
-7. 第二阶段目标调整为**完整的游戏内 GeoWorld 创建流程**：世界类型选择 `GeoWorld` → “自定义”打开 GeoWorld 参数页 → Seed/大陆预设/板块/洋壳/破碎度/分离度/尺度等参数 → 异步世界预览 → 创建世界。预览与真正 ChunkGenerator 必须消费同一套确定性 GeoWorld Engine，不允许两套近似逻辑。
-8. `GeoWorldChunkGenerator` 再接按需 Chunk；首个真实验收仍比较同一坐标的创建界面预览 / Java Runtime / 实际 Minecraft 新 Chunk 的 Ground / WaterKind / Biome。
-5. Tester 继续保留 QA 静态导出，用于快速肉眼检查与回归；黄色导出框明确代表“Vanilla 预生成快照范围”，不能再把框外结果当成 GeoWorld。
-6. NeoForge 首个真实验收必须比较同一坐标的 Tester Runtime 与实际新生成 Chunk 的 Ground / WaterKind / Biome；不能只看世界能否进入。
+## 当前 NeoForge 26.3 进度
+1. `java/neoforge-mod` 基于官方 ModDevGradle MDK，Minecraft 26.3 / NeoForge 26.3.0.40-beta / Java 25；`build.cmd` 固定优先使用 `D:\\tools\\jdk\\jdk-25_windows-x64_bin\\jdk-25.0.4.1`，当前真实 `BUILD SUCCESSFUL`。
+2. Minecraft 创建世界的“世界类型”已通过 `WORLD_PRESET` registry 正式加入 `GeoWorld`；NeoForge `RegisterPresetEditorsEvent` 注册原生“自定义”编辑器，无 Mixin 劫持。
+3. `GeoWorldPresetScreen` 已支持 Seed、默认/超级大陆/多大陆/破碎大陆/群岛预设、320×200 默认模型、64/128 blocks/node、板块数、洋壳比例、破碎度、分离度；参数与 `GeoWorldCreationConfig.CODEC` 同源。
+4. “生成世界预览”会异步调用 bundled `geoworld-engine`（Go 正式 Generator）生成真正的 `.geoworld`，Java Runtime 重新加载同一模型；生成完成后现在会自动进入 `GeoWorldPreviewScreen`，预览逐点调用同一 `GeoWorldV1.sample(x,z)`，不是另做一套近似图。
+5. `GeoWorldChunkGenerator` / `GeoWorldBiomeSource` 已注册为 `geoworld:geoworld` codec，按 Seed+配置懒加载同一模型，按需生成地形、水体、surfaceProfile 与 Biome；26.3 高度/地表/Biome 映射已抽到 `java/minecraft-v26_3-common`，静态 save writer 与 MOD 共享。
+6. Java JSON reader 已补 64-bit integer 精度回归，避免 Minecraft 随机 Seed 超过 JS-safe integer 后被截断；空 rivers/lakes 也按空数组兼容。Java golden 仍为 15/15。
+7. 真实客户端已确认 GeoWorld MOD、client creation hook、`geoworld:geoworld` PresetEditor 均加载成功。用户直接创建的 GeoWorld 世界实际生成了新的模型 cache，说明动态 ChunkGenerator 路径已经工作。
+8. 用户该次直接创建世界的实际 Spawn 为 `(8,95,8)`；对应模型 Seed=`-1273393314970095624`，Runtime 在 `(8,8)` 明确为 `Warm Ocean / Ocean / sourceLand=false / ground=0.2752586`，因此“出生点附近是海洋”符合模型，不是游戏与预览不一致。
+9. 已新增纯 Runtime `GeoWorldSpawnPlanner`，不修改世界本身，只把 Minecraft `ChunkGenerator.getOrigin()` 移到中心附近安全陆地。固定回归 Seed `-1273393314970095624`：中心仍为 Warm Ocean，但 planner 选择 Chunk `(-28,-164)`，候选方块 `(-440,105,-2616)`，Biome=Tropical Rainforest，周围 3×3 采样均为 dry land；`verifyGeoWorldSpawn` 通过。
+10. Server lifecycle 已改为：动态 GeoWorld 新世界第一次启动时自动把实际模型复制到 `data/geoworld/world.geoworld` 并写 binding；重开时优先加载存档内模型并 attach 到 generator。旧 Vanilla QA 快照若只有 binding 而 generator 不是 GeoWorld，会明确标记为 static Preview，不冒充动态 worldgen。
+11. 当前完整回归：`go test ./... -count=1` 全绿；Java golden 15/15；`verify-storage.cmd` 通过；NeoForge `build.cmd` 通过；`verifyGeoWorldEngine` 与 `verifyGeoWorldSpawn` 均通过。
+12. 下一次真实客户端验收：重启 NeoForge dev client 后新建 GeoWorld，确认“生成世界预览”完成后自动打开地图；用上述 ocean-center Seed 或随机 Seed 新建世界，确认 Spawn 落在 planner 选择的陆地附近，并检查存档自动出现 `data/geoworld/geoworld.properties + world.geoworld`。
 
 ## 继续工作入口
 先读 STATUS -> PHASE6 -> DECISIONS；查历史读 PROGRESS 和 PHASE1–5。每个开发切片保留验证口径、结果、剩余风险并提交。

@@ -1145,3 +1145,20 @@ NeoForge 26.3 已确认 WORLD_PRESET registry 与 RegisterPresetEditorsEvent / P
 4. 预览、保存到 world 的 config/model、GeoWorldChunkGenerator 必须由同一确定性 GeoWorld Engine 产生；不允许为预览单独做另一套近似随机图。
 5. GeoWorldChunkGenerator codec 持久化足以重建世界的稳定配置；`.geoworld` 文件作为可校验的模型/cache/诊断资产，不能成为只能由外部 Tester 手工准备的前置条件。
 6. 普通 Minecraft preset/world 不受 GeoWorld MOD 影响。
+
+
+---
+
+## D-047：出生点选择不得篡改 GeoWorld；动态世界必须自包含模型
+
+状态：Phase 6.4 NeoForge 客户端实测后确定
+
+真实客户端世界 Seed `-1273393314970095624` 的中心附近实际为 Warm Ocean；这与同一 Java Runtime 的 `(8,8)` 采样完全一致，因此“出生在海里”是 Spawn 策略问题，不是模型错误。
+
+规则：
+1. 不为了保证陆地出生去修改 Seed、强制世界中心为陆地、重新 roll 大陆或在 ChunkGenerator 中偷偷改地形。预览和世界模型必须保持同一确定性结果。
+2. GeoWorld 自己实现 Spawn Planner，并通过 `ChunkGenerator.getOrigin()` 把 Minecraft 初始 5-Chunk 搜索中心移动到模型中心附近的安全陆地。
+3. 第一版安全候选要求 `sourceLand=true`、WaterKind=None、地面高于海平面一定余量且不过分高；候选周围 3×3 采样都必须是 dry land，并综合距离、局部起伏和目标海拔评分。
+4. 固定回归 Seed `-1273393314970095624`：中心仍为 Warm Ocean，Planner 当前选择 Chunk (-28,-164)，方块中心约 (-440,-2616)，Biome=Tropical Rainforest；回归用于确保以后修改 Spawn 不改变世界本身。
+5. 动态 GeoWorld 世界首次启动后必须把实际使用的 `.geoworld` 复制到存档自己的 `data/geoworld/world.geoworld` 并写 binding；后续重开优先读取存档内模型，而不是依赖全局 cache 或重新生成。
+6. 旧 Vanilla QA Preview 允许存在 binding + vanilla generator；这种世界明确标记为 static Preview，不得被误报为动态 GeoWorld worldgen。

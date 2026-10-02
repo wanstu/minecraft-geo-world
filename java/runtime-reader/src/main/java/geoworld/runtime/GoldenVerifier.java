@@ -11,6 +11,8 @@ public final class GoldenVerifier {
     private GoldenVerifier() {}
 
     public static void main(String[] args) throws Exception {
+        verifyJsonIntegerPrecision();
+
         Path modelPath = args.length >= 1
             ? Path.of(args[0])
             : Path.of("internal/goldenvectors/testdata/runtime-v1.geoworld");
@@ -19,6 +21,33 @@ public final class GoldenVerifier {
             : Path.of("internal/goldenvectors/testdata/runtime-v1.json");
 
         verify(modelPath, goldenPath);
+    }
+
+    private static void verifyJsonIntegerPrecision() {
+        long[] values = {
+            Long.MIN_VALUE,
+            -9007199254740993L,
+            9007199254740993L,
+            3873414348276034653L,
+            Long.MAX_VALUE
+        };
+        for (long expected : values) {
+            String json = "{\"value\":" + expected + "}";
+            Map<String, Object> object = Json.object(
+                Json.parse(json),
+                "integer precision probe"
+            );
+            long actual = Json.longValue(object, "value");
+            if (actual != expected) {
+                throw new AssertionError(
+                    "JSON integer precision lost: got=" +
+                    actual +
+                    " want=" +
+                    expected
+                );
+            }
+        }
+        System.out.println("PASS JSON long integer precision");
     }
 
     static void verify(Path modelPath, Path goldenPath) throws IOException {

@@ -11,6 +11,7 @@ New-Item -ItemType Directory -Force $out | Out-Null
 
 $sources = @()
 $sources += Get-ChildItem (Join-Path $repo "java\runtime-reader\src\main\java") -Recurse -Filter *.java | ForEach-Object { $_.FullName }
+$sources += Get-ChildItem (Join-Path $repo "java\minecraft-v26_3-common\src\main\java") -Recurse -Filter *.java | ForEach-Object { $_.FullName }
 $sources += Get-ChildItem (Join-Path $PSScriptRoot "src\main\java") -Recurse -Filter *.java | ForEach-Object { $_.FullName }
 
 & javac --release 21 -encoding UTF-8 -d $out $sources

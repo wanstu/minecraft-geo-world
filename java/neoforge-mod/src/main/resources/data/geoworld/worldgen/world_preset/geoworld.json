@@ -1,0 +1,60 @@
+{
+  "dimensions": {
+    "minecraft:overworld": {
+      "type": "minecraft:overworld",
+      "generator": {
+        "type": "geoworld:geoworld",
+        "biome_source": {
+          "type": "geoworld:geoworld",
+          "biomes": [
+            "minecraft:warm_ocean",
+            "minecraft:ocean",
+            "minecraft:cold_ocean",
+            "minecraft:frozen_ocean",
+            "minecraft:ice_spikes",
+            "minecraft:snowy_plains",
+            "minecraft:jagged_peaks",
+            "minecraft:taiga",
+            "minecraft:forest",
+            "minecraft:plains",
+            "minecraft:desert",
+            "minecraft:savanna",
+            "minecraft:birch_forest",
+            "minecraft:jungle",
+            "minecraft:swamp"
+          ]
+        },
+        "config": {
+          "width": 320,
+          "height": 200,
+          "cell_size_blocks": 128,
+          "plate_count": 18,
+          "ocean_fraction": 0.68,
+          "continent_fragmentation": 0.35,
+          "continent_separation": 0.65
+        }
+      }
+    },
+    "minecraft:the_end": {
+      "type": "minecraft:the_end",
+      "generator": {
+        "type": "minecraft:noise",
+        "biome_source": {
+          "type": "minecraft:the_end"
+        },
+        "settings": "minecraft:end"
+      }
+    },
+    "minecraft:the_nether": {
+      "type": "minecraft:the_nether",
+      "generator": {
+        "type": "minecraft:noise",
+        "biome_source": {
+          "type": "minecraft:multi_noise",
+          "preset": "minecraft:nether"
+        },
+        "settings": "minecraft:nether"
+      }
+    }
+  }
+}
