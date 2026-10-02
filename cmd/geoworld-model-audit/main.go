@@ -44,6 +44,28 @@ type report struct {
 	GenerateMillis int64
 	SaveMillis     int64
 	LoadMillis     int64
+
+	GeneratePeakHeapBytes uint64
+	GenerateAllocBytes    uint64
+
+	SaveBaselineHeapBytes    uint64
+	SavePeakHeapBytes        uint64
+	SaveIncrementalPeakBytes uint64
+	SaveAllocBytes           uint64
+
+	LoadBaselineHeapBytes uint64
+	LoadPeakHeapBytes     uint64
+	LoadRetainedHeapBytes uint64
+	LoadAllocBytes        uint64
+
+	FileToPayloadRatio float64
+}
+
+type memoryMeasure struct {
+	BaselineHeapBytes uint64
+	PeakHeapBytes     uint64
+	RetainedHeapBytes uint64
+	AllocBytes        uint64
 }
 
 func main() {
@@ -66,17 +88,20 @@ func main() {
 		fail(err)
 	}
 
-	start := time.Now()
-	model, err := generator.GenerateWorld(context.Background(), generator.Config{
-		Seed:          *seed,
-		Geometry:      g,
-		PlateCount:    18,
-		OceanFraction: 0.68,
-	}, nil)
+	var model *generator.WorldModel
+	generateDuration, generateMemory, err := measureMemory(func() error {
+		var generateErr error
+		model, generateErr = generator.GenerateWorld(context.Background(), generator.Config{
+			Seed:          *seed,
+			Geometry:      g,
+			PlateCount:    18,
+			OceanFraction: 0.68,
+		}, nil)
+		return generateErr
+	})
 	if err != nil {
 		fail(err)
 	}
-	generateDuration := time.Since(start)
 
 	checks := collectSamples(model)
 	riverCount := len(model.Waterbed.Rivers)
@@ -96,11 +121,12 @@ func main() {
 	}
 	defer cleanup()
 
-	start = time.Now()
-	if err := worldmodelio.Save(path, model); err != nil {
+	saveDuration, saveMemory, err := measureMemory(func() error {
+		return worldmodelio.Save(path, model)
+	})
+	if err != nil {
 		fail(err)
 	}
-	saveDuration := time.Since(start)
 
 	info, err := os.Stat(path)
 	if err != nil {
@@ -111,12 +137,15 @@ func main() {
 	model = nil
 	goruntime.GC()
 
-	start = time.Now()
-	reopened, err := worldmodelio.Load(path)
+	var reopened *worldmodelio.RuntimeModel
+	loadDuration, loadMemory, err := measureMemory(func() error {
+		var loadErr error
+		reopened, loadErr = worldmodelio.Load(path)
+		return loadErr
+	})
 	if err != nil {
 		fail(err)
 	}
-	loadDuration := time.Since(start)
 
 	mismatches := 0
 	for _, c := range checks {
@@ -142,6 +171,21 @@ func main() {
 		GenerateMillis:   generateDuration.Milliseconds(),
 		SaveMillis:       saveDuration.Milliseconds(),
 		LoadMillis:       loadDuration.Milliseconds(),
+
+		GeneratePeakHeapBytes: generateMemory.PeakHeapBytes,
+		GenerateAllocBytes:    generateMemory.AllocBytes,
+
+		SaveBaselineHeapBytes:    saveMemory.BaselineHeapBytes,
+		SavePeakHeapBytes:        saveMemory.PeakHeapBytes,
+		SaveIncrementalPeakBytes: saturatingSub(saveMemory.PeakHeapBytes, saveMemory.BaselineHeapBytes),
+		SaveAllocBytes:           saveMemory.AllocBytes,
+
+		LoadBaselineHeapBytes: loadMemory.BaselineHeapBytes,
+		LoadPeakHeapBytes:     loadMemory.PeakHeapBytes,
+		LoadRetainedHeapBytes: loadMemory.RetainedHeapBytes,
+		LoadAllocBytes:        loadMemory.AllocBytes,
+
+		FileToPayloadRatio: float64(info.Size()) / float64(reopened.Manifest.PayloadBytes),
 	}
 	if err := json.NewEncoder(os.Stdout).Encode(r); err != nil {
 		fail(err)
@@ -149,6 +193,63 @@ func main() {
 	if mismatches != 0 {
 		os.Exit(1)
 	}
+}
+
+func measureMemory(run func() error) (time.Duration, memoryMeasure, error) {
+	goruntime.GC()
+
+	var before goruntime.MemStats
+	goruntime.ReadMemStats(&before)
+	measure := memoryMeasure{
+		BaselineHeapBytes: before.HeapAlloc,
+		PeakHeapBytes:     before.HeapAlloc,
+	}
+
+	done := make(chan struct{})
+	sampled := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(5 * time.Millisecond)
+		defer ticker.Stop()
+		defer close(sampled)
+		for {
+			select {
+			case <-ticker.C:
+				var current goruntime.MemStats
+				goruntime.ReadMemStats(&current)
+				if current.HeapAlloc > measure.PeakHeapBytes {
+					measure.PeakHeapBytes = current.HeapAlloc
+				}
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	start := time.Now()
+	err := run()
+	duration := time.Since(start)
+	close(done)
+	<-sampled
+
+	var afterRun goruntime.MemStats
+	goruntime.ReadMemStats(&afterRun)
+	if afterRun.HeapAlloc > measure.PeakHeapBytes {
+		measure.PeakHeapBytes = afterRun.HeapAlloc
+	}
+	measure.AllocBytes = afterRun.TotalAlloc - before.TotalAlloc
+
+	goruntime.GC()
+	var retained goruntime.MemStats
+	goruntime.ReadMemStats(&retained)
+	measure.RetainedHeapBytes = retained.HeapAlloc
+	return duration, measure, err
+}
+
+func saturatingSub(a, b uint64) uint64 {
+	if a <= b {
+		return 0
+	}
+	return a - b
 }
 
 func collectSamples(m *generator.WorldModel) []sampleCheck {
