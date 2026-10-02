@@ -188,7 +188,9 @@
 - 第一版 HeightMapping 正式冻结为边界语义：GeoWorld 0.0→Y=-64、0.5→Y=63、1.0→Y=320；实体地面填 `y < groundBoundary`，水填 `groundBoundary <= y < waterBoundary`，避免 sea_level 出现一格偏差。
 - 默认 golden fixture 生成的正式 Preview World 位于 `output/minecraft-26.3-preview/GeoWorld-Preview`，Seed=731894205，安全出生点自动选为 `(0,101,0)`，共 289 Chunk / 4 Region。
 - Mojang 26.3 官方 codec 验收已真实执行：验证脚本先核对官方 server jar SHA-1，再在**不启动 server、不接受 EULA**的情况下调用官方类解析。`level.dat` 通过 `LevelVersion/LevelSettings/RespawnData`；`data/minecraft/world_gen_settings.dat` 通过 `WorldGenSettings.CODEC` 且 Overworld/Nether/End 三维度齐全；`SerializableChunkData.parse` 对正式 Preview 的 289/289 Chunk 全部通过。
-- 首次真实 Minecraft 26.3 客户端进入失败已定位：旧 writer 写成 `data/world_gen_settings.dat`，客户端日志实际读取 `data/minecraft/world_gen_settings.dat`，因此报 `Unable to read or access the world gen settings file` / `Overworld settings missing`。已修正为 namespaced SavedData 路径，并让内部 smoke 与 Mojang reference verifier 都只接受正确路径且拒绝旧错误路径。修复版 `GeoWorld 26.3 Preview Fix1` 已复制到 HMCL 的 26.3 `saves` 并再次通过 Mojang 289/289 验证，待客户端复测。
+- 首次真实 Minecraft 26.3 客户端进入失败已定位：旧 writer 写成 `data/world_gen_settings.dat`，客户端日志实际读取 `data/minecraft/world_gen_settings.dat`，因此报 `Unable to read or access the world gen settings file` / `Overworld settings missing`。已修正为 namespaced SavedData 路径，并让内部 smoke 与 Mojang reference verifier 都只接受正确路径且拒绝旧错误路径。修复版 `GeoWorld 26.3 Preview Fix1` 已复制到 HMCL 的 26.3 `saves` 并再次通过 Mojang 289/289 验证；随后用户已确认可以正常进入游戏。
+- Tester 已增加 Minecraft 26.3 QA 导出入口：可直接从“新生成但未保存”的活动模型临时落盘后导出，也可从已重开 `.geoworld` 直接导出；默认 QA 模式写入 Creative + allowCommands=true，并返回出生点、Chunk/Region 数和输出路径。Tester 地图已增加导出范围框、出生点叠加以及 1×～8× 缩放/复位，BSK 实际验证缩放到 1.6× 正常。
+- 用户进入实际 Preview 后发现游戏世界很快与 Tester 全图视觉不一致。原因已确认不是模型随机变化：当前 radius=8 只预生成 17×17=289 Chunk，即约 272×272 blocks，而被验收模型约 20416×12736 blocks；预生成范围外 `world_gen_settings.dat` 明确仍是 vanilla `minecraft:noise + minecraft:overworld`，因此新 Chunk 必然由原版生成器接管。扩大 radius 只能推远边界，不能根治。
 - 收口回归：`verify-storage.cmd` 通过已知 NBT 字节向量、UTF-8、Region header/zlib/sector、负 Chunk 坐标、26.3 HeightMapping / bit packing 与 3×3 preview smoke；Java Runtime golden 15/15 再次通过；`go test ./... -count=1` 全仓通过。
 - 详细参数、当前数值和历史对照见 PHASE6.md。
 
@@ -196,17 +198,17 @@
 1. Raw Terrain 的 806/608 海岸变化与 72/126 逆坡继续保留为历史基线；applied CoastTerrain + Waterbed + WorldSample + RuntimeProfile 已不再受这些 raw 指标阻塞。
 2. Phase 6.1b 已完成当前已知生成尺度迁移；但“物理尺度稳定”不等于不同采样精度逐 Cell 完全相同。D8 河网、离散边界/分类、量化采样仍允许合理的拓扑差异，后续新增任何空间参数也必须继续遵守 GridGeometry / blocks 规则。
 3. `phase1.Generate` 仍保留 legacy panic wrapper，但正式统一入口已改用 `phase1.GenerateChecked` 返回 error；其它旧 Lab/CLI 尚未全部迁到统一 Generator，这不再阻塞 Phase 6.2 最终 Runtime 契约。
-4. WorldModel V1 保存/重开、Windows/Unix 安全替换、manifest inspect/validate、cross-language golden vectors、最小 Java V1 reader/sampler 与 Minecraft 26.3 Preview save writer 已完成；尚未完成 migrate、Minecraft 客户端真实进入世界人工验收，以及 Loader 按需 Chunk 生成。
+4. WorldModel V1 保存/重开、Windows/Unix 安全替换、manifest inspect/validate、cross-language golden vectors、最小 Java V1 reader/sampler、Minecraft 26.3 Preview save writer 与客户端真实进入世界验收已完成；尚未完成 migrate，以及 NeoForge 按需 Chunk 生成。
 5. 已新增 GeoWorld Tester 本地 Web 工具，可直接生成、看最终地形/水体/群系/Profile、点击采样、保存与重开模型；MOD/Loader 暂后置，优先通过该工具做人工验收。
 6. 静态 prototype 仍是先前实验快照；实时验证请使用 `open-geoworld-tester.cmd`，不要再把 prototype/generated 当当前世界结果。
 
-## 下一步（6.4）
-1. Phase 6.3 的 WorldModel V1、inspect/validate、cross-language golden、规模审计与 Java reader 已完成；migrate 仍未做，但不阻塞首次游戏验证。
-2. Phase 6.4 第一切片已完成：版本无关 NBT/Anvil writer + Minecraft Java 26.3 adapter 已能生成标准 Preview save，Mojang 官方 26.3 codec 对 `level.dat`、`world_gen_settings.dat` 与 289/289 Chunk 全部解析通过。
-3. **当前最近验收目标是 Minecraft 26.3 客户端真实进入世界**：把 `output/minecraft-26.3-preview/GeoWorld-Preview` 作为单人存档打开，确认世界列表可识别、出生点可进入、无存档损坏/升级提示异常，并实际观察地形、海洋、河流、湖泊与群系。
-4. 客户端验收后先修真实游戏中暴露的问题，再完善 surface/vegetation 映射、预生成边界接缝、实际方块高度查询一致性与 Chunk 生成顺序独立性；第一版暂不追求洞穴、矿物、结构和完整装饰。
-5. GeoWorld Tester 继续作为宏观模型与最终 Runtime 语义的主要诊断入口；Minecraft Preview save 用于真实游戏空间验收，两者职责分开。
-6. **Loader 继续后置**：只有 Vanilla Preview 在客户端真实验收通过，且地形/水体/群系映射稳定后，再选择一个 Loader 做按需 Chunk 生成；不先做 MOD UI。
+## 下一步（6.4 / NeoForge）
+1. Vanilla Preview 已完成客户端真实进入验收；当前发现的核心限制不是 NBT/Chunk 文件格式，而是有限预生成范围之外仍由 vanilla worldgen 接管。
+2. **正式进入 NeoForge 26.3 通用 MOD**：目标产物固定为一个可复用的 `geoworld-neoforge-26.3.jar`，不是每张地图重新编译 MOD。
+3. 存档导出需要携带 GeoWorld 标记与该世界自己的 `.geoworld` 模型；MOD 只有在世界明确绑定 GeoWorld 时才接管生成，普通 Minecraft 世界不受影响。
+4. 第一阶段先完成 MOD 启动、世界识别、模型加载与 Java Runtime golden 自检；第二阶段再注册/接入 GeoWorld ChunkGenerator，让未生成 Chunk 按需调用同一 Runtime。
+5. Tester 继续保留 QA 静态导出，用于快速肉眼检查与回归；黄色导出框明确代表“Vanilla 预生成快照范围”，不能再把框外结果当成 GeoWorld。
+6. NeoForge 首个真实验收必须比较同一坐标的 Tester Runtime 与实际新生成 Chunk 的 Ground / WaterKind / Biome；不能只看世界能否进入。
 
 ## 继续工作入口
 先读 STATUS -> PHASE6 -> DECISIONS；查历史读 PROGRESS 和 PHASE1–5。每个开发切片保留验证口径、结果、剩余风险并提交。

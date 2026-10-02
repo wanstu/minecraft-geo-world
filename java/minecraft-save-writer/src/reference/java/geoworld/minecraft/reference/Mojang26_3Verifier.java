@@ -16,6 +16,7 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.Bootstrap;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.LevelSettings;
 import net.minecraft.world.level.WorldDataConfiguration;
@@ -51,8 +52,18 @@ public final class Mojang26_3Verifier {
         }
         Path world = Path.of(args[0]).toAbsolutePath();
         int radius = args.length >= 2 ? Integer.parseInt(args[1]) : 8;
+        String expectedMode = args.length >= 3 ? args[2] : "any";
         if (radius < 0 || radius > 31) {
             throw new IllegalArgumentException("radius must be in 0..31");
+        }
+        if (
+            !expectedMode.equals("any") &&
+            !expectedMode.equals("qa") &&
+            !expectedMode.equals("survival")
+        ) {
+            throw new IllegalArgumentException(
+                "mode must be any, qa, or survival"
+            );
         }
 
         SharedConstants.tryDetectVersion();
@@ -83,12 +94,21 @@ public final class Mojang26_3Verifier {
             levelVersion.levelDataVersion(),
             19133
         );
+        if (expectedMode.equals("qa")) {
+            requireEquals("QA game type", settings.gameType(), GameType.CREATIVE);
+            requireEquals("QA allowCommands", settings.allowCommands(), true);
+        } else if (expectedMode.equals("survival")) {
+            requireEquals("survival game type", settings.gameType(), GameType.SURVIVAL);
+            requireEquals("survival allowCommands", settings.allowCommands(), false);
+        }
 
         System.out.println(
             "PASS Mojang level.dat: " +
             settings.levelName() +
             ", version=" + levelVersion.minecraftVersionName() +
             ", DataVersion=" + levelVersion.minecraftVersion().version() +
+            ", gameType=" + settings.gameType() +
+            ", allowCommands=" + settings.allowCommands() +
             ", spawn=" + spawn.pos()
         );
 

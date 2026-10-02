@@ -20,6 +20,17 @@ public final class Minecraft26_3Metadata {
         int spawnY,
         int spawnZ
     ) throws IOException {
+        writeLevelDat(worldDirectory, levelName, spawnX, spawnY, spawnZ, false);
+    }
+
+    public void writeLevelDat(
+        Path worldDirectory,
+        String levelName,
+        int spawnX,
+        int spawnY,
+        int spawnZ,
+        boolean qaMode
+    ) throws IOException {
         if (worldDirectory == null || levelName == null) {
             throw new NullPointerException("worldDirectory/levelName");
         }
@@ -53,13 +64,13 @@ public final class Minecraft26_3Metadata {
             .put("Version", version)
             .put("version_history", Nbt.list(List.of()))
             .put("DataVersion", Nbt.intTag(DATA_VERSION))
-            .put("GameType", Nbt.intTag(0))
+            .put("GameType", Nbt.intTag(qaMode ? 1 : 0))
             .put("spawn", spawn)
             .put("Time", Nbt.longTag(0))
             .put("LastPlayed", Nbt.longTag(lastPlayed))
             .put("LevelName", Nbt.string(levelName))
             .put("version", Nbt.intTag(LEVEL_DATA_VERSION))
-            .put("allowCommands", Nbt.byteTag(0))
+            .put("allowCommands", Nbt.byteTag(qaMode ? 1 : 0))
             .put("initialized", Nbt.byteTag(1))
             .put("difficulty_settings", difficulty)
             .put("DataPacks", dataPacks);

@@ -1111,4 +1111,21 @@ WorldModel 内存对象用于生成与调试，不等于长期存档 schema。�
 6. 官方 `LevelVersion/LevelSettings/WorldGenSettings/SerializableChunkData` 全部能解析只证明格式契约成立；**不能把 codec 通过冒充成 Minecraft 客户端真实进入世界已验收**。
 7. 首次客户端验收优先观察世界列表识别、出生点、存档损坏/升级提示、地形高度、Ocean/River/Lake、Biome 与可见表层；洞穴、矿物、结构、完整植被与多 Loader 不属于这一切片的完成条件。
 
-当前默认 Preview（Seed 731894205，radius=8）已经由 Mojang 26.3 官方 codec 解析 `level.dat` / `world_gen_settings.dat`，并通过 289/289 Chunk；客户端真实进入世界仍待验收。
+当前默认 Preview（Seed 731894205，radius=8）已经由 Mojang 26.3 官方 codec 解析 `level.dat` / `world_gen_settings.dat`，并通过 289/289 Chunk；修复 SavedData namespaced 路径后，用户已确认客户端可以正常进入世界。
+---
+
+## D-045：Vanilla Preview 只作为有限区域 QA；完整世界改由 NeoForge 按需接管
+
+状态：Phase 6.4 客户端验收后确定
+
+用户已经能够进入 Minecraft Java 26.3 Preview，但实际游玩发现很快离开 GeoWorld 形状。排查确认：当前 Preview 只预写 radius 范围内的 Anvil Chunk；范围外 `world_gen_settings.dat` 仍是 vanilla `minecraft:noise + minecraft:overworld`，因此未生成 Chunk 必然由原版生成器接管。
+
+规则：
+1. Vanilla Preview 的定位固定为**有限区域 QA 快照**，不再尝试通过无上限扩大 radius 冒充完整世界生成方案。
+2. Tester 必须明确显示 Preview 预生成范围与出生点；框外地形不属于 GeoWorld 验收范围。
+3. 当前常用 radius=8 仅覆盖 17×17=289 Chunk，即约 272×272 blocks；对 20416×12736 blocks 级模型只占极小局部。即使 radius 提升到 31，也只有约 1008×1008 blocks，仍不代表完整世界。
+4. 完整世界进入 **NeoForge 26.3 通用 MOD** 路线：一个 `geoworld-neoforge-26.3.jar` 服务所有 GeoWorld 存档，每个世界携带自己的 `.geoworld` 模型与绑定标记。
+5. 普通世界没有 GeoWorld 标记时 MOD 不得改变其 worldgen；只有明确绑定的世界才加载模型并接管新的 Overworld Chunk。
+6. NeoForge 层必须复用已通过 15/15 cross-language golden 的 Java V1 Runtime Reader，不能在 MOD 内重写另一套地形数学。
+7. 首个 MOD 切片只做启动、世界识别、模型加载与版本/校验失败的明确报错；第二切片再接 GeoWorld ChunkGenerator / worldgen codec。
+8. MOD 按需生成的验收口径是同坐标 Tester Runtime ↔ Java Runtime ↔ 实际 Minecraft 新 Chunk 一致；“能进游戏”本身不构成通过。

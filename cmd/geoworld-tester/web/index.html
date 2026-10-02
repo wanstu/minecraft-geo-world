@@ -74,6 +74,25 @@
     <div id="modelMessage" class="muted small"></div>
 
     <hr>
+    <h2>Minecraft 导出</h2>
+    <label>世界名称<input id="exportName" placeholder="例如 GeoWorld QA"></label>
+    <label>导出到<input id="exportDir" value="output/minecraft-exports" placeholder="目录路径"></label>
+    <label>预生成半径（Chunk）
+      <input id="exportRadius" type="number" value="8" min="0" max="31">
+    </label>
+    <label class="check-row">
+      <input id="exportQA" type="checkbox" checked>
+      <span>QA 模式：创造模式 + 开启作弊</span>
+    </label>
+    <label class="check-row">
+      <input id="exportOverwrite" type="checkbox">
+      <span>覆盖同名导出目录</span>
+    </label>
+    <button id="exportMinecraft" class="primary" disabled>导出 Minecraft 26.3 存档</button>
+    <button id="openExport" type="button" hidden>打开导出目录</button>
+    <div id="exportMessage" class="muted small export-message">生成或重开模型后即可导出。</div>
+
+    <hr>
     <h2>当前世界</h2>
     <div id="stats" class="kv"><span>Seed</span><b>—</b></div>
   </aside>
@@ -90,12 +109,20 @@
       <button class="layer" data-layer="biome">群系</button>
       <button class="layer" data-layer="profile">配置置信度</button>
       <button class="layer anomaly-layer" data-layer="anomalies">最终异常</button>
-      <span class="muted small">点击地图查看该坐标的最终结果</span>
+      <div class="map-zoom-controls" aria-label="地图缩放">
+        <button id="mapZoomOut" type="button" title="缩小">−</button>
+        <span id="mapZoomLabel">1.0×</span>
+        <button id="mapZoomIn" type="button" title="放大">+</button>
+        <button id="mapZoomReset" type="button" title="复位地图">复位</button>
+      </div>
+      <span class="muted small">滚轮缩放 · 放大后拖拽 · 点击查看坐标</span>
     </div>
     <div id="mapWrap" class="map-wrap empty">
       <img id="map" alt="GeoWorld map">
       <div id="emptyHint">设置参数后点击“生成世界”</div>
       <div id="mapNotice" class="map-notice" hidden></div>
+      <div id="exportBounds" class="export-bounds" hidden></div>
+      <div id="spawnMarker" class="spawn-marker" hidden title="Minecraft 出生点"></div>
       <div id="cursor"></div>
     </div>
     <div id="layerHelp" class="footnote">最终地形：显示 Runtime 的最终地面和水体；生成失败时不会把旧地图冒充成新结果。</div>

@@ -18,10 +18,13 @@ public final class PreviewWorldGenerator {
 
     public static void main(String[] args) throws Exception {
         Arguments parsed = Arguments.parse(args);
-        generate(parsed);
+        Result result = generate(parsed);
+        if (parsed.resultJson() != null) {
+            writeResultJson(parsed.resultJson(), result);
+        }
     }
 
-    public static void generate(Arguments args) throws Exception {
+    public static Result generate(Arguments args) throws Exception {
         GeoWorldV1 model = GeoWorldV1.load(args.model());
         HeightMapping heights = new HeightMapping();
         Spawn spawn = findSpawn(model, heights);
@@ -44,7 +47,8 @@ public final class PreviewWorldGenerator {
             args.levelName(),
             spawn.x(),
             spawn.y(),
-            spawn.z()
+            spawn.z(),
+            args.qaMode()
         );
         metadata.writeWorldGenSettings(world, model.manifest().seed());
 
@@ -94,6 +98,21 @@ public final class PreviewWorldGenerator {
             verifyRegion(regionPath, entry.getValue());
         }
 
+        Result result = new Result(
+            "26.3",
+            model.manifest().seed(),
+            world,
+            spawn.x(),
+            spawn.y(),
+            spawn.z(),
+            centerChunkX,
+            centerChunkZ,
+            args.radiusChunks(),
+            chunkCount,
+            regions.size(),
+            args.qaMode()
+        );
+
         System.out.printf(
             "Generated Minecraft Java 26.3 preview world%n" +
             "  model: %s%n" +
@@ -103,7 +122,8 @@ public final class PreviewWorldGenerator {
             "  center chunk: (%d, %d)%n" +
             "  radius: %d chunks%n" +
             "  chunks: %d%n" +
-            "  regions: %d%n",
+            "  regions: %d%n" +
+            "  QA mode: %s%n",
             args.model().toAbsolutePath(),
             model.manifest().seed(),
             world,
@@ -114,8 +134,10 @@ public final class PreviewWorldGenerator {
             centerChunkZ,
             args.radiusChunks(),
             chunkCount,
-            regions.size()
+            regions.size(),
+            args.qaMode()
         );
+        return result;
     }
 
     private static Spawn findSpawn(GeoWorldV1 model, HeightMapping heights) {
@@ -178,6 +200,52 @@ public final class PreviewWorldGenerator {
         }
     }
 
+    private static void writeResultJson(Path path, Result result) throws IOException {
+        Path absolute = path.toAbsolutePath();
+        Path parent = absolute.getParent();
+        if (parent != null) Files.createDirectories(parent);
+
+        String output = result.output().toAbsolutePath().toString();
+        String json =
+            "{" +
+            "\"minecraftVersion\":\"" + jsonEscape(result.minecraftVersion()) + "\"," +
+            "\"seed\":" + result.seed() + "," +
+            "\"output\":\"" + jsonEscape(output) + "\"," +
+            "\"spawnX\":" + result.spawnX() + "," +
+            "\"spawnY\":" + result.spawnY() + "," +
+            "\"spawnZ\":" + result.spawnZ() + "," +
+            "\"centerChunkX\":" + result.centerChunkX() + "," +
+            "\"centerChunkZ\":" + result.centerChunkZ() + "," +
+            "\"radiusChunks\":" + result.radiusChunks() + "," +
+            "\"chunks\":" + result.chunks() + "," +
+            "\"regions\":" + result.regions() + "," +
+            "\"qaMode\":" + result.qaMode() +
+            "}\n";
+        Files.writeString(absolute, json);
+    }
+
+    private static String jsonEscape(String value) {
+        StringBuilder out = new StringBuilder(value.length() + 16);
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '\\' -> out.append("\\\\");
+                case '"' -> out.append("\\\"");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+                }
+            }
+        }
+        return out.toString();
+    }
+
     private static void deleteTree(Path root) throws IOException {
         if (!Files.exists(root)) return;
         try (var stream = Files.walk(root)) {
@@ -187,6 +255,21 @@ public final class PreviewWorldGenerator {
             for (Path path : paths) Files.deleteIfExists(path);
         }
     }
+
+    public record Result(
+        String minecraftVersion,
+        long seed,
+        Path output,
+        int spawnX,
+        int spawnY,
+        int spawnZ,
+        int centerChunkX,
+        int centerChunkZ,
+        int radiusChunks,
+        int chunks,
+        int regions,
+        boolean qaMode
+    ) {}
 
     private record RegionKey(int x, int z) {}
 
@@ -204,8 +287,20 @@ public final class PreviewWorldGenerator {
         Path output,
         String levelName,
         int radiusChunks,
-        boolean force
+        boolean force,
+        boolean qaMode,
+        Path resultJson
     ) {
+        public Arguments(
+            Path model,
+            Path output,
+            String levelName,
+            int radiusChunks,
+            boolean force
+        ) {
+            this(model, output, levelName, radiusChunks, force, true, null);
+        }
+
         static Arguments parse(String[] args) {
             Path model = Path.of(
                 "internal/goldenvectors/testdata/runtime-v1.geoworld"
@@ -214,6 +309,8 @@ public final class PreviewWorldGenerator {
             String levelName = "GeoWorld 26.3 Preview";
             int radius = 8;
             boolean force = false;
+            boolean qaMode = true;
+            Path resultJson = null;
 
             for (int i = 0; i < args.length; i++) {
                 switch (args[i]) {
@@ -229,6 +326,10 @@ public final class PreviewWorldGenerator {
                         }
                     }
                     case "--force" -> force = true;
+                    case "--qa" -> qaMode = true;
+                    case "--survival" -> qaMode = false;
+                    case "--result-json" ->
+                        resultJson = Path.of(requireValue(args, ++i, "--result-json"));
                     case "--help", "-h" -> {
                         System.out.println(
                             "Usage: generate-preview-world.cmd [options]\n" +
@@ -236,6 +337,9 @@ public final class PreviewWorldGenerator {
                             "  --output <world-directory>\n" +
                             "  --name <level-name>\n" +
                             "  --radius <0..31 chunks>\n" +
+                            "  --qa (default: creative + cheats)\n" +
+                            "  --survival\n" +
+                            "  --result-json <file>\n" +
                             "  --force"
                         );
                         System.exit(0);
@@ -246,7 +350,15 @@ public final class PreviewWorldGenerator {
                 }
             }
 
-            return new Arguments(model, output, levelName, radius, force);
+            return new Arguments(
+                model,
+                output,
+                levelName,
+                radius,
+                force,
+                qaMode,
+                resultJson
+            );
         }
 
         private static String requireValue(

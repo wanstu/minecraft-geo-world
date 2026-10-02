@@ -1,7 +1,9 @@
 param(
     [string]$ServerJar = "",
     [string]$World = "",
-    [int]$Radius = 8
+    [int]$Radius = 8,
+    [ValidateSet("any","qa","survival")]
+    [string]$Mode = "any"
 )
 
 $ErrorActionPreference = "Stop"
@@ -69,7 +71,7 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 $runCp = [string]::Join(';', @($referenceOut, $inner, $mainOut) + $libraries)
 Push-Location $cache
 try {
-    & java -cp $runCp geoworld.minecraft.reference.Mojang26_3Verifier $World $Radius
+    & java -cp $runCp geoworld.minecraft.reference.Mojang26_3Verifier $World $Radius $Mode
     exit $LASTEXITCODE
 } finally {
     Pop-Location

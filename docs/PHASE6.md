@@ -852,7 +852,7 @@ Raw Terrain 806/608 的 coast changes 与 72/126 的 river upslope 保留为校�
 - `WorldGenSettings.CODEC`：`data/minecraft/world_gen_settings.dat` 解析通过；Seed=731894205，Overworld/Nether/End 三维度齐全。
 - `SerializableChunkData.parse`：3×3 smoke 9/9 通过；正式 radius=8 Preview 289/289 Chunk 全部通过。
 
-这证明当前输出符合 Mojang 26.3 的 NBT/Chunk 反序列化契约，但**不等于客户端真实进入世界已经验收**。
+这证明当前输出符合 Mojang 26.3 的 NBT/Chunk 反序列化契约。随后修正 SavedData namespaced 路径后，用户已经确认 Minecraft 26.3 客户端可以正常进入 Preview 世界。
 
 首次 Minecraft 26.3 客户端实测发现一处路径契约遗漏：writer 原先把 worldgen SavedData 写到 `data/world_gen_settings.dat`，而 26.3 客户端实际按 namespaced SavedData 路径读取 `data/minecraft/world_gen_settings.dat`。真实 `latest.log` 明确报 `Unable to read or access the world gen settings file`，随后 `Overworld settings missing`。已修正 writer 与两套 verifier，并新增回归断言：正确 namespaced 路径必须存在，旧错误路径必须不存在。修复版 `GeoWorld 26.3 Preview Fix1` 已再次通过 Mojang 官方 289/289 Chunk 验证，并复制到 HMCL 26.3 `saves` 目录等待客户端复测。
 
@@ -864,12 +864,12 @@ Raw Terrain 806/608 的 coast changes 与 72/126 的 river upslope 保留为校�
 
 ### 当前边界
 
-- [ ] 尚未在 Minecraft 26.3 客户端真实进入该 Preview 存档做人眼验收。
+- [x] Minecraft 26.3 客户端已能真实进入修复后的 Preview 存档。
+- [x] Tester 已支持 QA 导出：默认 Creative + allowCommands=true，可从新生成或已重开模型直接导出；地图显示出生点与预生成范围，并支持 1×～8× 缩放/复位。
 - [ ] 表层材质仍是简化映射；植被、树木、洞穴、矿物、结构、完整装饰未实现。
 - [ ] Preview Chunk 不写结构/实体/block entity；`isLightOn` 不置 true，首次加载由 Minecraft 补光。
-- [ ] 预生成范围之外仍由 vanilla 26.3 normal worldgen 接管，边界可能存在接缝。
+- [ ] 预生成范围之外仍由 vanilla 26.3 normal worldgen 接管。这已经在实际游戏中表现为离开小范围后地形与 Tester 全图不一致，属于结构性限制而不是单纯 radius 默认值过小。
 - [ ] Biome 第一版使用受限 local palette 的简化水平采样，尚未做完整 quart-biome/global-palette 路径。
 - [ ] external `.mcc` Chunk 尚未实现；单 Chunk 超过 255 sectors 会明确拒绝。
-- [ ] Loader 仍未接入；按需 Chunk 生成必须等 Vanilla Preview 客户端验收通过后再开始。
 
-下一切片：Minecraft 26.3 客户端真实进入世界验收；先修实际游戏中暴露的地形/水体/群系/存档问题，再决定 surface/vegetation 与 Loader 的优先级。
+下一切片：NeoForge 26.3 通用 MOD。世界携带自己的 `.geoworld` 模型与绑定标记；MOD 在明确绑定的世界中加载同一 Java Runtime，并逐步接管未生成 Overworld Chunk，普通世界不受影响。

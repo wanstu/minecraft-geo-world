@@ -59,6 +59,7 @@ type activeWorld struct {
 	source                 string
 	model                  *generator.WorldModel
 	reopened               *worldmodelio.RuntimeModel
+	modelPath              string
 	generatedAt            time.Time
 	duration               time.Duration
 }
@@ -92,6 +93,7 @@ type appState struct {
 	mu         sync.RWMutex
 	active     *activeWorld
 	generating bool
+	exporting  bool
 	stage      generator.Stage
 	completed  int
 	total      int
@@ -118,6 +120,33 @@ type loadRequest struct {
 	Name string `json:"name"`
 }
 
+type exportMinecraftRequest struct {
+	Name      string `json:"name"`
+	Directory string `json:"directory"`
+	Radius    *int   `json:"radius"`
+	QAMode    *bool  `json:"qaMode"`
+	Overwrite bool   `json:"overwrite"`
+}
+
+type minecraftExportResult struct {
+	MinecraftVersion string `json:"minecraftVersion"`
+	Seed             int64  `json:"seed"`
+	Output           string `json:"output"`
+	SpawnX           int    `json:"spawnX"`
+	SpawnY           int    `json:"spawnY"`
+	SpawnZ           int    `json:"spawnZ"`
+	CenterChunkX     int    `json:"centerChunkX"`
+	CenterChunkZ     int    `json:"centerChunkZ"`
+	RadiusChunks     int    `json:"radiusChunks"`
+	Chunks           int    `json:"chunks"`
+	Regions          int    `json:"regions"`
+	QAMode           bool   `json:"qaMode"`
+}
+
+type openFolderRequest struct {
+	Path string `json:"path"`
+}
+
 type modelInfo struct {
 	Name             string             `json:"name"`
 	FileBytes        int64              `json:"fileBytes"`
@@ -132,6 +161,11 @@ func main() {
 	openBrowser := flag.Bool("open", true, "open browser automatically")
 	modelDir := flag.String("models", filepath.FromSlash("output/models"), "saved model directory")
 	flag.Parse()
+
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	state := &appState{}
 	if err := os.MkdirAll(*modelDir, 0o755); err != nil {
@@ -156,10 +190,15 @@ func main() {
 	mux.HandleFunc("/api/save", func(w http.ResponseWriter, r *http.Request) { state.handleSave(w, r, *modelDir) })
 	mux.HandleFunc("/api/load", func(w http.ResponseWriter, r *http.Request) { state.handleLoad(w, r, *modelDir) })
 	mux.HandleFunc("/api/models", func(w http.ResponseWriter, r *http.Request) { handleModels(w, r, *modelDir) })
+	mux.HandleFunc("/api/export-minecraft", func(w http.ResponseWriter, r *http.Request) {
+		state.handleExportMinecraft(w, r, repoRoot)
+	})
+	mux.HandleFunc("/api/open-folder", handleOpenFolder)
 
 	url := "http://" + *addr
 	fmt.Printf("GeoWorld Tester: %s\n", url)
 	fmt.Printf("models: %s\n", *modelDir)
+	fmt.Printf("repo: %s\n", repoRoot)
 	if *openBrowser {
 		go func() {
 			time.Sleep(350 * time.Millisecond)
@@ -178,6 +217,7 @@ func (s *appState) handleStatus(w http.ResponseWriter, r *http.Request) {
 	defer s.mu.RUnlock()
 	resp := map[string]any{
 		"generating": s.generating,
+		"exporting":  s.exporting,
 		"stage":      s.stage,
 		"completed":  s.completed,
 		"total":      s.total,
@@ -228,6 +268,11 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	if s.generating {
 		s.mu.Unlock()
 		writeError(w, http.StatusConflict, errors.New("generation already running"))
+		return
+	}
+	if s.exporting {
+		s.mu.Unlock()
+		writeError(w, http.StatusConflict, errors.New("minecraft export already running"))
 		return
 	}
 	s.generating = true
@@ -437,6 +482,11 @@ func (s *appState) handleSave(w http.ResponseWriter, r *http.Request, modelDir s
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
+	s.mu.Lock()
+	if s.active == active {
+		active.modelPath = path
+	}
+	s.mu.Unlock()
 	writeJSON(w, http.StatusOK, map[string]any{"name": name, "info": info})
 }
 
@@ -486,6 +536,7 @@ func (s *appState) handleLoad(w http.ResponseWriter, r *http.Request, modelDir s
 		largestLandShare:       largestLandShare,
 		source:                 "reopened",
 		reopened:               model,
+		modelPath:              path,
 		generatedAt:            time.Now(),
 		duration:               time.Since(start),
 	}
@@ -529,6 +580,209 @@ func handleModels(w http.ResponseWriter, r *http.Request, modelDir string) {
 	}
 	sort.Slice(models, func(i, j int) bool { return models[i].Name < models[j].Name })
 	writeJSON(w, http.StatusOK, models)
+}
+
+func (s *appState) handleExportMinecraft(w http.ResponseWriter, r *http.Request, repoRoot string) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+
+	var req exportMinecraftRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	radius := 8
+	if req.Radius != nil {
+		radius = *req.Radius
+	}
+	if radius < 0 || radius > 31 {
+		writeError(w, http.StatusBadRequest, errors.New("radius must be in 0..31 chunks"))
+		return
+	}
+	qaMode := true
+	if req.QAMode != nil {
+		qaMode = *req.QAMode
+	}
+
+	s.mu.Lock()
+	if s.generating {
+		s.mu.Unlock()
+		writeError(w, http.StatusConflict, errors.New("generation already running"))
+		return
+	}
+	if s.exporting {
+		s.mu.Unlock()
+		writeError(w, http.StatusConflict, errors.New("minecraft export already running"))
+		return
+	}
+	active := s.active
+	if active == nil {
+		s.mu.Unlock()
+		writeError(w, http.StatusConflict, errors.New("generate or load a world first"))
+		return
+	}
+	s.exporting = true
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		s.exporting = false
+		s.mu.Unlock()
+	}()
+
+	worldName := strings.TrimSpace(req.Name)
+	if worldName == "" {
+		worldName = fmt.Sprintf("GeoWorld %d QA", active.seed)
+	}
+	folderName := sanitizeFolderName(worldName)
+	if folderName == "" {
+		folderName = fmt.Sprintf("GeoWorld-%d", active.seed)
+	}
+
+	parent := strings.TrimSpace(req.Directory)
+	if parent == "" {
+		parent = filepath.Join("output", "minecraft-exports")
+	}
+	if !filepath.IsAbs(parent) {
+		parent = filepath.Join(repoRoot, parent)
+	}
+	parent, err := filepath.Abs(parent)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	target := filepath.Join(parent, folderName)
+	if !req.Overwrite {
+		if _, err := os.Stat(target); err == nil {
+			writeError(w, http.StatusConflict, fmt.Errorf("export target already exists: %s", target))
+			return
+		} else if !os.IsNotExist(err) {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+	}
+
+	modelPath := active.modelPath
+	var tempModelDir string
+	if modelPath != "" {
+		if abs, err := filepath.Abs(modelPath); err == nil {
+			modelPath = abs
+		}
+		if _, err := os.Stat(modelPath); err != nil {
+			modelPath = ""
+		}
+	}
+	if modelPath == "" {
+		if active.model == nil {
+			writeError(w, http.StatusConflict, errors.New("active reopened model has no source file"))
+			return
+		}
+		tempModelDir, err = os.MkdirTemp("", "geoworld-tester-export-model-*")
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		defer os.RemoveAll(tempModelDir)
+		modelPath = filepath.Join(tempModelDir, "active.geoworld")
+		if err := worldmodelio.Save(modelPath, active.model); err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Errorf("prepare export model: %w", err))
+			return
+		}
+	}
+
+	resultDir, err := os.MkdirTemp("", "geoworld-tester-export-result-*")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	defer os.RemoveAll(resultDir)
+	resultPath := filepath.Join(resultDir, "result.json")
+
+	script := filepath.Join(repoRoot, "java", "minecraft-save-writer", "generate-preview-world.ps1")
+	if _, err := os.Stat(script); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Errorf("minecraft writer not found: %w", err))
+		return
+	}
+
+	args := []string{
+		"-NoProfile",
+		"-ExecutionPolicy", "Bypass",
+		"-File", script,
+		"--model", modelPath,
+		"--output", target,
+		"--name", worldName,
+		"--radius", strconv.Itoa(radius),
+		"--result-json", resultPath,
+	}
+	if qaMode {
+		args = append(args, "--qa")
+	} else {
+		args = append(args, "--survival")
+	}
+	if req.Overwrite {
+		args = append(args, "--force")
+	}
+
+	cmd := exec.CommandContext(r.Context(), powershellCommand(), args...)
+	cmd.Dir = repoRoot
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		message := strings.TrimSpace(string(output))
+		if message == "" {
+			message = err.Error()
+		}
+		writeError(w, http.StatusInternalServerError, fmt.Errorf("minecraft export failed: %s", message))
+		return
+	}
+
+	resultBytes, err := os.ReadFile(resultPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Errorf("read export result: %w", err))
+		return
+	}
+	var result minecraftExportResult
+	if err := json.Unmarshal(resultBytes, &result); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Errorf("decode export result: %w", err))
+		return
+	}
+	if result.Output == "" {
+		writeError(w, http.StatusInternalServerError, errors.New("minecraft export returned empty output path"))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+func handleOpenFolder(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+	var req openFolderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	path := strings.TrimSpace(req.Path)
+	if path == "" {
+		writeError(w, http.StatusBadRequest, errors.New("path is required"))
+		return
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if !info.IsDir() {
+		path = filepath.Dir(path)
+	}
+	if err := openFolder(path); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"path": path})
 }
 
 func activeSummary(a *activeWorld) map[string]any {
@@ -1226,6 +1480,76 @@ func lerp(a, b color.RGBA, t float64) color.RGBA {
 
 func clamp(v, lo, hi float64) float64 {
 	return math.Max(lo, math.Min(hi, v))
+}
+
+func findRepoRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		goMod := filepath.Join(dir, "go.mod")
+		writer := filepath.Join(dir, "java", "minecraft-save-writer", "generate-preview-world.ps1")
+		if _, err := os.Stat(goMod); err == nil {
+			if _, err := os.Stat(writer); err == nil {
+				return dir, nil
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return "", errors.New("cannot locate GeoWorld repository root")
+}
+
+func powershellCommand() string {
+	if runtime.GOOS == "windows" {
+		return "powershell.exe"
+	}
+	return "pwsh"
+}
+
+func openFolder(path string) error {
+	switch runtime.GOOS {
+	case "windows":
+		return exec.Command("explorer.exe", path).Start()
+	case "darwin":
+		return exec.Command("open", path).Start()
+	default:
+		return exec.Command("xdg-open", path).Start()
+	}
+}
+
+func sanitizeFolderName(v string) string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return ""
+	}
+	var b strings.Builder
+	for _, r := range v {
+		switch {
+		case r < 32:
+			b.WriteRune('_')
+		case strings.ContainsRune(`<>:"/\|?*`, r):
+			b.WriteRune('_')
+		default:
+			b.WriteRune(r)
+		}
+	}
+	name := strings.TrimRight(strings.TrimSpace(b.String()), ". ")
+	if name == "" {
+		return ""
+	}
+	upper := strings.ToUpper(name)
+	switch upper {
+	case "CON", "PRN", "AUX", "NUL",
+		"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+		"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9":
+		return "_" + name
+	}
+	return name
 }
 
 func sanitizeName(v string) string {

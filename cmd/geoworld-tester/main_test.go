@@ -11,6 +11,24 @@ import (
 	"geoworld/internal/worldmodelio"
 )
 
+func TestSanitizeFolderName(t *testing.T) {
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"GeoWorld 世界 QA", "GeoWorld 世界 QA"},
+		{"GeoWorld 世界:QA?", "GeoWorld 世界_QA_"},
+		{"  preview.  ", "preview"},
+		{"CON", "_CON"},
+		{"a/b\\c|d*e", "a_b_c_d_e"},
+	}
+	for _, tt := range tests {
+		if got := sanitizeFolderName(tt.in); got != tt.want {
+			t.Fatalf("sanitizeFolderName(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
 func TestAnomalyReportMatchesAfterModelReopen(t *testing.T) {
 	const (
 		width    = 80

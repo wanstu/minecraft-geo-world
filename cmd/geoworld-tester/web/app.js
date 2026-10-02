@@ -9,6 +9,19 @@ let mapLoadToken=0;
 let mapObjectURL=null;
 let renderedSeed=null;
 let modelNameTouched=false;
+let exportNameTouched=false;
+let lastExport=null;
+let mapZoom=1;
+let mapPanX=0;
+let mapPanY=0;
+let mapDragging=false;
+let mapDragMoved=false;
+let mapDragStartX=0;
+let mapDragStartY=0;
+let mapPanStartX=0;
+let mapPanStartY=0;
+let suppressMapClick=false;
+let lastFocusPoint=null;
 
 const stageNames={
   phase1:'地壳与大尺度地形',
@@ -93,6 +106,7 @@ function updateBackend(online){
     const staleSeed=renderedSeed;
     active=null;
     clearSample();
+    clearExportResult();
     renderEmptyStats();
     renderEmptyAnomalies();
     $('topStatus').textContent='需重新加载';
@@ -112,10 +126,157 @@ function setBusy(v){
   updateActionState();
 }
 
+function clearExportResult({message=true}={}){
+  lastExport=null;
+  $('openExport').hidden=true;
+  $('exportBounds').hidden=true;
+  $('spawnMarker').hidden=true;
+  if(message)$('exportMessage').textContent='生成或重开模型后即可导出。';
+  updateActionState();
+}
+
+function clampMapZoom(v){
+  return Math.max(1,Math.min(8,v));
+}
+
+function applyMapTransform(){
+  const img=$('map');
+  const wrap=$('mapWrap');
+  img.style.transform=`translate(${mapPanX}px,${mapPanY}px) scale(${mapZoom})`;
+  wrap.classList.toggle('zoomed',mapZoom>1.001);
+  $('mapZoomLabel').textContent=mapZoom.toFixed(1)+'×';
+  updateActionState();
+  requestAnimationFrame(()=>{
+    renderExportOverlay();
+    renderCursorOverlay();
+  });
+}
+
+function resetMapView(){
+  mapZoom=1;
+  mapPanX=0;
+  mapPanY=0;
+  applyMapTransform();
+}
+
+function zoomMapAt(clientX,clientY,nextZoom){
+  nextZoom=clampMapZoom(nextZoom);
+  if(Math.abs(nextZoom-mapZoom)<1e-6)return;
+  if(nextZoom<=1.001){
+    resetMapView();
+    return;
+  }
+  const img=$('map');
+  const oldRect=img.getBoundingClientRect();
+  if(oldRect.width<=0||oldRect.height<=0)return;
+  const fx=(clientX-oldRect.left)/oldRect.width;
+  const fz=(clientY-oldRect.top)/oldRect.height;
+
+  mapZoom=nextZoom;
+  img.style.transform=`translate(${mapPanX}px,${mapPanY}px) scale(${mapZoom})`;
+  const nextRect=img.getBoundingClientRect();
+  mapPanX+=clientX-(nextRect.left+fx*nextRect.width);
+  mapPanY+=clientY-(nextRect.top+fz*nextRect.height);
+  applyMapTransform();
+}
+
+function zoomMapCentered(factor){
+  const wrap=$('mapWrap').getBoundingClientRect();
+  zoomMapAt(
+    wrap.left+wrap.width/2,
+    wrap.top+wrap.height/2,
+    mapZoom*factor
+  );
+}
+
+function renderCursorOverlay(){
+  const c=$('cursor');
+  if(!active||!lastFocusPoint||$('mapWrap').classList.contains('empty')){
+    c.style.display='none';
+    return;
+  }
+  const g=active.geometry;
+  const fx=Math.max(0,Math.min(1,(lastFocusPoint.x-g.OriginX)/g.SpanXBlocks));
+  const fz=Math.max(0,Math.min(1,(lastFocusPoint.z-g.OriginZ)/g.SpanZBlocks));
+  const imgRect=$('map').getBoundingClientRect();
+  const wrapRect=$('mapWrap').getBoundingClientRect();
+  if(imgRect.width<=0||imgRect.height<=0){
+    c.style.display='none';
+    return;
+  }
+  c.style.display='block';
+  c.style.left=(imgRect.left-wrapRect.left+fx*imgRect.width-6)+'px';
+  c.style.top=(imgRect.top-wrapRect.top+fz*imgRect.height-6)+'px';
+}
+
+function renderExportOverlay(){
+  const bounds=$('exportBounds');
+  const spawn=$('spawnMarker');
+  if(!active||!lastExport||$('mapWrap').classList.contains('empty')){
+    bounds.hidden=true;
+    spawn.hidden=true;
+    return;
+  }
+
+  const g=active.geometry;
+  const worldMinX=(lastExport.centerChunkX-lastExport.radiusChunks)*16;
+  const worldMaxX=(lastExport.centerChunkX+lastExport.radiusChunks+1)*16;
+  const worldMinZ=(lastExport.centerChunkZ-lastExport.radiusChunks)*16;
+  const worldMaxZ=(lastExport.centerChunkZ+lastExport.radiusChunks+1)*16;
+  const modelMinX=g.OriginX;
+  const modelMaxX=g.OriginX+g.SpanXBlocks;
+  const modelMinZ=g.OriginZ;
+  const modelMaxZ=g.OriginZ+g.SpanZBlocks;
+
+  if(
+    worldMaxX<=modelMinX||worldMinX>=modelMaxX||
+    worldMaxZ<=modelMinZ||worldMinZ>=modelMaxZ
+  ){
+    bounds.hidden=true;
+    spawn.hidden=true;
+    return;
+  }
+
+  const fx0=Math.max(0,Math.min(1,(worldMinX-modelMinX)/g.SpanXBlocks));
+  const fx1=Math.max(0,Math.min(1,(worldMaxX-modelMinX)/g.SpanXBlocks));
+  const fz0=Math.max(0,Math.min(1,(worldMinZ-modelMinZ)/g.SpanZBlocks));
+  const fz1=Math.max(0,Math.min(1,(worldMaxZ-modelMinZ)/g.SpanZBlocks));
+
+  const imgRect=$('map').getBoundingClientRect();
+  const wrapRect=$('mapWrap').getBoundingClientRect();
+  if(imgRect.width<=0||imgRect.height<=0){
+    bounds.hidden=true;
+    spawn.hidden=true;
+    return;
+  }
+
+  const baseLeft=imgRect.left-wrapRect.left;
+  const baseTop=imgRect.top-wrapRect.top;
+  bounds.hidden=false;
+  bounds.style.left=(baseLeft+fx0*imgRect.width)+'px';
+  bounds.style.top=(baseTop+fz0*imgRect.height)+'px';
+  bounds.style.width=Math.max(2,(fx1-fx0)*imgRect.width)+'px';
+  bounds.style.height=Math.max(2,(fz1-fz0)*imgRect.height)+'px';
+  bounds.title='Minecraft 预生成范围：radius '+lastExport.radiusChunks+' Chunk';
+
+  const sfx=Math.max(0,Math.min(1,(lastExport.spawnX-modelMinX)/g.SpanXBlocks));
+  const sfz=Math.max(0,Math.min(1,(lastExport.spawnZ-modelMinZ)/g.SpanZBlocks));
+  spawn.hidden=false;
+  spawn.style.left=(baseLeft+sfx*imgRect.width)+'px';
+  spawn.style.top=(baseTop+sfz*imgRect.height)+'px';
+  spawn.title='Minecraft 出生点：'+lastExport.spawnX+', '+lastExport.spawnY+', '+lastExport.spawnZ;
+}
+
 function updateActionState(){
   $('generate').disabled=busy||!serviceOnline;
   $('save').disabled=busy||!serviceOnline||!active||active.source!=='generated';
   $('load').disabled=busy||!serviceOnline||!$('models').value;
+  $('exportMinecraft').disabled=busy||!serviceOnline||!active;
+  $('openExport').disabled=busy||!serviceOnline||!lastExport;
+  const mapDisabled=busy||!serviceOnline||!active||$('mapWrap').classList.contains('empty');
+  $('mapZoomIn').disabled=mapDisabled||mapZoom>=7.999;
+  $('mapZoomOut').disabled=mapDisabled||mapZoom<=1.001;
+  $('mapZoomReset').disabled=mapDisabled||(mapZoom<=1.001&&Math.abs(mapPanX)<0.5&&Math.abs(mapPanY)<0.5);
   const debugDisabled=busy||!serviceOnline||!active||!active.intermediateDiagnostics;
   document.querySelectorAll('.debug-layer').forEach(btn=>{btn.disabled=debugDisabled});
 }
@@ -145,6 +306,8 @@ async function refreshStatus(){
       $('progressBar').style.width=pct+'%';
       $('progressText').textContent=`正在生成：${stageLabel(s.stage)} · ${s.completed}/${s.total} · ${((s.elapsedMs||0)/1000).toFixed(1)}s`;
       $('topStatus').textContent='生成中';
+    }else if(s.exporting){
+      $('topStatus').textContent='导出中';
     }
   }catch(e){
     if(e.network){
@@ -223,6 +386,7 @@ function updateContinentLabels(){
 }));
 $('continentPreset').addEventListener('change',()=>applyContinentPreset($('continentPreset').value));
 $('modelName').addEventListener('input',()=>{modelNameTouched=true});
+$('exportName').addEventListener('input',()=>{exportNameTouched=true});
 $('randomSeed').addEventListener('click',()=>{
   const values=new Uint32Array(1);
   crypto.getRandomValues(values);
@@ -232,6 +396,7 @@ $('randomSeed').addEventListener('click',()=>{
 $('generate').onclick=async()=>{
   const previous=active;
   setBusy(true);
+  clearExportResult();
   $('progressBar').style.width='0%';
   $('progressText').textContent='开始生成…';
   $('modelMessage').textContent='';
@@ -253,12 +418,17 @@ $('generate').onclick=async()=>{
       continentSeparation:Number($('separation').value)
     })});
     active=next;
+    resetMapView();
     $('progressBar').style.width='100%';
     $('progressText').textContent=`生成完成 · ${(active.durationMs/1000).toFixed(2)}s`;
     $('topStatus').textContent='已生成';
     if(!modelNameTouched||!$('modelName').value.trim()){
       $('modelName').value='seed-'+active.seed;
       modelNameTouched=false;
+    }
+    if(!exportNameTouched||!$('exportName').value.trim()){
+      $('exportName').value='GeoWorld '+active.seed+' QA';
+      exportNameTouched=false;
     }
     clearSample();
     renderStats();
@@ -354,11 +524,67 @@ function updateLayerHelp(){
   $('layerHelp').textContent=help[layer]||'';
 }
 
+$('mapZoomIn').onclick=()=>zoomMapCentered(1.25);
+$('mapZoomOut').onclick=()=>zoomMapCentered(0.8);
+$('mapZoomReset').onclick=resetMapView;
+
+$('mapWrap').addEventListener('wheel',e=>{
+  if(!active||$('mapWrap').classList.contains('empty'))return;
+  e.preventDefault();
+  zoomMapAt(
+    e.clientX,
+    e.clientY,
+    mapZoom*(e.deltaY<0?1.25:0.8)
+  );
+},{passive:false});
+
+$('map').addEventListener('pointerdown',e=>{
+  if(mapZoom<=1.001||e.button!==0)return;
+  mapDragging=true;
+  mapDragMoved=false;
+  mapDragStartX=e.clientX;
+  mapDragStartY=e.clientY;
+  mapPanStartX=mapPanX;
+  mapPanStartY=mapPanY;
+  $('mapWrap').classList.add('dragging');
+  $('map').setPointerCapture(e.pointerId);
+  e.preventDefault();
+});
+
+$('map').addEventListener('pointermove',e=>{
+  if(!mapDragging)return;
+  const dx=e.clientX-mapDragStartX;
+  const dy=e.clientY-mapDragStartY;
+  if(Math.hypot(dx,dy)>3)mapDragMoved=true;
+  mapPanX=mapPanStartX+dx;
+  mapPanY=mapPanStartY+dy;
+  applyMapTransform();
+});
+
+function finishMapDrag(e){
+  if(!mapDragging)return;
+  mapDragging=false;
+  $('mapWrap').classList.remove('dragging');
+  try{$('map').releasePointerCapture(e.pointerId)}catch(_){}
+  if(mapDragMoved){
+    suppressMapClick=true;
+    setTimeout(()=>{suppressMapClick=false},0);
+  }
+  updateActionState();
+}
+
+$('map').addEventListener('pointerup',finishMapDrag);
+$('map').addEventListener('pointercancel',finishMapDrag);
+
 $('map').onclick=async e=>{
+  if(suppressMapClick){
+    suppressMapClick=false;
+    return;
+  }
   if(!active)return;
   const rect=$('map').getBoundingClientRect();
-  const fx=(e.clientX-rect.left)/rect.width;
-  const fz=(e.clientY-rect.top)/rect.height;
+  const fx=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+  const fz=Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height));
   const g=active.geometry;
   const x=g.OriginX+fx*g.SpanXBlocks;
   const z=g.OriginZ+fz*g.SpanZBlocks;
@@ -380,9 +606,11 @@ $('load').onclick=async()=>{
   const name=$('models').value;
   if(!name)return;
   setBusy(true);
+  clearExportResult();
   $('modelMessage').textContent='';
   try{
     active=await api('/api/load',{method:'POST',body:JSON.stringify({name})});
+    resetMapView();
     $('seed').value=active.seed;
     $('width').value=active.geometry.Width;
     $('height').value=active.geometry.Height;
@@ -402,6 +630,10 @@ $('load').onclick=async()=>{
     $('progressText').textContent=`模型重开完成 · ${active.durationMs}ms`;
     $('modelName').value=name;
     modelNameTouched=true;
+    if(!exportNameTouched||!$('exportName').value.trim()){
+      $('exportName').value=name+' QA';
+      exportNameTouched=false;
+    }
     $('modelMessage').innerHTML='<span class="warn">当前是已保存模型的只读重开结果；如需再次保存，请重新生成世界。</span>';
     clearSample();
     renderStats();
@@ -411,6 +643,58 @@ $('load').onclick=async()=>{
     $('modelMessage').innerHTML='<span class="error">'+escapeHtml(e.message)+'</span>';
   }finally{
     setBusy(false);
+  }
+};
+
+$('exportMinecraft').onclick=async()=>{
+  if(!active)return;
+  setBusy(true);
+  lastExport=null;
+  $('openExport').hidden=true;
+  $('exportMessage').innerHTML='<span class="warn">正在编译 Java writer 并导出存档…</span>';
+  $('topStatus').textContent='导出中';
+  try{
+    const radius=Math.max(0,Math.min(31,Number($('exportRadius').value)||0));
+    $('exportRadius').value=String(radius);
+    const result=await api('/api/export-minecraft',{
+      method:'POST',
+      body:JSON.stringify({
+        name:$('exportName').value,
+        directory:$('exportDir').value,
+        radius,
+        qaMode:$('exportQA').checked,
+        overwrite:$('exportOverwrite').checked
+      })
+    });
+    lastExport=result;
+    $('openExport').hidden=false;
+    $('topStatus').textContent='已导出';
+    $('exportMessage').innerHTML=
+      '<span class="ok">导出完成</span><br>'+
+      'Minecraft '+escapeHtml(result.minecraftVersion)+
+      ' · '+Number(result.chunks).toLocaleString()+' Chunk'+
+      ' · '+Number(result.regions).toLocaleString()+' Region<br>'+
+      '出生点 '+Number(result.spawnX)+', '+Number(result.spawnY)+', '+Number(result.spawnZ)+
+      (result.qaMode?' · QA 创造/作弊':' · 生存模式')+
+      '<br><span class="muted">'+escapeHtml(result.output)+'</span>';
+    renderExportOverlay();
+  }catch(e){
+    $('topStatus').textContent='导出失败';
+    $('exportMessage').innerHTML='<span class="error">'+escapeHtml(e.message)+'</span>';
+  }finally{
+    setBusy(false);
+  }
+};
+
+$('openExport').onclick=async()=>{
+  if(!lastExport)return;
+  try{
+    await api('/api/open-folder',{
+      method:'POST',
+      body:JSON.stringify({path:lastExport.output})
+    });
+  }catch(e){
+    $('exportMessage').innerHTML+='<br><span class="error">'+escapeHtml(e.message)+'</span>';
   }
 };
 
@@ -475,15 +759,8 @@ async function refreshAnomalies(){
 
 async function focusWorldPoint(x,z){
   if(!active)return;
-  const g=active.geometry;
-  const fx=Math.max(0,Math.min(1,(x-g.OriginX)/g.SpanXBlocks));
-  const fz=Math.max(0,Math.min(1,(z-g.OriginZ)/g.SpanZBlocks));
-  const imgRect=$('map').getBoundingClientRect();
-  const wrapRect=$('mapWrap').getBoundingClientRect();
-  const c=$('cursor');
-  c.style.display='block';
-  c.style.left=(imgRect.left-wrapRect.left+fx*imgRect.width-6)+'px';
-  c.style.top=(imgRect.top-wrapRect.top+fz*imgRect.height-6)+'px';
+  lastFocusPoint={x,z};
+  renderCursorOverlay();
   try{
     renderSample(await api('/api/sample?x='+encodeURIComponent(x)+'&z='+encodeURIComponent(z)));
   }catch(err){
@@ -534,6 +811,7 @@ function renderStats(){
 }
 
 function clearSample(){
+  lastFocusPoint=null;
   $('cursor').style.display='none';
   $('sampleEmpty').hidden=false;
   $('sample').hidden=true;
@@ -580,6 +858,15 @@ function formatBytes(n){return n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).t
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function escapeAttr(s){return escapeHtml(s)}
 
+$('map').addEventListener('load',()=>{
+  renderExportOverlay();
+  renderCursorOverlay();
+  updateActionState();
+});
+window.addEventListener('resize',()=>{
+  renderExportOverlay();
+  renderCursorOverlay();
+});
 window.addEventListener('beforeunload',()=>{if(mapObjectURL)URL.revokeObjectURL(mapObjectURL)});
 
 updateRangePreview();
