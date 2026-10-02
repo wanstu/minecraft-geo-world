@@ -20,6 +20,7 @@ input,select{width:100%;margin-top:5px;background:#0d1215;border:1px solid #3441
 .seed-control input{margin-top:5px}
 .seed-control button{height:35px;white-space:nowrap}
 .parameter-help{margin:-4px 0 10px}
+.preset-help{padding:7px 8px;background:#11181d;border:1px solid #253038;border-radius:4px;line-height:1.5}
 .range-label{position:relative;margin-bottom:4px}
 .range-label b{float:right;color:#dce5ea;font-weight:600}
 .range-label input[type="range"]{padding:0;height:24px;accent-color:#55a77c}

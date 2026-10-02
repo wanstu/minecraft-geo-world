@@ -26,6 +26,30 @@ const stageNames={
   runtimeprofile:'最终群系配置'
 };
 
+
+const continentPresets={
+  default:{
+    ocean:.68,fragmentation:.35,separation:.65,
+    help:'64 Seed 基线（Seed 1–64，320×200 / 128）：平均主要陆块 2.61、全部陆块 6.14、最大陆块占比 69.9%。'
+  },
+  super:{
+    ocean:.50,fragmentation:.05,separation:.05,
+    help:'64 Seed 基线：50/64 达到“主要陆块=1 且最大陆块≥85%”；平均主要陆块 1.23、最大陆块占比 96.8%。'
+  },
+  multi:{
+    ocean:.68,fragmentation:.30,separation:.90,
+    help:'64 Seed 基线：54/64 达到“主要陆块≥2 且最大陆块≤80%”；平均主要陆块 3.48、最大陆块占比 57.0%。'
+  },
+  broken:{
+    ocean:.68,fragmentation:.75,separation:.75,
+    help:'64 Seed 基线：平均主要陆块 2.69、全部陆块 8.86；强调海峡、半岛和次级陆块，不保证没有大型大陆。'
+  },
+  archipelago:{
+    ocean:.90,fragmentation:.95,separation:.95,
+    help:'64 Seed 基线：62/64 达到“全部陆块≥10 且最大陆块≤65%”；平均主要陆块 6.73、全部陆块 15.61、最大陆块占比 33.4%。'
+  }
+};
+
 class ApiError extends Error{
   constructor(message,{network=false,status=0}={}){
     super(message);
@@ -139,13 +163,65 @@ function updateRangePreview(){
   $('rangePreview').textContent=`当前覆盖约 ${Math.round(sx).toLocaleString()} × ${Math.round(sz).toLocaleString()} 方块；间距越小，细节越密，但同样网格覆盖范围越小。`;
 }
 
+
+function nearlyEqual(a,b){
+  return Math.abs(Number(a)-Number(b))<1e-9;
+}
+
+function matchingContinentPreset(){
+  const ocean=Number($('ocean').value);
+  const fragmentation=Number($('fragmentation').value);
+  const separation=Number($('separation').value);
+  for(const [name,p] of Object.entries(continentPresets)){
+    if(nearlyEqual(ocean,p.ocean)&&
+       nearlyEqual(fragmentation,p.fragmentation)&&
+       nearlyEqual(separation,p.separation)){
+      return name;
+    }
+  }
+  return 'custom';
+}
+
+function updatePresetHelp(){
+  const name=$('continentPreset').value;
+  const p=continentPresets[name];
+  if(!p){
+    $('presetHelp').textContent='自定义：当前三个参数不属于内置预设；生成与保存仍直接使用输入框中的实际数值。';
+    return;
+  }
+  $('presetHelp').textContent=
+    `洋壳 ${p.ocean.toFixed(2)} · 破碎 ${p.fragmentation.toFixed(2)} · 分离 ${p.separation.toFixed(2)}。 ${p.help}`;
+}
+
+function syncContinentPreset(){
+  $('continentPreset').value=matchingContinentPreset();
+  updatePresetHelp();
+}
+
+function applyContinentPreset(name){
+  const p=continentPresets[name];
+  if(!p){
+    updatePresetHelp();
+    return;
+  }
+  $('ocean').value=p.ocean.toFixed(2);
+  $('fragmentation').value=p.fragmentation.toFixed(2);
+  $('separation').value=p.separation.toFixed(2);
+  updateContinentLabels();
+  updatePresetHelp();
+}
+
 function updateContinentLabels(){
   $('fragmentationValue').textContent=Number($('fragmentation').value).toFixed(2);
   $('separationValue').textContent=Number($('separation').value).toFixed(2);
 }
 
 ['width','height','cellSize'].forEach(id=>$(id).addEventListener('input',updateRangePreview));
-['fragmentation','separation'].forEach(id=>$(id).addEventListener('input',updateContinentLabels));
+['ocean','fragmentation','separation'].forEach(id=>$(id).addEventListener('input',()=>{
+  updateContinentLabels();
+  syncContinentPreset();
+}));
+$('continentPreset').addEventListener('change',()=>applyContinentPreset($('continentPreset').value));
 $('modelName').addEventListener('input',()=>{modelNameTouched=true});
 $('randomSeed').addEventListener('click',()=>{
   const values=new Uint32Array(1);
@@ -318,6 +394,7 @@ $('load').onclick=async()=>{
     $('separation').value=active.continentSeparation||0.65;
     updateRangePreview();
     updateContinentLabels();
+    syncContinentPreset();
     if(!active.intermediateDiagnostics&&(layer==='raw'||layer==='coast')){
       selectLayer('final',{load:false});
     }
@@ -507,6 +584,7 @@ window.addEventListener('beforeunload',()=>{if(mapObjectURL)URL.revokeObjectURL(
 
 updateRangePreview();
 updateContinentLabels();
+syncContinentPreset();
 updateLayerHelp();
 updateActionState();
 renderEmptyAnomalies();
