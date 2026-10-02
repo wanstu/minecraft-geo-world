@@ -4,10 +4,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.GZIPOutputStream;
 
 public final class Nbt {
     private Nbt() {}
@@ -180,6 +185,47 @@ public final class Nbt {
             return bytes.toByteArray();
         } catch (IOException e) {
             throw new IllegalStateException("unexpected in-memory NBT I/O failure", e);
+        }
+    }
+
+    public static byte[] writeRootCompressed(String name, Tag root) {
+        byte[] raw = writeRoot(name, root);
+        try {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            try (GZIPOutputStream gzip = new GZIPOutputStream(bytes)) {
+                gzip.write(raw);
+            }
+            return bytes.toByteArray();
+        } catch (IOException e) {
+            throw new IllegalStateException("unexpected in-memory gzip failure", e);
+        }
+    }
+
+    public static void writeRootCompressed(Path path, String name, Tag root) throws IOException {
+        if (path == null) throw new NullPointerException("NBT output path");
+        byte[] compressed = writeRootCompressed(name, root);
+
+        Path absolute = path.toAbsolutePath();
+        Path parent = absolute.getParent();
+        if (parent != null) Files.createDirectories(parent);
+
+        Path temp = Files.createTempFile(parent, "." + path.getFileName(), ".tmp");
+        boolean published = false;
+        try {
+            Files.write(temp, compressed);
+            try {
+                Files.move(
+                    temp,
+                    absolute,
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING
+                );
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(temp, absolute, StandardCopyOption.REPLACE_EXISTING);
+            }
+            published = true;
+        } finally {
+            if (!published) Files.deleteIfExists(temp);
         }
     }
 
