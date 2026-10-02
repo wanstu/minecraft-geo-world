@@ -5,7 +5,7 @@
 ## 当前目标与阶段
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。
 
-**Phase 6.0、6.1a、6.1b、6.2 已完成；Phase 6.3 进行中。第一切片已实现 versioned World Model 持久化与 Runtime 重开：gzip+JSON envelope、schemaVersion/generatorVersion、SHA-256 payload 校验、create-only 原子发布、版本/损坏拒绝，以及不重跑 Phase1→Geomorph 的 Runtime 恢复。正式 Seed 731894205 / 640×400 保存后文件约 7.63 MB，重开 484 个跨海岸/河/湖/边界样点 0 mismatch。下一步继续补可更新保存策略、manifest inspect 与更完整 golden vectors。**
+**Phase 6.0、6.1a、6.1b、6.2 已完成；Phase 6.3 进行中。World Model V1 的持久化、Runtime 重开、安全替换、manifest inspect/validate 与首版 cross-language golden vectors 已完成。正式 Seed 731894205 / 640×400 保存后文件约 7.63 MB，重开 484 个跨海岸/河/湖/边界样点 0 mismatch；另有固定 48×30 跨负坐标 golden fixture 供未来 Java reader/sampler 直接对拍。下一步先评估 V1 gzip+JSON 在更大世界上的文件体积、保存/加载耗时与内存成本，再决定是否需要通过新 schemaVersion 引入 binary field encoding。**
 
 ## 仓库与基线
 - 仓库：D:\projects\minecraft-geo-world
@@ -36,6 +36,7 @@
 - Tester 诊断图层：3d7fff7 — feat: add tester diagnostic map layers。
 - Tester 最终异常定位：d78aa47 — feat: add tester anomaly localization。
 - Tester 大陆预设：a7c8018 — feat: add continent generation presets。
+- Cross-language Runtime golden vectors：0323155 — feat: add cross-language runtime golden vectors。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -116,6 +117,9 @@
 - Tester 新增“最终异常”图层与右侧异常列表。海岸冲突 / 河床逆坡 / 湖床违规 / Runtime 宏观节点 fallback / semantic mismatch 使用与正式最终模型一致的数据重新定位；异常点可直接点击，自动切到异常图层、移动地图光标并打开该坐标的 Runtime 检查。总数完整统计，位置列表最多保留 250 个并明确标记截断，避免异常风暴拖垮页面。
 - 最终异常报告只依赖持久化 Runtime 模型中的 Surface / CoastTerrain / Waterbed / RuntimeProfile，不依赖生成态 Lab 暂存数组，因此刚生成与保存后重开使用同一套异常口径；已加入自动回归保证生成态与重开态报告逐字段一致。
 - Tester 新增大陆预设：默认世界 / 超级大陆 / 多大陆 / 破碎大陆 / 群岛世界 / 自定义。预设没有新增生成算法或模型字段，只映射现有洋壳比例、ContinentFragmentation、ContinentSeparation；手动修改任一参数会自动切到“自定义”，重开模型时按持久化数值自动识别匹配的预设。
+- 新增 `internal/goldenvectors` 与 `cmd/geoworld-golden-vectors`。固定 fixture 为 Seed 731894205、48×30、Origin=(-3072,-2048)、128 blocks/node、PlateCount=12、OceanFraction=.68；提交 `testdata/runtime-v1.geoworld` 与 `runtime-v1.json`，作为未来 Java Runtime reader/sampler 的跨语言对拍协议。
+- Golden V1 JSON 使用独立的 lowerCamelCase Geometry/Source 契约，不直接暴露 Go struct JSON 命名；记录 golden format/version、World Model schema/generator version、`1e-9` 浮点容差、固定生成参数以及每个命名坐标的完整 Runtime Sample。当前 15 个样点覆盖四角、四边、负 X/Z 16-block Chunk 边界、世界原点、Macro 节点与 Cell 内部、mixed coast、带 receiver surface 的 River 下游段和 Lake 节点中心。
+- Golden 生成命令默认拒绝覆盖已有产物，只有显式 `-force` 才可再生；README 明确要求不要手改 JSON 数值让测试通过。Go 回归同时验证“fresh generation → golden JSON”和“committed .geoworld Load → golden JSON”，后者就是未来 Java 端需要复刻的验收方式。
 
 ## 本轮验证
 - go test ./... -count=1：全部通过（包括新的连通性、负坐标、分辨率/范围、Phase 1 物理尺度和全链路回归）。
@@ -158,23 +162,25 @@
   - 群岛世界 `.90 / .95 / .95`：平均主要陆块 6.73、全部陆块 15.61、最大陆块占比 33.4%；62/64 达到“全部陆块≥10 且最大陆块≤65%”。
 - 大陆预设通过 BSK 真实 UI A/B：同 Seed 731894205 下，超级大陆生成结果为主要陆块 1 / 全部陆块 3 / 最大陆块 100.0%；群岛世界为 7 / 20 / 51.0%。手动把群岛洋壳 0.90 改成 0.89 后预设立即变为自定义；保存群岛模型、切成超级大陆、再重开保存模型后，UI 自动恢复并识别为群岛世界。临时验收模型已删除。
 - 预设完成后执行 `node --check cmd/geoworld-tester/web/app.js` 与 `go test ./... -count=1`，全部通过。
+- Golden V1 生成结果：`runtime-v1.geoworld` 64,462 bytes，payload 222,325 bytes，manifest payload SHA-256=`147bf084f6a66a0f4b22587d83dd9b954111725f61b6374c4ec9dd8cbea875fe`；`runtime-v1.json` 共 15 cases。`geoworld-model-inspect -validate` 通过；`river_backwater` 实际为 River，`lake_center` 实际为 Lake，负坐标 Chunk case 的 X/Z 均为负且对齐 16 blocks。
+- Golden 生成命令不带 `-force` 时对已有产物返回失败，不会误覆盖基线；`go test ./internal/goldenvectors -count=1` 与随后 `go test ./... -count=1` 全部通过。
 - 详细参数、当前数值和历史对照见 PHASE6.md。
 
 ## 仍未完成（不要误报完成）
 1. Raw Terrain 的 806/608 海岸变化与 72/126 逆坡继续保留为历史基线；applied CoastTerrain + Waterbed + WorldSample + RuntimeProfile 已不再受这些 raw 指标阻塞。
 2. Phase 6.1b 已完成当前已知生成尺度迁移；但“物理尺度稳定”不等于不同采样精度逐 Cell 完全相同。D8 河网、离散边界/分类、量化采样仍允许合理的拓扑差异，后续新增任何空间参数也必须继续遵守 GridGeometry / blocks 规则。
 3. `phase1.Generate` 仍保留 legacy panic wrapper，但正式统一入口已改用 `phase1.GenerateChecked` 返回 error；其它旧 Lab/CLI 尚未全部迁到统一 Generator，这不再阻塞 Phase 6.2 最终 Runtime 契约。
-4. WorldModel V1 保存/重开、Windows/Unix 安全替换、manifest inspect/validate 已完成；尚未完成 migrate、跨语言 Java reader/sampler 和实际游戏生成。
+4. WorldModel V1 保存/重开、Windows/Unix 安全替换、manifest inspect/validate 与首版 cross-language golden vectors 已完成；尚未完成 migrate、Java reader/sampler 和实际游戏生成。
 5. 已新增 GeoWorld Tester 本地 Web 工具，可直接生成、看最终地形/水体/群系/Profile、点击采样、保存与重开模型；MOD/Loader 暂后置，优先通过该工具做人工验收。
 6. 静态 prototype 仍是先前实验快照；实时验证请使用 `open-geoworld-tester.cmd`，不要再把 prototype/generated 当当前世界结果。
 
 ## 下一步（6.3）
 1. 第一切片已完成：最小 Runtime schema、schema/generator version、checksum、create-only 原子发布、Load 校验与 Runtime 重建已经落地。
-2. 第二切片的安全替换与 manifest inspect / validate 已完成并提交；继续补 migrate / golden vectors，不再阻塞人工测试。
+2. 第二切片的安全替换与 manifest inspect / validate 已完成并提交；cross-language golden vectors V1 也已完成。migrate 仍未做，但不阻塞当前 Runtime 模型验收。
 3. **优先完善 GeoWorld Tester**：先让人工验证成为主入口，包括生成参数、最终地形 / 水体 / 群系 / Profile 图层、坐标采样、保存 / 更新 / 重开模型；发现视觉或语义问题时从 Tester 直接复现。
 4. Tester 的河网 / 湖泊 / 海陆骨架 / Raw Terrain / 海岸约束、最终异常位置高亮、默认大陆多 Seed 统计与大陆预设均已完成；继续以 Tester 人工验收为主入口，发现视觉 / 语义问题优先在这里复现，不先做 MOD UI。
-5. 下一步扩展 cross-language golden vectors：固定海岸、河口、湖泊、负坐标、Macro/Chunk 边界、外围与角落，为后续 Java reader/sampler 准备；这一步仍属于模型工具链，不进入 Loader/MOD UI。
-6. 评估 V1 gzip+JSON 在更大世界上的大小/加载成本；若需要 binary field encoding，应通过 schemaVersion 升级，不静默改变 V1 解释。
+5. Cross-language golden vectors V1 已完成，固定海岸、River 下游/受纳语义、Lake、负坐标、Macro/Chunk 边界、外围与角落均已有机器可读基线；Java reader/sampler 后续必须以这组 fixture 对拍。
+6. **下一步优先评估 V1 gzip+JSON 在更大世界上的大小、保存/加载时间和峰值内存成本**；若确实需要 binary field encoding，应通过新的 schemaVersion 升级，不静默改变 V1 解释。完成这一评估后再决定 Java reader 的具体格式实现。
 7. **MOD / Loader 后置**：只有当前 Tester 中的最终世界结果通过人工验收后，再进入 Go model → Java reader/sampler → 一个 Loader。
 
 ## 继续工作入口
