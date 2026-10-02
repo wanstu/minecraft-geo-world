@@ -39,6 +39,8 @@
 - Cross-language Runtime golden vectors：0323155 — feat: add cross-language runtime golden vectors。
 - World Model 持久化内存审计：f297574 — feat: measure world model persistence memory。
 - Java V1 Runtime Reader：fd6436e — feat: add java v1 runtime reader。
+- Minecraft NBT / Anvil 底层：83f4f85 — feat: add nbt and anvil region writer。
+- Minecraft 26.3 Preview World：842a0d8 — feat: generate minecraft 26.3 preview worlds。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -181,24 +183,29 @@
 - Java V1 reader 通过提交的 `runtime-v1.geoworld + runtime-v1.json` 真实跨语言验收：15/15 cases 全部通过，float tolerance=`1e-9`。覆盖四角/四边、负坐标 Chunk 边界、原点、Macro node/cell interior、mixed coast、River backwater、Lake center；WaterKind、Biome/Profile、SourceNode/SourceWeight、SemanticFallback/Mismatch 均与 Go golden 一致。
 - Java 验收中特别确认 V1 的 Ecology/Profile `[]uint8` 字段在 Go JSON 中是 Base64 字符串而非数字数组；Java reader 已按该实际格式实现，避免后续 Minecraft 群系读取静默错位。
 - `java\\runtime-reader\\verify-golden.cmd` 在当前 JDK 27 上以 `--release 21` 编译并运行成功，不依赖 Gradle/Maven。
+- Minecraft 存档输出第一版已固定到 Java Edition 26.3：DataVersion=5023、level.dat storage version=19133、Overworld minY=-64 / height=384 / sea_level=63。版本与 NBT schema 均从 Mojang 26.3 官方 server jar / 内置数据核对，writer 主代码本身不依赖 Mojang jar。
+- `java/minecraft-save-writer` 已能从 GeoWorld V1 直接写出 gzip NBT、26.3 `level.dat`、26.3 `data/world_gen_settings.dat`、Anvil `.mca`、Section block-state/biome palette 与四类 Heightmap；默认生成出生点周围 radius=8，即 17×17=289 个 Chunk。未预生成范围仍由 vanilla 26.3 normal worldgen 接管。
+- 第一版 HeightMapping 正式冻结为边界语义：GeoWorld 0.0→Y=-64、0.5→Y=63、1.0→Y=320；实体地面填 `y < groundBoundary`，水填 `groundBoundary <= y < waterBoundary`，避免 sea_level 出现一格偏差。
+- 默认 golden fixture 生成的正式 Preview World 位于 `output/minecraft-26.3-preview/GeoWorld-Preview`，Seed=731894205，安全出生点自动选为 `(0,101,0)`，共 289 Chunk / 4 Region。
+- Mojang 26.3 官方 codec 验收已真实执行：验证脚本先核对官方 server jar SHA-1，再在**不启动 server、不接受 EULA**的情况下调用官方类解析。`level.dat` 通过 `LevelVersion/LevelSettings/RespawnData`；`world_gen_settings.dat` 通过 `WorldGenSettings.CODEC` 且 Overworld/Nether/End 三维度齐全；`SerializableChunkData.parse` 对正式 Preview 的 289/289 Chunk 全部通过。
+- 收口回归：`verify-storage.cmd` 通过已知 NBT 字节向量、UTF-8、Region header/zlib/sector、负 Chunk 坐标、26.3 HeightMapping / bit packing 与 3×3 preview smoke；Java Runtime golden 15/15 再次通过；`go test ./... -count=1` 全仓通过。
 - 详细参数、当前数值和历史对照见 PHASE6.md。
 
 ## 仍未完成（不要误报完成）
 1. Raw Terrain 的 806/608 海岸变化与 72/126 逆坡继续保留为历史基线；applied CoastTerrain + Waterbed + WorldSample + RuntimeProfile 已不再受这些 raw 指标阻塞。
 2. Phase 6.1b 已完成当前已知生成尺度迁移；但“物理尺度稳定”不等于不同采样精度逐 Cell 完全相同。D8 河网、离散边界/分类、量化采样仍允许合理的拓扑差异，后续新增任何空间参数也必须继续遵守 GridGeometry / blocks 规则。
 3. `phase1.Generate` 仍保留 legacy panic wrapper，但正式统一入口已改用 `phase1.GenerateChecked` 返回 error；其它旧 Lab/CLI 尚未全部迁到统一 Generator，这不再阻塞 Phase 6.2 最终 Runtime 契约。
-4. WorldModel V1 保存/重开、Windows/Unix 安全替换、manifest inspect/validate、cross-language golden vectors 与最小 Java V1 reader/sampler 已完成；尚未完成 migrate、Minecraft 世界存档/Loader 实际游戏生成。
+4. WorldModel V1 保存/重开、Windows/Unix 安全替换、manifest inspect/validate、cross-language golden vectors、最小 Java V1 reader/sampler 与 Minecraft 26.3 Preview save writer 已完成；尚未完成 migrate、Minecraft 客户端真实进入世界人工验收，以及 Loader 按需 Chunk 生成。
 5. 已新增 GeoWorld Tester 本地 Web 工具，可直接生成、看最终地形/水体/群系/Profile、点击采样、保存与重开模型；MOD/Loader 暂后置，优先通过该工具做人工验收。
 6. 静态 prototype 仍是先前实验快照；实时验证请使用 `open-geoworld-tester.cmd`，不要再把 prototype/generated 当当前世界结果。
 
-## 下一步（6.3）
-1. 第一切片已完成：最小 Runtime schema、schema/generator version、checksum、create-only 原子发布、Load 校验与 Runtime 重建已经落地。
-2. 第二切片的安全替换与 manifest inspect / validate 已完成并提交；cross-language golden vectors V1 也已完成。migrate 仍未做，但不阻塞当前 Runtime 模型验收。
-3. **优先完善 GeoWorld Tester**：先让人工验证成为主入口，包括生成参数、最终地形 / 水体 / 群系 / Profile 图层、坐标采样、保存 / 更新 / 重开模型；发现视觉或语义问题时从 Tester 直接复现。
-4. Tester 的河网 / 湖泊 / 海陆骨架 / Raw Terrain / 海岸约束、最终异常位置高亮、默认大陆多 Seed 统计与大陆预设均已完成；继续以 Tester 人工验收为主入口，发现视觉 / 语义问题优先在这里复现，不先做 MOD UI。
-5. Cross-language golden vectors V1 已完成，固定海岸、River 下游/受纳语义、Lake、负坐标、Macro/Chunk 边界、外围与角落均已有机器可读基线；Java reader/sampler 后续必须以这组 fixture 对拍。
-6. V1 gzip+JSON 的规模评估与最小 Java V1 reader/sampler 均已完成，cross-language golden 15/15 通过。下一步进入 **Phase 6.4 的最小 Minecraft 世界输出链路**：先做版本隔离的 NBT + Anvil Region 写出层，再接一个明确 Minecraft 版本的 Chunk/level.dat adapter；目标是输出出生点附近小范围可直接进入的世界存档，而不是先做完整 MOD UI。
-7. **Loader 继续后置**：世界存档 writer 与 Minecraft 版本 adapter 先验证“GeoWorld → 可进入的 Vanilla save”；只有小范围真实世界通过游戏验收后，再决定一个 Loader 做按需 Chunk 生成。
+## 下一步（6.4）
+1. Phase 6.3 的 WorldModel V1、inspect/validate、cross-language golden、规模审计与 Java reader 已完成；migrate 仍未做，但不阻塞首次游戏验证。
+2. Phase 6.4 第一切片已完成：版本无关 NBT/Anvil writer + Minecraft Java 26.3 adapter 已能生成标准 Preview save，Mojang 官方 26.3 codec 对 `level.dat`、`world_gen_settings.dat` 与 289/289 Chunk 全部解析通过。
+3. **当前最近验收目标是 Minecraft 26.3 客户端真实进入世界**：把 `output/minecraft-26.3-preview/GeoWorld-Preview` 作为单人存档打开，确认世界列表可识别、出生点可进入、无存档损坏/升级提示异常，并实际观察地形、海洋、河流、湖泊与群系。
+4. 客户端验收后先修真实游戏中暴露的问题，再完善 surface/vegetation 映射、预生成边界接缝、实际方块高度查询一致性与 Chunk 生成顺序独立性；第一版暂不追求洞穴、矿物、结构和完整装饰。
+5. GeoWorld Tester 继续作为宏观模型与最终 Runtime 语义的主要诊断入口；Minecraft Preview save 用于真实游戏空间验收，两者职责分开。
+6. **Loader 继续后置**：只有 Vanilla Preview 在客户端真实验收通过，且地形/水体/群系映射稳定后，再选择一个 Loader 做按需 Chunk 生成；不先做 MOD UI。
 
 ## 继续工作入口
 先读 STATUS -> PHASE6 -> DECISIONS；查历史读 PROGRESS 和 PHASE1–5。每个开发切片保留验证口径、结果、剩余风险并提交。

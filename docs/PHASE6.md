@@ -783,3 +783,91 @@ Raw Terrain 806/608 的 coast changes 与 72/126 的 river upslope 保留为校�
 - [ ] gzip+JSON 是否继续作为长期大世界编码，需要基于更大模型与 Java reader 实测后决定；若切 binary encoding 必须升级 schemaVersion。
 
 下一切片：安全 replace、manifest inspect/validate、跨语言 golden vector 文件。
+
+## Phase 6.4 第一切片实施结果（2026-10-02）
+
+底层提交：83f4f85 — feat: add nbt and anvil region writer。
+功能提交：842a0d8 — feat: generate minecraft 26.3 preview worlds。
+开发分支：agent/world-model-foundation。
+
+目标：不先接 Loader，而是先把已验证的 GeoWorld V1 Runtime 模型直接输出为一个标准 Vanilla Minecraft 存档，用真实 Chunk/NBT 契约证明“Go 模型 → Java 采样 → Minecraft save”链路成立。
+
+### 目标版本与格式基线
+
+- Minecraft Java Edition 26.3。
+- DataVersion = 5023。
+- level.dat storage version = 19133。
+- Overworld：min_y=-64，height=384，sea_level=63。
+- 版本值、Chunk NBT 字段、palette/bit-storage 规则与 worldgen metadata 均从 Mojang 26.3 官方 server jar / 内置 JSON / 官方类反编译结果核对。
+- Writer 主代码零 Mojang runtime 依赖；Mojang jar 只用于开发期 reference verifier，放在 output/，不进入 Git。
+
+### 已实现
+
+- [x] 标准 NBT 全类型写出、标准 UTF-8 String、gzip NBT 文件。
+- [x] Anvil `.mca` 8 KiB header、location/timestamp table、zlib Chunk record、4 KiB sector 分配、正负 Chunk floorDiv/floorMod。
+- [x] Minecraft 26.3 Section `block_states` / `biomes` local palette。
+- [x] 按 26.3 `SimpleBitStorage` 实现 non-crossing long packing。
+- [x] `WORLD_SURFACE` / `OCEAN_FLOOR` / `MOTION_BLOCKING` / `MOTION_BLOCKING_NO_LEAVES` Heightmap。
+- [x] 26.3 `level.dat`。
+- [x] 26.3 `data/world_gen_settings.dat`；默认 Overworld / Nether / End 三维度均使用 Mojang 26.3 normal worldgen 契约。
+- [x] GeoWorld Runtime Sample → 简化地表方块、水体、Biome 的真实 Chunk 映射。
+- [x] 自动选择非 Ocean、无 SemanticFallback/Mismatch 的安全出生点。
+- [x] 按 Chunk 半径生成 Preview World；默认 radius=8，即 17×17=289 Chunk。
+- [x] Region 写出后逐 Chunk zlib round-trip 自检。
+- [x] 官方 Mojang 26.3 codec reference verifier。
+
+### 高度边界
+
+第一版 `HeightMapping` 以 26.3 Overworld sea_level=63 为锚：
+
+- GeoWorld 0.0 → Y boundary -64
+- GeoWorld 0.5 → Y boundary 63
+- GeoWorld 1.0 → Y boundary 320
+
+填充规则：
+
+- 地面：`y < groundBoundary`
+- 水：`groundBoundary <= y < waterBoundary`
+
+因此 GeoWorld Ocean surface=0.5 时最高水方块位于 y=62，first available Y=63，与 Minecraft sea_level 的边界语义一致。
+
+### 正式 Preview
+
+默认 fixture：
+
+- Model：`internal/goldenvectors/testdata/runtime-v1.geoworld`
+- Seed：731894205
+- 输出：`output/minecraft-26.3-preview/GeoWorld-Preview`
+- 自动出生点：`(0,101,0)`
+- Center Chunk：`(0,0)`
+- Radius：8 Chunk
+- Chunk：289
+- Region：4
+
+### 官方 26.3 验证
+
+`verify-mojang-26.3.cmd` 首先校验 Mojang 26.3 官方 server jar SHA-1，然后在**不启动 server、不接受 EULA**的情况下调用官方类：
+
+- `NbtIo + LevelVersion + LevelSettings + RespawnData`：`level.dat` 解析通过；版本=26.3，DataVersion=5023，spawn=(0,101,0)。
+- `WorldGenSettings.CODEC`：`data/world_gen_settings.dat` 解析通过；Seed=731894205，Overworld/Nether/End 三维度齐全。
+- `SerializableChunkData.parse`：3×3 smoke 9/9 通过；正式 radius=8 Preview 289/289 Chunk 全部通过。
+
+这证明当前输出符合 Mojang 26.3 的 NBT/Chunk 反序列化契约，但**不等于客户端真实进入世界已经验收**。
+
+### 收口回归
+
+- `java\minecraft-save-writer\verify-storage.cmd`：通过。
+- `java\runtime-reader\verify-golden.cmd`：15/15 cross-language golden 再次通过，float tolerance=1e-9。
+- `go test ./... -count=1`：全仓通过。
+
+### 当前边界
+
+- [ ] 尚未在 Minecraft 26.3 客户端真实进入该 Preview 存档做人眼验收。
+- [ ] 表层材质仍是简化映射；植被、树木、洞穴、矿物、结构、完整装饰未实现。
+- [ ] Preview Chunk 不写结构/实体/block entity；`isLightOn` 不置 true，首次加载由 Minecraft 补光。
+- [ ] 预生成范围之外仍由 vanilla 26.3 normal worldgen 接管，边界可能存在接缝。
+- [ ] Biome 第一版使用受限 local palette 的简化水平采样，尚未做完整 quart-biome/global-palette 路径。
+- [ ] external `.mcc` Chunk 尚未实现；单 Chunk 超过 255 sectors 会明确拒绝。
+- [ ] Loader 仍未接入；按需 Chunk 生成必须等 Vanilla Preview 客户端验收通过后再开始。
+
+下一切片：Minecraft 26.3 客户端真实进入世界验收；先修实际游戏中暴露的地形/水体/群系/存档问题，再决定 surface/vegetation 与 Loader 的优先级。

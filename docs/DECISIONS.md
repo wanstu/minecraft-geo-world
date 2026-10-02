@@ -1093,3 +1093,22 @@ WorldModel 内存对象用于生成与调试，不等于长期存档 schema。�
 7. 当前外层 gzip+JSON 优先换取跨语言可读性与版本可控性；若未来切换 binary field encoding 必须升级 schemaVersion，不得静默改变 V1。
 
 正式 640×400 文件约 7.63 MB，重开固定 484 样点 0 mismatch。
+
+---
+
+## D-044：首次 Minecraft 验证先走 Vanilla 26.3 Save，Loader 后置
+
+状态：Phase 6.4 第一切片已实施
+
+跨语言 Runtime 已经有稳定 golden 后，首次真实游戏验证不应立刻引入 Fabric / NeoForge / Forge。先输出标准 Vanilla 存档，可以把“GeoWorld 模型是否正确映射为 Minecraft Chunk”与“Loader 生命周期/注入点是否正确”两个问题拆开。
+
+规则：
+1. Phase 6.4 首个目标版本固定为 Minecraft Java Edition 26.3；DataVersion=5023，level.dat storage version=19133。版本相关 Chunk/NBT 逻辑必须隔离在 `v26_3` adapter，不污染通用 GeoWorld Java Runtime reader。
+2. 先实现标准 NBT + Anvil Region + `level.dat` + `data/world_gen_settings.dat`，生成 Vanilla Preview save；Loader 只有在客户端真实进入 Preview 并完成第一轮地形/水体/群系验收后才开始。
+3. 26.3 Overworld 高度映射采用**边界语义**：GeoWorld 0.0→Y=-64，0.5→Y=63，1.0→Y=320；方块地面满足 `y < groundBoundary`，水满足 `groundBoundary <= y < waterBoundary`。Ocean surface=0.5 因而最高水方块为 y=62，first available Y=63。
+4. Preview 第一版允许有限半径预生成，范围外继续使用 vanilla 26.3 normal worldgen；边界接缝属于明确已知限制，不通过隐藏扩展预生成范围冒充解决。
+5. Mojang 官方 server jar 仅用于开发期 reference verifier，必须校验固定 SHA-1，不进入 Git，也不成为 writer/runtime 依赖。
+6. 官方 `LevelVersion/LevelSettings/WorldGenSettings/SerializableChunkData` 全部能解析只证明格式契约成立；**不能把 codec 通过冒充成 Minecraft 客户端真实进入世界已验收**。
+7. 首次客户端验收优先观察世界列表识别、出生点、存档损坏/升级提示、地形高度、Ocean/River/Lake、Biome 与可见表层；洞穴、矿物、结构、完整植被与多 Loader 不属于这一切片的完成条件。
+
+当前默认 Preview（Seed 731894205，radius=8）已经由 Mojang 26.3 官方 codec 解析 `level.dat` / `world_gen_settings.dat`，并通过 289/289 Chunk；客户端真实进入世界仍待验收。
