@@ -22,7 +22,7 @@
 - 26.3 SimpleBitStorage 兼容的 non-crossing long packing；
 - WORLD_SURFACE / OCEAN_FLOOR / MOTION_BLOCKING / MOTION_BLOCKING_NO_LEAVES heightmaps；
 - 26.3 level.dat；
-- 26.3 data/world_gen_settings.dat；
+- 26.3 data/minecraft/world_gen_settings.dat；
 - GeoWorld V1 Runtime Sample -> 地形 / 水体 / 群系 / 表层方块；
 - 自动选择非海洋、无 semantic fallback/mismatch 的安全出生点；
 - 按 Chunk 半径预生成小范围 Overworld。
@@ -78,7 +78,7 @@
 已验证：
 
 - NbtIo + LevelVersion / LevelSettings 成功读取生成的 level.dat；
-- WorldGenSettings.CODEC 成功读取 data/world_gen_settings.dat，Seed 与 overworld/nether/end 三维度全部通过；
+- WorldGenSettings.CODEC 成功读取 data/minecraft/world_gen_settings.dat，Seed 与 overworld/nether/end 三维度全部通过；
 - SerializableChunkData.parse 先通过 3x3 smoke，再对正式 radius=8（17x17）的 289/289 个生成 Chunk 全量解析通过。
 
 官方 server jar 与解包内容仅放在 output/ 调试目录，不进入 Git。

@@ -88,8 +88,16 @@ public final class Minecraft26_3Verifier {
 
             requireFile(world.resolve("level.dat"));
             requireFile(
-                world.resolve("data").resolve("world_gen_settings.dat")
+                world
+                    .resolve("data")
+                    .resolve("minecraft")
+                    .resolve("world_gen_settings.dat")
             );
+            if (Files.exists(world.resolve("data").resolve("world_gen_settings.dat"))) {
+                throw new AssertionError(
+                    "legacy wrong world_gen_settings.dat path must not be written"
+                );
+            }
 
             long regionFiles;
             try (var files = Files.list(world.resolve("region"))) {

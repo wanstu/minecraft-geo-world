@@ -114,7 +114,10 @@ public final class Minecraft26_3Metadata {
             .put("DataVersion", Nbt.intTag(DATA_VERSION));
 
         Nbt.writeRootCompressed(
-            worldDirectory.resolve("data").resolve("world_gen_settings.dat"),
+            worldDirectory
+                .resolve("data")
+                .resolve("minecraft")
+                .resolve("world_gen_settings.dat"),
             "",
             root
         );

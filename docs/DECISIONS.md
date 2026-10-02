@@ -1104,7 +1104,7 @@ WorldModel 内存对象用于生成与调试，不等于长期存档 schema。�
 
 规则：
 1. Phase 6.4 首个目标版本固定为 Minecraft Java Edition 26.3；DataVersion=5023，level.dat storage version=19133。版本相关 Chunk/NBT 逻辑必须隔离在 `v26_3` adapter，不污染通用 GeoWorld Java Runtime reader。
-2. 先实现标准 NBT + Anvil Region + `level.dat` + `data/world_gen_settings.dat`，生成 Vanilla Preview save；Loader 只有在客户端真实进入 Preview 并完成第一轮地形/水体/群系验收后才开始。
+2. 先实现标准 NBT + Anvil Region + `level.dat` + `data/minecraft/world_gen_settings.dat`，生成 Vanilla Preview save；Loader 只有在客户端真实进入 Preview 并完成第一轮地形/水体/群系验收后才开始。
 3. 26.3 Overworld 高度映射采用**边界语义**：GeoWorld 0.0→Y=-64，0.5→Y=63，1.0→Y=320；方块地面满足 `y < groundBoundary`，水满足 `groundBoundary <= y < waterBoundary`。Ocean surface=0.5 因而最高水方块为 y=62，first available Y=63。
 4. Preview 第一版允许有限半径预生成，范围外继续使用 vanilla 26.3 normal worldgen；边界接缝属于明确已知限制，不通过隐藏扩展预生成范围冒充解决。
 5. Mojang 官方 server jar 仅用于开发期 reference verifier，必须校验固定 SHA-1，不进入 Git，也不成为 writer/runtime 依赖。

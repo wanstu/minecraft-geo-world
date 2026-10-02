@@ -184,10 +184,11 @@
 - Java 验收中特别确认 V1 的 Ecology/Profile `[]uint8` 字段在 Go JSON 中是 Base64 字符串而非数字数组；Java reader 已按该实际格式实现，避免后续 Minecraft 群系读取静默错位。
 - `java\\runtime-reader\\verify-golden.cmd` 在当前 JDK 27 上以 `--release 21` 编译并运行成功，不依赖 Gradle/Maven。
 - Minecraft 存档输出第一版已固定到 Java Edition 26.3：DataVersion=5023、level.dat storage version=19133、Overworld minY=-64 / height=384 / sea_level=63。版本与 NBT schema 均从 Mojang 26.3 官方 server jar / 内置数据核对，writer 主代码本身不依赖 Mojang jar。
-- `java/minecraft-save-writer` 已能从 GeoWorld V1 直接写出 gzip NBT、26.3 `level.dat`、26.3 `data/world_gen_settings.dat`、Anvil `.mca`、Section block-state/biome palette 与四类 Heightmap；默认生成出生点周围 radius=8，即 17×17=289 个 Chunk。未预生成范围仍由 vanilla 26.3 normal worldgen 接管。
+- `java/minecraft-save-writer` 已能从 GeoWorld V1 直接写出 gzip NBT、26.3 `level.dat`、26.3 `data/minecraft/world_gen_settings.dat`、Anvil `.mca`、Section block-state/biome palette 与四类 Heightmap；默认生成出生点周围 radius=8，即 17×17=289 个 Chunk。未预生成范围仍由 vanilla 26.3 normal worldgen 接管。
 - 第一版 HeightMapping 正式冻结为边界语义：GeoWorld 0.0→Y=-64、0.5→Y=63、1.0→Y=320；实体地面填 `y < groundBoundary`，水填 `groundBoundary <= y < waterBoundary`，避免 sea_level 出现一格偏差。
 - 默认 golden fixture 生成的正式 Preview World 位于 `output/minecraft-26.3-preview/GeoWorld-Preview`，Seed=731894205，安全出生点自动选为 `(0,101,0)`，共 289 Chunk / 4 Region。
-- Mojang 26.3 官方 codec 验收已真实执行：验证脚本先核对官方 server jar SHA-1，再在**不启动 server、不接受 EULA**的情况下调用官方类解析。`level.dat` 通过 `LevelVersion/LevelSettings/RespawnData`；`world_gen_settings.dat` 通过 `WorldGenSettings.CODEC` 且 Overworld/Nether/End 三维度齐全；`SerializableChunkData.parse` 对正式 Preview 的 289/289 Chunk 全部通过。
+- Mojang 26.3 官方 codec 验收已真实执行：验证脚本先核对官方 server jar SHA-1，再在**不启动 server、不接受 EULA**的情况下调用官方类解析。`level.dat` 通过 `LevelVersion/LevelSettings/RespawnData`；`data/minecraft/world_gen_settings.dat` 通过 `WorldGenSettings.CODEC` 且 Overworld/Nether/End 三维度齐全；`SerializableChunkData.parse` 对正式 Preview 的 289/289 Chunk 全部通过。
+- 首次真实 Minecraft 26.3 客户端进入失败已定位：旧 writer 写成 `data/world_gen_settings.dat`，客户端日志实际读取 `data/minecraft/world_gen_settings.dat`，因此报 `Unable to read or access the world gen settings file` / `Overworld settings missing`。已修正为 namespaced SavedData 路径，并让内部 smoke 与 Mojang reference verifier 都只接受正确路径且拒绝旧错误路径。修复版 `GeoWorld 26.3 Preview Fix1` 已复制到 HMCL 的 26.3 `saves` 并再次通过 Mojang 289/289 验证，待客户端复测。
 - 收口回归：`verify-storage.cmd` 通过已知 NBT 字节向量、UTF-8、Region header/zlib/sector、负 Chunk 坐标、26.3 HeightMapping / bit packing 与 3×3 preview smoke；Java Runtime golden 15/15 再次通过；`go test ./... -count=1` 全仓通过。
 - 详细参数、当前数值和历史对照见 PHASE6.md。
 

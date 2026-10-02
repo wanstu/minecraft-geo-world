@@ -94,7 +94,10 @@ public final class Mojang26_3Verifier {
 
         HolderLookup.Provider worldLookup = VanillaRegistries.createWorldLookup();
         CompoundTag worldGenRoot = NbtIo.readCompressed(
-            world.resolve("data").resolve("world_gen_settings.dat"),
+            world
+                .resolve("data")
+                .resolve("minecraft")
+                .resolve("world_gen_settings.dat"),
             NbtAccounter.unlimitedHeap()
         );
         CompoundTag worldGenData = worldGenRoot.getCompoundOrEmpty("data");

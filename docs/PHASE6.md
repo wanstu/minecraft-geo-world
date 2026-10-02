@@ -809,7 +809,7 @@ Raw Terrain 806/608 的 coast changes 与 72/126 的 river upslope 保留为校�
 - [x] 按 26.3 `SimpleBitStorage` 实现 non-crossing long packing。
 - [x] `WORLD_SURFACE` / `OCEAN_FLOOR` / `MOTION_BLOCKING` / `MOTION_BLOCKING_NO_LEAVES` Heightmap。
 - [x] 26.3 `level.dat`。
-- [x] 26.3 `data/world_gen_settings.dat`；默认 Overworld / Nether / End 三维度均使用 Mojang 26.3 normal worldgen 契约。
+- [x] 26.3 `data/minecraft/world_gen_settings.dat`；默认 Overworld / Nether / End 三维度均使用 Mojang 26.3 normal worldgen 契约。
 - [x] GeoWorld Runtime Sample → 简化地表方块、水体、Biome 的真实 Chunk 映射。
 - [x] 自动选择非 Ocean、无 SemanticFallback/Mismatch 的安全出生点。
 - [x] 按 Chunk 半径生成 Preview World；默认 radius=8，即 17×17=289 Chunk。
@@ -849,10 +849,12 @@ Raw Terrain 806/608 的 coast changes 与 72/126 的 river upslope 保留为校�
 `verify-mojang-26.3.cmd` 首先校验 Mojang 26.3 官方 server jar SHA-1，然后在**不启动 server、不接受 EULA**的情况下调用官方类：
 
 - `NbtIo + LevelVersion + LevelSettings + RespawnData`：`level.dat` 解析通过；版本=26.3，DataVersion=5023，spawn=(0,101,0)。
-- `WorldGenSettings.CODEC`：`data/world_gen_settings.dat` 解析通过；Seed=731894205，Overworld/Nether/End 三维度齐全。
+- `WorldGenSettings.CODEC`：`data/minecraft/world_gen_settings.dat` 解析通过；Seed=731894205，Overworld/Nether/End 三维度齐全。
 - `SerializableChunkData.parse`：3×3 smoke 9/9 通过；正式 radius=8 Preview 289/289 Chunk 全部通过。
 
 这证明当前输出符合 Mojang 26.3 的 NBT/Chunk 反序列化契约，但**不等于客户端真实进入世界已经验收**。
+
+首次 Minecraft 26.3 客户端实测发现一处路径契约遗漏：writer 原先把 worldgen SavedData 写到 `data/world_gen_settings.dat`，而 26.3 客户端实际按 namespaced SavedData 路径读取 `data/minecraft/world_gen_settings.dat`。真实 `latest.log` 明确报 `Unable to read or access the world gen settings file`，随后 `Overworld settings missing`。已修正 writer 与两套 verifier，并新增回归断言：正确 namespaced 路径必须存在，旧错误路径必须不存在。修复版 `GeoWorld 26.3 Preview Fix1` 已再次通过 Mojang 官方 289/289 Chunk 验证，并复制到 HMCL 26.3 `saves` 目录等待客户端复测。
 
 ### 收口回归
 
