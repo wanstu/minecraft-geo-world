@@ -70,6 +70,7 @@ function updateBackend(online){
     active=null;
     clearSample();
     renderEmptyStats();
+    renderEmptyAnomalies();
     $('topStatus').textContent='需重新加载';
     $('progressText').textContent='后端已恢复，请重新生成世界或重新打开已保存模型';
     if(staleSeed!==null){
@@ -185,6 +186,7 @@ $('generate').onclick=async()=>{
     }
     clearSample();
     renderStats();
+    await refreshAnomalies();
     await loadMap();
     await refreshModels();
   }catch(e){
@@ -255,7 +257,8 @@ function layerName(v){
     lakes:'湖泊',
     water:'最终水体',
     biome:'群系',
-    profile:'配置置信度'
+    profile:'配置置信度',
+    anomalies:'最终异常'
   })[v]||v;
 }
 
@@ -269,7 +272,8 @@ function updateLayerHelp(){
     lakes:'湖泊：直接绘制正式 Waterbed 湖泊节点和影响半径，便于检查湖泊分布与聚集区域。',
     water:'最终水体：按 Runtime 逐点显示海洋、湖泊和河流的最终水体判定。',
     biome:'群系：显示最终 Minecraft 生物群系家族。',
-    profile:'配置置信度：颜色越异常越需要检查；语义 fallback / mismatch 会高亮。'
+    profile:'配置置信度：颜色越异常越需要检查；语义 fallback / mismatch 会高亮。',
+    anomalies:'最终异常：红=海岸冲突，橙=河床逆坡，青=湖床违规，黄=Runtime 回退，紫=Runtime 语义冲突。没有标记表示当前最终审计为 0。'
   };
   $('layerHelp').textContent=help[layer]||'';
 }
@@ -282,17 +286,7 @@ $('map').onclick=async e=>{
   const g=active.geometry;
   const x=g.OriginX+fx*g.SpanXBlocks;
   const z=g.OriginZ+fz*g.SpanZBlocks;
-  const c=$('cursor');
-  c.style.display='block';
-  c.style.left=(e.clientX-$('mapWrap').getBoundingClientRect().left-6)+'px';
-  c.style.top=(e.clientY-$('mapWrap').getBoundingClientRect().top-6)+'px';
-  try{
-    renderSample(await api(`/api/sample?x=${x}&z=${z}`));
-  }catch(err){
-    $('sampleEmpty').hidden=true;
-    $('sample').hidden=false;
-    $('sample').innerHTML='<div class="error-card">'+escapeHtml(err.message)+'</div>';
-  }
+  await focusWorldPoint(x,z);
 };
 
 $('save').onclick=async()=>{
@@ -334,6 +328,7 @@ $('load').onclick=async()=>{
     $('modelMessage').innerHTML='<span class="warn">当前是已保存模型的只读重开结果；如需再次保存，请重新生成世界。</span>';
     clearSample();
     renderStats();
+    await refreshAnomalies();
     await loadMap();
   }catch(e){
     $('modelMessage').innerHTML='<span class="error">'+escapeHtml(e.message)+'</span>';
@@ -355,6 +350,70 @@ async function refreshModels(selectName=''){
     if(e.network)$('modelMessage').innerHTML='<span class="error">'+escapeHtml(e.message)+'</span>';
   }
   updateActionState();
+}
+
+
+function renderEmptyAnomalies(){
+  $('anomalySummary').textContent='生成或重开模型后显示最终异常。';
+  $('anomalyList').innerHTML='';
+}
+
+async function refreshAnomalies(){
+  if(!active){
+    renderEmptyAnomalies();
+    return;
+  }
+  try{
+    const report=await api('/api/anomalies');
+    const counts=report.counts||{};
+    $('anomalySummary').innerHTML=
+      '共 <b>'+Number(report.total||0)+'</b> 个最终异常 · 海岸 '+Number(counts.coast_mismatch||0)+
+      ' · 河床 '+Number(counts.river_upslope||0)+
+      ' · 湖床 '+Number(counts.lake_bed||0)+
+      ' · Runtime 回退 '+Number(counts.runtime_fallback||0)+
+      ' · Runtime 冲突 '+Number(counts.runtime_mismatch||0);
+    if(!report.points||report.points.length===0){
+      $('anomalyList').innerHTML='<div class="anomaly-empty">当前最终异常为 0</div>';
+      return;
+    }
+    $('anomalyList').innerHTML=report.points.map((p,i)=>
+      '<button type="button" class="anomaly-item" data-anomaly-index="'+i+'">'+
+        '<strong>'+escapeHtml(p.label)+'</strong>'+
+        '<span>坐标 '+Math.round(p.x)+', '+Math.round(p.z)+(p.detail?' · '+escapeHtml(p.detail):'')+'</span>'+
+      '</button>'
+    ).join('')+(report.truncated?'<div class="anomaly-truncated">异常过多，只显示前 '+report.points.length+' 个位置；总数仍按完整审计统计。</div>':'');
+    document.querySelectorAll('.anomaly-item').forEach((btn)=>{
+      btn.onclick=async()=>{
+        const p=report.points[Number(btn.dataset.anomalyIndex)];
+        if(!p)return;
+        selectLayer('anomalies');
+        await focusWorldPoint(p.x,p.z);
+      };
+    });
+  }catch(e){
+    $('anomalySummary').innerHTML='<span class="error">'+escapeHtml(e.message)+'</span>';
+    $('anomalyList').innerHTML='';
+  }
+}
+
+async function focusWorldPoint(x,z){
+  if(!active)return;
+  const g=active.geometry;
+  const fx=Math.max(0,Math.min(1,(x-g.OriginX)/g.SpanXBlocks));
+  const fz=Math.max(0,Math.min(1,(z-g.OriginZ)/g.SpanZBlocks));
+  const imgRect=$('map').getBoundingClientRect();
+  const wrapRect=$('mapWrap').getBoundingClientRect();
+  const c=$('cursor');
+  c.style.display='block';
+  c.style.left=(imgRect.left-wrapRect.left+fx*imgRect.width-6)+'px';
+  c.style.top=(imgRect.top-wrapRect.top+fz*imgRect.height-6)+'px';
+  try{
+    renderSample(await api('/api/sample?x='+encodeURIComponent(x)+'&z='+encodeURIComponent(z)));
+  }catch(err){
+    $('sampleEmpty').hidden=true;
+    $('sample').hidden=false;
+    $('sample').innerHTML='<div class="error-card">'+escapeHtml(err.message)+'</div>';
+  }
 }
 
 function renderEmptyStats(){
@@ -380,6 +439,7 @@ function renderStats(){
     ${kv('最大陆块占比',(Number(active.largestLandShare)*100).toFixed(1)+'%')}
     ${kv('河段',active.riverSegments)}
     ${kv('湖泊节点',active.lakeNodes)}
+    ${diagnosticKV('最终海岸冲突',active.finalCoastMismatch)}
     ${diagnosticKV('最终河床逆坡',active.finalRiverUpslope)}
     ${diagnosticKV('最终湖床违规',active.finalLakeBedViolations)}
     ${diagnosticKV('Runtime 节点回退',active.runtimeFallback)}
@@ -449,6 +509,7 @@ updateRangePreview();
 updateContinentLabels();
 updateLayerHelp();
 updateActionState();
+renderEmptyAnomalies();
 refreshModels();
 refreshStatus();
 setInterval(()=>{if(!poll)void refreshStatus()},2000);

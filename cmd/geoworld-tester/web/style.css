@@ -54,6 +54,13 @@ hr{border:0;border-top:1px solid #29333a;margin:16px 0}
 .warn{color:#e6b86a}
 .ok{color:#70c294}
 .error{color:#ef7777}
+.anomaly-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.anomaly-item{width:100%;text-align:left;padding:8px;border-radius:5px;background:#11181d;border:1px solid #2d3941}
+.anomaly-item:hover{border-color:#566771}
+.anomaly-item strong{display:block;font-size:12px;margin-bottom:2px}
+.anomaly-item span{display:block;color:#8fa0aa;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.anomaly-empty{padding:10px;border:1px solid #2f5d48;background:#16271f;color:#70c294;border-radius:6px}
+.anomaly-truncated{margin-top:7px;color:#e6b86a;font-size:11px}
 @media(max-width:1100px){
   .layout{grid-template-columns:245px 1fr}
   .inspector{position:fixed;right:0;top:54px;bottom:0;width:290px;z-index:5;transform:translateX(100%)}

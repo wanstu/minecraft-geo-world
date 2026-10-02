@@ -28,6 +28,7 @@ import (
 	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
+	"geoworld/internal/terrain"
 	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
 	"geoworld/internal/worldmodelio"
@@ -51,13 +52,40 @@ type activeWorld struct {
 	largestLandShare       float64
 	finalRiverUpslope      int
 	finalLakeBedViolations int
+	finalCoastMismatch     int
 	runtimeFallback        int
 	runtimeMismatch        int
+	anomalies              anomalyReport
 	source                 string
 	model                  *generator.WorldModel
 	reopened               *worldmodelio.RuntimeModel
 	generatedAt            time.Time
 	duration               time.Duration
+}
+
+const anomalyPointLimit = 250
+
+const (
+	anomalyCoastMismatch   = "coast_mismatch"
+	anomalyRiverUpslope    = "river_upslope"
+	anomalyLakeBed         = "lake_bed"
+	anomalyRuntimeFallback = "runtime_fallback"
+	anomalyRuntimeMismatch = "runtime_mismatch"
+)
+
+type anomalyPoint struct {
+	Kind   string  `json:"kind"`
+	Label  string  `json:"label"`
+	X      float64 `json:"x"`
+	Z      float64 `json:"z"`
+	Detail string  `json:"detail,omitempty"`
+}
+
+type anomalyReport struct {
+	Total     int            `json:"total"`
+	Counts    map[string]int `json:"counts"`
+	Points    []anomalyPoint `json:"points"`
+	Truncated bool           `json:"truncated"`
 }
 
 type appState struct {
@@ -123,6 +151,7 @@ func main() {
 	mux.HandleFunc("/api/status", state.handleStatus)
 	mux.HandleFunc("/api/generate", state.handleGenerate)
 	mux.HandleFunc("/api/sample", state.handleSample)
+	mux.HandleFunc("/api/anomalies", state.handleAnomalies)
 	mux.HandleFunc("/api/layer", state.handleLayer)
 	mux.HandleFunc("/api/save", func(w http.ResponseWriter, r *http.Request) { state.handleSave(w, r, *modelDir) })
 	mux.HandleFunc("/api/load", func(w http.ResponseWriter, r *http.Request) { state.handleLoad(w, r, *modelDir) })
@@ -252,8 +281,6 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	landComponents, majorLandComponents, largestLandShare := summarizeLand(model.Surface)
-	waterbedAudit := model.Waterbed.Audit(16, model.Config.Reconcile.FinalUpslopeEpsilon)
-	runtimeFallback, runtimeMismatch := summarizeRuntimeSemantics(model.Geometry, model.RuntimeProfile.Sample)
 	active := &activeWorld{
 		seed:                   model.Config.Seed,
 		geometry:               model.Geometry,
@@ -267,15 +294,12 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		landComponents:         landComponents,
 		majorLandComponents:    majorLandComponents,
 		largestLandShare:       largestLandShare,
-		finalRiverUpslope:      waterbedAudit.RiverUpslopeSteps,
-		finalLakeBedViolations: waterbedAudit.LakeBedViolations,
-		runtimeFallback:        runtimeFallback,
-		runtimeMismatch:        runtimeMismatch,
 		source:                 "generated",
 		model:                  model,
 		generatedAt:            time.Now(),
 		duration:               duration,
 	}
+	applyAnomalyReport(active, buildAnomalyReport(active))
 	s.mu.Lock()
 	s.generating = false
 	s.lastError = ""
@@ -310,6 +334,21 @@ func (s *appState) handleSample(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, sampleJSON(x, z, sample))
 }
 
+func (s *appState) handleAnomalies(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+	s.mu.RLock()
+	active := s.active
+	s.mu.RUnlock()
+	if active == nil {
+		writeError(w, http.StatusConflict, errors.New("generate or load a world first"))
+		return
+	}
+	writeJSON(w, http.StatusOK, active.anomalies)
+}
+
 func (s *appState) handleLayer(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w)
@@ -331,7 +370,7 @@ func (s *appState) handleLayer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	if layer == "skeleton" || layer == "rivers" || layer == "lakes" {
+	if layer == "skeleton" || layer == "rivers" || layer == "lakes" || layer == "anomalies" {
 		if err := renderDiagnosticLayer(img, active, layer); err != nil {
 			writeError(w, http.StatusConflict, err)
 			return
@@ -424,8 +463,6 @@ func (s *appState) handleLoad(w http.ResponseWriter, r *http.Request, modelDir s
 		return
 	}
 	landComponents, majorLandComponents, largestLandShare := summarizeLand(model.Surface)
-	waterbedAudit := model.Waterbed.Audit(16, model.Config.Reconcile.FinalUpslopeEpsilon)
-	runtimeFallback, runtimeMismatch := summarizeRuntimeSemantics(model.Geometry, model.RuntimeProfile.Sample)
 	fragmentation := model.Config.Phase1.ContinentFragmentation
 	if fragmentation == 0 {
 		fragmentation = phase1.DefaultContinentFragmentation
@@ -447,15 +484,13 @@ func (s *appState) handleLoad(w http.ResponseWriter, r *http.Request, modelDir s
 		landComponents:         landComponents,
 		majorLandComponents:    majorLandComponents,
 		largestLandShare:       largestLandShare,
-		finalRiverUpslope:      waterbedAudit.RiverUpslopeSteps,
-		finalLakeBedViolations: waterbedAudit.LakeBedViolations,
-		runtimeFallback:        runtimeFallback,
-		runtimeMismatch:        runtimeMismatch,
 		source:                 "reopened",
 		reopened:               model,
 		generatedAt:            time.Now(),
 		duration:               time.Since(start),
 	}
+	applyAnomalyReport(active, buildAnomalyReport(active))
+	active.duration = time.Since(start)
 	s.mu.Lock()
 	s.active = active
 	s.lastError = ""
@@ -509,10 +544,13 @@ func activeSummary(a *activeWorld) map[string]any {
 		"landComponents":          a.landComponents,
 		"majorLandComponents":     a.majorLandComponents,
 		"largestLandShare":        a.largestLandShare,
+		"finalCoastMismatch":      a.finalCoastMismatch,
 		"finalRiverUpslope":       a.finalRiverUpslope,
 		"finalLakeBedViolations":  a.finalLakeBedViolations,
 		"runtimeFallback":         a.runtimeFallback,
 		"runtimeMismatch":         a.runtimeMismatch,
+		"anomalyTotal":            a.anomalies.Total,
+		"anomalyTruncated":        a.anomalies.Truncated,
 		"source":                  a.source,
 		"durationMs":              a.duration.Milliseconds(),
 		"intermediateDiagnostics": false,
@@ -622,6 +660,151 @@ func summarizeRuntimeSemantics(g world.GridGeometry, sample func(float64, float6
 		}
 	}
 	return fallback, mismatch
+}
+
+func applyAnomalyReport(active *activeWorld, report anomalyReport) {
+	active.anomalies = report
+	active.finalCoastMismatch = report.Counts[anomalyCoastMismatch]
+	active.finalRiverUpslope = report.Counts[anomalyRiverUpslope]
+	active.finalLakeBedViolations = report.Counts[anomalyLakeBed]
+	active.runtimeFallback = report.Counts[anomalyRuntimeFallback]
+	active.runtimeMismatch = report.Counts[anomalyRuntimeMismatch]
+}
+
+func buildAnomalyReport(active *activeWorld) anomalyReport {
+	report := anomalyReport{Counts: map[string]int{
+		anomalyCoastMismatch:   0,
+		anomalyRiverUpslope:    0,
+		anomalyLakeBed:         0,
+		anomalyRuntimeFallback: 0,
+		anomalyRuntimeMismatch: 0,
+	}}
+	if active == nil {
+		return report
+	}
+	add := func(point anomalyPoint) {
+		report.Counts[point.Kind]++
+		report.Total++
+		if len(report.Points) < anomalyPointLimit {
+			report.Points = append(report.Points, point)
+		} else {
+			report.Truncated = true
+		}
+	}
+
+	surface := activeSurface(active)
+	coast := activeCoastTerrain(active)
+	if surface != nil && coast != nil && surface.Width == active.geometry.Width && surface.Height == active.geometry.Height {
+		heights := make([]float64, surface.Width*surface.Height)
+		for z := 0; z < surface.Height; z++ {
+			for x := 0; x < surface.Width; x++ {
+				wx, wz := active.geometry.NodePosition(x, z)
+				heights[z*surface.Width+x] = coast.SampleNormalized(wx, wz)
+			}
+		}
+		if classified, err := world.ClassifySurface(surface.Width, surface.Height, heights, surface.SeaLevelNormalized); err == nil {
+			for i, land := range classified.LandMask {
+				if land == surface.LandMask[i] {
+					continue
+				}
+				x, z := i%surface.Width, i/surface.Width
+				wx, wz := active.geometry.NodePosition(x, z)
+				add(anomalyPoint{
+					Kind: anomalyCoastMismatch, Label: "最终海岸冲突",
+					X: wx, Z: wz,
+					Detail: fmt.Sprintf("Surface=%t CoastTerrain=%t", surface.LandMask[i], land),
+				})
+			}
+		}
+	}
+
+	wb := activeWaterbed(active)
+	if wb != nil {
+		epsilon := activeFinalUpslopeEpsilon(active)
+		for segID, seg := range wb.Rivers {
+			steps := 16
+			if profileSteps := 2 * (len(seg.Profile) - 1); profileSteps > steps {
+				steps = profileSteps
+			}
+			prev := wb.SampleNormalized(seg.X0, seg.Z0)
+			for j := 1; j <= steps; j++ {
+				t := float64(j) / float64(steps)
+				x := seg.X0 + (seg.X1-seg.X0)*t
+				z := seg.Z0 + (seg.Z1-seg.Z0)*t
+				current := wb.SampleNormalized(x, z)
+				rise := current - prev
+				if rise > epsilon {
+					add(anomalyPoint{
+						Kind: anomalyRiverUpslope, Label: "最终河床逆坡",
+						X: x, Z: z,
+						Detail: fmt.Sprintf("segment=%d rise=%.8f", segID, rise),
+					})
+				}
+				prev = current
+			}
+		}
+		for _, lake := range wb.Lakes {
+			h := wb.SampleNormalized(lake.X, lake.Z)
+			excess := h - lake.BedCeiling
+			if excess > epsilon {
+				add(anomalyPoint{
+					Kind: anomalyLakeBed, Label: "最终湖床违规",
+					X: lake.X, Z: lake.Z,
+					Detail: fmt.Sprintf("lake=%d excess=%.8f", lake.LakeID, excess),
+				})
+			}
+		}
+	}
+
+	if active.sample != nil {
+		for z := 0; z < active.geometry.Height; z++ {
+			for x := 0; x < active.geometry.Width; x++ {
+				wx, wz := active.geometry.NodePosition(x, z)
+				s := active.sample(wx, wz)
+				if s.SemanticFallback {
+					add(anomalyPoint{
+						Kind: anomalyRuntimeFallback, Label: "Runtime 节点回退",
+						X: wx, Z: wz,
+						Detail: fmt.Sprintf("sourceNode=%d", s.SourceNode),
+					})
+				}
+				if s.SemanticMismatch {
+					add(anomalyPoint{
+						Kind: anomalyRuntimeMismatch, Label: "Runtime 节点冲突",
+						X: wx, Z: wz,
+						Detail: fmt.Sprintf("sourceNode=%d", s.SourceNode),
+					})
+				}
+			}
+		}
+	}
+	return report
+}
+
+func activeFinalUpslopeEpsilon(active *activeWorld) float64 {
+	if active == nil {
+		return 0
+	}
+	if active.model != nil && active.model.Reconciliation != nil {
+		return math.Max(0, active.model.Reconciliation.Config.FinalUpslopeEpsilon)
+	}
+	if active.reopened != nil {
+		return math.Max(0, active.reopened.Config.Reconcile.FinalUpslopeEpsilon)
+	}
+	return 0
+}
+
+func activeCoastTerrain(active *activeWorld) *terrain.Model {
+	if active == nil {
+		return nil
+	}
+	if active.model != nil {
+		return active.model.CoastTerrain
+	}
+	if active.reopened != nil {
+		return active.reopened.CoastTerrain
+	}
+	return nil
 }
 
 func sampleJSON(x, z float64, s runtimeprofile.Sample) map[string]any {
@@ -735,7 +918,11 @@ func renderDiagnosticLayer(img *image.RGBA, active *activeWorld, layer string) e
 		gz := int(math.Round(float64(py) / float64(maxInt(b.Dy()-1, 1)) * float64(surface.Height-1)))
 		for px := 0; px < b.Dx(); px++ {
 			gx := int(math.Round(float64(px) / float64(maxInt(b.Dx()-1, 1)) * float64(surface.Width-1)))
-			img.SetRGBA(px, py, diagnosticSurfaceColor(surface, gx, gz, layer == "skeleton"))
+			if layer == "anomalies" {
+				img.SetRGBA(px, py, anomalyBaseColor(surface, gx, gz))
+			} else {
+				img.SetRGBA(px, py, diagnosticSurfaceColor(surface, gx, gz, layer == "skeleton"))
+			}
 		}
 	}
 
@@ -761,8 +948,39 @@ func renderDiagnosticLayer(img *image.RGBA, active *activeWorld, layer string) e
 			drawDiagnosticDisc(img, x, y, radius, color.RGBA{73, 169, 205, 255})
 			drawDiagnosticDisc(img, x, y, maxInt(1, radius/2), color.RGBA{115, 211, 238, 255})
 		}
+	case "anomalies":
+		for _, point := range active.anomalies.Points {
+			x, y := diagnosticWorldToPixel(active.geometry, b, point.X, point.Z)
+			c := anomalyColor(point.Kind)
+			drawDiagnosticDisc(img, x, y, 5, color.RGBA{20, 22, 24, 255})
+			drawDiagnosticDisc(img, x, y, 3, c)
+		}
 	}
 	return nil
+}
+
+func anomalyBaseColor(surface *world.Surface, x, z int) color.RGBA {
+	if surface.LandMask[z*surface.Width+x] {
+		return color.RGBA{66, 84, 73, 255}
+	}
+	return color.RGBA{27, 58, 76, 255}
+}
+
+func anomalyColor(kind string) color.RGBA {
+	switch kind {
+	case anomalyCoastMismatch:
+		return color.RGBA{239, 76, 94, 255}
+	case anomalyRiverUpslope:
+		return color.RGBA{242, 151, 61, 255}
+	case anomalyLakeBed:
+		return color.RGBA{66, 197, 226, 255}
+	case anomalyRuntimeFallback:
+		return color.RGBA{235, 205, 75, 255}
+	case anomalyRuntimeMismatch:
+		return color.RGBA{219, 82, 190, 255}
+	default:
+		return color.RGBA{240, 240, 240, 255}
+	}
 }
 
 func activeSurface(active *activeWorld) *world.Surface {
