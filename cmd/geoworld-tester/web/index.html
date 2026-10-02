@@ -70,7 +70,12 @@
   <main class="map-area">
     <div class="toolbar">
       <button class="layer active" data-layer="final">最终地形</button>
-      <button class="layer" data-layer="water">水体</button>
+      <button class="layer debug-layer" data-layer="raw" disabled>Raw 地形</button>
+      <button class="layer" data-layer="skeleton">海陆骨架</button>
+      <button class="layer debug-layer" data-layer="coast" disabled>海岸约束</button>
+      <button class="layer" data-layer="rivers">河网</button>
+      <button class="layer" data-layer="lakes">湖泊</button>
+      <button class="layer" data-layer="water">最终水体</button>
       <button class="layer" data-layer="biome">群系</button>
       <button class="layer" data-layer="profile">配置置信度</button>
       <span class="muted small">点击地图查看该坐标的最终结果</span>
@@ -81,7 +86,7 @@
       <div id="mapNotice" class="map-notice" hidden></div>
       <div id="cursor"></div>
     </div>
-    <div class="footnote">这里显示的是最终 Runtime 结果；生成失败时不会把旧地图冒充成新结果。</div>
+    <div id="layerHelp" class="footnote">最终地形：显示 Runtime 的最终地面和水体；生成失败时不会把旧地图冒充成新结果。</div>
   </main>
 
   <aside class="panel inspector">

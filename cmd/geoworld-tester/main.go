@@ -28,6 +28,7 @@ import (
 	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
+	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
 	"geoworld/internal/worldmodelio"
 )
@@ -48,6 +49,10 @@ type activeWorld struct {
 	landComponents         int
 	majorLandComponents    int
 	largestLandShare       float64
+	finalRiverUpslope      int
+	finalLakeBedViolations int
+	runtimeFallback        int
+	runtimeMismatch        int
 	source                 string
 	model                  *generator.WorldModel
 	reopened               *worldmodelio.RuntimeModel
@@ -247,6 +252,8 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	landComponents, majorLandComponents, largestLandShare := summarizeLand(model.Surface)
+	waterbedAudit := model.Waterbed.Audit(16, model.Config.Reconcile.FinalUpslopeEpsilon)
+	runtimeFallback, runtimeMismatch := summarizeRuntimeSemantics(model.Geometry, model.RuntimeProfile.Sample)
 	active := &activeWorld{
 		seed:                   model.Config.Seed,
 		geometry:               model.Geometry,
@@ -260,6 +267,10 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		landComponents:         landComponents,
 		majorLandComponents:    majorLandComponents,
 		largestLandShare:       largestLandShare,
+		finalRiverUpslope:      waterbedAudit.RiverUpslopeSteps,
+		finalLakeBedViolations: waterbedAudit.LakeBedViolations,
+		runtimeFallback:        runtimeFallback,
+		runtimeMismatch:        runtimeMismatch,
 		source:                 "generated",
 		model:                  model,
 		generatedAt:            time.Now(),
@@ -320,13 +331,25 @@ func (s *appState) handleLayer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	g := active.geometry
-	for py := 0; py < height; py++ {
-		z := g.OriginZ + float64(py)/float64(maxInt(height-1, 1))*g.SpanZBlocks
-		for px := 0; px < width; px++ {
-			x := g.OriginX + float64(px)/float64(maxInt(width-1, 1))*g.SpanXBlocks
-			sm := active.sample(x, z)
-			img.SetRGBA(px, py, layerColor(layer, sm))
+	if layer == "skeleton" || layer == "rivers" || layer == "lakes" {
+		if err := renderDiagnosticLayer(img, active, layer); err != nil {
+			writeError(w, http.StatusConflict, err)
+			return
+		}
+	} else if layer == "raw" || layer == "coast" {
+		if err := renderIntermediateLayer(img, active, layer); err != nil {
+			writeError(w, http.StatusConflict, err)
+			return
+		}
+	} else {
+		g := active.geometry
+		for py := 0; py < height; py++ {
+			z := g.OriginZ + float64(py)/float64(maxInt(height-1, 1))*g.SpanZBlocks
+			for px := 0; px < width; px++ {
+				x := g.OriginX + float64(px)/float64(maxInt(width-1, 1))*g.SpanXBlocks
+				sm := active.sample(x, z)
+				img.SetRGBA(px, py, layerColor(layer, sm))
+			}
 		}
 	}
 	w.Header().Set("Content-Type", "image/png")
@@ -401,6 +424,8 @@ func (s *appState) handleLoad(w http.ResponseWriter, r *http.Request, modelDir s
 		return
 	}
 	landComponents, majorLandComponents, largestLandShare := summarizeLand(model.Surface)
+	waterbedAudit := model.Waterbed.Audit(16, model.Config.Reconcile.FinalUpslopeEpsilon)
+	runtimeFallback, runtimeMismatch := summarizeRuntimeSemantics(model.Geometry, model.RuntimeProfile.Sample)
 	fragmentation := model.Config.Phase1.ContinentFragmentation
 	if fragmentation == 0 {
 		fragmentation = phase1.DefaultContinentFragmentation
@@ -422,6 +447,10 @@ func (s *appState) handleLoad(w http.ResponseWriter, r *http.Request, modelDir s
 		landComponents:         landComponents,
 		majorLandComponents:    majorLandComponents,
 		largestLandShare:       largestLandShare,
+		finalRiverUpslope:      waterbedAudit.RiverUpslopeSteps,
+		finalLakeBedViolations: waterbedAudit.LakeBedViolations,
+		runtimeFallback:        runtimeFallback,
+		runtimeMismatch:        runtimeMismatch,
 		source:                 "reopened",
 		reopened:               model,
 		generatedAt:            time.Now(),
@@ -468,21 +497,40 @@ func handleModels(w http.ResponseWriter, r *http.Request, modelDir string) {
 }
 
 func activeSummary(a *activeWorld) map[string]any {
-	return map[string]any{
-		"seed":                   a.seed,
-		"geometry":               a.geometry,
-		"riverSegments":          a.riverCount,
-		"lakeNodes":              a.lakeCount,
-		"plateCount":             a.plateCount,
-		"oceanFraction":          a.oceanFraction,
-		"continentFragmentation": a.continentFragmentation,
-		"continentSeparation":    a.continentSeparation,
-		"landComponents":         a.landComponents,
-		"majorLandComponents":    a.majorLandComponents,
-		"largestLandShare":       a.largestLandShare,
-		"source":                 a.source,
-		"durationMs":             a.duration.Milliseconds(),
+	summary := map[string]any{
+		"seed":                    a.seed,
+		"geometry":                a.geometry,
+		"riverSegments":           a.riverCount,
+		"lakeNodes":               a.lakeCount,
+		"plateCount":              a.plateCount,
+		"oceanFraction":           a.oceanFraction,
+		"continentFragmentation":  a.continentFragmentation,
+		"continentSeparation":     a.continentSeparation,
+		"landComponents":          a.landComponents,
+		"majorLandComponents":     a.majorLandComponents,
+		"largestLandShare":        a.largestLandShare,
+		"finalRiverUpslope":       a.finalRiverUpslope,
+		"finalLakeBedViolations":  a.finalLakeBedViolations,
+		"runtimeFallback":         a.runtimeFallback,
+		"runtimeMismatch":         a.runtimeMismatch,
+		"source":                  a.source,
+		"durationMs":              a.duration.Milliseconds(),
+		"intermediateDiagnostics": false,
 	}
+	if a.model != nil && a.model.Terrain != nil && a.model.Reconciliation != nil {
+		r := a.model.Reconciliation
+		summary["intermediateDiagnostics"] = true
+		summary["coastAdjustedNodes"] = r.CoastAdjustedNodes
+		summary["coastRaisedNodes"] = r.CoastRaisedNodes
+		summary["coastCarvedNodes"] = r.CoastCarvedNodes
+		summary["surfaceMismatchBefore"] = r.SurfaceMismatchBefore
+		summary["surfaceMismatchAfter"] = r.SurfaceMismatchAfter
+		summary["appliedCoastSurfaceMismatch"] = r.AppliedCoastSurfaceMismatch
+		summary["rawUpslopeRiverEdges"] = r.RawUpslopeRiverEdges
+		summary["targetUpslopeRiverEdges"] = r.TargetUpslopeRiverEdges
+		summary["lakeBedViolations"] = r.LakeBedViolations
+	}
+	return summary
 }
 
 func summarizeLand(surface *world.Surface) (components, major int, largestShare float64) {
@@ -557,6 +605,25 @@ func summarizeLand(surface *world.Surface) (components, major int, largestShare 
 	return components, major, float64(largest) / float64(totalLand)
 }
 
+func summarizeRuntimeSemantics(g world.GridGeometry, sample func(float64, float64) runtimeprofile.Sample) (fallback, mismatch int) {
+	if sample == nil {
+		return 0, 0
+	}
+	for z := 0; z < g.Height; z++ {
+		for x := 0; x < g.Width; x++ {
+			wx, wz := g.NodePosition(x, z)
+			s := sample(wx, wz)
+			if s.SemanticFallback {
+				fallback++
+			}
+			if s.SemanticMismatch {
+				mismatch++
+			}
+		}
+	}
+	return fallback, mismatch
+}
+
 func sampleJSON(x, z float64, s runtimeprofile.Sample) map[string]any {
 	return map[string]any{
 		"x": x, "z": z,
@@ -593,6 +660,260 @@ func waterKindName(k reconcile.WaterKind) string {
 	default:
 		return "None"
 	}
+}
+
+func renderIntermediateLayer(img *image.RGBA, active *activeWorld, layer string) error {
+	if active == nil || active.model == nil || active.model.Terrain == nil || active.model.Reconciliation == nil {
+		return errors.New("this diagnostic requires a freshly generated world")
+	}
+	switch layer {
+	case "raw":
+		g := active.geometry
+		b := img.Bounds()
+		for py := 0; py < b.Dy(); py++ {
+			z := g.OriginZ + float64(py)/float64(maxInt(b.Dy()-1, 1))*g.SpanZBlocks
+			for px := 0; px < b.Dx(); px++ {
+				x := g.OriginX + float64(px)/float64(maxInt(b.Dx()-1, 1))*g.SpanXBlocks
+				img.SetRGBA(px, py, terrainHeightColor(active.model.Terrain.SampleNormalized(x, z)))
+			}
+		}
+		return nil
+	case "coast":
+		return renderCoastConstraintLayer(img, active)
+	default:
+		return errors.New("unknown intermediate diagnostic layer")
+	}
+}
+
+func renderCoastConstraintLayer(img *image.RGBA, active *activeWorld) error {
+	r := active.model.Reconciliation
+	target := active.model.Surface
+	if target == nil || r.RawTerrainSurface == nil || r.AppliedCoastSurface == nil {
+		return errors.New("coast diagnostics are unavailable for this world")
+	}
+	n := target.Width * target.Height
+	if len(r.CoastCorrection) != n ||
+		len(r.RawTerrainSurface.LandMask) != n ||
+		len(r.AppliedCoastSurface.LandMask) != n {
+		return errors.New("coast diagnostic fields do not match the world geometry")
+	}
+	b := img.Bounds()
+	for py := 0; py < b.Dy(); py++ {
+		gz := int(math.Round(float64(py) / float64(maxInt(b.Dy()-1, 1)) * float64(target.Height-1)))
+		for px := 0; px < b.Dx(); px++ {
+			gx := int(math.Round(float64(px) / float64(maxInt(b.Dx()-1, 1)) * float64(target.Width-1)))
+			i := gz*target.Width + gx
+			rawMismatch := r.RawTerrainSurface.LandMask[i] != target.LandMask[i]
+			finalMismatch := r.AppliedCoastSurface.LandMask[i] != target.LandMask[i]
+			correction := r.CoastCorrection[i]
+			var c color.RGBA
+			switch {
+			case finalMismatch:
+				c = color.RGBA{229, 72, 168, 255}
+			case rawMismatch:
+				c = color.RGBA{238, 142, 67, 255}
+			case correction > 1e-15:
+				c = color.RGBA{221, 195, 84, 255}
+			case correction < -1e-15:
+				c = color.RGBA{89, 178, 211, 255}
+			default:
+				c = diagnosticSurfaceColor(target, gx, gz, false)
+			}
+			img.SetRGBA(px, py, c)
+		}
+	}
+	return nil
+}
+
+func renderDiagnosticLayer(img *image.RGBA, active *activeWorld, layer string) error {
+	surface := activeSurface(active)
+	if surface == nil || surface.Width <= 0 || surface.Height <= 0 || len(surface.LandMask) != surface.Width*surface.Height {
+		return errors.New("surface diagnostics are unavailable for this world")
+	}
+	b := img.Bounds()
+	for py := 0; py < b.Dy(); py++ {
+		gz := int(math.Round(float64(py) / float64(maxInt(b.Dy()-1, 1)) * float64(surface.Height-1)))
+		for px := 0; px < b.Dx(); px++ {
+			gx := int(math.Round(float64(px) / float64(maxInt(b.Dx()-1, 1)) * float64(surface.Width-1)))
+			img.SetRGBA(px, py, diagnosticSurfaceColor(surface, gx, gz, layer == "skeleton"))
+		}
+	}
+
+	wb := activeWaterbed(active)
+	switch layer {
+	case "rivers":
+		if wb == nil {
+			return errors.New("river diagnostics are unavailable for this world")
+		}
+		for _, segment := range wb.Rivers {
+			x0, y0 := diagnosticWorldToPixel(active.geometry, b, segment.X0, segment.Z0)
+			x1, y1 := diagnosticWorldToPixel(active.geometry, b, segment.X1, segment.Z1)
+			radius := diagnosticPhysicalRadius(active.geometry, b, segment.HalfWidth, 1, 3)
+			drawDiagnosticLine(img, x0, y0, x1, y1, radius, color.RGBA{70, 188, 235, 255})
+		}
+	case "lakes":
+		if wb == nil {
+			return errors.New("lake diagnostics are unavailable for this world")
+		}
+		for _, lake := range wb.Lakes {
+			x, y := diagnosticWorldToPixel(active.geometry, b, lake.X, lake.Z)
+			radius := diagnosticPhysicalRadius(active.geometry, b, lake.OuterRadius, 2, 8)
+			drawDiagnosticDisc(img, x, y, radius, color.RGBA{73, 169, 205, 255})
+			drawDiagnosticDisc(img, x, y, maxInt(1, radius/2), color.RGBA{115, 211, 238, 255})
+		}
+	}
+	return nil
+}
+
+func activeSurface(active *activeWorld) *world.Surface {
+	if active == nil {
+		return nil
+	}
+	if active.model != nil {
+		return active.model.Surface
+	}
+	if active.reopened != nil {
+		return active.reopened.Surface
+	}
+	return nil
+}
+
+func activeWaterbed(active *activeWorld) *waterbed.Model {
+	if active == nil {
+		return nil
+	}
+	if active.model != nil {
+		return active.model.Waterbed
+	}
+	if active.reopened != nil {
+		return active.reopened.Waterbed
+	}
+	return nil
+}
+
+func diagnosticSurfaceColor(surface *world.Surface, x, z int, emphasizeCoast bool) color.RGBA {
+	i := z*surface.Width + x
+	land := surface.LandMask[i]
+	if emphasizeCoast && diagnosticCoastNode(surface, x, z) {
+		if land {
+			return color.RGBA{232, 201, 132, 255}
+		}
+		return color.RGBA{110, 164, 186, 255}
+	}
+	if surface.EnclosedBelowSea != nil && i < len(surface.EnclosedBelowSea) && surface.EnclosedBelowSea[i] {
+		return color.RGBA{151, 112, 76, 255}
+	}
+	if land {
+		return color.RGBA{79, 117, 75, 255}
+	}
+	return color.RGBA{27, 69, 96, 255}
+}
+
+func diagnosticCoastNode(surface *world.Surface, x, z int) bool {
+	i := z*surface.Width + x
+	land := surface.LandMask[i]
+	if x > 0 && surface.LandMask[i-1] != land {
+		return true
+	}
+	if x+1 < surface.Width && surface.LandMask[i+1] != land {
+		return true
+	}
+	if z > 0 && surface.LandMask[i-surface.Width] != land {
+		return true
+	}
+	if z+1 < surface.Height && surface.LandMask[i+surface.Width] != land {
+		return true
+	}
+	return false
+}
+
+func diagnosticWorldToPixel(g world.GridGeometry, b image.Rectangle, x, z float64) (int, int) {
+	fx, fz := 0.5, 0.5
+	if g.SpanXBlocks > 0 {
+		fx = (x - g.OriginX) / g.SpanXBlocks
+	}
+	if g.SpanZBlocks > 0 {
+		fz = (z - g.OriginZ) / g.SpanZBlocks
+	}
+	fx = clamp(fx, 0, 1)
+	fz = clamp(fz, 0, 1)
+	return int(math.Round(fx * float64(maxInt(b.Dx()-1, 0)))), int(math.Round(fz * float64(maxInt(b.Dy()-1, 0))))
+}
+
+func diagnosticPhysicalRadius(g world.GridGeometry, b image.Rectangle, blocks float64, lo, hi int) int {
+	scale := 0.0
+	if g.SpanXBlocks > 0 {
+		scale = float64(maxInt(b.Dx()-1, 1)) / g.SpanXBlocks
+	}
+	if g.SpanZBlocks > 0 {
+		zScale := float64(maxInt(b.Dy()-1, 1)) / g.SpanZBlocks
+		if scale == 0 || zScale < scale {
+			scale = zScale
+		}
+	}
+	r := int(math.Round(blocks * scale))
+	if r < lo {
+		r = lo
+	}
+	if r > hi {
+		r = hi
+	}
+	return r
+}
+
+func drawDiagnosticLine(img *image.RGBA, x0, y0, x1, y1, radius int, c color.RGBA) {
+	dx := absInt(x1 - x0)
+	sx := -1
+	if x0 < x1 {
+		sx = 1
+	}
+	dy := -absInt(y1 - y0)
+	sy := -1
+	if y0 < y1 {
+		sy = 1
+	}
+	err := dx + dy
+	for {
+		drawDiagnosticDisc(img, x0, y0, radius, c)
+		if x0 == x1 && y0 == y1 {
+			return
+		}
+		e2 := 2 * err
+		if e2 >= dy {
+			err += dy
+			x0 += sx
+		}
+		if e2 <= dx {
+			err += dx
+			y0 += sy
+		}
+	}
+}
+
+func drawDiagnosticDisc(img *image.RGBA, cx, cy, radius int, c color.RGBA) {
+	b := img.Bounds()
+	r2 := radius * radius
+	for y := cy - radius; y <= cy+radius; y++ {
+		if y < b.Min.Y || y >= b.Max.Y {
+			continue
+		}
+		for x := cx - radius; x <= cx+radius; x++ {
+			if x < b.Min.X || x >= b.Max.X {
+				continue
+			}
+			dx, dy := x-cx, y-cy
+			if dx*dx+dy*dy <= r2 {
+				img.SetRGBA(x, y, c)
+			}
+		}
+	}
+}
+
+func absInt(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
 }
 
 func layerColor(layer string, s runtimeprofile.Sample) color.RGBA {

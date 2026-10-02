@@ -91,6 +91,8 @@ function updateActionState(){
   $('generate').disabled=busy||!serviceOnline;
   $('save').disabled=busy||!serviceOnline||!active||active.source!=='generated';
   $('load').disabled=busy||!serviceOnline||!$('models').value;
+  const debugDisabled=busy||!serviceOnline||!active||!active.intermediateDiagnostics;
+  document.querySelectorAll('.debug-layer').forEach(btn=>{btn.disabled=debugDisabled});
 }
 
 function setMapNotice(text='',kind=''){
@@ -200,11 +202,16 @@ $('generate').onclick=async()=>{
   }
 };
 
+function selectLayer(next,{load=true}={}){
+  layer=next;
+  document.querySelectorAll('.layer').forEach(b=>b.classList.toggle('active',b.dataset.layer===next));
+  updateLayerHelp();
+  if(load&&active)void loadMap();
+}
+
 document.querySelectorAll('.layer').forEach(btn=>btn.onclick=()=>{
-  document.querySelectorAll('.layer').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  layer=btn.dataset.layer;
-  if(active)void loadMap();
+  if(btn.disabled)return;
+  selectLayer(btn.dataset.layer);
 });
 
 async function loadMap(){
@@ -239,7 +246,32 @@ async function loadMap(){
 }
 
 function layerName(v){
-  return ({final:'最终地形',water:'水体',biome:'群系',profile:'配置置信度'})[v]||v;
+  return ({
+    final:'最终地形',
+    raw:'Raw 地形',
+    skeleton:'海陆骨架',
+    coast:'海岸约束',
+    rivers:'河网',
+    lakes:'湖泊',
+    water:'最终水体',
+    biome:'群系',
+    profile:'配置置信度'
+  })[v]||v;
+}
+
+function updateLayerHelp(){
+  const help={
+    final:'最终地形：显示 Runtime 的最终地面和水体；生成失败时不会把旧地图冒充成新结果。',
+    raw:'Raw 地形：海岸校正前的正式连续高度场，不叠加海洋、河流或湖泊水体。仅刚生成世界保留这份中间模型，用来和最终结果对照。',
+    skeleton:'海陆骨架：绿=陆地，深蓝=海洋，浅色边线=海岸，棕=封闭且低于海平面的陆地洼地。',
+    coast:'海岸约束：橙=Raw 海陆冲突，黄=需要抬升，蓝=需要削低，粉=应用校正后仍有冲突（理想应为 0）。仅刚生成世界可用。',
+    rivers:'河网：直接绘制正式 Waterbed 河段；线宽为验收可视化宽度，不代表地图像素就是实际河宽。',
+    lakes:'湖泊：直接绘制正式 Waterbed 湖泊节点和影响半径，便于检查湖泊分布与聚集区域。',
+    water:'最终水体：按 Runtime 逐点显示海洋、湖泊和河流的最终水体判定。',
+    biome:'群系：显示最终 Minecraft 生物群系家族。',
+    profile:'配置置信度：颜色越异常越需要检查；语义 fallback / mismatch 会高亮。'
+  };
+  $('layerHelp').textContent=help[layer]||'';
 }
 
 $('map').onclick=async e=>{
@@ -292,6 +324,9 @@ $('load').onclick=async()=>{
     $('separation').value=active.continentSeparation||0.65;
     updateRangePreview();
     updateContinentLabels();
+    if(!active.intermediateDiagnostics&&(layer==='raw'||layer==='coast')){
+      selectLayer('final',{load:false});
+    }
     $('topStatus').textContent='已重开';
     $('progressText').textContent=`模型重开完成 · ${active.durationMs}ms`;
     $('modelName').value=name;
@@ -345,6 +380,19 @@ function renderStats(){
     ${kv('最大陆块占比',(Number(active.largestLandShare)*100).toFixed(1)+'%')}
     ${kv('河段',active.riverSegments)}
     ${kv('湖泊节点',active.lakeNodes)}
+    ${diagnosticKV('最终河床逆坡',active.finalRiverUpslope)}
+    ${diagnosticKV('最终湖床违规',active.finalLakeBedViolations)}
+    ${diagnosticKV('Runtime 节点回退',active.runtimeFallback)}
+    ${diagnosticKV('Runtime 节点冲突',active.runtimeMismatch)}
+    ${active.intermediateDiagnostics?`
+      ${kv('海岸校正节点',active.coastAdjustedNodes)}
+      ${kv('Raw 海陆冲突',active.surfaceMismatchBefore)}
+      ${kv('约束后海陆冲突',active.surfaceMismatchAfter)}
+      ${kv('应用后海陆冲突',active.appliedCoastSurfaceMismatch)}
+      ${kv('Raw 河流逆坡',active.rawUpslopeRiverEdges)}
+      ${kv('目标河流逆坡',active.targetUpslopeRiverEdges)}
+      ${kv('海岸后湖床待挖',active.lakeBedViolations)}
+    `:''}
   </div>`;
 }
 
@@ -386,6 +434,10 @@ function renderSample(s){
 }
 
 function kv(k,v){return `<div class="kv"><span>${k}</span><b>${v}</b></div>`}
+function diagnosticKV(k,v){
+  const n=Number(v)||0;
+  return kv(k,n===0?'<span class="ok">0</span>':'<span class="error">'+n+'</span>');
+}
 function f(v){return Number(v).toFixed(6)}
 function formatBytes(n){return n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).toFixed(2)+' MB'}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -395,6 +447,7 @@ window.addEventListener('beforeunload',()=>{if(mapObjectURL)URL.revokeObjectURL(
 
 updateRangePreview();
 updateContinentLabels();
+updateLayerHelp();
 updateActionState();
 refreshModels();
 refreshStatus();
