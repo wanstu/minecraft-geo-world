@@ -1,6 +1,8 @@
 package geoworld.minecraft.v26_3;
 
 import geoworld.minecraft.anvil.RegionFile;
+import geoworld.runtime.GeoWorldBinding;
+import geoworld.runtime.GeoWorldV1;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -97,6 +99,20 @@ public final class Minecraft26_3Verifier {
                 throw new AssertionError(
                     "legacy wrong world_gen_settings.dat path must not be written"
                 );
+            }
+
+            GeoWorldBinding.Binding binding = GeoWorldBinding.detect(world)
+                .orElseThrow(() -> new AssertionError("GeoWorld binding was not written"));
+            requireFile(binding.configPath());
+            requireFile(binding.modelPath());
+            if (!"26.3".equals(binding.minecraftVersion())) {
+                throw new AssertionError(
+                    "binding minecraftVersion=" + binding.minecraftVersion()
+                );
+            }
+            GeoWorldV1 boundModel = GeoWorldBinding.loadModel(binding);
+            if (boundModel.manifest().seed() != binding.seed()) {
+                throw new AssertionError("bound model seed mismatch");
             }
 
             long regionFiles;

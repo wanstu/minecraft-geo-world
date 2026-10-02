@@ -1,6 +1,7 @@
 package geoworld.minecraft.v26_3;
 
 import geoworld.minecraft.anvil.RegionFile;
+import geoworld.runtime.GeoWorldBinding;
 import geoworld.runtime.GeoWorldV1;
 
 import java.io.IOException;
@@ -51,6 +52,7 @@ public final class PreviewWorldGenerator {
             args.qaMode()
         );
         metadata.writeWorldGenSettings(world, model.manifest().seed());
+        GeoWorldBinding.write(world, args.model(), "26.3");
 
         Minecraft26_3Chunk chunkWriter = new Minecraft26_3Chunk(model, heights);
         int centerChunkX = Math.floorDiv(spawn.x(), 16);

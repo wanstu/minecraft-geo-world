@@ -1129,3 +1129,19 @@ WorldModel 内存对象用于生成与调试，不等于长期存档 schema。�
 6. NeoForge 层必须复用已通过 15/15 cross-language golden 的 Java V1 Runtime Reader，不能在 MOD 内重写另一套地形数学。
 7. 首个 MOD 切片只做启动、世界识别、模型加载与版本/校验失败的明确报错；第二切片再接 GeoWorld ChunkGenerator / worldgen codec。
 8. MOD 按需生成的验收口径是同坐标 Tester Runtime ↔ Java Runtime ↔ 实际 Minecraft 新 Chunk 一致；“能进游戏”本身不构成通过。
+
+---
+
+## D-046：GeoWorld 必须成为原生 World Preset，创建参数与预览使用同一生成引擎
+
+状态：Phase 6.4 NeoForge 第二阶段确定
+
+NeoForge 26.3 已确认 WORLD_PRESET registry 与 RegisterPresetEditorsEvent / PresetEditorManager 正式支持第三方世界类型和自定义编辑器，因此 GeoWorld 不通过 Mixin 劫持 CreateWorldScreen。
+
+规则：
+1. 创建世界的“世界类型”列表直接出现 `GeoWorld`；选择后原版“自定义”按钮进入 GeoWorld 专用参数/预览页。
+2. 参数页至少覆盖现有 Tester 的 Seed、大陆预设、板块数、洋壳比例、大陆破碎度、大陆分离度、模型尺度/精度；默认值与 Tester 共享定义。
+3. 参数改变后预览异步更新；不得阻塞 UI 主线程，也不得每次键入都无节制重跑完整模型，需 debounce/cancel/cache。
+4. 预览、保存到 world 的 config/model、GeoWorldChunkGenerator 必须由同一确定性 GeoWorld Engine 产生；不允许为预览单独做另一套近似随机图。
+5. GeoWorldChunkGenerator codec 持久化足以重建世界的稳定配置；`.geoworld` 文件作为可校验的模型/cache/诊断资产，不能成为只能由外部 Tester 手工准备的前置条件。
+6. 普通 Minecraft preset/world 不受 GeoWorld MOD 影响。

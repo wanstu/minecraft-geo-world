@@ -206,7 +206,11 @@
 1. Vanilla Preview 已完成客户端真实进入验收；当前发现的核心限制不是 NBT/Chunk 文件格式，而是有限预生成范围之外仍由 vanilla worldgen 接管。
 2. **正式进入 NeoForge 26.3 通用 MOD**：目标产物固定为一个可复用的 `geoworld-neoforge-26.3.jar`，不是每张地图重新编译 MOD。
 3. 存档导出需要携带 GeoWorld 标记与该世界自己的 `.geoworld` 模型；MOD 只有在世界明确绑定 GeoWorld 时才接管生成，普通 Minecraft 世界不受影响。
-4. 第一阶段先完成 MOD 启动、世界识别、模型加载与 Java Runtime golden 自检；第二阶段再注册/接入 GeoWorld ChunkGenerator，让未生成 Chunk 按需调用同一 Runtime。
+4. NeoForge 第一阶段已完成：`java/neoforge-mod` 基于官方 26.3 ModDevGradle MDK，锁定 Minecraft 26.3 / NeoForge 26.3.0.40-beta / Java 25；`build.cmd` 优先使用 `D:\\tools\\jdk\\jdk-25_windows-x64_bin\\jdk-25.0.4.1`，真实 `BUILD SUCCESSFUL`。MOD JAR 已包含共享 Java V1 Runtime Reader、GeoWorld binding 检测和 server lifecycle 模型加载；普通世界无 binding 时不介入，binding/model 不一致时明确失败。
+5. Tester/Preview 导出的世界现在会携带 `data/geoworld/geoworld.properties` + `data/geoworld/world.geoworld`，`verify-storage.cmd` 已把 binding/model 一致性纳入回归。
+6. NeoForge 26.3 创建世界源码已确认正式扩展点：自定义 `WORLD_PRESET` 可进入原版“世界类型”列表，NeoForge `RegisterPresetEditorsEvent` / `PresetEditorManager` 可给第三方 preset 注册“自定义”编辑器，无需 Mixin 劫持原版按钮。
+7. 第二阶段目标调整为**完整的游戏内 GeoWorld 创建流程**：世界类型选择 `GeoWorld` → “自定义”打开 GeoWorld 参数页 → Seed/大陆预设/板块/洋壳/破碎度/分离度/尺度等参数 → 异步世界预览 → 创建世界。预览与真正 ChunkGenerator 必须消费同一套确定性 GeoWorld Engine，不允许两套近似逻辑。
+8. `GeoWorldChunkGenerator` 再接按需 Chunk；首个真实验收仍比较同一坐标的创建界面预览 / Java Runtime / 实际 Minecraft 新 Chunk 的 Ground / WaterKind / Biome。
 5. Tester 继续保留 QA 静态导出，用于快速肉眼检查与回归；黄色导出框明确代表“Vanilla 预生成快照范围”，不能再把框外结果当成 GeoWorld。
 6. NeoForge 首个真实验收必须比较同一坐标的 Tester Runtime 与实际新生成 Chunk 的 Ground / WaterKind / Biome；不能只看世界能否进入。
 
