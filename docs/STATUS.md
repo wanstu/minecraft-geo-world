@@ -1,6 +1,6 @@
 # GeoWorld 项目状态
 
-更新时间：2026-10-01。当前状态以本文件为入口；历史逐阶段记录完整保存在 [PROGRESS.md](PROGRESS.md)。
+更新时间：2026-10-02。当前状态以本文件为入口；历史逐阶段记录完整保存在 [PROGRESS.md](PROGRESS.md)。
 
 ## 当前目标与阶段
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。
@@ -31,6 +31,8 @@
 - Phase 6.3 第一切片：0b830de — feat: add versioned world model persistence。
 - Phase 6.3 第二切片（部分）：8cd95b9 — feat: add safe model replacement and inspection。
 - 交互测试工具：0a10067 — feat: add interactive geoworld tester。
+- Tester 运行状态/断线可用性修复：ba4aa3d — fix: make geoworld tester runtime state explicit。
+- 多大陆与可调形态：a4e3353 — feat: add controllable multi-continent generation。
 - 工作区的完成状态在提交后检查；继续前先核对 git status，不能仅凭本文假定 clean。
 
 ## 已完成
@@ -104,6 +106,8 @@
 - 保存采用同目录完整临时文件 + hard-link publish；V1 对已存在目标明确返回 `ErrTargetExists`，不会先删除或覆盖旧完整模型。Load 对 schema/generator version、checksum、Geometry/SeaLevel/config 契约、字段长度和 Runtime enum/confidence 做校验。
 - `waterbed.Restore` 只从持久化 RiverSegment/LakeNode 重建 spatial buckets；WorldSample / RuntimeProfile 在加载时重建，不重新运行全球模拟。
 - 新增 `geoworld-model-audit`，可真实 Generate→Save→释放生成图→Load→固定样点逐字段比较。
+- Phase 1 大陆核生成已从多个高斯势能直接叠加改为独立大陆核主导，并引入 `ContinentFragmentation` / `ContinentSeparation` 两个正式 Config；默认分别为 0.35 / 0.65。
+- Tester 增加随机 Seed、大陆破碎度、大陆平均分离度；生成结果直接显示主要陆块数、全部陆块数与最大陆块占比，并随模型保存/重开恢复参数。
 
 ## 本轮验证
 - go test ./... -count=1：全部通过（包括新的连通性、负坐标、分辨率/范围、Phase 1 物理尺度和全链路回归）。
