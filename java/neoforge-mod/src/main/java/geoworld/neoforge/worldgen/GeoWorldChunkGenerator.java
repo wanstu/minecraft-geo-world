@@ -410,10 +410,13 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         ) {
             return groundBoundary;
         }
-        return Math.max(
-            groundBoundary,
-            HEIGHTS.boundaryY(sample.waterSurfaceElevation())
-        );
+        int mapped = "River".equals(sample.waterKind())
+            ? HEIGHTS.boundaryYCeil(sample.waterSurfaceElevation())
+            : HEIGHTS.boundaryY(sample.waterSurfaceElevation());
+        if ("River".equals(sample.waterKind())) {
+            mapped = Math.max(mapped, groundBoundary + 1);
+        }
+        return Math.max(groundBoundary, mapped);
     }
 
     private static int clampToHeightAccessor(

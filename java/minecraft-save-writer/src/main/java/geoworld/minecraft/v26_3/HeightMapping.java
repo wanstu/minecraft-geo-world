@@ -18,6 +18,10 @@ public final class HeightMapping {
         return this.delegate.boundaryY(normalizedHeight);
     }
 
+    public int boundaryYCeil(double normalizedHeight) {
+        return this.delegate.boundaryYCeil(normalizedHeight);
+    }
+
     public int relativeHeightmapValue(int firstAvailableY) {
         return this.delegate.relativeHeightmapValue(firstAvailableY);
     }

@@ -1,6 +1,7 @@
 package geoworld.minecraft.v26_3;
 
 import geoworld.minecraft.nbt.Nbt;
+import geoworld.minecraft.v26_3common.Minecraft26_3BiomeRealizer;
 import geoworld.minecraft.v26_3common.Minecraft26_3ProfileMapping;
 import geoworld.runtime.GeoWorldV1;
 
@@ -88,7 +89,13 @@ public final class Minecraft26_3Chunk {
                 int ground = heights.boundaryY(sample.groundHeight());
                 int water = ground;
                 if (sample.waterSurfaceDefined() && sample.waterSurfaceElevation() != null) {
-                    water = Math.max(ground, heights.boundaryY(sample.waterSurfaceElevation()));
+                    int mappedWater = "River".equals(sample.waterKind())
+                        ? heights.boundaryYCeil(sample.waterSurfaceElevation())
+                        : heights.boundaryY(sample.waterSurfaceElevation());
+                    if ("River".equals(sample.waterKind())) {
+                        mappedWater = Math.max(mappedWater, ground + 1);
+                    }
+                    water = Math.max(ground, mappedWater);
                 }
                 columns[z * 16 + x] = new Column(
                     sample,
@@ -96,7 +103,11 @@ public final class Minecraft26_3Chunk {
                     water,
                     Minecraft26_3ProfileMapping.surfaceBlock(sample.surfaceProfile()),
                     Minecraft26_3ProfileMapping.underBlock(sample.surfaceProfile()),
-                    Minecraft26_3ProfileMapping.biomeId(sample.biomeFamily())
+                    Minecraft26_3BiomeRealizer.biomeId(
+                        model,
+                        baseX + x,
+                        baseZ + z
+                    )
                 );
             }
         }
@@ -148,8 +159,12 @@ public final class Minecraft26_3Chunk {
                     // 2x2 horizontal biome samples per Chunk -> at most 4 unique IDs.
                     int sampleX = bx < 2 ? 4 : 12;
                     int sampleZ = bz < 2 ? 4 : 12;
-                    String biome = Minecraft26_3ProfileMapping.biomeId(
-                        model.sample(baseX + sampleX, baseZ + sampleZ).biomeFamily()
+                    int sampleY = baseY + by * 4 + 2;
+                    String biome = Minecraft26_3BiomeRealizer.biomeId(
+                        model,
+                        baseX + sampleX,
+                        sampleY,
+                        baseZ + sampleZ
                     );
                     int paletteIndex = biomePalette.computeIfAbsent(
                         biome,

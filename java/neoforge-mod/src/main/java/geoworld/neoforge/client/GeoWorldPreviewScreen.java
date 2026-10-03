@@ -706,9 +706,12 @@ public final class GeoWorldPreviewScreen extends Screen {
             sample.waterSurfaceDefined() &&
             sample.waterSurfaceElevation() != null
         ) {
-            int waterBoundary = HEIGHTS.boundaryY(
-                sample.waterSurfaceElevation()
-            );
+            int waterBoundary = "River".equals(sample.waterKind())
+                ? Math.max(
+                    groundBoundary + 1,
+                    HEIGHTS.boundaryYCeil(sample.waterSurfaceElevation())
+                )
+                : HEIGHTS.boundaryY(sample.waterSurfaceElevation());
             line2 = Component.translatable(
                 "geoworld.preview.hover_water",
                 localizedValue(sample.waterKind()),

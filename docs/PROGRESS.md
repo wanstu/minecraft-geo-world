@@ -1442,3 +1442,13 @@ Phase 6.2 正式完成。下一步 Phase 6.3：最小持久化 schema、原子�
 - Golden fixture 已重建，Java/Go GoldenVerifier 15/15。
 - NeoForge compileJava、build.cmd verifyGeoWorldEngine verifyGeoWorldSpawn 全通过。
 - 最新 MOD 已自动部署到 HMCL 26.3。
+
+## 2026-10-03 · 河流水面向上取整 + 原版群系覆盖扩展
+
+- 河流从连续 GeoWorld 高度映射到 Minecraft 整格方块时，水面边界改为向上取整；已经被 Runtime 判定为有效 River 的位置至少保留 1 格水层。之前新增的最小可见河流深度仍保留，因此极浅 fringe 不会重新变成“水板”。
+- t2 实测点 (2241,-5894)：River ground boundary=114，ceil water boundary=116，最终 2 格水；旧异常 fringe (2248.691,-5875.576) 仍为 dry bank。
+- 抽出 Minecraft26_3BiomeRealizer，动态 MOD 与静态 save writer 共用同一套原版群系实现，不再各自映射。
+- 群系映射从原先约 18 个基础群系扩展为按 GeoWorld 的水文、温度、降水、季风、地形类型、表层、植被和高度挑选 Vanilla 26.3 群系：海洋深浅/温度、海滩/石岸/雪滩、平原/向日葵平原、森林变体、针叶林变体、热带雨林/稀疏丛林/竹林、热带草原变体、恶地变体、山地/山峰/草甸/樱花林、沼泽/红树林、河流/冻河、蘑菇岛等。
+- 地下 Y 维度开始使用洞穴群系：滴水石洞穴、繁茂洞穴、幽匿深暗之域、硫磺洞穴；不会把 Nether / End 群系硬塞进主世界。
+- 对当前 t2/world.geoworld 做全图规则扫描：52 个主世界地表原版群系全部出现；4 个主世界洞穴群系全部出现。即 26.3 Biomes 中除 THE_VOID 以及 Nether/End 专属群系外，主世界可用群系均已进入 GeoWorld 实现路径。
+- Go 全仓、Java Golden 15/15、Minecraft storage/save writer、NeoForge build、Engine bridge、Spawn verifier 全通过；最新 MOD 已自动部署 HMCL 26.3。
