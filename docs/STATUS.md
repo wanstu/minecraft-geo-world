@@ -5,7 +5,7 @@
 ## 当前目标与阶段
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。
 
-**World Model V1、Java Runtime、Minecraft 26.3 静态 QA writer 与 NeoForge 26.3 动态 GeoWorld worldgen 已接通。当前主线是 HMCL 真实客户端可用性与地形/生态质量验收。创建页内外 Seed 已补齐双向视觉同步；雨林边缘除 Runtime 的 domain warp / 竞争侵蚀外，Minecraft 实现层新增 Sparse Jungle + Forest 过渡肩带，避免 Jungle 直接切到 Birch Forest 形成树冠墙。游戏内 `GeoWorld 预览` 已确认读取当前存档绑定的同一 `.geoworld`：全局图仅用于世界概览，暂停菜单打开时默认显示玩家附近约 1016×632 blocks 的局部图（8 blocks/sample），并显示精确当前位置的模型地表高度、BiomeFamily 与 SurfaceProfile，以便和实际 Chunk 对拍。**
+**World Model V1、Java Runtime、Minecraft 26.3 静态 QA writer 与 NeoForge 26.3 动态 GeoWorld worldgen 已接通。当前主线是 HMCL 真实客户端可用性与地形/生态质量验收。创建页 Seed 内外联动、雨林 Sparse Jungle / Forest 过渡肩带已完成；河流链路继续补齐到湖泊/海洋接收节点，不再在最后一个陆地宏节点提前结束，且 Waterbed 为河道中心线提供最小下切深度，避免水面铺在未切开的地表上。Minecraft 群系映射现在优先尊重 Runtime 的 River/Frozen River 水体语义。游戏内 `GeoWorld 预览` 已升级为大幅地图：默认玩家附近视图，滚轮以鼠标位置为锚点缩放，可切换全局/当前位置、重置视图，并在鼠标悬停处显示精确 X/Z、地表、水体、水深、GeoWorld Profile 与实际 Minecraft biome。**
 
 ## 仓库与基线
 - 仓库：D:\projects\minecraft-geo-world

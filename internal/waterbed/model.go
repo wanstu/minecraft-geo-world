@@ -16,6 +16,12 @@ type Config struct {
 	// RiverProfileStepBlocks controls precomputed centerline profile resolution.
 	// It is a physical Minecraft-block distance, independent of macro-grid size.
 	RiverProfileStepBlocks float64
+
+	// MinRiverBedDepthNormalized guarantees that a river centerline is actually
+	// cut into the broad terrain even when the broad terrain already slopes
+	// downhill. Without this minimum trench depth, Runtime water can sit one or
+	// two blocks on top of an uncarved surface.
+	MinRiverBedDepthNormalized float64 `json:",omitempty"`
 }
 
 type RiverSegment struct {

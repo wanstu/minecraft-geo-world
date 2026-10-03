@@ -145,6 +145,45 @@ func TestRiverBedTargetsBecomeMonotonicWithoutRaisingBed(t *testing.T) {
 	}
 }
 
+func TestRiverConstraintKeepsTerminalEdgeIntoOcean(t *testing.T) {
+	raw := []float64{0.58, 0.54, 0.46}
+	m := &Model{
+		Config: Config{
+			RiverStrengthThreshold:    0.30,
+			OriginalDownhillEpsilon:   1e-6,
+			FinalUpslopeEpsilon:       1e-5,
+			MinRiverBedDropNormalized: 1e-5,
+		},
+		RawTerrainElevation: append([]float64(nil), raw...),
+		RiverBedTarget:      append([]float64(nil), raw...),
+		WaterKind:           []WaterKind{WaterNone, WaterNone, WaterOcean},
+		RiverBedActive:      make([]bool, len(raw)),
+	}
+	h := &hydrology.Model{
+		Width:         3,
+		Height:        1,
+		LandMask:      []bool{true, true, false},
+		FlowTo:        []int{1, 2, -1},
+		LakeID:        []int{0, 0, 0},
+		RiverStrength: []float64{0.9, 0.9, 0},
+	}
+	macro := []float64{0.70, 0.58, 0.40}
+
+	if err := m.buildRiverConstraints(macro, h, raw); err != nil {
+		t.Fatal(err)
+	}
+	if len(m.RiverEdges) != 2 {
+		t.Fatalf("river edges=%d want=2 including terminal ocean edge", len(m.RiverEdges))
+	}
+	last := m.RiverEdges[1]
+	if last.From != 1 || last.To != 2 {
+		t.Fatalf("terminal edge=%d->%d want=1->2", last.From, last.To)
+	}
+	if m.WaterKind[2] != WaterOcean {
+		t.Fatalf("ocean receiver reclassified as %v", m.WaterKind[2])
+	}
+}
+
 func TestLakeConstraintExposesWaterSurfaceAndBedCeiling(t *testing.T) {
 	m := &Model{
 		Config:                Config{LakeBedClearanceNormalized: 0.01},

@@ -118,6 +118,7 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 			draft.x1, draft.z1,
 			bed0, bed1,
 			cfg.RiverProfileStepBlocks,
+			cfg.MinRiverBedDepthNormalized,
 		)
 		if len(profile) == 0 {
 			return nil, errors.New("waterbed: river profile is empty")
@@ -338,6 +339,9 @@ func normalizeConfig(cfg Config) (Config, error) {
 	if cfg.RiverProfileStepBlocks == 0 {
 		cfg.RiverProfileStepBlocks = 1
 	}
+	if cfg.MinRiverBedDepthNormalized == 0 {
+		cfg.MinRiverBedDepthNormalized = 0.004
+	}
 	if !finite(cfg.MinRiverHalfWidthBlocks) || !finite(cfg.MaxRiverHalfWidthBlocks) ||
 		cfg.MinRiverHalfWidthBlocks <= 0 ||
 		cfg.MaxRiverHalfWidthBlocks < cfg.MinRiverHalfWidthBlocks {
@@ -346,10 +350,21 @@ func normalizeConfig(cfg Config) (Config, error) {
 	if !finite(cfg.RiverProfileStepBlocks) || cfg.RiverProfileStepBlocks <= 0 {
 		return Config{}, errors.New("waterbed: river profile step must be finite and positive")
 	}
+	if !finite(cfg.MinRiverBedDepthNormalized) ||
+		cfg.MinRiverBedDepthNormalized <= 0 ||
+		cfg.MinRiverBedDepthNormalized >= 0.05 {
+		return Config{}, errors.New("waterbed: minimum river bed depth must be finite and inside (0,0.05)")
+	}
 	return cfg, nil
 }
 
-func buildRiverProfile(base *terrain.Model, x0, z0, x1, z1, bed0, bed1, stepBlocks float64) []float64 {
+func buildRiverProfile(
+	base *terrain.Model,
+	x0, z0, x1, z1,
+	bed0, bed1,
+	stepBlocks,
+	minBedDepthNormalized float64,
+) []float64 {
 	length := math.Hypot(x1-x0, z1-z0)
 	steps := maxInt(1, int(math.Ceil(length/stepBlocks)))
 	profile := make([]float64, steps+1)
@@ -359,7 +374,8 @@ func buildRiverProfile(base *terrain.Model, x0, z0, x1, z1, bed0, bed1, stepBloc
 		z := lerp(z0, z1, t)
 		target := lerp(bed0, bed1, t)
 		h := base.SampleNormalized(x, z)
-		v := math.Min(h, target)
+		minimumTrench := math.Max(0, h-minBedDepthNormalized)
+		v := math.Min(h, math.Min(target, minimumTrench))
 		if j > 0 && v > profile[j-1] {
 			v = profile[j-1]
 		}
@@ -386,6 +402,17 @@ func downstreamReceiverSurface(start int, rec *reconcile.Model, hydro *hydrology
 	}
 	node := start
 	for steps := 0; steps < n; steps++ {
+		if rec.WaterSurfaceDefined[node] {
+			switch rec.WaterKind[node] {
+			case reconcile.WaterLake, reconcile.WaterOcean:
+				surface := rec.WaterSurfaceElevation[node]
+				if !finite(surface) || surface < 0 || surface > 1 {
+					return 0, false, errors.New("waterbed: invalid downstream receiver surface")
+				}
+				return surface, true, nil
+			}
+		}
+
 		to := hydro.FlowTo[node]
 		if to < 0 {
 			return 0, false, nil
@@ -397,16 +424,6 @@ func downstreamReceiverSurface(start int, rec *reconcile.Model, hydro *hydrology
 			return 0, false, errors.New("waterbed: receiver search encountered self cycle")
 		}
 		node = to
-		if rec.WaterSurfaceDefined[node] {
-			switch rec.WaterKind[node] {
-			case reconcile.WaterLake, reconcile.WaterOcean:
-				surface := rec.WaterSurfaceElevation[node]
-				if !finite(surface) || surface < 0 || surface > 1 {
-					return 0, false, errors.New("waterbed: invalid downstream receiver surface")
-				}
-				return surface, true, nil
-			}
-		}
 	}
 	return 0, false, errors.New("waterbed: receiver search exceeded flow graph length")
 }

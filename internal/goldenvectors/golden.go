@@ -287,16 +287,29 @@ func selectPoints(model *generator.WorldModel) ([]pointSpec, error) {
 		if !segment.ReceiverSurfaceDefined {
 			continue
 		}
-		const t = 0.95
-		points = append(points, pointSpec{
-			"river_backwater",
-			"river-mouth",
-			"near the downstream end of the first river segment with a propagated receiver surface",
-			segment.X0 + (segment.X1-segment.X0)*t,
-			segment.Z0 + (segment.Z1-segment.Z0)*t,
-		})
-		foundRiver = true
-		break
+		// A receiver-bound segment may now extend all the way into the ocean or
+		// lake. Pick the furthest downstream point that is still Runtime River,
+		// so the golden case keeps exercising river backwater semantics rather
+		// than accidentally turning into an Ocean sample.
+		for t := 0.95; t >= 0.05; t -= 0.05 {
+			x := segment.X0 + (segment.X1-segment.X0)*t
+			z := segment.Z0 + (segment.Z1-segment.Z0)*t
+			if model.Runtime.Sample(x, z).WaterKind != reconcile.WaterRiver {
+				continue
+			}
+			points = append(points, pointSpec{
+				"river_backwater",
+				"river-mouth",
+				"furthest downstream Runtime River point on a segment with a propagated receiver surface",
+				x,
+				z,
+			})
+			foundRiver = true
+			break
+		}
+		if foundRiver {
+			break
+		}
 	}
 	if !foundRiver {
 		return nil, errors.New("goldenvectors: fixture contains no river with receiver surface")

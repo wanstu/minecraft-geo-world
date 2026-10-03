@@ -373,9 +373,13 @@ func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Mod
 	}
 
 	for i, to := range h.FlowTo {
+		// Keep the final land -> lake/ocean edge. The receiver itself does not
+		// need to be land: Waterbed needs this geometric segment so the rendered
+		// channel reaches the receiving waterbody instead of ending one macro
+		// cell inland.
 		if to < 0 || to >= n ||
-			!h.LandMask[i] || !h.LandMask[to] ||
-			h.LakeID[i] != 0 || h.LakeID[to] != 0 ||
+			!h.LandMask[i] ||
+			h.LakeID[i] != 0 ||
 			h.RiverStrength[i] < m.Config.RiverStrengthThreshold {
 			continue
 		}

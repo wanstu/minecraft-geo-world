@@ -3,8 +3,8 @@ package geoworld.neoforge.client;
 import geoworld.minecraft.v26_3common.Minecraft26_3HeightMapping;
 import geoworld.neoforge.engine.GeoWorldEngineBridge;
 import geoworld.neoforge.worldgen.GeoWorldBiomeSource;
-
 import geoworld.runtime.GeoWorldV1;
+
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
@@ -18,9 +18,15 @@ import java.util.Locale;
 public final class GeoWorldPreviewScreen extends Screen {
     private static final Component TITLE =
         Component.translatable("geoworld.preview.title");
-    private static final int MAX_COLUMNS = 128;
-    private static final int MAX_ROWS = 80;
-    private static final double LOCAL_BLOCKS_PER_SAMPLE = 8.0;
+
+    private static final int MAX_COLUMNS = 160;
+    private static final int MAX_ROWS = 100;
+    private static final double INITIAL_LOCAL_SPAN_X = 1600.0;
+    private static final double INITIAL_LOCAL_SPAN_Z = 1000.0;
+    private static final double MIN_VIEW_SPAN_X = 128.0;
+    private static final double MIN_VIEW_SPAN_Z = 80.0;
+    private static final double ZOOM_STEP = 0.78;
+
     private static final Minecraft26_3HeightMapping HEIGHTS =
         new Minecraft26_3HeightMapping();
 
@@ -28,8 +34,10 @@ public final class GeoWorldPreviewScreen extends Screen {
     private final GeoWorldV1 model;
     private final Double focusX;
     private final Double focusZ;
+
     private HeaderAndFooterLayout layout;
     private Button viewModeButton;
+
     private boolean localView;
     private double viewOriginX;
     private double viewOriginZ;
@@ -39,10 +47,16 @@ public final class GeoWorldPreviewScreen extends Screen {
     private int columns;
     private int rows;
     private int[] colors;
+
     private int landSamples;
     private int oceanSamples;
     private int lakeSamples;
     private int riverSamples;
+
+    private int mapLeft;
+    private int mapTop;
+    private int mapWidth;
+    private int mapHeight;
 
     public GeoWorldPreviewScreen(
         Screen parent,
@@ -62,45 +76,122 @@ public final class GeoWorldPreviewScreen extends Screen {
         this.model = model;
         this.focusX = focusX;
         this.focusZ = focusZ;
-        this.localView = focusX != null && focusZ != null;
-        this.buildPreview();
+
+        if (focusX != null && focusZ != null) {
+            this.resetLocalView();
+        } else {
+            this.resetGlobalView();
+        }
     }
 
     @Override
     protected void init() {
-        this.layout = new HeaderAndFooterLayout(this, 29, 33);
+        this.layout = new HeaderAndFooterLayout(this, 27, 31);
         this.layout.addTitleHeader(this.title, this.font);
+
         LinearLayout footer = this.layout.addToFooter(
             LinearLayout.horizontal().spacing(8)
         );
+
         if (this.focusX != null && this.focusZ != null) {
             this.viewModeButton = footer.addChild(
                 Button.builder(
                     this.viewModeLabel(),
                     button -> this.toggleViewMode()
                 )
-                    .width(150)
+                    .width(120)
                     .build()
             );
         }
+
         footer.addChild(
-            Button.builder(CommonComponents.GUI_BACK, button -> this.onClose())
-                .width(150)
+            Button.builder(
+                Component.translatable("geoworld.preview.reset_view"),
+                button -> this.resetCurrentView()
+            )
+                .width(120)
                 .build()
         );
+
+        footer.addChild(
+            Button.builder(CommonComponents.GUI_BACK, button -> this.onClose())
+                .width(120)
+                .build()
+        );
+
         this.layout.visitWidgets(this::addRenderableWidget);
         this.repositionElements();
     }
 
     private void toggleViewMode() {
         if (this.focusX == null || this.focusZ == null) {
+            this.resetGlobalView();
             return;
         }
-        this.localView = !this.localView;
-        this.buildPreview();
-        if (this.viewModeButton != null) {
-            this.viewModeButton.setMessage(this.viewModeLabel());
+        if (this.localView) {
+            this.resetGlobalView();
+        } else {
+            this.resetLocalView();
         }
+        this.refreshViewModeButton();
+    }
+
+    private void resetCurrentView() {
+        if (
+            this.localView &&
+            this.focusX != null &&
+            this.focusZ != null
+        ) {
+            this.resetLocalView();
+        } else {
+            this.resetGlobalView();
+        }
+        this.refreshViewModeButton();
+    }
+
+    private void resetGlobalView() {
+        GeoWorldV1.Geometry geometry = this.model.manifest().geometry();
+        this.localView = false;
+        this.viewOriginX = geometry.originX();
+        this.viewOriginZ = geometry.originZ();
+        this.viewSpanX = geometry.spanXBlocks();
+        this.viewSpanZ = geometry.spanZBlocks();
+        this.rebuildSamples();
+    }
+
+    private void resetLocalView() {
+        GeoWorldV1.Geometry geometry = this.model.manifest().geometry();
+        this.localView = true;
+
+        this.viewSpanX = Math.min(
+            geometry.spanXBlocks(),
+            INITIAL_LOCAL_SPAN_X
+        );
+        this.viewSpanZ = Math.min(
+            geometry.spanZBlocks(),
+            INITIAL_LOCAL_SPAN_Z
+        );
+
+        double centerX = this.focusX != null
+            ? this.focusX
+            : geometry.originX() + geometry.spanXBlocks() * 0.5;
+        double centerZ = this.focusZ != null
+            ? this.focusZ
+            : geometry.originZ() + geometry.spanZBlocks() * 0.5;
+
+        this.viewOriginX = clampViewOrigin(
+            centerX - this.viewSpanX * 0.5,
+            geometry.originX(),
+            geometry.spanXBlocks(),
+            this.viewSpanX
+        );
+        this.viewOriginZ = clampViewOrigin(
+            centerZ - this.viewSpanZ * 0.5,
+            geometry.originZ(),
+            geometry.spanZBlocks(),
+            this.viewSpanZ
+        );
+        this.rebuildSamples();
     }
 
     private Component viewModeLabel() {
@@ -111,69 +202,36 @@ public final class GeoWorldPreviewScreen extends Screen {
         );
     }
 
-    private void buildPreview() {
-        GeoWorldV1.Geometry geometry =
-            this.model.manifest().geometry();
+    private void refreshViewModeButton() {
+        if (this.viewModeButton != null) {
+            this.viewModeButton.setMessage(this.viewModeLabel());
+        }
+    }
 
-        if (
-            this.localView &&
-            this.focusX != null &&
-            this.focusZ != null
-        ) {
+    private void rebuildSamples() {
+        double aspect = this.viewSpanX / this.viewSpanZ;
+        if (!Double.isFinite(aspect) || aspect <= 0.0) {
+            aspect = 1.0;
+        }
+
+        if (aspect >= 1.0) {
             this.columns = MAX_COLUMNS;
-            this.rows = MAX_ROWS;
-            this.viewSpanX = Math.min(
-                geometry.spanXBlocks(),
-                (this.columns - 1) * LOCAL_BLOCKS_PER_SAMPLE
-            );
-            this.viewSpanZ = Math.min(
-                geometry.spanZBlocks(),
-                (this.rows - 1) * LOCAL_BLOCKS_PER_SAMPLE
-            );
-            this.viewOriginX = clamp(
-                this.focusX - this.viewSpanX * 0.5,
-                geometry.originX(),
-                geometry.originX() +
-                    geometry.spanXBlocks() -
-                    this.viewSpanX
-            );
-            this.viewOriginZ = clamp(
-                this.focusZ - this.viewSpanZ * 0.5,
-                geometry.originZ(),
-                geometry.originZ() +
-                    geometry.spanZBlocks() -
-                    this.viewSpanZ
+            this.rows = Math.max(
+                32,
+                Math.min(
+                    MAX_ROWS,
+                    (int)Math.round(MAX_COLUMNS / aspect)
+                )
             );
         } else {
-            double aspect =
-                geometry.spanXBlocks() / geometry.spanZBlocks();
-            if (!Double.isFinite(aspect) || aspect <= 0.0) {
-                aspect = 1.0;
-            }
-
-            if (aspect >= 1.0) {
-                this.columns = MAX_COLUMNS;
-                this.rows = Math.max(
-                    24,
-                    Math.min(
-                        MAX_ROWS,
-                        (int)Math.round(MAX_COLUMNS / aspect)
-                    )
-                );
-            } else {
-                this.rows = MAX_ROWS;
-                this.columns = Math.max(
-                    24,
-                    Math.min(
-                        MAX_COLUMNS,
-                        (int)Math.round(MAX_ROWS * aspect)
-                    )
-                );
-            }
-            this.viewOriginX = geometry.originX();
-            this.viewOriginZ = geometry.originZ();
-            this.viewSpanX = geometry.spanXBlocks();
-            this.viewSpanZ = geometry.spanZBlocks();
+            this.rows = MAX_ROWS;
+            this.columns = Math.max(
+                32,
+                Math.min(
+                    MAX_COLUMNS,
+                    (int)Math.round(MAX_ROWS * aspect)
+                )
+            );
         }
 
         this.landSamples = 0;
@@ -198,9 +256,44 @@ public final class GeoWorldPreviewScreen extends Screen {
                     this.model.sample(x, z);
                 this.colors[row * this.columns + column] =
                     color(this.model, x, z, sample);
-                count(sample);
+                this.count(sample);
             }
         }
+    }
+
+    private void updateMapRect() {
+        int header = this.layout != null
+            ? this.layout.getHeaderHeight()
+            : 27;
+        int footer = this.layout != null
+            ? this.layout.getFooterHeight()
+            : 31;
+
+        int availableWidth = Math.max(120, this.width - 32);
+        int availableHeight = Math.max(
+            80,
+            this.height - header - footer - 34
+        );
+
+        double aspect = this.viewSpanX / this.viewSpanZ;
+        if (!Double.isFinite(aspect) || aspect <= 0.0) {
+            aspect = 1.0;
+        }
+
+        int widthFromHeight = (int)Math.round(availableHeight * aspect);
+        if (widthFromHeight <= availableWidth) {
+            this.mapHeight = availableHeight;
+            this.mapWidth = Math.max(1, widthFromHeight);
+        } else {
+            this.mapWidth = availableWidth;
+            this.mapHeight = Math.max(
+                1,
+                (int)Math.round(availableWidth / aspect)
+            );
+        }
+
+        this.mapLeft = (this.width - this.mapWidth) / 2;
+        this.mapTop = header + 5;
     }
 
     @Override
@@ -211,54 +304,36 @@ public final class GeoWorldPreviewScreen extends Screen {
         float partialTick
     ) {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
-
-        int availableWidth = Math.max(80, this.width - 24);
-        int availableHeight = Math.max(
-            60,
-            this.height -
-            this.layout.getHeaderHeight() -
-            this.layout.getFooterHeight() -
-            70
-        );
-
-        int pixel = Math.max(
-            1,
-            Math.min(
-                availableWidth / this.columns,
-                availableHeight / this.rows
-            )
-        );
-        int mapWidth = this.columns * pixel;
-        int mapHeight = this.rows * pixel;
-        int left = (this.width - mapWidth) / 2;
-        int top = this.layout.getHeaderHeight() + 8;
+        this.updateMapRect();
 
         graphics.fill(
-            left - 2,
-            top - 2,
-            left + mapWidth + 2,
-            top + mapHeight + 2,
+            this.mapLeft - 3,
+            this.mapTop - 3,
+            this.mapLeft + this.mapWidth + 3,
+            this.mapTop + this.mapHeight + 3,
             0xFF101820
         );
 
         for (int row = 0; row < this.rows; row++) {
-            int y0 = top + row * pixel;
-            int y1 = y0 + pixel;
+            int y0 =
+                this.mapTop + row * this.mapHeight / this.rows;
+            int y1 =
+                this.mapTop + (row + 1) * this.mapHeight / this.rows;
+
             int runStart = 0;
             int runColor = this.colors[row * this.columns];
-
             for (int column = 1; column <= this.columns; column++) {
                 int nextColor = column < this.columns
                     ? this.colors[row * this.columns + column]
                     : Integer.MIN_VALUE;
                 if (column == this.columns || nextColor != runColor) {
-                    graphics.fill(
-                        left + runStart * pixel,
-                        y0,
-                        left + column * pixel,
-                        y1,
-                        runColor
-                    );
+                    int x0 =
+                        this.mapLeft +
+                        runStart * this.mapWidth / this.columns;
+                    int x1 =
+                        this.mapLeft +
+                        column * this.mapWidth / this.columns;
+                    graphics.fill(x0, y0, x1, y1, runColor);
                     if (column < this.columns) {
                         runStart = column;
                         runColor = nextColor;
@@ -267,39 +342,55 @@ public final class GeoWorldPreviewScreen extends Screen {
             }
         }
 
-        GeoWorldV1.Manifest manifest = this.model.manifest();
-        boolean focusVisible =
-            this.focusX != null &&
-            this.focusZ != null &&
-            this.viewSpanX > 0.0 &&
-            this.viewSpanZ > 0.0 &&
-            this.focusX >= this.viewOriginX &&
-            this.focusX <= this.viewOriginX + this.viewSpanX &&
-            this.focusZ >= this.viewOriginZ &&
-            this.focusZ <= this.viewOriginZ + this.viewSpanZ;
-        if (focusVisible) {
-            double fx =
-                (this.focusX - this.viewOriginX) / this.viewSpanX;
-            double fz =
-                (this.focusZ - this.viewOriginZ) / this.viewSpanZ;
-            int markerX = left + (int)Math.round(fx * mapWidth);
-            int markerY = top + (int)Math.round(fz * mapHeight);
-            graphics.fill(
-                markerX - 4,
-                markerY - 1,
-                markerX + 5,
-                markerY + 2,
-                0xFFFF3B30
-            );
-            graphics.fill(
-                markerX - 1,
-                markerY - 4,
-                markerX + 2,
-                markerY + 5,
-                0xFFFF3B30
-            );
+        this.renderFocusMarker(graphics);
+        this.renderSummary(graphics);
+
+        if (this.isInsideMap(mouseX, mouseY)) {
+            this.renderHoverInfo(graphics, mouseX, mouseY);
+        }
+    }
+
+    private void renderFocusMarker(GuiGraphicsExtractor graphics) {
+        if (
+            this.focusX == null ||
+            this.focusZ == null ||
+            this.viewSpanX <= 0.0 ||
+            this.viewSpanZ <= 0.0 ||
+            this.focusX < this.viewOriginX ||
+            this.focusX > this.viewOriginX + this.viewSpanX ||
+            this.focusZ < this.viewOriginZ ||
+            this.focusZ > this.viewOriginZ + this.viewSpanZ
+        ) {
+            return;
         }
 
+        double fx =
+            (this.focusX - this.viewOriginX) / this.viewSpanX;
+        double fz =
+            (this.focusZ - this.viewOriginZ) / this.viewSpanZ;
+        int markerX =
+            this.mapLeft + (int)Math.round(fx * this.mapWidth);
+        int markerY =
+            this.mapTop + (int)Math.round(fz * this.mapHeight);
+
+        graphics.fill(
+            markerX - 5,
+            markerY - 1,
+            markerX + 6,
+            markerY + 2,
+            0xFFFF3B30
+        );
+        graphics.fill(
+            markerX - 1,
+            markerY - 5,
+            markerX + 2,
+            markerY + 6,
+            0xFFFF3B30
+        );
+    }
+
+    private void renderSummary(GuiGraphicsExtractor graphics) {
+        GeoWorldV1.Manifest manifest = this.model.manifest();
         double sampleScale = Math.max(
             this.columns > 1
                 ? this.viewSpanX / (this.columns - 1)
@@ -308,20 +399,19 @@ public final class GeoWorldPreviewScreen extends Screen {
                 ? this.viewSpanZ / (this.rows - 1)
                 : this.viewSpanZ
         );
+        double zoom = manifest.geometry().spanXBlocks() / this.viewSpanX;
+
         String summary = String.format(
             Locale.ROOT,
-            "Seed %d · %s · %.0f×%.0f blocks · %.1f blocks/sample",
+            "Seed %d · %.1fx · %.0f×%.0f blocks · %.1f blocks/sample",
             manifest.seed(),
-            Component.translatable(
-                this.localView
-                    ? "geoworld.preview.local_view"
-                    : "geoworld.preview.global_view"
-            ).getString(),
+            zoom,
             this.viewSpanX,
             this.viewSpanZ,
             sampleScale
         );
-        int textY = top + mapHeight + 8;
+
+        int textY = this.mapTop + this.mapHeight + 6;
         graphics.text(
             this.font,
             summary,
@@ -330,51 +420,221 @@ public final class GeoWorldPreviewScreen extends Screen {
             0xFFFFFFFF
         );
 
-        if (this.focusX != null && this.focusZ != null) {
-            GeoWorldV1.RuntimeSample focusSample =
-                this.model.sample(this.focusX, this.focusZ);
-            int surfaceY =
-                HEIGHTS.boundaryY(focusSample.groundHeight()) - 1;
-            Component positionText = Component.translatable(
-                "geoworld.preview.current_detail",
-                Math.round(this.focusX),
-                Math.round(this.focusZ),
-                surfaceY,
-                focusSample.biomeFamily(),
-                focusSample.surfaceProfile()
+        Component controls = Component.translatable(
+            "geoworld.preview.controls"
+        );
+        graphics.text(
+            this.font,
+            controls,
+            Math.max(
+                6,
+                (this.width - this.font.width(controls)) / 2
+            ),
+            textY + 11,
+            0xFFB8B8B8
+        );
+    }
+
+    private void renderHoverInfo(
+        GuiGraphicsExtractor graphics,
+        int mouseX,
+        int mouseY
+    ) {
+        double fx =
+            (double)(mouseX - this.mapLeft) / this.mapWidth;
+        double fz =
+            (double)(mouseY - this.mapTop) / this.mapHeight;
+        double worldX =
+            this.viewOriginX + clamp(fx, 0.0, 1.0) * this.viewSpanX;
+        double worldZ =
+            this.viewOriginZ + clamp(fz, 0.0, 1.0) * this.viewSpanZ;
+
+        GeoWorldV1.RuntimeSample sample =
+            this.model.sample(worldX, worldZ);
+        String minecraftBiome =
+            GeoWorldBiomeSource.minecraftBiomeId(
+                this.model,
+                worldX,
+                worldZ
             );
-            graphics.text(
-                this.font,
-                positionText,
-                Math.max(
-                    6,
-                    (this.width - this.font.width(positionText)) / 2
-                ),
-                textY + 11,
-                focusVisible ? 0xFFFF7770 : 0xFFB0B0B0
+
+        int groundBoundary = HEIGHTS.boundaryY(sample.groundHeight());
+        int groundY = groundBoundary - 1;
+
+        Component line1 = Component.translatable(
+            "geoworld.preview.hover_position",
+            Math.round(worldX),
+            Math.round(worldZ),
+            groundY
+        );
+
+        Component line2;
+        if (
+            sample.waterSurfaceDefined() &&
+            sample.waterSurfaceElevation() != null
+        ) {
+            int waterBoundary = HEIGHTS.boundaryY(
+                sample.waterSurfaceElevation()
+            );
+            int depthBlocks = Math.max(
+                0,
+                waterBoundary - groundBoundary
+            );
+            line2 = Component.translatable(
+                "geoworld.preview.hover_water",
+                sample.waterKind(),
+                waterBoundary - 1,
+                depthBlocks
             );
         } else {
-            String counts = String.format(
-                Locale.ROOT,
-                "land %d · ocean %d · lake %d · river %d",
-                this.landSamples,
-                this.oceanSamples,
-                this.lakeSamples,
-                this.riverSamples
+            line2 = Component.translatable(
+                "geoworld.preview.hover_dry"
             );
+        }
+
+        Component line3 = Component.translatable(
+            "geoworld.preview.hover_profile",
+            sample.biomeFamily(),
+            sample.terrainVariant(),
+            sample.surfaceProfile()
+        );
+        Component line4 = Component.translatable(
+            "geoworld.preview.hover_minecraft",
+            minecraftBiome,
+            sample.vegetationProfile()
+        );
+
+        Component[] lines = {line1, line2, line3, line4};
+        int boxWidth = 0;
+        for (Component line : lines) {
+            boxWidth = Math.max(boxWidth, this.font.width(line));
+        }
+        int boxHeight = lines.length * 11 + 7;
+
+        int x = mouseX + 12;
+        int y = mouseY + 12;
+        if (x + boxWidth + 10 > this.width) {
+            x = mouseX - boxWidth - 14;
+        }
+        if (y + boxHeight + 4 > this.height) {
+            y = mouseY - boxHeight - 8;
+        }
+
+        graphics.fill(
+            x - 4,
+            y - 4,
+            x + boxWidth + 5,
+            y + boxHeight,
+            0xE0101418
+        );
+
+        for (int i = 0; i < lines.length; i++) {
             graphics.text(
                 this.font,
-                counts,
-                Math.max(6, (this.width - this.font.width(counts)) / 2),
-                textY + 11,
-                0xFFB0B0B0
+                lines[i],
+                x,
+                y + i * 11,
+                i == 0 ? 0xFFFFFFFF : 0xFFD7D7D7
             );
         }
     }
 
     @Override
+    public boolean mouseScrolled(
+        double mouseX,
+        double mouseY,
+        double scrollX,
+        double scrollY
+    ) {
+        this.updateMapRect();
+        if (
+            scrollY != 0.0 &&
+            this.isInsideMap(mouseX, mouseY)
+        ) {
+            this.zoomAt(mouseX, mouseY, scrollY);
+            return true;
+        }
+        return super.mouseScrolled(
+            mouseX,
+            mouseY,
+            scrollX,
+            scrollY
+        );
+    }
+
+    private void zoomAt(
+        double mouseX,
+        double mouseY,
+        double scrollY
+    ) {
+        GeoWorldV1.Geometry geometry = this.model.manifest().geometry();
+
+        double anchorXFraction = clamp(
+            (mouseX - this.mapLeft) / this.mapWidth,
+            0.0,
+            1.0
+        );
+        double anchorZFraction = clamp(
+            (mouseY - this.mapTop) / this.mapHeight,
+            0.0,
+            1.0
+        );
+        double anchorWorldX =
+            this.viewOriginX +
+            anchorXFraction * this.viewSpanX;
+        double anchorWorldZ =
+            this.viewOriginZ +
+            anchorZFraction * this.viewSpanZ;
+
+        double factor = Math.pow(ZOOM_STEP, scrollY);
+        double newSpanX = clamp(
+            this.viewSpanX * factor,
+            Math.min(MIN_VIEW_SPAN_X, geometry.spanXBlocks()),
+            geometry.spanXBlocks()
+        );
+        double newSpanZ = clamp(
+            this.viewSpanZ * factor,
+            Math.min(MIN_VIEW_SPAN_Z, geometry.spanZBlocks()),
+            geometry.spanZBlocks()
+        );
+
+        this.viewOriginX = clampViewOrigin(
+            anchorWorldX - anchorXFraction * newSpanX,
+            geometry.originX(),
+            geometry.spanXBlocks(),
+            newSpanX
+        );
+        this.viewOriginZ = clampViewOrigin(
+            anchorWorldZ - anchorZFraction * newSpanZ,
+            geometry.originZ(),
+            geometry.spanZBlocks(),
+            newSpanZ
+        );
+        this.viewSpanX = newSpanX;
+        this.viewSpanZ = newSpanZ;
+
+        boolean isGlobal =
+            Math.abs(this.viewSpanX - geometry.spanXBlocks()) < 1e-6 &&
+            Math.abs(this.viewSpanZ - geometry.spanZBlocks()) < 1e-6;
+        this.localView = !isGlobal;
+
+        this.rebuildSamples();
+        this.refreshViewModeButton();
+    }
+
+    private boolean isInsideMap(double x, double y) {
+        return x >= this.mapLeft &&
+            x < this.mapLeft + this.mapWidth &&
+            y >= this.mapTop &&
+            y < this.mapTop + this.mapHeight;
+    }
+
+    @Override
     protected void repositionElements() {
-        this.layout.arrangeElements();
+        if (this.layout != null) {
+            this.layout.arrangeElements();
+        }
+        this.updateMapRect();
     }
 
     @Override
@@ -404,7 +664,7 @@ public final class GeoWorldPreviewScreen extends Screen {
         return switch (sample.waterKind()) {
             case "Ocean" -> oceanColor(sample);
             case "Lake" -> 0xFF3F9FD0;
-            case "River" -> 0xFF55B9E8;
+            case "River" -> 0xFF4AAFE6;
             default -> landColor(model, x, z, sample);
         };
     }
@@ -425,7 +685,10 @@ public final class GeoWorldPreviewScreen extends Screen {
         String surface = sample.surfaceProfile();
         if (surface != null) {
             String surfaceValue = surface.toLowerCase(Locale.ROOT);
-            if (surfaceValue.contains("snow") || surfaceValue.contains("ice")) {
+            if (
+                surfaceValue.contains("snow") ||
+                surfaceValue.contains("ice")
+            ) {
                 return 0xFFDCE5E2;
             }
             if (surfaceValue.contains("alpine rock")) {
@@ -457,20 +720,42 @@ public final class GeoWorldPreviewScreen extends Screen {
         if (value.contains("desert")) return 0xFFD8C27A;
         if (value.contains("savanna")) return 0xFFB6B65D;
         if (value.contains("tundra")) return 0xFFB8C4B5;
-        if (value.contains("taiga") || value.contains("conifer")) {
+        if (
+            value.contains("taiga") ||
+            value.contains("conifer")
+        ) {
             return 0xFF496B55;
         }
-        if (value.contains("rainforest") || value.contains("tropical")) {
+        if (
+            value.contains("rainforest") ||
+            value.contains("tropical")
+        ) {
             return 0xFF2D7546;
         }
         if (value.contains("forest")) return 0xFF4E8150;
         if (value.contains("wetland")) return 0xFF5F8C69;
         if (value.contains("grass")) return 0xFF79A85B;
         if (value.contains("shrub")) return 0xFF839260;
-        if (value.contains("snow") || value.contains("ice")) {
+        if (
+            value.contains("snow") ||
+            value.contains("ice")
+        ) {
             return 0xFFDCE5E2;
         }
         return heightColor(sample.groundHeight());
+    }
+
+    private static double clampViewOrigin(
+        double origin,
+        double geometryOrigin,
+        double geometrySpan,
+        double viewSpan
+    ) {
+        double max = geometryOrigin + geometrySpan - viewSpan;
+        if (max < geometryOrigin) {
+            return geometryOrigin;
+        }
+        return clamp(origin, geometryOrigin, max);
     }
 
     private static double clamp(

@@ -83,8 +83,12 @@ func TestRiverCorridorNeverRaisesBroadTerrain(t *testing.T) {
 	x0, z0 := g.NodePosition(0, 1)
 	x1, _ := g.NodePosition(1, 1)
 	got := m.Sample((x0+x1)*0.5, z0)
-	if math.Abs(got.FinalHeight-0.60) > 1e-12 || got.RiverCarve != 0 {
-		t.Fatalf("river overlay raised or carved invalid bed: %+v", got)
+	want := 0.60 - m.Config.MinRiverBedDepthNormalized
+	if math.Abs(got.FinalHeight-want) > 1e-12 || got.RiverCarve <= 0 {
+		t.Fatalf("river centerline was not embedded into broad terrain: got=%+v wantHeight=%.6f", got, want)
+	}
+	if got.FinalHeight > 0.60+1e-12 {
+		t.Fatalf("river overlay raised broad terrain: %+v", got)
 	}
 }
 
@@ -281,6 +285,48 @@ func TestConfluencePropagatesActualUpstreamOutlet(t *testing.T) {
 	d := m.Audit(32, 1e-9)
 	if d.RiverUpslopeSteps != 0 {
 		t.Fatalf("confluence introduced %d upslope steps, max rise %.12g", d.RiverUpslopeSteps, d.MaxRiverRise)
+	}
+}
+
+func TestTerminalRiverSegmentInheritsOceanSurfaceAtItsEndpoint(t *testing.T) {
+	g := testGeometry()
+	base := testTerrain(t, g, 0.55)
+	n := g.Width * g.Height
+	from, ocean := 3, 4
+	rec := &reconcile.Model{
+		Geometry:              g,
+		Config:                reconcile.Config{RiverStrengthThreshold: 0.30},
+		RiverBaseElevation:    filled(n, 0.55),
+		RiverBedTarget:        filled(n, 0.55),
+		LakeBedCeilingDefined: make([]bool, n),
+		LakeBedCeiling:        make([]float64, n),
+		WaterKind:             make([]reconcile.WaterKind, n),
+		WaterSurfaceDefined:   make([]bool, n),
+		WaterSurfaceElevation: make([]float64, n),
+		RiverEdges: []reconcile.RiverEdgeConstraint{{
+			From: from, To: ocean, RiverStrength: 1,
+		}},
+	}
+	rec.RiverBedTarget[from] = 0.53
+	rec.RiverBedTarget[ocean] = 0.47
+	rec.WaterKind[ocean] = reconcile.WaterOcean
+	rec.WaterSurfaceDefined[ocean] = true
+	rec.WaterSurfaceElevation[ocean] = 0.50
+
+	h := emptyHydrology(g)
+	h.LandMask[from] = true
+	h.FlowTo[from] = ocean
+
+	m, err := Build(base, rec, h, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Rivers) != 1 {
+		t.Fatalf("river segments=%d want=1", len(m.Rivers))
+	}
+	seg := m.Rivers[0]
+	if !seg.ReceiverSurfaceDefined || math.Abs(seg.ReceiverSurface-0.50) > 1e-12 {
+		t.Fatalf("terminal ocean surface not inherited: %+v", seg)
 	}
 }
 

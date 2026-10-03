@@ -75,7 +75,9 @@ public final class GeoWorldBiomeSource extends BiomeSource {
             biomes.getOrThrow(Biomes.BIRCH_FOREST),
             biomes.getOrThrow(Biomes.JUNGLE),
             biomes.getOrThrow(Biomes.SPARSE_JUNGLE),
-            biomes.getOrThrow(Biomes.SWAMP)
+            biomes.getOrThrow(Biomes.SWAMP),
+            biomes.getOrThrow(Biomes.RIVER),
+            biomes.getOrThrow(Biomes.FROZEN_RIVER)
         ));
     }
 
@@ -117,6 +119,15 @@ public final class GeoWorldBiomeSource extends BiomeSource {
     ) {
         GeoWorldV1.RuntimeSample sample = model.sample(blockX, blockZ);
         String family = sample.biomeFamily();
+
+        // River is a first-class Runtime water semantic. Keep that semantic in
+        // Minecraft's stored biome data too instead of inheriting the broad
+        // terrestrial biome (for example Jungle) underneath the channel.
+        if ("River".equals(sample.waterKind())) {
+            return isFrozenRiverFamily(family)
+                ? "minecraft:frozen_river"
+                : "minecraft:river";
+        }
 
         // The model already has a broad tropical -> subtropical -> temperate
         // climate transition, but mapping Tropical Rainforest directly to
@@ -203,6 +214,13 @@ public final class GeoWorldBiomeSource extends BiomeSource {
     private static boolean isTropicalForest(String family) {
         return "Tropical Rainforest".equals(family) ||
             "Tropical Monsoon Forest".equals(family);
+    }
+
+    private static boolean isFrozenRiverFamily(String family) {
+        return "Frozen Ocean".equals(family) ||
+            "Ice Sheet".equals(family) ||
+            "Tundra".equals(family) ||
+            "Alpine".equals(family);
     }
 
     @Override

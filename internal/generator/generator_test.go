@@ -156,7 +156,10 @@ func TestGenerateWorldStoresResolvedConfig(t *testing.T) {
 	if m.Config.Reconcile.CoastMarginNormalized <= 0 || m.Config.Reconcile.MinRiverBedDropNormalized <= 0 {
 		t.Fatal("resolved reconciliation defaults were not retained")
 	}
-	if m.Config.Waterbed.MinRiverHalfWidthBlocks <= 0 || m.Config.Waterbed.MaxRiverHalfWidthBlocks <= 0 || m.Config.Waterbed.RiverProfileStepBlocks <= 0 {
+	if m.Config.Waterbed.MinRiverHalfWidthBlocks <= 0 ||
+		m.Config.Waterbed.MaxRiverHalfWidthBlocks <= 0 ||
+		m.Config.Waterbed.RiverProfileStepBlocks <= 0 ||
+		m.Config.Waterbed.MinRiverBedDepthNormalized <= 0 {
 		t.Fatal("resolved waterbed defaults were not retained")
 	}
 	if m.Config.WorldSample.RiverCenterDepthNormalized <= 0 || m.Config.WorldSample.OceanEligibilityThreshold <= 0 {

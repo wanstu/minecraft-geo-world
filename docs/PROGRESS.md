@@ -1337,3 +1337,40 @@ Phase 6.2 正式完成。下一步 Phase 6.3：最小持久化 schema、原子�
 - `git diff --check` 通过。
 
 验收注意：雨林 Minecraft biome 映射只影响新生成 Chunk。已经生成过的 Chunk 不会被重写；观察新过渡带时应新建 GeoWorld 或前往此前从未加载过的区域。
+
+## 2026-10-03 · 河流入海 / 河床嵌入 / River biome / 高级预览
+
+用户在 HMCL 26.3 的新存档 test11（Seed 5441493196688466877）实测发现：河流在海岸前断开、部分河水铺在地表上、河道仍显示为丛林群系，以及游戏内 GeoWorld 预览面积和交互能力不足。
+
+定位：
+- 当前存档旧模型的河口链路 #72 只到 `(2240,-192)->(2368,-192)`；而同一纬线约 X=2490 开始才进入正式 Ocean。原因是 `reconcile.buildRiverConstraints` 要求上下游节点都必须是陆地，最终 `land -> ocean/lake` 边被直接丢弃，因此河道天然少最后一个宏 Cell。
+- 旧模型在 `(2240,320)` 的 river centerline 上 broad terrain=0.529628（Minecraft 约 Y=78），Waterbed final 仍为 0.529628（carve=0），但河面达到 0.532128（约 Y=80）。也就是 Runtime 确实声明“这里有河”，却没有保证河床低于周围地表，视觉上就会出现水铺在地面上的情况。
+- Minecraft biome 映射此前只看 `BiomeFamily`，所以热带雨林中的 Runtime River 最终仍写成 `minecraft:jungle`。
+- 预览已有局部视图，但仍是固定小图，缺少连续缩放和指针位置诊断。
+
+本轮实现：
+- Reconcile 保留河流源节点必须是陆地的约束，但允许接收节点为 lake/ocean，从而把最后一段河道真正连接到接收水体；新增 land->land->ocean 单测。
+- Waterbed 新增 `MinRiverBedDepthNormalized`，默认 0.004；河流中心线每个采样点至少下切该深度，同时继续执行 carve-only 与单调下坡约束。旧模型的零值字段使用 JSON `omitempty` 保持 V1 文件 checksum/加载兼容。
+- `downstreamReceiverSurface` 会先检查当前节点自身是否已经是 lake/ocean，保证直接终止在接收节点上的最后一段河道能拿到正确水面 datum。
+- Minecraft `GeoWorldBiomeSource` 加入 River / Frozen River holder，Runtime `waterKind=River` 优先映射成 `minecraft:river`，寒带/冻原/高山河流映射 `minecraft:frozen_river`。
+- GeoWorld cache key 从 v3 提升到 v4，避免相同 Seed/参数继续命中旧算法生成的模型。
+- 游戏内预览重做为更大地图，保持世界纵横比并尽量占满屏幕；局部默认 1600×1000 blocks，最高 160×100 样点；滚轮以鼠标位置为锚点缩放，最小可缩到约 128×80 blocks；保留“查看全局/查看当前位置”，新增“重置视图”。
+- 鼠标悬停地图会即时显示精确 X/Z、模型地表 Y、水体类型/水面 Y/深度、GeoWorld BiomeFamily/TerrainVariant/SurfaceProfile、Minecraft biome id 与 vegetation profile。
+
+对用户 test11 同 Seed/同参数重新生成模型验证：
+- 河流段数由旧模型 80 增加到 109；原河口链路现在多出 `(2368,-192)->(2496,-192)`，直接跨入 Ocean，旧模型 X≈2432 的 dry gap 已消失。
+- `(2240,320)`：旧模型 broad≈Y78 / river bed≈Y78 / water≈Y80（零下切）；新模型 broad≈Y78 / river bed≈Y76 / water≈Y77，河道已经嵌入周围地表。
+- `(2240,-192)` 同样从零下切变成 normalized 0.004 的有效河床下切。
+- 旧 test11 的 `.geoworld` 仍可正常读取，证明新增 Waterbed 配置没有破坏现有存档格式。
+
+验证：
+- `go test ./... -count=1` 全绿。
+- Golden fixture 已按新河口语义重建；Java/Go GoldenVerifier 15/15 通过。
+- NeoForge `compileJava` 通过。
+- `build.cmd verifyGeoWorldEngine verifyGeoWorldSpawn` 通过，并已部署新的 HMCL 26.3 JAR。
+- zh_cn/en_us 使用 UTF-8 JSON.parse 验证通过。
+- `git diff --check` 通过。
+
+验收注意：
+- 河口链路和最小河床下切属于 World Model 生成结果，已有 test11 的 `.geoworld` 不会自动替换；要验证 1/2 最稳妥的是新建 GeoWorld。
+- River biome 对尚未生成的新 Chunk 会生效；已经生成并写盘的旧 Chunk biome 不会被 MOD 自动重写。
