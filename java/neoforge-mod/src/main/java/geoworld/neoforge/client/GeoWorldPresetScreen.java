@@ -142,26 +142,59 @@ public final class GeoWorldPresetScreen extends Screen {
             );
         body.addChild(this.presetButton);
 
-        this.widthEdit = addNumber(
-            body,
+        this.widthEdit = numberBox(
+            152,
             WIDTH_LABEL,
             Integer.toString(this.initialConfig.width())
         );
-        this.heightEdit = addNumber(
-            body,
+        this.heightEdit = numberBox(
+            152,
             HEIGHT_LABEL,
             Integer.toString(this.initialConfig.height())
         );
-        this.cellSizeEdit = addNumber(
-            body,
+        LinearLayout sizeRow = LinearLayout.horizontal().spacing(6);
+        sizeRow.addChild(
+            CommonLayouts.labeledElement(
+                this.font,
+                this.widthEdit,
+                WIDTH_LABEL
+            )
+        );
+        sizeRow.addChild(
+            CommonLayouts.labeledElement(
+                this.font,
+                this.heightEdit,
+                HEIGHT_LABEL
+            )
+        );
+        body.addChild(sizeRow);
+
+        this.cellSizeEdit = numberBox(
+            152,
             CELL_SIZE_LABEL,
             Integer.toString(this.initialConfig.cellSizeBlocks())
         );
-        this.platesEdit = addNumber(
-            body,
+        this.platesEdit = numberBox(
+            152,
             PLATES_LABEL,
             Integer.toString(this.initialConfig.plateCount())
         );
+        LinearLayout samplingRow = LinearLayout.horizontal().spacing(6);
+        samplingRow.addChild(
+            CommonLayouts.labeledElement(
+                this.font,
+                this.cellSizeEdit,
+                CELL_SIZE_LABEL
+            )
+        );
+        samplingRow.addChild(
+            CommonLayouts.labeledElement(
+                this.font,
+                this.platesEdit,
+                PLATES_LABEL
+            )
+        );
+        body.addChild(samplingRow);
         this.oceanSlider = addFractionSlider(
             body,
             OCEAN_LABEL,
