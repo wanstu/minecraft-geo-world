@@ -210,14 +210,11 @@ func surfaceProfile(i int, region ecology.Region, in Input) SurfaceProfile {
 		return SurfaceDryGrass
 	case ecology.RegionTemperateDesert:
 		if in.BareGroundPotential[i] > 0.72 {
-			return SurfaceDesertGravel
+			return SurfaceDesertSand
 		}
 		return SurfaceShrubSoil
 	case ecology.RegionHotDesert:
-		if in.BareGroundPotential[i] > 0.78 {
-			return SurfaceDesertSand
-		}
-		return SurfaceDesertGravel
+		return SurfaceDesertSand
 	case ecology.RegionWetland:
 		return SurfaceWetMud
 	default:

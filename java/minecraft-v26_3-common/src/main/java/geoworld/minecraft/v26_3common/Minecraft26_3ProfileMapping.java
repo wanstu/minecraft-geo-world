@@ -5,8 +5,8 @@ public final class Minecraft26_3ProfileMapping {
 
     public static String surfaceBlock(String profile) {
         return switch (profile) {
-            case "Ocean Sand", "Desert Sand" -> "minecraft:sand";
-            case "Ocean Gravel", "Desert Gravel" -> "minecraft:gravel";
+            case "Ocean Sand", "Desert Sand", "Desert Gravel" -> "minecraft:sand";
+            case "Ocean Gravel" -> "minecraft:gravel";
             case "Frozen Ocean" -> "minecraft:gravel";
             case "Ice / Snow", "Alpine Snow" -> "minecraft:snow_block";
             case "Alpine Rock" -> "minecraft:stone";
@@ -20,8 +20,8 @@ public final class Minecraft26_3ProfileMapping {
 
     public static String underBlock(String profile) {
         return switch (profile) {
-            case "Ocean Sand", "Desert Sand" -> "minecraft:sandstone";
-            case "Ocean Gravel", "Desert Gravel", "Frozen Ocean", "Alpine Rock" -> "minecraft:stone";
+            case "Ocean Sand", "Desert Sand", "Desert Gravel" -> "minecraft:sandstone";
+            case "Ocean Gravel", "Frozen Ocean", "Alpine Rock" -> "minecraft:stone";
             case "Ice / Snow", "Alpine Snow",
                  "Forest Loam", "Grass Loam", "Podzol",
                  "Tundra Soil", "Dry Grass Soil", "Shrub Soil",

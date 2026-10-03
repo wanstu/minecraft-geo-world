@@ -44,6 +44,22 @@ func TestSelectSourceNodeExposesMissingSemanticSide(t *testing.T) {
 	}
 }
 
+func TestElevationZoningThresholdsFollowClimateAndTerrain(t *testing.T) {
+	if !(terrainElevationContext(mcprofile.TerrainMountain) >
+		terrainElevationContext(mcprofile.TerrainFoothills) &&
+		terrainElevationContext(mcprofile.TerrainFoothills) >
+			terrainElevationContext(mcprofile.TerrainHills)) {
+		t.Fatal("terrain elevation context should decrease from mountain to foothills to hills")
+	}
+
+	if !(biomeSnowLine(mcprofile.BiomeTropicalRainforest) >
+		biomeSnowLine(mcprofile.BiomeTemperateForest) &&
+		biomeSnowLine(mcprofile.BiomeTemperateForest) >
+			biomeSnowLine(mcprofile.BiomeBorealForest)) {
+		t.Fatal("warmer climate families should require higher elevation before alpine snow")
+	}
+}
+
 func TestRuntimeSideMatchesProfile(t *testing.T) {
 	ocean := Sample{
 		SourceLand:        false,

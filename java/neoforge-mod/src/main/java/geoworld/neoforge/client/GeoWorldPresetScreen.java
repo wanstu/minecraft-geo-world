@@ -7,6 +7,7 @@ import geoworld.neoforge.creation.GeoWorldCreationConfig;
 import geoworld.neoforge.creation.GeoWorldCreationConfig.ContinentPreset;
 import geoworld.neoforge.worldgen.GeoWorldBiomeSource;
 import geoworld.neoforge.worldgen.GeoWorldChunkGenerator;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
@@ -47,8 +48,7 @@ public final class GeoWorldPresetScreen extends Screen {
         Component.translatable("geoworld.create.continent_preset");
 
     private final CreateWorldScreen parent;
-    private final HeaderAndFooterLayout layout =
-        new HeaderAndFooterLayout(this, 33, 58);
+    private HeaderAndFooterLayout layout;
 
     private GeoWorldCreationConfig initialConfig;
     private ContinentPreset selectedPreset;
@@ -59,9 +59,9 @@ public final class GeoWorldPresetScreen extends Screen {
     private EditBox heightEdit;
     private EditBox cellSizeEdit;
     private EditBox platesEdit;
-    private EditBox oceanEdit;
-    private EditBox fragmentationEdit;
-    private EditBox separationEdit;
+    private FractionSlider oceanSlider;
+    private FractionSlider fragmentationSlider;
+    private FractionSlider separationSlider;
     private CycleButton<ContinentPreset> presetButton;
     private StringWidget statusText;
     private StringWidget spanText;
@@ -87,6 +87,7 @@ public final class GeoWorldPresetScreen extends Screen {
 
     @Override
     protected void init() {
+        this.layout = new HeaderAndFooterLayout(this, 33, 58);
         this.layout.addTitleHeader(this.title, this.font);
 
         LinearLayout body = this.layout.addToContents(
@@ -94,10 +95,18 @@ public final class GeoWorldPresetScreen extends Screen {
         );
         body.defaultCellSetting().alignHorizontallyCenter();
 
+        String seedValue = this.parent.getUiState().getSeed();
+        if (seedValue == null || seedValue.isBlank()) {
+            seedValue = Long.toString(ThreadLocalRandom.current().nextLong());
+            this.parent.getUiState().setSeed(seedValue);
+            GeoWorldCreationSession.invalidateGenerated(
+                this.parent.getUiState()
+            );
+        }
         this.seedEdit = numberBox(
             230,
             SEED_LABEL,
-            this.parent.getUiState().getSeed()
+            seedValue
         );
         this.seedEdit.setResponder(value -> {
             this.parent.getUiState().setSeed(value);
@@ -153,29 +162,32 @@ public final class GeoWorldPresetScreen extends Screen {
             PLATES_LABEL,
             Integer.toString(this.initialConfig.plateCount())
         );
-        this.oceanEdit = addNumber(
+        this.oceanSlider = addFractionSlider(
             body,
             OCEAN_LABEL,
-            formatFraction(this.initialConfig.oceanFraction())
+            this.initialConfig.oceanFraction(),
+            0.10,
+            0.95
         );
-        this.fragmentationEdit = addNumber(
+        this.fragmentationSlider = addFractionSlider(
             body,
             FRAGMENTATION_LABEL,
-            formatFraction(this.initialConfig.continentFragmentation())
+            this.initialConfig.continentFragmentation(),
+            0.05,
+            1.00
         );
-        this.separationEdit = addNumber(
+        this.separationSlider = addFractionSlider(
             body,
             SEPARATION_LABEL,
-            formatFraction(this.initialConfig.continentSeparation())
+            this.initialConfig.continentSeparation(),
+            0.05,
+            1.00
         );
 
         this.widthEdit.setResponder(_ -> this.onConfigEdited());
         this.heightEdit.setResponder(_ -> this.onConfigEdited());
         this.cellSizeEdit.setResponder(_ -> this.onConfigEdited());
         this.platesEdit.setResponder(_ -> this.onConfigEdited());
-        this.oceanEdit.setResponder(_ -> this.onContinentNumberEdited());
-        this.fragmentationEdit.setResponder(_ -> this.onContinentNumberEdited());
-        this.separationEdit.setResponder(_ -> this.onContinentNumberEdited());
 
         this.spanText = body.addChild(
             new StringWidget(Component.empty(), this.font)
@@ -238,6 +250,25 @@ public final class GeoWorldPresetScreen extends Screen {
         return box;
     }
 
+    private FractionSlider addFractionSlider(
+        LinearLayout body,
+        Component label,
+        double value,
+        double min,
+        double max
+    ) {
+        FractionSlider slider = new FractionSlider(
+            310,
+            label,
+            value,
+            min,
+            max,
+            this::onContinentSliderEdited
+        );
+        body.addChild(slider);
+        return slider;
+    }
+
     private void applyPreset(ContinentPreset preset) {
         this.selectedPreset = preset;
         if (preset == ContinentPreset.CUSTOM) {
@@ -247,35 +278,25 @@ public final class GeoWorldPresetScreen extends Screen {
 
         this.applyingPreset = true;
         try {
-            this.oceanEdit.setValue(formatFraction(preset.oceanFraction()));
-            this.fragmentationEdit.setValue(formatFraction(preset.fragmentation()));
-            this.separationEdit.setValue(formatFraction(preset.separation()));
+            this.oceanSlider.setActualValue(preset.oceanFraction());
+            this.fragmentationSlider.setActualValue(preset.fragmentation());
+            this.separationSlider.setActualValue(preset.separation());
         } finally {
             this.applyingPreset = false;
         }
         this.onConfigEdited();
     }
 
-    private void onContinentNumberEdited() {
+    private void onContinentSliderEdited() {
         if (this.applyingPreset) {
             return;
         }
-        try {
-            double ocean = Double.parseDouble(this.oceanEdit.getValue());
-            double fragmentation =
-                Double.parseDouble(this.fragmentationEdit.getValue());
-            double separation =
-                Double.parseDouble(this.separationEdit.getValue());
-            this.selectedPreset = GeoWorldCreationConfig.detectPreset(
-                ocean,
-                fragmentation,
-                separation
-            );
-            this.presetButton.setValue(this.selectedPreset);
-        } catch (NumberFormatException ignored) {
-            this.selectedPreset = ContinentPreset.CUSTOM;
-            this.presetButton.setValue(this.selectedPreset);
-        }
+        this.selectedPreset = GeoWorldCreationConfig.detectPreset(
+            this.oceanSlider.actualValue(),
+            this.fragmentationSlider.actualValue(),
+            this.separationSlider.actualValue()
+        );
+        this.presetButton.setValue(this.selectedPreset);
         this.onConfigEdited();
     }
 
@@ -316,6 +337,12 @@ public final class GeoWorldPresetScreen extends Screen {
                 this.parent.getUiState(),
                 config
             );
+            // Screen#setScreen re-initializes this same screen after closing the
+            // map preview. Keep the latest accepted editor config as the source
+            // for the next init() so returning from preview cannot silently
+            // restore constructor-time defaults and invalidate the ready model.
+            this.initialConfig = config;
+            this.selectedPreset = config.continentPreset();
             this.previewButton.active = !this.previewGenerating;
             this.spanText.setMessage(
                 Component.translatable(
@@ -526,11 +553,9 @@ public final class GeoWorldPresetScreen extends Screen {
     }
 
     private GeoWorldCreationConfig readConfig() {
-        double ocean = Double.parseDouble(this.oceanEdit.getValue());
-        double fragmentation =
-            Double.parseDouble(this.fragmentationEdit.getValue());
-        double separation =
-            Double.parseDouble(this.separationEdit.getValue());
+        double ocean = this.oceanSlider.actualValue();
+        double fragmentation = this.fragmentationSlider.actualValue();
+        double separation = this.separationSlider.actualValue();
         ContinentPreset preset = GeoWorldCreationConfig.detectPreset(
             ocean,
             fragmentation,
@@ -621,5 +646,67 @@ public final class GeoWorldPresetScreen extends Screen {
 
     private static String formatFraction(double value) {
         return String.format(java.util.Locale.ROOT, "%.2f", value);
+    }
+
+    private static final class FractionSlider extends AbstractSliderButton {
+        private static final double STEP = 0.01;
+
+        private final Component label;
+        private final double min;
+        private final double max;
+        private final Runnable onChanged;
+
+        private FractionSlider(
+            int width,
+            Component label,
+            double initialValue,
+            double min,
+            double max,
+            Runnable onChanged
+        ) {
+            super(0, 0, width, 20, Component.empty(), 0.0);
+            this.label = label;
+            this.min = min;
+            this.max = max;
+            this.onChanged = onChanged;
+            this.setActualValue(initialValue);
+        }
+
+        private double actualValue() {
+            return snap(this.min + this.value * (this.max - this.min));
+        }
+
+        private void setActualValue(double actualValue) {
+            double snapped = snap(actualValue);
+            this.value = Math.max(
+                0.0,
+                Math.min(1.0, (snapped - this.min) / (this.max - this.min))
+            );
+            this.updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            this.setMessage(
+                Component.empty()
+                    .append(this.label)
+                    .append(Component.literal(": " + formatFraction(this.actualValue())))
+            );
+        }
+
+        @Override
+        protected void applyValue() {
+            double snapped = this.actualValue();
+            this.value = Math.max(
+                0.0,
+                Math.min(1.0, (snapped - this.min) / (this.max - this.min))
+            );
+            this.onChanged.run();
+        }
+
+        private double snap(double actualValue) {
+            double clamped = Math.max(this.min, Math.min(this.max, actualValue));
+            return Math.round(clamped / STEP) * STEP;
+        }
     }
 }

@@ -230,6 +230,17 @@ public final class GeoWorldPreviewScreen extends Screen {
     }
 
     private static int landColor(GeoWorldV1.RuntimeSample sample) {
+        String surface = sample.surfaceProfile();
+        if (surface != null) {
+            String surfaceValue = surface.toLowerCase(Locale.ROOT);
+            if (surfaceValue.contains("snow") || surfaceValue.contains("ice")) {
+                return 0xFFDCE5E2;
+            }
+            if (surfaceValue.contains("alpine rock")) {
+                return 0xFF96958D;
+            }
+        }
+
         String biome = sample.biomeFamily();
         if (biome == null) {
             return heightColor(sample.groundHeight());

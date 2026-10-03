@@ -158,16 +158,16 @@ func normalizeConfig(cfg Config, geometry world.GridGeometry) Config {
 		cfg.PlainAmplitude = 0.0035
 	}
 	if cfg.HillAmplitude <= 0 {
-		cfg.HillAmplitude = 0.018
+		cfg.HillAmplitude = 0.025
 	}
 	if cfg.FoothillAmplitude <= 0 {
-		cfg.FoothillAmplitude = 0.028
+		cfg.FoothillAmplitude = 0.040
 	}
 	if cfg.MountainAmplitude <= 0 {
-		cfg.MountainAmplitude = 0.042
+		cfg.MountainAmplitude = 0.075
 	}
 	if cfg.PlateauAmplitude <= 0 {
-		cfg.PlateauAmplitude = 0.007
+		cfg.PlateauAmplitude = 0.010
 	}
 	if cfg.ValleyDepth <= 0 {
 		cfg.ValleyDepth = 0.007
@@ -243,12 +243,25 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	valleyCarve := valley * m.Config.ValleyDepth * valleyMod
 	canyonCarve := canyon * m.Config.CanyonExtraDepth
 
+	// Terrain morphology has a distinct vertical identity: plains stay close
+	// to the broad base surface, hills undulate, foothills climb, and mountain /
+	// plateau regions rise materially above their surroundings. These are smooth
+	// weight fields, so the lift does not create terrain-class steps.
+	orographicLift :=
+		0.012*hill +
+			0.030*foothill +
+			0.100*mountain +
+			0.020*plateau
+
 	// Deposition fills a small amount of accommodation space. Alluvial fans add
 	// a slightly stronger convex accumulation at mountain exits.
 	depositionLift := deposition*m.Config.DepositionLift +
 		alluvialFan*m.Config.AlluvialFanLift
 
-	final := boundedAdd(base, regionalDetail+depositionLift-valleyCarve-canyonCarve)
+	final := boundedAdd(
+		base,
+		regionalDetail+orographicLift+depositionLift-valleyCarve-canyonCarve,
+	)
 	heightCorrection := 0.0
 	if m.HeightCorrection != nil {
 		heightCorrection = m.HeightCorrection.SampleSmoothstepBilinear(worldX, worldZ)

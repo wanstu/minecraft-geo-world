@@ -311,6 +311,20 @@ public final class GeoWorldV1 {
         int vegetationCode = unsigned(vegetationProfile[node]);
 
         boolean sourceLand = landMask[node];
+        ProfileCodes zoned = applyElevationZoning(
+            worldX,
+            worldZ,
+            world,
+            sourceLand,
+            terrainCode,
+            biomeCode,
+            surfaceCode,
+            vegetationCode
+        );
+        biomeCode = zoned.biomeCode();
+        surfaceCode = zoned.surfaceCode();
+        vegetationCode = zoned.vegetationCode();
+
         boolean mismatch;
         if (world.waterKind() == WaterKind.OCEAN) {
             mismatch = sourceLand ||
@@ -644,16 +658,196 @@ public final class GeoWorldV1 {
         );
     }
 
+    private record ProfileCodes(
+        int biomeCode,
+        int surfaceCode,
+        int vegetationCode
+    ) {}
+
+    private ProfileCodes applyElevationZoning(
+        double worldX,
+        double worldZ,
+        WorldSample world,
+        boolean sourceLand,
+        int terrainCode,
+        int biomeCode,
+        int surfaceCode,
+        int vegetationCode
+    ) {
+        if (!sourceLand || world.waterKind() == WaterKind.OCEAN) {
+            return new ProfileCodes(biomeCode, surfaceCode, vegetationCode);
+        }
+
+        double context = terrainElevationContext(
+            enumName(TERRAIN_NAMES, terrainCode)
+        );
+        if (context < 0.45) {
+            return new ProfileCodes(biomeCode, surfaceCode, vegetationCode);
+        }
+
+        double sea = manifest.seaLevelNormalized();
+        if (sea <= 0 || sea >= 1) {
+            sea = 0.5;
+        }
+        double relativeHeight = clamp(
+            (world.groundHeight() - sea) / (1 - sea),
+            0,
+            1
+        );
+
+        double cellSize = 0.5 * (geometry.spacingX() + geometry.spacingZ());
+        long seed = terrain.config.seed();
+        double bandNoise =
+            0.028 * valueNoise(seed + 33071L, worldX, worldZ, cellSize * 5.5) +
+            0.012 * valueNoise(seed + 33091L, worldX, worldZ, cellSize * 2.2);
+        double effectiveHeight = clamp(
+            relativeHeight + bandNoise + 0.025 * (context - 0.5),
+            0,
+            1
+        );
+
+        String biome = enumName(BIOME_NAMES, biomeCode);
+        double snowLine = biomeSnowLine(biome);
+        if (effectiveHeight >= snowLine) {
+            int alpine = enumCode(BIOME_NAMES, "Alpine");
+            int alpineVegetation = enumCode(
+                VEGETATION_NAMES,
+                "Alpine Sparse"
+            );
+            int alpineSurface = enumCode(
+                SURFACE_NAMES,
+                effectiveHeight >= snowLine + 0.055
+                    ? "Alpine Snow"
+                    : "Alpine Rock"
+            );
+            return new ProfileCodes(
+                alpine,
+                alpineSurface,
+                alpineVegetation
+            );
+        }
+
+        if (context < 0.65 || effectiveHeight < snowLine - 0.12) {
+            return new ProfileCodes(biomeCode, surfaceCode, vegetationCode);
+        }
+
+        return switch (biome) {
+            case "Tropical Rainforest", "Tropical Monsoon Forest" ->
+                new ProfileCodes(
+                    enumCode(BIOME_NAMES, "Subtropical Forest"),
+                    enumCode(SURFACE_NAMES, "Forest Loam"),
+                    enumCode(VEGETATION_NAMES, "Broadleaf Forest")
+                );
+            case "Subtropical Forest" ->
+                new ProfileCodes(
+                    enumCode(BIOME_NAMES, "Temperate Forest"),
+                    enumCode(SURFACE_NAMES, "Forest Loam"),
+                    enumCode(VEGETATION_NAMES, "Mixed Forest")
+                );
+            case "Temperate Forest" ->
+                new ProfileCodes(
+                    enumCode(BIOME_NAMES, "Boreal Forest"),
+                    enumCode(SURFACE_NAMES, "Podzol"),
+                    enumCode(VEGETATION_NAMES, "Conifer Forest")
+                );
+            case "Boreal Forest" ->
+                new ProfileCodes(
+                    enumCode(BIOME_NAMES, "Tundra"),
+                    enumCode(SURFACE_NAMES, "Tundra Soil"),
+                    enumCode(VEGETATION_NAMES, "Tundra Sparse")
+                );
+            case "Savanna", "Mediterranean Shrubland" ->
+                new ProfileCodes(
+                    enumCode(BIOME_NAMES, "Temperate Grassland"),
+                    enumCode(SURFACE_NAMES, "Dry Grass Soil"),
+                    enumCode(VEGETATION_NAMES, "Dry Grassland")
+                );
+            case "Hot Desert" ->
+                new ProfileCodes(
+                    enumCode(BIOME_NAMES, "Temperate Desert"),
+                    enumCode(SURFACE_NAMES, "Shrub Soil"),
+                    enumCode(VEGETATION_NAMES, "Desert Sparse")
+                );
+            case "Wetland" ->
+                new ProfileCodes(
+                    enumCode(BIOME_NAMES, "Temperate Grassland"),
+                    enumCode(SURFACE_NAMES, "Grass Loam"),
+                    enumCode(VEGETATION_NAMES, "Grassland")
+                );
+            default -> new ProfileCodes(
+                biomeCode,
+                surfaceCode,
+                vegetationCode
+            );
+        };
+    }
+
+    private static double terrainElevationContext(String terrainName) {
+        return switch (terrainName) {
+            case "Mountain" -> 1.0;
+            case "Foothills" -> 0.82;
+            case "Plateau" -> 0.68;
+            case "Hills" -> 0.56;
+            default -> 0.0;
+        };
+    }
+
+    private static double biomeSnowLine(String biomeName) {
+        return switch (biomeName) {
+            case "Ice Sheet", "Tundra" -> 0.20;
+            case "Alpine" -> 0.24;
+            case "Boreal Forest" -> 0.30;
+            case "Temperate Forest",
+                 "Temperate Grassland",
+                 "Temperate Desert",
+                 "Wetland" -> 0.44;
+            case "Mediterranean Shrubland" -> 0.49;
+            case "Subtropical Forest", "Savanna" -> 0.55;
+            case "Hot Desert" -> 0.60;
+            case "Tropical Monsoon Forest", "Tropical Rainforest" -> 0.62;
+            default -> 0.46;
+        };
+    }
+
+    private static int enumCode(String[] names, String value) {
+        for (int i = 0; i < names.length; i++) {
+            if (names[i].equals(value)) {
+                return i;
+            }
+        }
+        throw new IllegalArgumentException("unknown enum label: " + value);
+    }
+
     private record SourceSelection(int node, double weight, boolean fallback) {}
 
     private SourceSelection selectSourceNode(double x, double z, boolean wantLand) {
+        double spacingX = geometry.spacingX();
+        double spacingZ = geometry.spacingZ();
+
+        // Keep categorical profile regions organic instead of exposing the
+        // underlying macro-grid as rectangular biome patches. This must mirror
+        // internal/runtimeprofile exactly so Go generation, Java Runtime,
+        // preview and Minecraft chunks all choose the same profile node.
+        double cellSize = 0.5 * (spacingX + spacingZ);
+        double wavelength = cellSize * 5.0;
+        double amplitude = cellSize * 0.42;
+        long seed = terrain.config.seed();
+        double warpX =
+            0.72 * valueNoise(seed + 12011L, x, z, wavelength) +
+            0.28 * valueNoise(seed + 12029L, x, z, wavelength * 0.5);
+        double warpZ =
+            0.72 * valueNoise(seed + 22003L, x, z, wavelength) +
+            0.28 * valueNoise(seed + 22027L, x, z, wavelength * 0.5);
+        double profileX = x + amplitude * warpX;
+        double profileZ = z + amplitude * warpZ;
+
         double gx = clamp(
-            (x - geometry.originX()) / geometry.spacingX(),
+            (profileX - geometry.originX()) / spacingX,
             0,
             geometry.width() - 1.0
         );
         double gz = clamp(
-            (z - geometry.originZ()) / geometry.spacingZ(),
+            (profileZ - geometry.originZ()) / spacingZ,
             0,
             geometry.height() - 1.0
         );
@@ -688,6 +882,50 @@ public final class GeoWorldV1 {
             if (weights[i] > bestWeight) {
                 best = nodes[i];
                 bestWeight = weights[i];
+            }
+        }
+        if (best >= 0) {
+            return new SourceSelection(best, bestWeight, false);
+        }
+
+        // A warped categorical coordinate may cross a coastline even though
+        // Ground/Water intentionally sampled the original coordinate. Retry
+        // that unwarped cell before exposing a semantic fallback.
+        double originalGX = clamp(
+            (x - geometry.originX()) / spacingX,
+            0,
+            geometry.width() - 1.0
+        );
+        double originalGZ = clamp(
+            (z - geometry.originZ()) / spacingZ,
+            0,
+            geometry.height() - 1.0
+        );
+        int originalX0 = (int) Math.floor(originalGX);
+        int originalZ0 = (int) Math.floor(originalGZ);
+        int originalX1 = Math.min(originalX0 + 1, geometry.width() - 1);
+        int originalZ1 = Math.min(originalZ0 + 1, geometry.height() - 1);
+        double originalTX = smoothstepUnit(originalGX - originalX0);
+        double originalTZ = smoothstepUnit(originalGZ - originalZ0);
+        int[] originalNodes = {
+            originalZ0 * geometry.width() + originalX0,
+            originalZ0 * geometry.width() + originalX1,
+            originalZ1 * geometry.width() + originalX0,
+            originalZ1 * geometry.width() + originalX1
+        };
+        double[] originalWeights = {
+            (1 - originalTX) * (1 - originalTZ),
+            originalTX * (1 - originalTZ),
+            (1 - originalTX) * originalTZ,
+            originalTX * originalTZ
+        };
+        for (int i = 0; i < originalNodes.length; i++) {
+            if (landMask[originalNodes[i]] != wantLand) {
+                continue;
+            }
+            if (originalWeights[i] > bestWeight) {
+                best = originalNodes[i];
+                bestWeight = originalWeights[i];
             }
         }
         if (best >= 0) {
@@ -1097,13 +1335,21 @@ public final class GeoWorldV1 {
             double valleyCarve = valley * config.valleyDepth() * valleyMod;
             double canyonCarve = canyon * config.canyonExtraDepth();
 
+            // Mirror the Go terrain morphology lift exactly. Ecological
+            // families are laid over this terrain; they do not define its shape.
+            double orographicLift =
+                0.012 * hill +
+                0.030 * foothill +
+                0.100 * mountain +
+                0.020 * plateau;
+
             double depositionLift =
                 deposition * config.depositionLift() +
                 alluvialFan * config.alluvialFanLift();
 
             double result = boundedAdd(
                 base,
-                regionalDetail + depositionLift - valleyCarve - canyonCarve
+                regionalDetail + orographicLift + depositionLift - valleyCarve - canyonCarve
             );
             if (heightCorrection != null) {
                 result = clamp(

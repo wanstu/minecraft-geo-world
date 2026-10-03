@@ -191,9 +191,10 @@ idea {
 }
 tasks.register('verifyGeoWorldEngine', JavaExec) {
     group = 'verification'
-    description = 'Verifies Java -> Go GeoWorld generation and Java Runtime reload.'
+    description = 'Verifies Java -> bundled Go GeoWorld generation and Java Runtime reload.'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'geoworld.neoforge.client.GeoWorldEngineBridgeVerifier'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
 }
 def geoWorldEngineResources = layout.buildDirectory.dir('generated/geoworldEngineResources')
 def geoWorldEngineExe = layout.buildDirectory.file('generated/geoworldEngineResources/native/windows-x64/geoworld-engine.exe')
@@ -202,6 +203,12 @@ tasks.register('buildGeoWorldEngine', Exec) {
     group = 'build'
     description = 'Builds the bundled Windows x64 GeoWorld engine.'
     workingDir file('../..')
+    inputs.files(fileTree('../..') {
+        include 'go.mod'
+        include 'go.sum'
+        include 'cmd/geoworld-engine/**/*.go'
+        include 'internal/**/*.go'
+    })
     outputs.file geoWorldEngineExe
     environment 'GOOS', 'windows'
     environment 'GOARCH', 'amd64'

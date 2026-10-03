@@ -70,6 +70,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		ProfileConfidence: m.Profile.ProfileConfidence[node],
 		SemanticFallback:  fallback,
 	}
+	m.applyElevationZoning(worldX, worldZ, &out)
 	out.SemanticMismatch = !runtimeSideMatchesProfile(ws.WaterKind, out)
 	return out
 }
@@ -82,8 +83,28 @@ type candidate struct {
 func (m *Model) selectSourceNode(worldX, worldZ float64, wantLand bool) (int, float64, bool) {
 	spacingX := m.Geometry.SpacingX()
 	spacingZ := m.Geometry.SpacingZ()
-	gx := clamp((worldX-m.Geometry.OriginX)/spacingX, 0, float64(m.Geometry.Width-1))
-	gz := clamp((worldZ-m.Geometry.OriginZ)/spacingZ, 0, float64(m.Geometry.Height-1))
+
+	// Categorical ecology/profile fields cannot be numerically interpolated like
+	// height. Sampling a raw macro cell therefore produces obvious square
+	// biome borders. Bend only the categorical lookup coordinates with a
+	// deterministic, low-frequency domain warp; Ground/Water still sample the
+	// original world coordinate, so coastlines and terrain remain authoritative.
+	seed := int64(0)
+	if m.Runtime != nil && m.Runtime.Ground != nil && m.Runtime.Ground.Base != nil {
+		seed = m.Runtime.Ground.Base.Config.Seed
+	}
+	cellSize := 0.5 * (spacingX + spacingZ)
+	wavelength := cellSize * 5.0
+	amplitude := cellSize * 0.42
+	warpX := 0.72*valueNoise(seed+12011, worldX, worldZ, wavelength) +
+		0.28*valueNoise(seed+12029, worldX, worldZ, wavelength*0.5)
+	warpZ := 0.72*valueNoise(seed+22003, worldX, worldZ, wavelength) +
+		0.28*valueNoise(seed+22027, worldX, worldZ, wavelength*0.5)
+	profileX := worldX + amplitude*warpX
+	profileZ := worldZ + amplitude*warpZ
+
+	gx := clamp((profileX-m.Geometry.OriginX)/spacingX, 0, float64(m.Geometry.Width-1))
+	gz := clamp((profileZ-m.Geometry.OriginZ)/spacingZ, 0, float64(m.Geometry.Height-1))
 
 	x0 := int(math.Floor(gx))
 	z0 := int(math.Floor(gz))
@@ -115,6 +136,36 @@ func (m *Model) selectSourceNode(worldX, worldZ float64, wantLand bool) (int, fl
 		return best, bestWeight, false
 	}
 
+	// Near coastlines the warped categorical coordinate can cross to the other
+	// semantic side while Ground/Water (correctly) stays at the original
+	// coordinate. Retry the unwarped cell before declaring a semantic fallback.
+	originalGX := clamp((worldX-m.Geometry.OriginX)/spacingX, 0, float64(m.Geometry.Width-1))
+	originalGZ := clamp((worldZ-m.Geometry.OriginZ)/spacingZ, 0, float64(m.Geometry.Height-1))
+	originalX0 := int(math.Floor(originalGX))
+	originalZ0 := int(math.Floor(originalGZ))
+	originalX1 := minInt(originalX0+1, m.Geometry.Width-1)
+	originalZ1 := minInt(originalZ0+1, m.Geometry.Height-1)
+	originalTX := smoothstep(originalGX - float64(originalX0))
+	originalTZ := smoothstep(originalGZ - float64(originalZ0))
+	originalCandidates := []candidate{
+		{node: originalZ0*m.Geometry.Width + originalX0, weight: (1 - originalTX) * (1 - originalTZ)},
+		{node: originalZ0*m.Geometry.Width + originalX1, weight: originalTX * (1 - originalTZ)},
+		{node: originalZ1*m.Geometry.Width + originalX0, weight: (1 - originalTX) * originalTZ},
+		{node: originalZ1*m.Geometry.Width + originalX1, weight: originalTX * originalTZ},
+	}
+	for _, c := range originalCandidates {
+		if m.Profile.LandMask[c.node] != wantLand {
+			continue
+		}
+		if c.weight > bestWeight {
+			best = c.node
+			bestWeight = c.weight
+		}
+	}
+	if best >= 0 {
+		return best, bestWeight, false
+	}
+
 	// A valid final sample should always have at least one matching corner:
 	// continuous ocean eligibility cannot produce Ocean inside an all-land cell,
 	// and non-ocean samples inside mixed/all-land cells have a land corner.
@@ -127,6 +178,128 @@ func (m *Model) selectSourceNode(worldX, worldZ float64, wantLand bool) (int, fl
 		}
 	}
 	return best, bestWeight, true
+}
+
+func (m *Model) applyElevationZoning(worldX, worldZ float64, s *Sample) {
+	if s == nil || m.Runtime == nil || !s.SourceLand || s.World.WaterKind == reconcile.WaterOcean {
+		return
+	}
+
+	context := terrainElevationContext(s.TerrainVariant)
+	if context < 0.45 {
+		return
+	}
+
+	sea := m.Runtime.SeaLevelNormalized
+	if sea <= 0 || sea >= 1 {
+		sea = 0.5
+	}
+	relativeHeight := clamp((s.World.GroundHeight-sea)/(1-sea), 0, 1)
+
+	seed := int64(0)
+	if m.Runtime.Ground != nil && m.Runtime.Ground.Base != nil {
+		seed = m.Runtime.Ground.Base.Config.Seed
+	}
+	cellSize := 0.5 * (m.Geometry.SpacingX() + m.Geometry.SpacingZ())
+	bandNoise :=
+		0.028*valueNoise(seed+33071, worldX, worldZ, cellSize*5.5) +
+			0.012*valueNoise(seed+33091, worldX, worldZ, cellSize*2.2)
+	effectiveHeight := clamp(
+		relativeHeight+bandNoise+0.025*(context-0.5),
+		0,
+		1,
+	)
+
+	snowLine := biomeSnowLine(s.BiomeFamily)
+	if effectiveHeight >= snowLine {
+		s.BiomeFamily = mcprofile.BiomeAlpine
+		s.VegetationProfile = mcprofile.VegetationAlpineSparse
+		if effectiveHeight >= snowLine+0.055 {
+			s.SurfaceProfile = mcprofile.SurfaceAlpineSnow
+		} else {
+			s.SurfaceProfile = mcprofile.SurfaceAlpineRock
+		}
+		return
+	}
+
+	// The band directly below the alpine zone keeps the broad climate family
+	// but cools vegetation/ecology with altitude. This makes a mountain read as
+	// one landform with ecological belts rather than one rectangular biome slab.
+	if context < 0.65 || effectiveHeight < snowLine-0.12 {
+		return
+	}
+
+	switch s.BiomeFamily {
+	case mcprofile.BiomeTropicalRainforest, mcprofile.BiomeTropicalMonsoonForest:
+		s.BiomeFamily = mcprofile.BiomeSubtropicalForest
+		s.SurfaceProfile = mcprofile.SurfaceForestLoam
+		s.VegetationProfile = mcprofile.VegetationBroadleafForest
+	case mcprofile.BiomeSubtropicalForest:
+		s.BiomeFamily = mcprofile.BiomeTemperateForest
+		s.SurfaceProfile = mcprofile.SurfaceForestLoam
+		s.VegetationProfile = mcprofile.VegetationMixedForest
+	case mcprofile.BiomeTemperateForest:
+		s.BiomeFamily = mcprofile.BiomeBorealForest
+		s.SurfaceProfile = mcprofile.SurfacePodzol
+		s.VegetationProfile = mcprofile.VegetationConiferForest
+	case mcprofile.BiomeBorealForest:
+		s.BiomeFamily = mcprofile.BiomeTundra
+		s.SurfaceProfile = mcprofile.SurfaceTundraSoil
+		s.VegetationProfile = mcprofile.VegetationTundraSparse
+	case mcprofile.BiomeSavanna, mcprofile.BiomeMediterraneanShrubland:
+		s.BiomeFamily = mcprofile.BiomeTemperateGrassland
+		s.SurfaceProfile = mcprofile.SurfaceDryGrass
+		s.VegetationProfile = mcprofile.VegetationDryGrassland
+	case mcprofile.BiomeHotDesert:
+		s.BiomeFamily = mcprofile.BiomeTemperateDesert
+		s.SurfaceProfile = mcprofile.SurfaceShrubSoil
+		s.VegetationProfile = mcprofile.VegetationDesertSparse
+	case mcprofile.BiomeWetland:
+		s.BiomeFamily = mcprofile.BiomeTemperateGrassland
+		s.SurfaceProfile = mcprofile.SurfaceGrassLoam
+		s.VegetationProfile = mcprofile.VegetationGrassland
+	}
+}
+
+func terrainElevationContext(v mcprofile.TerrainVariant) float64 {
+	switch v {
+	case mcprofile.TerrainMountain:
+		return 1.0
+	case mcprofile.TerrainFoothills:
+		return 0.82
+	case mcprofile.TerrainPlateau:
+		return 0.68
+	case mcprofile.TerrainHills:
+		return 0.56
+	default:
+		return 0
+	}
+}
+
+func biomeSnowLine(b mcprofile.BiomeFamily) float64 {
+	switch b {
+	case mcprofile.BiomeIceSheet, mcprofile.BiomeTundra:
+		return 0.20
+	case mcprofile.BiomeAlpine:
+		return 0.24
+	case mcprofile.BiomeBorealForest:
+		return 0.30
+	case mcprofile.BiomeTemperateForest,
+		mcprofile.BiomeTemperateGrassland,
+		mcprofile.BiomeTemperateDesert,
+		mcprofile.BiomeWetland:
+		return 0.44
+	case mcprofile.BiomeMediterraneanShrubland:
+		return 0.49
+	case mcprofile.BiomeSubtropicalForest, mcprofile.BiomeSavanna:
+		return 0.55
+	case mcprofile.BiomeHotDesert:
+		return 0.60
+	case mcprofile.BiomeTropicalMonsoonForest, mcprofile.BiomeTropicalRainforest:
+		return 0.62
+	default:
+		return 0.46
+	}
 }
 
 func runtimeSideMatchesProfile(kind reconcile.WaterKind, s Sample) bool {
@@ -149,6 +322,47 @@ func isOceanFamily(f mcprofile.BiomeFamily) bool {
 	default:
 		return false
 	}
+}
+
+func valueNoise(seed int64, x, z, wavelength float64) float64 {
+	if wavelength <= 0 {
+		return 0
+	}
+	gx := x / wavelength
+	gz := z / wavelength
+	x0 := int64(math.Floor(gx))
+	z0 := int64(math.Floor(gz))
+	tx := gx - float64(x0)
+	tz := gz - float64(z0)
+
+	fx := quinticFade(tx)
+	fz := quinticFade(tz)
+	v00 := hashValue(seed, x0, z0)
+	v10 := hashValue(seed, x0+1, z0)
+	v01 := hashValue(seed, x0, z0+1)
+	v11 := hashValue(seed, x0+1, z0+1)
+	top := v00 + (v10-v00)*fx
+	bottom := v01 + (v11-v01)*fx
+	return top + (bottom-top)*fz
+}
+
+func hashValue(seed, x, z int64) float64 {
+	h := uint64(seed) ^
+		(uint64(x) * 0x9E3779B185EBCA87) ^
+		(uint64(z) * 0xC2B2AE3D27D4EB4F)
+	h ^= h >> 30
+	h *= 0xBF58476D1CE4E5B9
+	h ^= h >> 27
+	h *= 0x94D049BB133111EB
+	h ^= h >> 31
+
+	unit := float64(h>>11) / float64(uint64(1)<<53)
+	return unit*2 - 1
+}
+
+func quinticFade(t float64) float64 {
+	t = clamp(t, 0, 1)
+	return t * t * t * (t*(t*6-15) + 10)
 }
 
 func smoothstep(t float64) float64 {

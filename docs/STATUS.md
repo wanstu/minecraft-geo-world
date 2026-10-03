@@ -5,7 +5,7 @@
 ## 当前目标与阶段
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。
 
-**Phase 6.0、6.1a、6.1b、6.2 已完成；Phase 6.3 进行中。World Model V1 的持久化、Runtime 重开、安全替换、manifest inspect/validate 与首版 cross-language golden vectors 已完成。正式 Seed 731894205 / 640×400 保存后文件约 7.63 MB，重开 484 个跨海岸/河/湖/边界样点 0 mismatch；另有固定 48×30 跨负坐标 golden fixture 供未来 Java reader/sampler 直接对拍。下一步先评估 V1 gzip+JSON 在更大世界上的文件体积、保存/加载耗时与内存成本，再决定是否需要通过新 schemaVersion 引入 binary field encoding。**
+**World Model V1、Java Runtime、Minecraft 26.3 静态 QA writer 与 NeoForge 26.3 动态 GeoWorld worldgen 已接通。当前主线已转为真实客户端可用性与地形/生态质量验收：创建页 Seed/随机 Seed/三项大陆滑块共享同一 `WorldCreationUiState`；预览生成与返回状态保持；动态 ChunkGenerator、创建页地图与 `.geoworld` Runtime 共用同一模型；安全陆地 Spawn、存档内模型绑定已实现。本轮正在收口沙漠地表、群系硬边界、平原/丘陵/山地高度层次以及随海拔变化的山地生态带，并通过 HMCL 26.3 直接手工验收。**
 
 ## 仓库与基线
 - 仓库：D:\projects\minecraft-geo-world
@@ -206,16 +206,17 @@
 ## 当前 NeoForge 26.3 进度
 1. `java/neoforge-mod` 基于官方 ModDevGradle MDK，Minecraft 26.3 / NeoForge 26.3.0.40-beta / Java 25；`build.cmd` 固定优先使用 `D:\\tools\\jdk\\jdk-25_windows-x64_bin\\jdk-25.0.4.1`，当前真实 `BUILD SUCCESSFUL`。
 2. Minecraft 创建世界的“世界类型”已通过 `WORLD_PRESET` registry 正式加入 `GeoWorld`；NeoForge `RegisterPresetEditorsEvent` 注册原生“自定义”编辑器，无 Mixin 劫持。
-3. `GeoWorldPresetScreen` 已支持 Seed、默认/超级大陆/多大陆/破碎大陆/群岛预设、320×200 默认模型、64/128 blocks/node、板块数、洋壳比例、破碎度、分离度；参数与 `GeoWorldCreationConfig.CODEC` 同源。
-4. “生成世界预览”会异步调用 bundled `geoworld-engine`（Go 正式 Generator）生成真正的 `.geoworld`，Java Runtime 重新加载同一模型；生成完成后现在会自动进入 `GeoWorldPreviewScreen`，预览逐点调用同一 `GeoWorldV1.sample(x,z)`，不是另做一套近似图。
+3. `GeoWorldPresetScreen` 已支持 Seed、随机 Seed、默认/超级大陆/多大陆/破碎大陆/群岛预设、320×200 默认模型、64/128 blocks/node、板块数；洋壳比例、大陆破碎度、平均分离度已改为 0.01 步进滑块并显示当前数值。Seed 与外层创建世界页共享同一 `WorldCreationUiState`；空 Seed 进入自定义页会生成并回写随机 Seed，修改 Seed 会使旧模型失效。
+4. “生成世界预览”会异步调用 bundled `geoworld-engine`（Go 正式 Generator）生成真正的 `.geoworld`，Java Runtime 重新加载同一模型；生成完成后自动进入 `GeoWorldPreviewScreen`。预览关闭后同一参数页重新 init 时会保留最新 config/generated model，并重建 layout，避免返回后“完成/查看世界地图”被错误禁用；预览逐点调用同一 `GeoWorldV1.sample(x,z)`。
 5. `GeoWorldChunkGenerator` / `GeoWorldBiomeSource` 已注册为 `geoworld:geoworld` codec，按 Seed+配置懒加载同一模型，按需生成地形、水体、surfaceProfile 与 Biome；26.3 高度/地表/Biome 映射已抽到 `java/minecraft-v26_3-common`，静态 save writer 与 MOD 共享。
 6. Java JSON reader 已补 64-bit integer 精度回归，避免 Minecraft 随机 Seed 超过 JS-safe integer 后被截断；空 rivers/lakes 也按空数组兼容。Java golden 仍为 15/15。
 7. 真实客户端已确认 GeoWorld MOD、client creation hook、`geoworld:geoworld` PresetEditor 均加载成功。用户直接创建的 GeoWorld 世界实际生成了新的模型 cache，说明动态 ChunkGenerator 路径已经工作。
 8. 用户该次直接创建世界的实际 Spawn 为 `(8,95,8)`；对应模型 Seed=`-1273393314970095624`，Runtime 在 `(8,8)` 明确为 `Warm Ocean / Ocean / sourceLand=false / ground=0.2752586`，因此“出生点附近是海洋”符合模型，不是游戏与预览不一致。
-9. 已新增纯 Runtime `GeoWorldSpawnPlanner`，不修改世界本身，只把 Minecraft `ChunkGenerator.getOrigin()` 移到中心附近安全陆地。固定回归 Seed `-1273393314970095624`：中心仍为 Warm Ocean，但 planner 选择 Chunk `(-28,-164)`，候选方块 `(-440,105,-2616)`，Biome=Tropical Rainforest，周围 3×3 采样均为 dry land；`verifyGeoWorldSpawn` 通过。
+9. 已新增纯 Runtime `GeoWorldSpawnPlanner`，不修改世界本身，只把 Minecraft `ChunkGenerator.getOrigin()` 移到中心附近安全陆地。当前地形权重调整后的固定回归 Seed `-1273393314970095624`：中心仍为 Warm Ocean，但 planner 选择 Chunk `(-12,-164)`，候选方块 `(-184,101,-2616)`，Biome=Subtropical Forest，安全陆地检查通过。
 10. Server lifecycle 已改为：动态 GeoWorld 新世界第一次启动时自动把实际模型复制到 `data/geoworld/world.geoworld` 并写 binding；重开时优先加载存档内模型并 attach 到 generator。旧 Vanilla QA 快照若只有 binding 而 generator 不是 GeoWorld，会明确标记为 static Preview，不冒充动态 worldgen。
-11. 当前完整回归：`go test ./... -count=1` 全绿；Java golden 15/15；`verify-storage.cmd` 通过；NeoForge `build.cmd` 通过；`verifyGeoWorldEngine` 与 `verifyGeoWorldSpawn` 均通过。
-12. 下一次真实客户端验收：重启 NeoForge dev client 后新建 GeoWorld，确认“生成世界预览”完成后自动打开地图；用上述 ocean-center Seed 或随机 Seed 新建世界，确认 Spawn 落在 planner 选择的陆地附近，并检查存档自动出现 `data/geoworld/geoworld.properties + world.geoworld`。
+11. 当前完整回归：`go test ./...` 全绿；Java/Go cross-language golden 15/15；NeoForge `build.cmd verifyGeoWorldEngine verifyGeoWorldSpawn` 通过。Gradle 已声明 Go engine 源码为 `buildGeoWorldEngine` 输入，避免代码变化却复用旧 engine；preview cache revision 已升到 v3，避免本轮地形语义变化读取旧缓存。每次 `build.cmd` 成功后会自动部署 JAR 到 HMCL 26.3 的 `mods` 目录。
+12. 本轮地形/生态质量改动：沙漠陆地 surface profile 统一以沙/砂岩为主（保留海底 gravel）；离散生态 Profile 采样加入低频 domain warp，减少宏观网格造成的直线/矩形硬边；平原、丘陵、山麓、山地使用不同细节振幅并加入平滑 orographic lift，单测要求平均高度呈 plain < hills < foothills < mountain 且 mountain-plain ≥ 0.05 normalized；山地 Runtime Profile 再按最终海拔和气候带做垂直分带，可从低海拔森林/草地过渡到较冷植被、Alpine Rock 与 Alpine Snow。Go Runtime 与 Java Runtime 使用同一公式。
+13. 下一次真实客户端验收由 HMCL 26.3 手工完成：检查空/随机 Seed 双向联动、三个滑块、生成预览→返回后“完成/查看世界地图”仍可用；创建世界后检查安全陆地 Spawn、沙漠不再大片 gravel、群系边界不再方块化，并重点飞行观察平原/丘陵/山地高差及山腰→雪顶生态分带；最后确认存档自动出现 `data/geoworld/geoworld.properties + world.geoworld`。
 
 ## 继续工作入口
 先读 STATUS -> PHASE6 -> DECISIONS；查历史读 PROGRESS 和 PHASE1–5。每个开发切片保留验证口径、结果、剩余风险并提交。

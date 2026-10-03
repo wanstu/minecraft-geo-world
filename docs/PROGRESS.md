@@ -1275,3 +1275,22 @@ Phase 6.2 正式完成。下一步 Phase 6.3：最小持久化 schema、原子�
 - go test ./... -count=1 全通过；git diff --check 通过。
 
 下一步：继续 Tester-first，补河网 / 湖泊 / 海岸 / Raw-vs-Final 等可视化诊断，再做更广 Seed 的大陆形态基线。
+
+## 2026-10-02 · NeoForge 26.3 地形/生态质量与创建页收口
+
+- 创建页：洋壳比例、大陆破碎度、平均分离度改为 0.01 步进滑块；预设切换会同步滑块，手调后自动识别/切换自定义。
+- Seed：GeoWorld 自定义页与 Minecraft 外层创建页继续共享 `WorldCreationUiState`。空 Seed 进入自定义页会立即生成并回写随机 long；随机按钮和手动修改都会同步外层并使旧 generated model 失效。
+- 预览生命周期：关闭 `GeoWorldPreviewScreen` 返回同一参数页时，保留最新 config/generated model；每次 init 重建 `HeaderAndFooterLayout`，避免旧 layout/构造期 config 使“完成/查看世界地图”重新失效。
+- 沙漠：正式 MC Profile 的 Hot Desert 固定使用 Desert Sand；Temperate Desert 高裸地也使用 Desert Sand，低裸地保留 Shrub Soil。Minecraft 26.3 映射同时把兼容旧模型的 `Desert Gravel` 映射为 sand/sandstone；海底 Ocean Gravel 保留。
+- 群系硬边：RuntimeProfile 的离散生态/Profile 选择加入低频 deterministic domain warp；只弯曲分类坐标，不改变 Ground/Water 坐标，并在海岸处回退原始坐标寻找正确 land/ocean 语义侧。Go Runtime 与 Java Runtime 公式一致。
+- 地形层次：plain/hill/foothill/mountain detail amplitude 分离，并增加平滑 orographic lift。当前 lift 为 hill=.012、foothill=.030、mountain=.100、plateau=.020 normalized；新单测要求平均高度 plain < hills < foothills < mountain，且 mountain-plain 至少 0.05 normalized。
+- 山地生态垂直分带：在最终 Runtime Profile 层基于实际 GroundHeight、terrain variant 与气候 family 计算高度带；山腰可从热带/亚热带森林逐级向温带/寒带过渡，峰部进入 Alpine Rock / Alpine Snow。雪线随基础气候变化并加入低频噪声，避免完美等高线圆环。Go/Java 同步实现。
+- 预览地图颜色现在优先识别 Alpine Snow/Ice 和 Alpine Rock，使创建页预览能看出雪顶/裸岩带。
+- Engine 构建：Gradle `buildGeoWorldEngine` 已把 Go 源码声明为 inputs，Go 代码变化会强制重编 bundled engine；preview cache revision 升到 v3，避免旧 `.geoworld` cache 污染本轮验收。
+- HMCL 自动部署：`java/neoforge-mod/build.cmd` 在构建成功后自动覆盖 `D:\games\hmcl\.minecraft\versions\26.3\mods\GeoWorld-NeoForge-26.3-0.1.0-dev.jar`，之后由用户手动启动 HMCL 26.3 做真实客户端验收。
+
+验证：
+- `go test ./...`：全绿。
+- NeoForge `build.cmd verifyGeoWorldEngine verifyGeoWorldSpawn`：BUILD SUCCESSFUL；bundled engine bridge 通过；固定 ocean-center Seed `-1273393314970095624` 的安全 Spawn 回归通过，当前候选为 Chunk (-12,-164)、Block (-184,101,-2616)、Biome=Subtropical Forest。
+- cross-language Java GoldenVerifier：15/15，通过，tolerance=1e-9。
+- 最新 JAR 已自动复制到 HMCL 26.3 mods；下一步是用户真实 UI/世界观感验收，而不是再以 build 通过冒充 UI 验收。

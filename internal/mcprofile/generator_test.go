@@ -133,6 +133,25 @@ func TestHotDesertGetsAridSurfaceAndSparseVegetation(t *testing.T) {
 	}
 }
 
+func TestTemperateDesertBareGroundUsesSandNotGravel(t *testing.T) {
+	in := baseInput(2, 2)
+	i := 0
+	in.EcoRegion[i] = uint8(ecology.RegionTemperateDesert)
+	in.TreeCoverPotential[i] = 0
+	in.GrassCoverPotential[i] = 0.05
+	in.ShrubCoverPotential[i] = 0.12
+	in.BareGroundPotential[i] = 0.92
+	in.SoilMoisture[i] = 0.10
+
+	m, err := Generate(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.SurfaceProfile[i] != SurfaceDesertSand {
+		t.Fatalf("temperate desert bare ground should be sand, got %s", m.SurfaceProfile[i])
+	}
+}
+
 func TestSnowyAlpineMountainGetsRockSnowProfile(t *testing.T) {
 	in := baseInput(2, 2)
 	i := 0

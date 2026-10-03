@@ -181,6 +181,46 @@ func TestTerrainDetailAmplitudeFollowsLandformWeight(t *testing.T) {
 	}
 }
 
+func TestLandformMeanHeightHasVisibleReliefOrder(t *testing.T) {
+	plain := uniformInput(8, 8, 0.65)
+	hill := uniformInput(8, 8, 0.65)
+	foothill := uniformInput(8, 8, 0.65)
+	mountain := uniformInput(8, 8, 0.65)
+
+	for i := range plain.BaseElevation {
+		hill.RollingPlainWeight[i] = 0
+		hill.HillWeight[i] = 1
+		foothill.RollingPlainWeight[i] = 0
+		foothill.FoothillWeight[i] = 1
+		mountain.RollingPlainWeight[i] = 0
+		mountain.MountainWeight[i] = 1
+	}
+
+	cfg := Config{Seed: 20261002, CellSizeBlocks: 128}
+	mp, _ := Generate(plain, cfg)
+	mh, _ := Generate(hill, cfg)
+	mf, _ := Generate(foothill, cfg)
+	mm, _ := Generate(mountain, cfg)
+
+	plainMean := meanTerrainHeight(mp)
+	hillMean := meanTerrainHeight(mh)
+	foothillMean := meanTerrainHeight(mf)
+	mountainMean := meanTerrainHeight(mm)
+
+	if !(mountainMean > foothillMean && foothillMean > hillMean && hillMean > plainMean) {
+		t.Fatalf(
+			"landform mean height order wrong: plain=%.6f hill=%.6f foothill=%.6f mountain=%.6f",
+			plainMean, hillMean, foothillMean, mountainMean,
+		)
+	}
+	if mountainMean-plainMean < 0.05 {
+		t.Fatalf(
+			"mountain relief is still too weak: plain=%.6f mountain=%.6f delta=%.6f",
+			plainMean, mountainMean, mountainMean-plainMean,
+		)
+	}
+}
+
 func TestValleyOverlayLowersAndSmoothsTerrain(t *testing.T) {
 	base := uniformInput(7, 7, 0.68)
 	valley := uniformInput(7, 7, 0.68)
@@ -263,6 +303,18 @@ func TestRegionalTerrainOutputFiniteAndBounded(t *testing.T) {
 			}
 		}
 	}
+}
+
+func meanTerrainHeight(m *Model) float64 {
+	values := 0
+	sum := 0.0
+	for z := 96.0; z <= 700; z += 41 {
+		for x := 112.0; x <= 700; x += 37 {
+			sum += m.SampleNormalized(x, z)
+			values++
+		}
+	}
+	return sum / float64(values)
 }
 
 func detailStdDev(m *Model) float64 {
