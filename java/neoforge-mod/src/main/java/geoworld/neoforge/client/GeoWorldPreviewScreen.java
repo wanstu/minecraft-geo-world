@@ -20,7 +20,9 @@ public final class GeoWorldPreviewScreen extends Screen {
     private static final int MAX_ROWS = 80;
 
     private final Screen parent;
-    private final GeoWorldEngineBridge.GeneratedModel generated;
+    private final GeoWorldV1 model;
+    private final Double focusX;
+    private final Double focusZ;
     private final HeaderAndFooterLayout layout =
         new HeaderAndFooterLayout(this, 29, 33);
 
@@ -36,9 +38,20 @@ public final class GeoWorldPreviewScreen extends Screen {
         Screen parent,
         GeoWorldEngineBridge.GeneratedModel generated
     ) {
+        this(parent, generated.model(), null, null);
+    }
+
+    public GeoWorldPreviewScreen(
+        Screen parent,
+        GeoWorldV1 model,
+        Double focusX,
+        Double focusZ
+    ) {
         super(TITLE);
         this.parent = parent;
-        this.generated = generated;
+        this.model = model;
+        this.focusX = focusX;
+        this.focusZ = focusZ;
         this.buildPreview();
     }
 
@@ -59,7 +72,7 @@ public final class GeoWorldPreviewScreen extends Screen {
 
     private void buildPreview() {
         GeoWorldV1.Geometry geometry =
-            this.generated.model().manifest().geometry();
+            this.model.manifest().geometry();
 
         double aspect = geometry.spanXBlocks() / geometry.spanZBlocks();
         if (!Double.isFinite(aspect) || aspect <= 0.0) {
@@ -95,7 +108,7 @@ public final class GeoWorldPreviewScreen extends Screen {
                 double x = geometry.originX() + fx * geometry.spanXBlocks();
 
                 GeoWorldV1.RuntimeSample sample =
-                    this.generated.model().sample(x, z);
+                    this.model.sample(x, z);
                 this.colors[row * this.columns + column] = color(sample);
                 count(sample);
             }
@@ -117,7 +130,7 @@ public final class GeoWorldPreviewScreen extends Screen {
             this.height -
             this.layout.getHeaderHeight() -
             this.layout.getFooterHeight() -
-            42
+            54
         );
 
         int pixel = Math.max(
@@ -166,10 +179,43 @@ public final class GeoWorldPreviewScreen extends Screen {
             }
         }
 
-        GeoWorldV1.Manifest manifest = this.generated.model().manifest();
+        GeoWorldV1.Manifest manifest = this.model.manifest();
+        GeoWorldV1.Geometry geometry = manifest.geometry();
+        boolean focusVisible =
+            this.focusX != null &&
+            this.focusZ != null &&
+            geometry.spanXBlocks() > 0 &&
+            geometry.spanZBlocks() > 0 &&
+            this.focusX >= geometry.originX() &&
+            this.focusX <= geometry.originX() + geometry.spanXBlocks() &&
+            this.focusZ >= geometry.originZ() &&
+            this.focusZ <= geometry.originZ() + geometry.spanZBlocks();
+        if (focusVisible) {
+            double fx =
+                (this.focusX - geometry.originX()) / geometry.spanXBlocks();
+            double fz =
+                (this.focusZ - geometry.originZ()) / geometry.spanZBlocks();
+            int markerX = left + (int)Math.round(fx * mapWidth);
+            int markerY = top + (int)Math.round(fz * mapHeight);
+            graphics.fill(
+                markerX - 4,
+                markerY - 1,
+                markerX + 5,
+                markerY + 2,
+                0xFFFF3B30
+            );
+            graphics.fill(
+                markerX - 1,
+                markerY - 4,
+                markerX + 2,
+                markerY + 5,
+                0xFFFF3B30
+            );
+        }
+
         String summary = String.format(
             Locale.ROOT,
-            "Seed %d 路 %dx%d nodes 路 %.0fx%.0f blocks 路 land %d 路 ocean %d 路 lake %d 路 river %d",
+            "Seed %d · %dx%d nodes · %.0fx%.0f blocks · land %d · ocean %d · lake %d · river %d",
             manifest.seed(),
             manifest.geometry().width(),
             manifest.geometry().height(),
@@ -188,6 +234,23 @@ public final class GeoWorldPreviewScreen extends Screen {
             textY,
             0xFFFFFFFF
         );
+        if (this.focusX != null && this.focusZ != null) {
+            Component positionText = Component.translatable(
+                "geoworld.preview.current_position",
+                Math.round(this.focusX),
+                Math.round(this.focusZ)
+            );
+            graphics.text(
+                this.font,
+                positionText,
+                Math.max(
+                    6,
+                    (this.width - this.font.width(positionText)) / 2
+                ),
+                textY + 11,
+                focusVisible ? 0xFFFF7770 : 0xFFB0B0B0
+            );
+        }
     }
 
     @Override

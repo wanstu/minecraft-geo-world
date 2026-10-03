@@ -44,6 +44,38 @@ func TestSelectSourceNodeExposesMissingSemanticSide(t *testing.T) {
 	}
 }
 
+func TestBiomeBoundaryCompetitionLetsBothSidesInvade(t *testing.T) {
+	m := &Model{
+		Profile: &mcprofile.Model{
+			Width: 2, Height: 1,
+			LandMask: []bool{true, true},
+		},
+	}
+	candidates := []candidate{
+		{node: 0, weight: 0.51},
+		{node: 1, weight: 0.49},
+	}
+
+	seen := map[int]bool{}
+	for x := 0.0; x <= 1024; x += 8 {
+		node, _, ok := m.selectErodedCandidate(
+			candidates,
+			true,
+			731894205,
+			x,
+			64,
+			128,
+		)
+		if !ok {
+			t.Fatal("expected competing land candidates to be selectable")
+		}
+		seen[node] = true
+	}
+	if !seen[0] || !seen[1] {
+		t.Fatalf("expected mutual biome invasion near boundary, winners=%v", seen)
+	}
+}
+
 func TestElevationZoningThresholdsFollowClimateAndTerrain(t *testing.T) {
 	if !(terrainElevationContext(mcprofile.TerrainMountain) >
 		terrainElevationContext(mcprofile.TerrainFoothills) &&

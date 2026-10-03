@@ -15,6 +15,8 @@
   "geoworld.create.generate_preview": "Generate World Preview",
   "geoworld.create.view_map": "View World Map",
   "geoworld.preview.title": "GeoWorld World Preview",
+  "geoworld.pause.preview": "GeoWorld Preview",
+  "geoworld.preview.current_position": "Current position: X %s · Z %s (red cross)",
   "geoworld.create.preview_generating": "Generating GeoWorld model…",
   "geoworld.create.preview_restoring": "Restoring the generated GeoWorld preview…",
   "geoworld.create.preview_ready": "Model ready: schema %s · %s · %s ms · %s",

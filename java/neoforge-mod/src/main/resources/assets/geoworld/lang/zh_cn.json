@@ -15,6 +15,8 @@
   "geoworld.create.generate_preview": "生成世界预览",
   "geoworld.create.view_map": "查看世界地图",
   "geoworld.preview.title": "GeoWorld 世界预览",
+  "geoworld.pause.preview": "GeoWorld 预览",
+  "geoworld.preview.current_position": "当前位置：X %s · Z %s（红色十字）",
   "geoworld.create.preview_generating": "正在生成 GeoWorld 模型…",
   "geoworld.create.preview_restoring": "正在恢复已生成的 GeoWorld 预览…",
   "geoworld.create.preview_ready": "模型已就绪：schema %s · %s · %s ms · %s",

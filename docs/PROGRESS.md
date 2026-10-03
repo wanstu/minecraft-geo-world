@@ -1294,3 +1294,21 @@ Phase 6.2 正式完成。下一步 Phase 6.3：最小持久化 schema、原子�
 - NeoForge `build.cmd verifyGeoWorldEngine verifyGeoWorldSpawn`：BUILD SUCCESSFUL；bundled engine bridge 通过；固定 ocean-center Seed `-1273393314970095624` 的安全 Spawn 回归通过，当前候选为 Chunk (-12,-164)、Block (-184,101,-2616)、Biome=Subtropical Forest。
 - cross-language Java GoldenVerifier：15/15，通过，tolerance=1e-9。
 - 最新 JAR 已自动复制到 HMCL 26.3 mods；下一步是用户真实 UI/世界观感验收，而不是再以 build 通过冒充 UI 验收。
+## 2026-10-03 · 群系边界侵蚀与游戏内模型预览
+
+- RuntimeProfile 在已有低频 domain warp 基础上增加“近边界竞争”：当同一宏观 Cell 内两个或更多同侧生态候选权重接近时，使用与 Seed/候选节点绑定的两级短波 value-noise 对权重做小幅竞争扰动。扰动强度只在候选接近时生效，离边界越远越快速衰减，因此群系内部保持稳定，边界则形成几十方块尺度的指状侵入、斑块和不规则锯齿，而不是一条规则直线。
+- 侵蚀选择保持整套 Profile 一起切换：BiomeFamily / TerrainVariant / SurfaceProfile / VegetationProfile 来自同一 SourceNode，避免把群系颜色柔化后却让地表/植被仍硬切成另一套语义。
+- Ground / Water 坐标和海岸判定不参与这次扰动，海陆几何继续由正式 Runtime 决定；近海若 warped profile 越过语义侧，仍回退 unwarped cell 搜索正确 land/ocean 侧。
+- Go Runtime 与 Java Runtime 同步实现完全相同的竞争参数与噪声种子；新增单测验证边界带内两个生态候选都能反向侵入，避免 winner-takes-all 直切退化。
+- 单人游戏 PauseScreen 通过 NeoForge ScreenEvent.Init.Post 注入 `GeoWorld 预览` 按钮；仅当前集成服务器已激活 GeoWorld 模型时出现，不影响普通 Vanilla 世界。
+- 游戏内预览直接读取 `GeoWorldWorldService.active(server).model()`，不是重新生成另一份预览。打开后显示当前存档绑定 `.geoworld` 的完整模型，并在玩家坐标仍位于模型范围内时绘制红色十字；底部同步显示玩家 X/Z，方便和游戏里真实地形、地图 MOD 对拍。
+- GeoWorld Tester 同步新增 `地貌类型` 与 `地表方案` 两个图层，专门检查 Plain/Hills/Foothills/Mountain 分区、Desert Sand/legacy Desert Gravel、Alpine Rock/Snow 等质量问题。
+
+验证：
+- `go test ./... -count=1` 全绿。
+- `node --check cmd/geoworld-tester/web/app.js` 通过；`go test ./cmd/geoworld-tester -count=1` 通过。
+- NeoForge `build.cmd verifyGeoWorldEngine verifyGeoWorldSpawn` 通过并自动部署 HMCL 26.3 JAR。
+- Java/Go cross-language GoldenVerifier 15/15 通过，tolerance=1e-9。
+- `javap` 已确认最终 client class 包含 `addPausePreviewButton(ScreenEvent.Init.Post)`，不是只改源码未编译。
+
+验收注意：本轮 Runtime Profile 算法改变会影响尚未生成的新 Chunk。为了判断“群系侵蚀”观感，应优先新建 GeoWorld；旧世界已经落盘的 Chunk 不会被重写，而新 Chunk 会走新 Runtime，旧测试世界可能因此故意暴露新旧边界差异。

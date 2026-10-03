@@ -121,18 +121,14 @@ func (m *Model) selectSourceNode(worldX, worldZ float64, wantLand bool) (int, fl
 		{node: z1*m.Geometry.Width + x1, weight: tx * tz},
 	}
 
-	best := -1
-	bestWeight := -1.0
-	for _, c := range candidates {
-		if m.Profile.LandMask[c.node] != wantLand {
-			continue
-		}
-		if c.weight > bestWeight {
-			best = c.node
-			bestWeight = c.weight
-		}
-	}
-	if best >= 0 {
+	if best, bestWeight, ok := m.selectErodedCandidate(
+		candidates,
+		wantLand,
+		seed,
+		worldX,
+		worldZ,
+		cellSize,
+	); ok {
 		return best, bestWeight, false
 	}
 
@@ -153,16 +149,14 @@ func (m *Model) selectSourceNode(worldX, worldZ float64, wantLand bool) (int, fl
 		{node: originalZ1*m.Geometry.Width + originalX0, weight: (1 - originalTX) * originalTZ},
 		{node: originalZ1*m.Geometry.Width + originalX1, weight: originalTX * originalTZ},
 	}
-	for _, c := range originalCandidates {
-		if m.Profile.LandMask[c.node] != wantLand {
-			continue
-		}
-		if c.weight > bestWeight {
-			best = c.node
-			bestWeight = c.weight
-		}
-	}
-	if best >= 0 {
+	if best, bestWeight, ok := m.selectErodedCandidate(
+		originalCandidates,
+		wantLand,
+		seed,
+		worldX,
+		worldZ,
+		cellSize,
+	); ok {
 		return best, bestWeight, false
 	}
 
@@ -171,10 +165,87 @@ func (m *Model) selectSourceNode(worldX, worldZ float64, wantLand bool) (int, fl
 	// and non-ocean samples inside mixed/all-land cells have a land corner.
 	// Keep a deterministic fallback so diagnostics can expose violations without
 	// making Runtime queries panic.
-	for _, c := range candidates {
+	best := candidates[0].node
+	bestWeight := candidates[0].weight
+	for _, c := range candidates[1:] {
 		if c.weight > bestWeight {
 			best = c.node
 			bestWeight = c.weight
+		}
+	}
+	return best, bestWeight, true
+}
+
+func (m *Model) selectErodedCandidate(
+	candidates []candidate,
+	wantLand bool,
+	seed int64,
+	worldX, worldZ, cellSize float64,
+) (int, float64, bool) {
+	eligible := make([]candidate, 0, len(candidates))
+	for _, c := range candidates {
+		if m.Profile.LandMask[c.node] != wantLand {
+			continue
+		}
+		duplicate := -1
+		for i := range eligible {
+			if eligible[i].node == c.node {
+				duplicate = i
+				break
+			}
+		}
+		if duplicate >= 0 {
+			if c.weight > eligible[duplicate].weight {
+				eligible[duplicate].weight = c.weight
+			}
+			continue
+		}
+		eligible = append(eligible, c)
+	}
+	if len(eligible) == 0 {
+		return -1, -1, false
+	}
+	if len(eligible) == 1 {
+		return eligible[0].node, eligible[0].weight, true
+	}
+
+	bestBase := -1.0
+	secondBase := -1.0
+	for _, c := range eligible {
+		if c.weight > bestBase {
+			secondBase = bestBase
+			bestBase = c.weight
+		} else if c.weight > secondBase {
+			secondBase = c.weight
+		}
+	}
+	gap := math.Max(0, bestBase-secondBase)
+	ambiguity := 1 - smoothstep(clamp(gap/0.38, 0, 1))
+	erosionStrength := 0.16 * ambiguity
+
+	best := eligible[0].node
+	bestWeight := eligible[0].weight
+	bestScore := -math.MaxFloat64
+	for _, c := range eligible {
+		nodeSeed := int64(c.node)
+		competitionNoise :=
+			0.66*valueNoise(
+				seed+31013+nodeSeed*7919,
+				worldX,
+				worldZ,
+				cellSize*0.34,
+			) +
+				0.34*valueNoise(
+					seed+41017+nodeSeed*1543,
+					worldX,
+					worldZ,
+					cellSize*0.14,
+				)
+		score := c.weight + erosionStrength*competitionNoise
+		if score > bestScore {
+			best = c.node
+			bestWeight = c.weight
+			bestScore = score
 		}
 	}
 	return best, bestWeight, true

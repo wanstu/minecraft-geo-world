@@ -1,11 +1,11 @@
 # GeoWorld 项目状态
 
-更新时间：2026-10-02。当前状态以本文件为入口；历史逐阶段记录完整保存在 [PROGRESS.md](PROGRESS.md)。
+更新时间：2026-10-03。当前状态以本文件为入口；历史逐阶段记录完整保存在 [PROGRESS.md](PROGRESS.md)。
 
 ## 当前目标与阶段
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。
 
-**World Model V1、Java Runtime、Minecraft 26.3 静态 QA writer 与 NeoForge 26.3 动态 GeoWorld worldgen 已接通。当前主线已转为真实客户端可用性与地形/生态质量验收：创建页 Seed/随机 Seed/三项大陆滑块共享同一 `WorldCreationUiState`；预览生成与返回状态保持；动态 ChunkGenerator、创建页地图与 `.geoworld` Runtime 共用同一模型；安全陆地 Spawn、存档内模型绑定已实现。本轮正在收口沙漠地表、群系硬边界、平原/丘陵/山地高度层次以及随海拔变化的山地生态带，并通过 HMCL 26.3 直接手工验收。**
+**World Model V1、Java Runtime、Minecraft 26.3 静态 QA writer 与 NeoForge 26.3 动态 GeoWorld worldgen 已接通。当前主线已转为真实客户端可用性与地形/生态质量验收：创建页、动态 ChunkGenerator、创建页预览、存档内 `.geoworld` 与 Java Runtime 共用同一模型。群系边界在低频 domain warp 之外新增近边界竞争噪声，使相邻生态在几十方块尺度内互相“侵蚀”而不是直线硬切；Go/Java 使用同一算法。单人游戏暂停菜单新增 `GeoWorld 预览`，直接打开当前存档绑定模型，并用红色十字标记玩家当前位置，方便和真实生成世界对照。**
 
 ## 仓库与基线
 - 仓库：D:\projects\minecraft-geo-world

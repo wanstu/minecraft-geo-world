@@ -873,19 +873,17 @@ public final class GeoWorldV1 {
             tx * tz
         };
 
-        int best = -1;
-        double bestWeight = -1;
-        for (int i = 0; i < nodes.length; i++) {
-            if (landMask[nodes[i]] != wantLand) {
-                continue;
-            }
-            if (weights[i] > bestWeight) {
-                best = nodes[i];
-                bestWeight = weights[i];
-            }
-        }
-        if (best >= 0) {
-            return new SourceSelection(best, bestWeight, false);
+        SourceSelection selected = selectErodedCandidate(
+            nodes,
+            weights,
+            wantLand,
+            seed,
+            x,
+            z,
+            cellSize
+        );
+        if (selected != null) {
+            return selected;
         }
 
         // A warped categorical coordinate may cross a coastline even though
@@ -919,26 +917,125 @@ public final class GeoWorldV1 {
             (1 - originalTX) * originalTZ,
             originalTX * originalTZ
         };
-        for (int i = 0; i < originalNodes.length; i++) {
-            if (landMask[originalNodes[i]] != wantLand) {
-                continue;
-            }
-            if (originalWeights[i] > bestWeight) {
-                best = originalNodes[i];
-                bestWeight = originalWeights[i];
-            }
-        }
-        if (best >= 0) {
-            return new SourceSelection(best, bestWeight, false);
+        selected = selectErodedCandidate(
+            originalNodes,
+            originalWeights,
+            wantLand,
+            seed,
+            x,
+            z,
+            cellSize
+        );
+        if (selected != null) {
+            return selected;
         }
 
-        for (int i = 0; i < nodes.length; i++) {
+        int best = nodes[0];
+        double bestWeight = weights[0];
+        for (int i = 1; i < nodes.length; i++) {
             if (weights[i] > bestWeight) {
                 best = nodes[i];
                 bestWeight = weights[i];
             }
         }
         return new SourceSelection(best, bestWeight, true);
+    }
+
+    private SourceSelection selectErodedCandidate(
+        int[] nodes,
+        double[] weights,
+        boolean wantLand,
+        long seed,
+        double x,
+        double z,
+        double cellSize
+    ) {
+        int[] uniqueNodes = new int[nodes.length];
+        double[] uniqueWeights = new double[nodes.length];
+        int count = 0;
+
+        for (int i = 0; i < nodes.length; i++) {
+            int node = nodes[i];
+            if (landMask[node] != wantLand) {
+                continue;
+            }
+
+            int duplicate = -1;
+            for (int j = 0; j < count; j++) {
+                if (uniqueNodes[j] == node) {
+                    duplicate = j;
+                    break;
+                }
+            }
+            if (duplicate >= 0) {
+                if (weights[i] > uniqueWeights[duplicate]) {
+                    uniqueWeights[duplicate] = weights[i];
+                }
+                continue;
+            }
+
+            uniqueNodes[count] = node;
+            uniqueWeights[count] = weights[i];
+            count++;
+        }
+
+        if (count == 0) {
+            return null;
+        }
+        if (count == 1) {
+            return new SourceSelection(
+                uniqueNodes[0],
+                uniqueWeights[0],
+                false
+            );
+        }
+
+        double bestBase = -1;
+        double secondBase = -1;
+        for (int i = 0; i < count; i++) {
+            double weight = uniqueWeights[i];
+            if (weight > bestBase) {
+                secondBase = bestBase;
+                bestBase = weight;
+            } else if (weight > secondBase) {
+                secondBase = weight;
+            }
+        }
+
+        double gap = Math.max(0, bestBase - secondBase);
+        double ambiguity =
+            1 - smoothstepUnit(clamp(gap / 0.38, 0, 1));
+        double erosionStrength = 0.16 * ambiguity;
+
+        int best = uniqueNodes[0];
+        double bestWeight = uniqueWeights[0];
+        double bestScore = -Double.MAX_VALUE;
+        for (int i = 0; i < count; i++) {
+            int node = uniqueNodes[i];
+            long nodeSeed = node;
+            double competitionNoise =
+                0.66 * valueNoise(
+                    seed + 31013L + nodeSeed * 7919L,
+                    x,
+                    z,
+                    cellSize * 0.34
+                ) +
+                0.34 * valueNoise(
+                    seed + 41017L + nodeSeed * 1543L,
+                    x,
+                    z,
+                    cellSize * 0.14
+                );
+            double score =
+                uniqueWeights[i] + erosionStrength * competitionNoise;
+            if (score > bestScore) {
+                best = node;
+                bestWeight = uniqueWeights[i];
+                bestScore = score;
+            }
+        }
+
+        return new SourceSelection(best, bestWeight, false);
     }
 
     private record PointSegment(double t, double distance) {}
