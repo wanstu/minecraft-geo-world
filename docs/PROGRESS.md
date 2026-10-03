@@ -1489,3 +1489,46 @@ Phase 6.2 正式完成。下一步 Phase 6.3：最小持久化 schema、原子�
 - 去掉固定左侧信息栏，地图重新占用整个可用宽度；位置信息改为鼠标悬停时使用 Minecraft 原生 tooltip 显示，并按屏幕宽度自动折行。
 - 保留红色玩家朝向箭头、黄色目标菱形、滚轮缩放和底部图层/重置/传送操作。
 - NeoForge compileJava --rerun-tasks 通过；build.cmd verifyGeoWorldEngine verifyGeoWorldSpawn 通过并已部署 HMCL 26.3。
+
+## 2026-10-03 · 山脉内部峰谷塑形
+
+用户反馈：当前已经有山脉走向/抬升趋势，但整体更像持续抬升的大坡，没有明显山峰、山谷、鞍部。
+
+根因核对（t5 / Seed=123456）：
+- 截图附近 X=1798 Z=24 的 Runtime 为 Mountain / Alpine，旧高度约 Y216；
+- 旧 X 向剖面从约 Y59 持续升到 Y270，宏观山带存在，但内部结构基本单调；
+- Mountain 区中位高度约 Y248，90% 高位约 Y297，且若干区域已经逼近 Y320；
+- 旧山谷默认 ValleyDepth=0.007、CanyonExtraDepth=0.006，折算到海平面以上只有约 3~4 格量级；截图山带的 ValleyWeight 甚至为 0，因此几乎没有可读的山谷切割。
+
+本轮实现：
+- 保留 tectonic / landform MountainWeight 作为“山脉在哪里”的宏观包络，不用噪声重新决定山脉位置。
+- 山脉内部改为多尺度塑形：
+  - 760 blocks broad ridged field：主山脊；
+  - 360 blocks fine ridged field：支脉/鞍部；
+  - 两级 ridge 交汇生成稀疏主峰；
+  - 270 blocks 小尺度波动用于打破长坡平面感；
+  - 低 crest 区生成 structural saddle / dry head valley。
+- 山脉整体抬升从 0.125 降到 0.090，把高度预算从“整片抬高”转给峰谷结构。
+- 对 base > 0.82 的高山带做只作用于 MountainWeight 的 upper-envelope compression，为真正峰顶预留 Minecraft Y 上限空间，避免大片贴 Y320。
+- 已有水文 ValleyWeight/CanyonWeight 在 foothill/mountain 内增强切深：平原保持旧深度，高山谷地可获得明显 V 型落差；不会随机把平原挖成峡谷。
+- Go terrain 与 Java GeoWorldV1 Runtime 完整镜像同一算法，并重新生成跨语言 golden vectors。
+
+t5 实测变化：
+- Mountain Y：p10≈181.7 / p50≈236.0 / p90≈287.6 / max≈313.8；
+- Y>=319.5 的 Mountain 抽样由旧的顶格现象降为 0；
+- 截图附近 X 剖面 32-block 采样已经出现明显局部峰/鞍，例如：
+  - Y213.3 -> 203.7 -> 221.1 -> 214.1；
+  - Y245.6 -> 235.9 -> 245+；
+  不再只有单调抬升。
+- 统一 Mountain fixture 2.4km 剖面 peak-to-saddle normalized relief=0.0875（约 45 blocks），24 个局部极值；
+- 高位 base=0.985 fixture 不再产生大面积 ceiling saturation，采样范围约 0.9496~0.9950。
+- 水文山谷 fixture ValleyCarve≈0.0317，最终垂直差约 0.0264（约十几格以上）。
+
+验证：
+- go test ./... -count=1 全绿；
+- terrain 新增峰谷/山谷深度/高山 headroom 三组回归测试；
+- Java compileJava --rerun-tasks 通过；
+- Java GoldenVerifier 15/15；
+- Minecraft storage/save writer 通过；
+- verifyGeoWorldEngine / verifyGeoWorldSpawn 通过；
+- 最新 MOD 已自动部署 HMCL 26.3。

@@ -1531,11 +1531,51 @@ public final class GeoWorldV1 {
             double foothillDetail =
                 fbm(config.seed() + 307, x, z, 1500, 3) * config.foothillAmplitude();
             double mountainDetail =
-                fbm(config.seed() + 401, x, z, 1750, 4) * config.mountainAmplitude();
-            double ridgeBase =
-                1 - Math.abs(valueNoise(config.seed() + 433, x, z, 900));
-            double mountainPeak =
-                (Math.pow(clamp(ridgeBase, 0, 1), 3) - 0.30) * 0.11;
+                fbm(config.seed() + 401, x, z, 1050, 4) *
+                config.mountainAmplitude() *
+                0.62;
+
+            double ridgeBroad =
+                ridgedFbm(config.seed() + 433, x, z, 760, 4);
+            double ridgeFine =
+                ridgedFbm(config.seed() + 461, x, z, 360, 3);
+            double crest = clamp(
+                0.70 * ridgeBroad + 0.30 * ridgeFine,
+                0,
+                1
+            );
+            double mountainCrest =
+                (Math.pow(crest, 2.20) - 0.34) * 0.115;
+
+            double ridgeIntersection = smoothstep(
+                0.30,
+                0.78,
+                ridgeBroad * ridgeFine
+            );
+            double summitMod =
+                0.72 +
+                0.28 *
+                (
+                    0.5 +
+                    0.5 *
+                    valueNoise(
+                        config.seed() + 487,
+                        x,
+                        z,
+                        560
+                    )
+                );
+            double summit =
+                Math.pow(ridgeIntersection, 2.35) *
+                0.085 *
+                summitMod;
+            double structuralSaddle =
+                Math.pow(clamp(1 - crest, 0, 1), 2.4) *
+                0.028;
+            double slopeWave =
+                fbm(config.seed() + 509, x, z, 270, 3) *
+                0.014;
+
             double plateauDetail =
                 fbm(config.seed() + 503, x, z, 2600, 2) * config.plateauAmplitude();
 
@@ -1543,7 +1583,13 @@ public final class GeoWorldV1 {
                 plain * plainDetail +
                 hill * hillDetail +
                 foothill * foothillDetail +
-                mountain * (mountainDetail + mountainPeak) +
+                mountain * (
+                    mountainDetail +
+                    mountainCrest +
+                    summit +
+                    slopeWave -
+                    structuralSaddle
+                ) +
                 plateau * plateauDetail;
 
             double flatness = clamp(
@@ -1559,23 +1605,45 @@ public final class GeoWorldV1 {
             double valleyMod =
                 0.82 +
                 0.18 * (0.5 + 0.5 * valueNoise(config.seed() + 607, x, z, 1800));
-            double valleyCarve = valley * config.valleyDepth() * valleyMod;
-            double canyonCarve = canyon * config.canyonExtraDepth();
+            double valleyReliefGain =
+                1 + 1.6 * foothill + 4.2 * mountain;
+            double valleyCarve =
+                valley *
+                config.valleyDepth() *
+                valleyMod *
+                valleyReliefGain;
+            double canyonReliefGain =
+                1 + 0.9 * foothill + 2.4 * mountain;
+            double canyonCarve =
+                canyon *
+                config.canyonExtraDepth() *
+                canyonReliefGain;
 
             // Mirror the Go terrain morphology lift exactly. Ecological
             // families are laid over this terrain; they do not define its shape.
             double orographicLift =
                 0.012 * hill +
                 0.030 * foothill +
-                0.125 * mountain +
+                0.090 * mountain +
                 0.020 * plateau;
 
             double depositionLift =
                 deposition * config.depositionLift() +
                 alluvialFan * config.alluvialFanLift();
 
+            double workingBase = base;
+            if (base > 0.82 && mountain > 0) {
+                double upper = (base - 0.82) / 0.18;
+                double compression =
+                    mountain *
+                    smoothstep(0, 1, upper) *
+                    (base - 0.82) *
+                    0.42;
+                workingBase -= compression;
+            }
+
             double result = boundedAdd(
-                base,
+                workingBase,
                 regionalDetail + orographicLift + depositionLift - valleyCarve - canyonCarve
             );
             if (heightCorrection != null) {
@@ -1707,6 +1775,38 @@ public final class GeoWorldV1 {
             currentWavelength *= 0.5;
         }
         return sumAmplitude <= 0 ? 0 : sum / sumAmplitude;
+    }
+
+    private static double ridgedFbm(
+        long seed,
+        double x,
+        double z,
+        double wavelength,
+        int octaves
+    ) {
+        if (octaves <= 0) {
+            return 0;
+        }
+        double amplitude = 1;
+        double sumAmplitude = 0;
+        double sum = 0;
+        double currentWavelength = wavelength;
+        for (int octave = 0; octave < octaves; octave++) {
+            double n = valueNoise(
+                seed + (long) octave * 104729L,
+                x,
+                z,
+                currentWavelength
+            );
+            double ridge = 1 - Math.abs(n);
+            sum += ridge * amplitude;
+            sumAmplitude += amplitude;
+            amplitude *= 0.55;
+            currentWavelength *= 0.5;
+        }
+        return sumAmplitude <= 0
+            ? 0
+            : clamp(sum / sumAmplitude, 0, 1);
     }
 
     private static double valueNoise(

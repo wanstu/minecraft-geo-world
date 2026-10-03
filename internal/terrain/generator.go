@@ -213,19 +213,51 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	plainDetail := fbm(m.Config.Seed+101, worldX, worldZ, 2300, 2) * m.Config.PlainAmplitude
 	hillDetail := fbm(m.Config.Seed+211, worldX, worldZ, 1250, 3) * m.Config.HillAmplitude
 	foothillDetail := fbm(m.Config.Seed+307, worldX, worldZ, 1500, 3) * m.Config.FoothillAmplitude
-	mountainDetail := fbm(m.Config.Seed+401, worldX, worldZ, 1750, 4) * m.Config.MountainAmplitude
-	// Mountain regions need real summits rather than only broad rolling noise.
-	// A sharpened ridge field adds sparse crests/peaks while the smooth
-	// mountain weight still decides where mountain building is allowed.
-	ridgeBase := 1 - math.Abs(valueNoise(m.Config.Seed+433, worldX, worldZ, 900))
-	mountainPeak := (math.Pow(clamp(ridgeBase, 0, 1), 3) - 0.30) * 0.11
+	mountainDetail := fbm(m.Config.Seed+401, worldX, worldZ, 1050, 4) * m.Config.MountainAmplitude * 0.62
+
+	// A mountain belt is not one continuously rising ramp. Build its internal
+	// morphology at several physical scales:
+	//   * a broad ridged network for the main crest,
+	//   * a finer ridged network for subsidiary ridges and saddles,
+	//   * sparse summit blobs along high crest intersections,
+	//   * a small short-wave component so long slopes do not look planar.
+	//
+	// The mountain weight is still the tectonic/landform envelope deciding
+	// where this is allowed; these fields only shape the inside of that belt.
+	ridgeBroad := ridgedFbm(m.Config.Seed+433, worldX, worldZ, 760, 4)
+	ridgeFine := ridgedFbm(m.Config.Seed+461, worldX, worldZ, 360, 3)
+	crest := clamp(0.70*ridgeBroad+0.30*ridgeFine, 0, 1)
+	mountainCrest := (math.Pow(crest, 2.20) - 0.34) * 0.115
+
+	// Sharp summits appear where a broad crest and a subsidiary ridge meet.
+	// A separate low-frequency modulation prevents every ridge crossing from
+	// becoming an equally tall peak.
+	ridgeIntersection := smoothstep01(
+		0.30,
+		0.78,
+		ridgeBroad*ridgeFine,
+	)
+	summitMod := 0.72 + 0.28*(0.5+0.5*valueNoise(
+		m.Config.Seed+487,
+		worldX,
+		worldZ,
+		560,
+	))
+	summit := math.Pow(ridgeIntersection, 2.35) * 0.085 * summitMod
+
+	// Low parts of the same ridge field become saddles / dry head valleys.
+	// River-cut valleys are handled separately below by the real hydrologic
+	// ValleyWeight/CanyonWeight fields.
+	structuralSaddle := math.Pow(clamp(1-crest, 0, 1), 2.4) * 0.028
+	slopeWave := fbm(m.Config.Seed+509, worldX, worldZ, 270, 3) * 0.014
+
 	plateauDetail := fbm(m.Config.Seed+503, worldX, worldZ, 2600, 2) * m.Config.PlateauAmplitude
 
 	regionalDetail :=
 		plain*plainDetail +
 			hill*hillDetail +
 			foothill*foothillDetail +
-			mountain*(mountainDetail+mountainPeak) +
+			mountain*(mountainDetail+mountainCrest+summit+slopeWave-structuralSaddle) +
 			plateau*plateauDetail
 
 	// Broad depositional lowlands should be smoother than surrounding terrain.
@@ -245,8 +277,14 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	// influence lowers the regional surface. Canyon tendency adds a narrower,
 	// stronger incision on top of the existing valley geometry.
 	valleyMod := 0.82 + 0.18*(0.5+0.5*valueNoise(m.Config.Seed+607, worldX, worldZ, 1800))
-	valleyCarve := valley * m.Config.ValleyDepth * valleyMod
-	canyonCarve := canyon * m.Config.CanyonExtraDepth
+	// Hydrologically derived valleys need visibly deeper incision in high
+	// relief terrain. On plains the historical depth is retained; inside
+	// foothills/mountains the same valley field gains enough vertical relief
+	// to read as a real V-shaped valley rather than a 3-4 block wrinkle.
+	valleyReliefGain := 1 + 1.6*foothill + 4.2*mountain
+	valleyCarve := valley * m.Config.ValleyDepth * valleyMod * valleyReliefGain
+	canyonReliefGain := 1 + 0.9*foothill + 2.4*mountain
+	canyonCarve := canyon * m.Config.CanyonExtraDepth * canyonReliefGain
 
 	// Terrain morphology has a distinct vertical identity: plains stay close
 	// to the broad base surface, hills undulate, foothills climb, and mountain /
@@ -255,7 +293,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	orographicLift :=
 		0.012*hill +
 			0.030*foothill +
-			0.125*mountain +
+			0.090*mountain +
 			0.020*plateau
 
 	// Deposition fills a small amount of accommodation space. Alluvial fans add
@@ -263,8 +301,20 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	depositionLift := deposition*m.Config.DepositionLift +
 		alluvialFan*m.Config.AlluvialFanLift
 
+	// Phase 1 can legitimately deliver very high tectonic elevations. If a
+	// whole mountain belt arrives already near normalized height 1, adding any
+	// local summit detail makes a broad Y=320 ceiling. Compress only the upper
+	// mountain envelope to reserve headroom for actual peaks; lower mountains,
+	// foothills and non-mountain terrain are left unchanged.
+	workingBase := base
+	if base > 0.82 && mountain > 0 {
+		upper := (base - 0.82) / 0.18
+		compression := mountain * smoothstep01(0, 1, upper) * (base - 0.82) * 0.42
+		workingBase -= compression
+	}
+
 	final := boundedAdd(
-		base,
+		workingBase,
 		regionalDetail+orographicLift+depositionLift-valleyCarve-canyonCarve,
 	)
 	heightCorrection := 0.0
@@ -339,6 +389,29 @@ func fbm(seed int64, x, z, wavelength float64, octaves int) float64 {
 	return sum / sumAmplitude
 }
 
+func ridgedFbm(seed int64, x, z, wavelength float64, octaves int) float64 {
+	if octaves <= 0 {
+		return 0
+	}
+	amplitude := 1.0
+	sumAmplitude := 0.0
+	sum := 0.0
+	freqWavelength := wavelength
+
+	for octave := 0; octave < octaves; octave++ {
+		n := valueNoise(seed+int64(octave)*104729, x, z, freqWavelength)
+		ridge := 1 - math.Abs(n)
+		sum += ridge * amplitude
+		sumAmplitude += amplitude
+		amplitude *= 0.55
+		freqWavelength *= 0.5
+	}
+	if sumAmplitude <= 0 {
+		return 0
+	}
+	return clamp(sum/sumAmplitude, 0, 1)
+}
+
 func valueNoise(seed int64, x, z, wavelength float64) float64 {
 	if wavelength <= 0 {
 		return 0
@@ -377,6 +450,17 @@ func hashValue(seed, x, z int64) float64 {
 	// Use the high 53 bits to produce a deterministic value in [-1,1].
 	unit := float64(h>>11) / float64(uint64(1)<<53)
 	return unit*2 - 1
+}
+
+func smoothstep01(edge0, edge1, v float64) float64 {
+	if edge1 <= edge0 {
+		if v >= edge1 {
+			return 1
+		}
+		return 0
+	}
+	t := clamp((v-edge0)/(edge1-edge0), 0, 1)
+	return t * t * (3 - 2*t)
 }
 
 func quinticFade(t float64) float64 {

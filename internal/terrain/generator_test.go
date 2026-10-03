@@ -339,6 +339,130 @@ func detailStdDev(m *Model) float64 {
 	return math.Sqrt(variance)
 }
 
+func TestMountainStructureCreatesSummitsAndSaddles(t *testing.T) {
+	in := uniformInput(20, 20, 0.70)
+	for i := range in.BaseElevation {
+		in.RollingPlainWeight[i] = 0
+		in.MountainWeight[i] = 1
+	}
+
+	m, err := Generate(in, Config{Seed: 20261003, CellSizeBlocks: 128})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	values := make([]float64, 0, 80)
+	for x := 0.0; x <= 2400; x += 32 {
+		values = append(values, m.SampleNormalized(x, 512))
+	}
+
+	minV, maxV := values[0], values[0]
+	extrema := 0
+	for i, v := range values {
+		if v < minV {
+			minV = v
+		}
+		if v > maxV {
+			maxV = v
+		}
+		if i >= 2 {
+			a, b, c := values[i-2], values[i-1], values[i]
+			if (b > a && b > c) || (b < a && b < c) {
+				extrema++
+			}
+		}
+	}
+
+	if maxV-minV < 0.070 {
+		t.Fatalf(
+			"mountain transect lacks peak-to-saddle relief: min=%.6f max=%.6f delta=%.6f",
+			minV, maxV, maxV-minV,
+		)
+	}
+	if extrema < 8 {
+		t.Fatalf("mountain transect too monotonic: only %d local extrema", extrema)
+	}
+}
+
+func TestMountainValleyCarveGainsDepthFromRelief(t *testing.T) {
+	base := uniformInput(12, 12, 0.70)
+	valley := uniformInput(12, 12, 0.70)
+	for i := range base.BaseElevation {
+		base.RollingPlainWeight[i] = 0
+		base.MountainWeight[i] = 1
+		valley.RollingPlainWeight[i] = 0
+		valley.MountainWeight[i] = 1
+		valley.ValleyWeight[i] = 1
+	}
+
+	cfg := Config{Seed: 991, CellSizeBlocks: 128}
+	a, err := Generate(base, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := Generate(valley, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sa := a.Sample(333, 281)
+	sb := b.Sample(333, 281)
+	if sb.ValleyCarve < 0.020 {
+		t.Fatalf("mountain valley incision still too weak: %.6f", sb.ValleyCarve)
+	}
+	if sa.FinalHeight-sb.FinalHeight < 0.015 {
+		t.Fatalf(
+			"mountain valley does not create visible vertical relief: base=%.6f valley=%.6f",
+			sa.FinalHeight, sb.FinalHeight,
+		)
+	}
+}
+
+func TestHighMountainEnvelopePreservesPeakHeadroom(t *testing.T) {
+	in := uniformInput(20, 20, 0.985)
+	for i := range in.BaseElevation {
+		in.RollingPlainWeight[i] = 0
+		in.MountainWeight[i] = 1
+	}
+
+	m, err := Generate(in, Config{Seed: 42, CellSizeBlocks: 128})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	minV, maxV := 1.0, 0.0
+	saturated := 0
+	total := 0
+	for z := 0.0; z <= 2000; z += 32 {
+		for x := 0.0; x <= 2000; x += 32 {
+			v := m.SampleNormalized(x, z)
+			total++
+			if v < minV {
+				minV = v
+			}
+			if v > maxV {
+				maxV = v
+			}
+			if v >= 0.999 {
+				saturated++
+			}
+		}
+	}
+
+	if maxV-minV < 0.025 {
+		t.Fatalf(
+			"high mountain collapsed into a flat ceiling: min=%.6f max=%.6f",
+			minV, maxV,
+		)
+	}
+	if saturated*20 > total {
+		t.Fatalf(
+			"too much high mountain terrain is ceiling-saturated: %d/%d",
+			saturated, total,
+		)
+	}
+}
+
 func TestBoundedAddAvoidsNewHardSaturation(t *testing.T) {
 	for _, tc := range []struct {
 		base  float64
