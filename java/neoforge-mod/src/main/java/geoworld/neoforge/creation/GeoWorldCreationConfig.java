@@ -162,7 +162,12 @@ public record GeoWorldCreationConfig(
         double min,
         double max
     ) {
-        if (!Double.isFinite(value) || value < min || value > max) {
+        double epsilon = 1.0e-9;
+        if (
+            !Double.isFinite(value) ||
+            value < min - epsilon ||
+            value > max + epsilon
+        ) {
             errors.add(name + " must be in " + min + ".." + max);
         }
     }

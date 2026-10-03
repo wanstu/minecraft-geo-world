@@ -11,6 +11,7 @@ import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.ScrollableLayout;
 import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.layouts.CommonLayouts;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
@@ -90,9 +91,7 @@ public final class GeoWorldPresetScreen extends Screen {
         this.layout = new HeaderAndFooterLayout(this, 33, 58);
         this.layout.addTitleHeader(this.title, this.font);
 
-        LinearLayout body = this.layout.addToContents(
-            LinearLayout.vertical().spacing(4)
-        );
+        LinearLayout body = LinearLayout.vertical().spacing(4);
         body.defaultCellSetting().alignHorizontallyCenter();
 
         String seedValue = this.parent.getUiState().getSeed();
@@ -259,6 +258,14 @@ public final class GeoWorldPresetScreen extends Screen {
                 .width(150)
                 .build()
         );
+
+        this.layout.addToContents(
+            new ScrollableLayout(
+                this.minecraft,
+                body,
+                this.layout.getContentHeight()
+            )
+        ).setMinWidth(310);
 
         this.layout.visitWidgets(this::addRenderableWidget);
         this.repositionElements();
@@ -739,7 +746,8 @@ public final class GeoWorldPresetScreen extends Screen {
 
         private double snap(double actualValue) {
             double clamped = Math.max(this.min, Math.min(this.max, actualValue));
-            return Math.round(clamped / STEP) * STEP;
+            double snapped = Math.round(clamped / STEP) * STEP;
+            return Math.max(this.min, Math.min(this.max, snapped));
         }
     }
 }
