@@ -128,6 +128,14 @@ public final class GeoWorldBiomeSource extends BiomeSource {
                 ? "minecraft:frozen_river"
                 : "minecraft:river";
         }
+        if ("Lake".equals(sample.waterKind())) {
+            // Vanilla has no dedicated lake biome. River is the closest
+            // freshwater biome and, importantly, prevents an inland lake from
+            // being stored as the surrounding Savanna/Jungle/Desert biome.
+            return isFrozenRiverFamily(family)
+                ? "minecraft:frozen_river"
+                : "minecraft:river";
+        }
 
         // The model already has a broad tropical -> subtropical -> temperate
         // climate transition, but mapping Tropical Rainforest directly to
@@ -150,7 +158,117 @@ public final class GeoWorldBiomeSource extends BiomeSource {
             }
         }
 
-        return Minecraft26_3ProfileMapping.biomeId(family);
+        String base = Minecraft26_3ProfileMapping.biomeId(family);
+        return erodedBoundaryBiome(
+            model,
+            blockX,
+            blockZ,
+            family,
+            base
+        );
+    }
+
+    private static String erodedBoundaryBiome(
+        GeoWorldV1 model,
+        double x,
+        double z,
+        String family,
+        String base
+    ) {
+        final double radius = 56.0;
+        final double diagonal = radius * 0.7071067811865476;
+        double[][] offsets = {
+            {radius, 0.0},
+            {-radius, 0.0},
+            {0.0, radius},
+            {0.0, -radius},
+            {diagonal, diagonal},
+            {diagonal, -diagonal},
+            {-diagonal, diagonal},
+            {-diagonal, -diagonal}
+        };
+
+        LinkedHashMap<String, Integer> candidates = new LinkedHashMap<>();
+        int different = 0;
+        for (double[] offset : offsets) {
+            GeoWorldV1.RuntimeSample nearby = model.sample(
+                x + offset[0],
+                z + offset[1]
+            );
+            if (
+                !nearby.sourceLand() ||
+                !"None".equals(nearby.waterKind()) ||
+                nearby.biomeFamily().equals(family)
+            ) {
+                continue;
+            }
+            String candidate = Minecraft26_3ProfileMapping.biomeId(
+                nearby.biomeFamily()
+            );
+            candidates.merge(candidate, 1, Integer::sum);
+            different++;
+        }
+        if (different == 0 || candidates.isEmpty()) {
+            return base;
+        }
+
+        String neighbor = candidates
+            .entrySet()
+            .stream()
+            .max(Map.Entry.comparingByValue())
+            .map(Map.Entry::getKey)
+            .orElse(base);
+        if (neighbor.equals(base)) {
+            return base;
+        }
+
+        double strength = Math.min(1.0, different / 4.0);
+        double noise = smoothValueNoise(
+            model.manifest().seed() ^ 0x5A17C9E3L,
+            x,
+            z,
+            24.0
+        );
+        return noise < 0.34 * strength ? neighbor : base;
+    }
+
+    private static double smoothValueNoise(
+        long seed,
+        double x,
+        double z,
+        double scale
+    ) {
+        double gx = x / scale;
+        double gz = z / scale;
+        int x0 = (int)Math.floor(gx);
+        int z0 = (int)Math.floor(gz);
+        double tx = smoothstep(gx - x0);
+        double tz = smoothstep(gz - z0);
+
+        double v00 = hashUnit(seed, x0, z0);
+        double v10 = hashUnit(seed, x0 + 1, z0);
+        double v01 = hashUnit(seed, x0, z0 + 1);
+        double v11 = hashUnit(seed, x0 + 1, z0 + 1);
+        double a = v00 + (v10 - v00) * tx;
+        double b = v01 + (v11 - v01) * tx;
+        return a + (b - a) * tz;
+    }
+
+    private static double hashUnit(long seed, int x, int z) {
+        long h = seed;
+        h ^= (long)x * 0x9E3779B97F4A7C15L;
+        h ^= (long)z * 0xC2B2AE3D27D4EB4FL;
+        h ^= h >>> 30;
+        h *= 0xBF58476D1CE4E5B9L;
+        h ^= h >>> 27;
+        h *= 0x94D049BB133111EBL;
+        h ^= h >>> 31;
+        return (h >>> 11) * 0x1.0p-53;
+    }
+
+    private static double smoothstep(double t) {
+        t = Math.max(0.0, Math.min(1.0, t));
+        return t * t * (3.0 - 2.0 * t);
     }
 
     private static boolean nearTropicalLand(

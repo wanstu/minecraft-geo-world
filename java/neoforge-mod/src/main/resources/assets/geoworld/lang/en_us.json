@@ -23,7 +23,7 @@
   "geoworld.preview.global_view": "global",
   "geoworld.preview.local_view": "current area",
   "geoworld.preview.reset_view": "Reset View",
-  "geoworld.preview.controls": "Mouse wheel to zoom · red cross = player · hover for details",
+  "geoworld.preview.controls": "Wheel to zoom · left click to select · drag to pan · yellow cross = teleport target",
   "geoworld.preview.hover_position": "X %s · Z %s · surface Y≈%s",
   "geoworld.preview.hover_water": "Water: %s · surface Y≈%s · depth≈%s blocks",
   "geoworld.preview.hover_dry": "Water: none",
@@ -103,5 +103,18 @@
   "geoworld.value.grassland": "Grassland",
   "geoworld.value.dry_grassland": "Dry Grassland",
   "geoworld.value.shrubland": "Shrubland",
-  "geoworld.value.desert_sparse": "Desert Sparse"
+  "geoworld.value.desert_sparse": "Desert Sparse",
+  "geoworld.preview.teleport": "Teleport to Selection",
+  "geoworld.preview.teleport_done": "Teleported to X %s · Y %s · Z %s",
+  "geoworld.preview.info_title": "Location Details",
+  "geoworld.preview.selected": "Selected: X %s · Z %s",
+  "geoworld.preview.layer_button": "Layer: %s",
+  "geoworld.preview.layer.biome": "Biomes",
+  "geoworld.preview.layer.continent": "Continents & Ocean",
+  "geoworld.preview.layer.terrain": "Terrain Height",
+  "geoworld.preview.layer.temperature": "Annual Temperature",
+  "geoworld.preview.layer.precipitation": "Annual Precipitation",
+  "geoworld.preview.layer.monsoon": "Monsoon Index",
+  "geoworld.preview.hover_climate": "Climate: mean %s°C · annual %s mm · monsoon %s",
+  "geoworld.preview.hover_climate_unavailable": "Climate: not stored in this older model"
 }

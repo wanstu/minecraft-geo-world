@@ -164,6 +164,15 @@ public final class GeoWorldV1 {
         boolean semanticMismatch
     ) {}
 
+    public record ClimateSample(
+        boolean available,
+        double annualMeanTempC,
+        double annualPrecipMM,
+        double monsoonIndex,
+        double windX,
+        double windZ
+    ) {}
+
     private enum WaterKind {
         NONE("None"),
         OCEAN("Ocean"),
@@ -249,6 +258,11 @@ public final class GeoWorldV1 {
     private final List<LakeNode> lakes;
     private final ScalarGrid oceanEligibility;
     private final WorldSampleConfig worldSampleConfig;
+    private final ScalarGrid climateTemp;
+    private final ScalarGrid climatePrecip;
+    private final ScalarGrid climateMonsoon;
+    private final ScalarGrid climateWindX;
+    private final ScalarGrid climateWindZ;
     private final byte[] ecoRegion;
     private final double[] regionConfidence;
     private final byte[] biomeFamily;
@@ -264,6 +278,11 @@ public final class GeoWorldV1 {
         List<RiverSegment> rivers,
         List<LakeNode> lakes,
         WorldSampleConfig worldSampleConfig,
+        ScalarGrid climateTemp,
+        ScalarGrid climatePrecip,
+        ScalarGrid climateMonsoon,
+        ScalarGrid climateWindX,
+        ScalarGrid climateWindZ,
         byte[] ecoRegion,
         double[] regionConfidence,
         byte[] biomeFamily,
@@ -279,6 +298,11 @@ public final class GeoWorldV1 {
         this.rivers = rivers;
         this.lakes = lakes;
         this.worldSampleConfig = worldSampleConfig;
+        this.climateTemp = climateTemp;
+        this.climatePrecip = climatePrecip;
+        this.climateMonsoon = climateMonsoon;
+        this.climateWindX = climateWindX;
+        this.climateWindZ = climateWindZ;
         this.ecoRegion = ecoRegion;
         this.regionConfidence = regionConfidence;
         this.biomeFamily = biomeFamily;
@@ -296,6 +320,28 @@ public final class GeoWorldV1 {
 
     public Manifest manifest() {
         return manifest;
+    }
+
+    public boolean hasClimatePreview() {
+        return this.climateTemp != null &&
+            this.climatePrecip != null &&
+            this.climateMonsoon != null &&
+            this.climateWindX != null &&
+            this.climateWindZ != null;
+    }
+
+    public ClimateSample sampleClimate(double worldX, double worldZ) {
+        if (!this.hasClimatePreview()) {
+            return new ClimateSample(false, 0, 0, 0, 0, 0);
+        }
+        return new ClimateSample(
+            true,
+            this.climateTemp.sampleSmoothstepBilinear(worldX, worldZ),
+            this.climatePrecip.sampleSmoothstepBilinear(worldX, worldZ),
+            this.climateMonsoon.sampleSmoothstepBilinear(worldX, worldZ),
+            this.climateWindX.sampleSmoothstepBilinear(worldX, worldZ),
+            this.climateWindZ.sampleSmoothstepBilinear(worldX, worldZ)
+        );
     }
 
     public RuntimeSample sample(double worldX, double worldZ) {
@@ -434,6 +480,72 @@ public final class GeoWorldV1 {
             Json.doubleValue(worldSampleObject, "OceanEligibilityThreshold")
         );
 
+        ScalarGrid climateTemp = null;
+        ScalarGrid climatePrecip = null;
+        ScalarGrid climateMonsoon = null;
+        ScalarGrid climateWindX = null;
+        ScalarGrid climateWindZ = null;
+        Object climatePreviewRaw = payload.get("climatePreview");
+        if (climatePreviewRaw != null) {
+            Map<String, Object> climatePreview = Json.object(
+                climatePreviewRaw,
+                "payload.climatePreview"
+            );
+            if (climatePreview.get("annualMeanTempC") != null) {
+                double[] temp = doubleArray(
+                    Json.required(climatePreview, "annualMeanTempC"),
+                    "climatePreview.annualMeanTempC"
+                );
+                double[] precip = doubleArray(
+                    Json.required(climatePreview, "annualPrecipMM"),
+                    "climatePreview.annualPrecipMM"
+                );
+                double[] monsoon = doubleArray(
+                    Json.required(climatePreview, "monsoonIndex"),
+                    "climatePreview.monsoonIndex"
+                );
+                double[] windX = doubleArray(
+                    Json.required(climatePreview, "windX"),
+                    "climatePreview.windX"
+                );
+                double[] windZ = doubleArray(
+                    Json.required(climatePreview, "windZ"),
+                    "climatePreview.windZ"
+                );
+                int climateN = manifest.geometry().nodeCount();
+                requireLength(
+                    "climatePreview.annualMeanTempC",
+                    temp.length,
+                    climateN
+                );
+                requireLength(
+                    "climatePreview.annualPrecipMM",
+                    precip.length,
+                    climateN
+                );
+                requireLength(
+                    "climatePreview.monsoonIndex",
+                    monsoon.length,
+                    climateN
+                );
+                requireLength(
+                    "climatePreview.windX",
+                    windX.length,
+                    climateN
+                );
+                requireLength(
+                    "climatePreview.windZ",
+                    windZ.length,
+                    climateN
+                );
+                climateTemp = new ScalarGrid(manifest.geometry(), temp);
+                climatePrecip = new ScalarGrid(manifest.geometry(), precip);
+                climateMonsoon = new ScalarGrid(manifest.geometry(), monsoon);
+                climateWindX = new ScalarGrid(manifest.geometry(), windX);
+                climateWindZ = new ScalarGrid(manifest.geometry(), windZ);
+            }
+        }
+
         Map<String, Object> ecology = Json.object(Json.required(payload, "ecology"), "payload.ecology");
         boolean[] ecologyLandMask = booleanArray(Json.required(ecology, "landMask"), "ecology.landMask");
         byte[] ecoRegion = byteSlice(Json.required(ecology, "ecoRegion"), "ecology.ecoRegion");
@@ -493,6 +605,11 @@ public final class GeoWorldV1 {
             List.copyOf(rivers),
             List.copyOf(lakes),
             worldSampleConfig,
+            climateTemp,
+            climatePrecip,
+            climateMonsoon,
+            climateWindX,
+            climateWindZ,
             ecoRegion,
             regionConfidence,
             biomeFamily,
@@ -621,9 +738,9 @@ public final class GeoWorldV1 {
         double waterSurface = 0;
         double bestLakeSurface = Double.NEGATIVE_INFINITY;
         for (LakeNode lake : lakes) {
-            double dx = Math.abs(x - lake.x());
-            double dz = Math.abs(z - lake.z());
-            double distance = Math.max(dx, dz);
+            double dx = x - lake.x();
+            double dz = z - lake.z();
+            double distance = Math.hypot(dx, dz);
             if (distance >= lake.outerRadius()) {
                 continue;
             }
@@ -637,7 +754,7 @@ public final class GeoWorldV1 {
                 finalHeight = candidate;
             }
             if (
-                finalHeight < lake.waterSurface() - 1e-12 &&
+                finalHeight < lake.waterSurface() - 0.003 &&
                 lake.waterSurface() > bestLakeSurface
             ) {
                 bestLakeSurface = lake.waterSurface();
@@ -1406,6 +1523,10 @@ public final class GeoWorldV1 {
                 fbm(config.seed() + 307, x, z, 1500, 3) * config.foothillAmplitude();
             double mountainDetail =
                 fbm(config.seed() + 401, x, z, 1750, 4) * config.mountainAmplitude();
+            double ridgeBase =
+                1 - Math.abs(valueNoise(config.seed() + 433, x, z, 900));
+            double mountainPeak =
+                (Math.pow(clamp(ridgeBase, 0, 1), 3) - 0.30) * 0.11;
             double plateauDetail =
                 fbm(config.seed() + 503, x, z, 2600, 2) * config.plateauAmplitude();
 
@@ -1413,7 +1534,7 @@ public final class GeoWorldV1 {
                 plain * plainDetail +
                 hill * hillDetail +
                 foothill * foothillDetail +
-                mountain * mountainDetail +
+                mountain * (mountainDetail + mountainPeak) +
                 plateau * plateauDetail;
 
             double flatness = clamp(
@@ -1437,7 +1558,7 @@ public final class GeoWorldV1 {
             double orographicLift =
                 0.012 * hill +
                 0.030 * foothill +
-                0.100 * mountain +
+                0.125 * mountain +
                 0.020 * plateau;
 
             double depositionLift =

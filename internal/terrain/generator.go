@@ -214,13 +214,18 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	hillDetail := fbm(m.Config.Seed+211, worldX, worldZ, 1250, 3) * m.Config.HillAmplitude
 	foothillDetail := fbm(m.Config.Seed+307, worldX, worldZ, 1500, 3) * m.Config.FoothillAmplitude
 	mountainDetail := fbm(m.Config.Seed+401, worldX, worldZ, 1750, 4) * m.Config.MountainAmplitude
+	// Mountain regions need real summits rather than only broad rolling noise.
+	// A sharpened ridge field adds sparse crests/peaks while the smooth
+	// mountain weight still decides where mountain building is allowed.
+	ridgeBase := 1 - math.Abs(valueNoise(m.Config.Seed+433, worldX, worldZ, 900))
+	mountainPeak := (math.Pow(clamp(ridgeBase, 0, 1), 3) - 0.30) * 0.11
 	plateauDetail := fbm(m.Config.Seed+503, worldX, worldZ, 2600, 2) * m.Config.PlateauAmplitude
 
 	regionalDetail :=
 		plain*plainDetail +
 			hill*hillDetail +
 			foothill*foothillDetail +
-			mountain*mountainDetail +
+			mountain*(mountainDetail+mountainPeak) +
 			plateau*plateauDetail
 
 	// Broad depositional lowlands should be smoother than surrounding terrain.
@@ -250,7 +255,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	orographicLift :=
 		0.012*hill +
 			0.030*foothill +
-			0.100*mountain +
+			0.125*mountain +
 			0.020*plateau
 
 	// Deposition fills a small amount of accommodation space. Alluvial fans add

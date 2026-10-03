@@ -328,6 +328,7 @@ func Load(path string) (*RuntimeModel, error) {
 		Ecology:        eco,
 		Profile:        profile,
 		RuntimeProfile: runtimeProfile,
+		ClimatePreview: restoreClimatePreview(env.Payload.ClimatePreview),
 	}, nil
 }
 
@@ -401,7 +402,7 @@ func validateEnvelopeContracts(env fileEnvelope) error {
 
 func snapshotFromWorldModel(m *generator.WorldModel) (payload, error) {
 	if m == nil || m.Surface == nil || m.CoastTerrain == nil ||
-		m.Waterbed == nil || m.Runtime == nil || m.Ecology == nil ||
+		m.Waterbed == nil || m.Runtime == nil || m.Climate == nil || m.Ecology == nil ||
 		m.Profile == nil || m.RuntimeProfile == nil {
 		return payload{}, errors.New("worldmodelio: world model is not Runtime-complete")
 	}
@@ -431,6 +432,13 @@ func snapshotFromWorldModel(m *generator.WorldModel) (payload, error) {
 			Config: m.Waterbed.Config,
 			Rivers: cloneRivers(m.Waterbed.Rivers),
 			Lakes:  append([]waterbed.LakeNode(nil), m.Waterbed.Lakes...),
+		},
+		ClimatePreview: &climatePreviewSnapshot{
+			AnnualMeanTempC: cloneFloat64(m.Climate.AdjustedAnnualTempC),
+			AnnualPrecipMM:  cloneFloat64(m.Climate.AnnualPrecipMM),
+			MonsoonIndex:    cloneFloat64(m.Climate.MonsoonIndex),
+			WindX:           cloneFloat64(m.Climate.WindX),
+			WindZ:           cloneFloat64(m.Climate.WindZ),
 		},
 		Ecology: ecologySnapshot{
 			LandMask:         append([]bool(nil), m.Ecology.LandMask...),
@@ -622,6 +630,26 @@ func cloneRivers(in []waterbed.RiverSegment) []waterbed.RiverSegment {
 		out[i] = seg
 	}
 	return out
+}
+
+func restoreClimatePreview(s *climatePreviewSnapshot) *ClimatePreview {
+	if s == nil {
+		return nil
+	}
+	if len(s.AnnualMeanTempC) == 0 &&
+		len(s.AnnualPrecipMM) == 0 &&
+		len(s.MonsoonIndex) == 0 &&
+		len(s.WindX) == 0 &&
+		len(s.WindZ) == 0 {
+		return nil
+	}
+	return &ClimatePreview{
+		AnnualMeanTempC: cloneFloat64(s.AnnualMeanTempC),
+		AnnualPrecipMM:  cloneFloat64(s.AnnualPrecipMM),
+		MonsoonIndex:    cloneFloat64(s.MonsoonIndex),
+		WindX:           cloneFloat64(s.WindX),
+		WindZ:           cloneFloat64(s.WindZ),
+	}
 }
 
 func cloneFloat64(in []float64) []float64 {

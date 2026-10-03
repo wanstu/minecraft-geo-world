@@ -62,11 +62,33 @@ public final class GeoWorldClientMod {
                     )
                 )
             )
-                .width(112)
+                .width(204)
                 .build();
+
+            int menuBottom = 0;
+            for (var child : pauseScreen.children()) {
+                if (
+                    child instanceof Button existing &&
+                    existing.getWidth() >= 98 &&
+                    Math.abs(
+                        existing.getX() +
+                        existing.getWidth() / 2 -
+                        pauseScreen.width / 2
+                    ) <= 110
+                ) {
+                    menuBottom = Math.max(
+                        menuBottom,
+                        existing.getY() + existing.getHeight()
+                    );
+                }
+            }
+            int y = Math.min(
+                pauseScreen.height - preview.getHeight() - 8,
+                menuBottom + 4
+            );
             preview.setPosition(
-                Math.max(6, pauseScreen.width - preview.getWidth() - 6),
-                6
+                (pauseScreen.width - preview.getWidth()) / 2,
+                Math.max(6, y)
             );
             event.addListener(preview);
         });

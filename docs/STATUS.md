@@ -5,7 +5,7 @@
 ## 当前目标与阶段
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。
 
-**World Model V1、Java Runtime、Minecraft 26.3 静态 QA writer 与 NeoForge 26.3 动态 GeoWorld worldgen 已接通。当前主线是 HMCL 真实客户端可用性与地形/生态质量验收。创建页 Seed 内外联动、雨林 Sparse Jungle / Forest 过渡肩带已完成；河流链路继续补齐到湖泊/海洋接收节点，不再在最后一个陆地宏节点提前结束，且 Waterbed 为河道中心线提供最小下切深度，避免水面铺在未切开的地表上。Minecraft 群系映射现在优先尊重 Runtime 的 River/Frozen River 水体语义。游戏内 `GeoWorld 预览` 已升级为大幅地图：默认玩家附近视图，滚轮以鼠标位置为锚点缩放，可切换全局/当前位置、重置视图，并在鼠标悬停处显示精确 X/Z、地表、水体、水深、GeoWorld Profile 与实际 Minecraft biome。**
+**World Model V1、Java Runtime、Minecraft 26.3 静态 QA writer 与 NeoForge 26.3 动态 GeoWorld worldgen 已接通。当前主线是 HMCL 真实客户端的地形/水文/生态质量验收。本轮把预览重构为左侧固定信息栏 + 右侧地图，支持鼠标锚点缩放、左键拖动、地图选点与安全传送，并增加生态群系 / 大陆与海洋 / 地形高度 / 年均温度 / 年降水 / 季风指数视图；新模型会持久化真实 Climate 阶段的温度、降水、季风和风场预览字段，旧 `.geoworld` 仍可兼容加载。湖泊渲染不再使用宏网格方形 footprint，而改为径向重叠盆地并保留最小岸坡深度，避免方格湖岸与薄水层漫流；湖泊在 Minecraft biome 层按淡水 biome 处理。群系边界增加通用生态侵蚀，不再只对雨林特判；山地区域增加由山地权重约束的 ridge/peak 场并提高抬升，以形成更明确的峰脊。暂停菜单中的 GeoWorld 预览按钮已移入主菜单按钮列。**
 
 ## 仓库与基线
 - 仓库：D:\projects\minecraft-geo-world

@@ -23,7 +23,7 @@
   "geoworld.preview.global_view": "全局",
   "geoworld.preview.local_view": "当前位置",
   "geoworld.preview.reset_view": "重置视图",
-  "geoworld.preview.controls": "滚轮缩放 · 红色十字为玩家位置 · 鼠标悬停查看详细信息",
+  "geoworld.preview.controls": "滚轮缩放 · 左键选择 · 按住左键拖动地图 · 黄色十字为传送目标",
   "geoworld.preview.hover_position": "X %s · Z %s · 地表 Y≈%s",
   "geoworld.preview.hover_water": "水体：%s · 水面 Y≈%s · 深度≈%s 格",
   "geoworld.preview.hover_dry": "水体：无",
@@ -103,5 +103,18 @@
   "geoworld.value.grassland": "草原",
   "geoworld.value.dry_grassland": "干旱草原",
   "geoworld.value.shrubland": "灌丛",
-  "geoworld.value.desert_sparse": "稀疏荒漠植被"
+  "geoworld.value.desert_sparse": "稀疏荒漠植被",
+  "geoworld.preview.teleport": "传送到选中位置",
+  "geoworld.preview.teleport_done": "已传送到 X %s · Y %s · Z %s",
+  "geoworld.preview.info_title": "位置详情",
+  "geoworld.preview.selected": "已选择：X %s · Z %s",
+  "geoworld.preview.layer_button": "视图：%s",
+  "geoworld.preview.layer.biome": "生态群系",
+  "geoworld.preview.layer.continent": "大陆与海洋",
+  "geoworld.preview.layer.terrain": "地形高度",
+  "geoworld.preview.layer.temperature": "年均温度",
+  "geoworld.preview.layer.precipitation": "年降水",
+  "geoworld.preview.layer.monsoon": "季风指数",
+  "geoworld.preview.hover_climate": "气候：年均温 %s°C · 年降水 %s mm · 季风指数 %s",
+  "geoworld.preview.hover_climate_unavailable": "气候：当前旧模型未包含气候预览数据"
 }

@@ -318,13 +318,24 @@ func selectPoints(model *generator.WorldModel) ([]pointSpec, error) {
 	if len(model.Waterbed.Lakes) == 0 {
 		return nil, errors.New("goldenvectors: fixture contains no lake nodes")
 	}
-	lake := model.Waterbed.Lakes[0]
-	points = append(points, pointSpec{
-		"lake_center",
-		"lake",
-		"center of the first persisted lake node",
-		lake.X, lake.Z,
-	})
+	foundLake := false
+	for _, lake := range model.Waterbed.Lakes {
+		sample := model.Runtime.Sample(lake.X, lake.Z)
+		if sample.WaterKind != reconcile.WaterLake {
+			continue
+		}
+		points = append(points, pointSpec{
+			"lake_center",
+			"lake",
+			"center of a persisted lake node with an actual Runtime lake surface",
+			lake.X, lake.Z,
+		})
+		foundLake = true
+		break
+	}
+	if !foundLake {
+		return nil, errors.New("goldenvectors: fixture contains no rendered lake center")
+	}
 
 	for _, point := range points {
 		if point.x < g.OriginX-1e-9 || point.x > endX+1e-9 ||

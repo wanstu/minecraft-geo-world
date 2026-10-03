@@ -261,9 +261,12 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	bestLakeSurface := math.Inf(-1)
 	for _, id := range m.lakeBuckets[bucket] {
 		node := m.Lakes[id]
-		dx := math.Abs(worldX - node.X)
-		dz := math.Abs(worldZ - node.Z)
-		distance := math.Max(dx, dz) // square raster-cell footprint
+		dx := worldX - node.X
+		dz := worldZ - node.Z
+		// Hydrology is solved on a regular macro grid, but the rendered lake
+		// must not inherit that grid as square shorelines. Use a radial
+		// footprint and let adjacent lake nodes blend as overlapping basins.
+		distance := math.Hypot(dx, dz)
 		if distance >= node.OuterRadius {
 			continue
 		}
@@ -276,7 +279,12 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			finalHeight = candidate
 			sample.LakeCarve = math.Max(sample.LakeCarve, baseHeight-candidate)
 		}
-		if finalHeight < node.WaterSurface-1e-12 && node.WaterSurface > bestLakeSurface {
+		// Do not expose sub-block-thin water at the fringe. That looked
+		// like a flood sheet creeping over otherwise dry terrain. A shallow
+		// carved margin remains as a natural bank before the actual lake.
+		const minLakeWaterDepthNormalized = 0.003
+		if finalHeight < node.WaterSurface-minLakeWaterDepthNormalized &&
+			node.WaterSurface > bestLakeSurface {
 			bestLakeSurface = node.WaterSurface
 			sample.WaterKind = reconcile.WaterLake
 			sample.WaterSurfaceDefined = true

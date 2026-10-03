@@ -61,6 +61,15 @@ type RuntimeModel struct {
 	Ecology        *ecology.Model
 	Profile        *mcprofile.Model
 	RuntimeProfile *runtimeprofile.Model
+	ClimatePreview *ClimatePreview
+}
+
+type ClimatePreview struct {
+	AnnualMeanTempC []float64
+	AnnualPrecipMM  []float64
+	MonsoonIndex    []float64
+	WindX           []float64
+	WindZ           []float64
 }
 
 func (m *RuntimeModel) Sample(worldX, worldZ float64) runtimeprofile.Sample {
@@ -73,12 +82,13 @@ type fileEnvelope struct {
 }
 
 type payload struct {
-	Config   generator.ResolvedConfig `json:"config"`
-	Surface  surfaceSnapshot          `json:"surface"`
-	Terrain  terrainSnapshot          `json:"terrain"`
-	Waterbed waterbedSnapshot         `json:"waterbed"`
-	Ecology  ecologySnapshot          `json:"ecology"`
-	Profile  profileSnapshot          `json:"profile"`
+	Config         generator.ResolvedConfig `json:"config"`
+	Surface        surfaceSnapshot          `json:"surface"`
+	Terrain        terrainSnapshot          `json:"terrain"`
+	Waterbed       waterbedSnapshot         `json:"waterbed"`
+	ClimatePreview *climatePreviewSnapshot  `json:"climatePreview,omitempty"`
+	Ecology        ecologySnapshot          `json:"ecology"`
+	Profile        profileSnapshot          `json:"profile"`
 }
 
 type surfaceSnapshot struct {
@@ -109,6 +119,14 @@ type waterbedSnapshot struct {
 	Config waterbed.Config         `json:"config"`
 	Rivers []waterbed.RiverSegment `json:"rivers"`
 	Lakes  []waterbed.LakeNode     `json:"lakes"`
+}
+
+type climatePreviewSnapshot struct {
+	AnnualMeanTempC []float64 `json:"annualMeanTempC,omitempty"`
+	AnnualPrecipMM  []float64 `json:"annualPrecipMM,omitempty"`
+	MonsoonIndex    []float64 `json:"monsoonIndex,omitempty"`
+	WindX           []float64 `json:"windX,omitempty"`
+	WindZ           []float64 `json:"windZ,omitempty"`
 }
 
 type ecologySnapshot struct {

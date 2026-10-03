@@ -1384,3 +1384,36 @@ Phase 6.2 正式完成。下一步 Phase 6.3：最小持久化 schema、原子�
 - 全局/局部预览摘要中的 Seed/zoom/span/blocks/sample 已整体改为翻译资源；中文创建页中的 Seed、blocks/node、模型范围也同步中文化。
 - 未知或未来新增值若暂时没有 GeoWorld 翻译键，会安全回退原始内部名称，不会显示缺失翻译 key。
 - gradlew compileJava 与完整 build.cmd 均通过，最新 JAR 已自动部署到 HMCL 26.3。
+## 2026-10-03 · 高级预览、地图传送、湖岸自然化与山峰强化
+
+用户基于 HMCL 26.3 实测继续提出：悬浮信息窗位置不稳定、预览需要拖动与传送、Savanna 等非雨林群系仍有硬边、湖泊/地形出现宏网格方块感、湖岸有薄水层漫流、山体缺少山峰，同时希望预览能展示大陆/气候/季风等真实模拟层。
+
+本轮实现：
+
+- 预览 UI：移除跟随鼠标的浮动信息框，改成左侧固定信息栏 + 右侧地图；保留鼠标锚点滚轮缩放，新增按住左键拖动平移。
+- 地图左键点击可选定世界坐标，黄色十字标记目标；新增“传送到选中位置”。传送只在单人集成服务器中启用，服务端先加载目标 Chunk，再用真实 WORLD_SURFACE 高度决定 Y，避免仅按预览高度把玩家传到地下/空中。
+- 玩家自身位置继续用红色十字；PauseScreen 的 GeoWorld 预览按钮由右上角移动到原版暂停菜单主按钮列下方。
+- 预览新增图层：生态群系 / 大陆与海洋 / 地形高度 / 年均温度 / 年降水 / 季风指数。
+- 新 .geoworld 额外持久化真实 Climate 阶段的 AdjustedAnnualTempC / AnnualPrecipMM / MonsoonIndex / WindX / WindZ 作为解释性预览字段；Java Runtime 在任意坐标连续采样，不从最终 biome 反推气候。
+- 旧模型没有 climatePreview 时继续兼容加载，气候图层明确显示旧模型未包含数据。Go 与 Java 均已用旧 t2/world.geoworld 验证兼容。
+- 同 Seed 新模型在 (6217,-2435) 的气候采样：年均温约 27.50°C、年降水约 1695.75 mm、季风指数约 0.337。
+- 通用群系边界：保留雨林的 Sparse Jungle / Forest 肩带，同时增加通用 ecotone。在约 56 blocks 邻域检测不同陆地生态，以约 24 blocks 的平滑 Seed 噪声让双方在边界互相侵入；Savanna、森林、草原等统一走同一机制。
+- River 继续映射 River/Frozen River；Lake 因 Vanilla 没有独立 lake biome，暂映射为 River/Frozen River 淡水 biome，至少不会再把湖面标成 Savanna/Jungle/Desert。
+- 湖泊与宏网格：Waterbed 湖泊 footprint 从 max(abs(dx),abs(dz)) 的方形距离改为 hypot(dx,dz) 径向 footprint；相邻 LakeNode 通过重叠组合，不再把宏网格方格直接投影进 Minecraft。
+- 湖边增加最小显示水深 0.003 normalized。低于该深度只保留侵蚀后的岸坡，不铺一层极薄水膜，从而形成干湿岸带。
+- 用户 t2 世界原先在 (6000,-2400) / (6217,-2200) 一类湖缘位置只有约 0.0001 normalized 水深；新逻辑这些位置转为干岸，湖心和深水区域保持 Lake。
+- 山峰：在真实 MountainWeight 允许的区域加入约 900-block 波长的 sharpened ridge/peak 场，并把 mountain orographic lift 从 0.100 提高到 0.125。峰脊不会随机出现在平原/湖区，仍受 Geomorph 山地权重约束；Go Terrain 与 Java Runtime 同步。
+- Engine cache key v4 -> v5，确保同 Seed/同参数新世界不会命中旧算法缓存。
+- climatePreview 改为可选 pointer + omitempty，旧 .geoworld checksum 仍可原样验证；Golden fixture 已按新地形/湖岸/Climate payload 重建。
+
+盆地现状：
+- 当前水文链路能够形成封闭低地、湖泊和局部洼地，但尚没有独立 Basin 地貌分类/生成阶段。
+- 后续 Basin 应基于闭合/半闭合流域、周边 relief、spill outlet 与侵蚀沉积结果识别，而不是按 biome 或随机噪声硬生成，继续遵守“先大陆架/构造与水文，再形成地貌与生态”的原则。
+
+验证：
+- go test ./... -count=1 全绿。
+- Java/Go GoldenVerifier 15/15，tolerance=1e-9。
+- NeoForge compileJava、build.cmd verifyGeoWorldEngine verifyGeoWorldSpawn 全通过。
+- t2 旧模型在 Go/Java 均可重新加载；旧模型 climate unavailable，新同 Seed 模型 climate 可采样。
+- 新同 Seed模型 output/t2-v5-check.geoworld 的 Climate payload 正常；湖缘薄水位置按新岸带逻辑转为干岸。
+- 最新 MOD 已由 build.cmd 自动部署至 HMCL 26.3。
