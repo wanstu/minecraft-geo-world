@@ -39,7 +39,8 @@ public final class GeoWorldPreviewScreen extends Screen {
     private static final double MIN_VIEW_SPAN_X = 128.0;
     private static final double MIN_VIEW_SPAN_Z = 80.0;
     private static final double ZOOM_STEP = 0.78;
-    private static final int INFO_PANEL_TARGET_WIDTH = 250;
+    // Minecraft 26.3's MouseButtonInfo uses 1 for the primary/left button.
+    private static final int PRIMARY_MOUSE_BUTTON = 1;
 
     private static final Minecraft26_3HeightMapping HEIGHTS =
         new Minecraft26_3HeightMapping();
@@ -76,10 +77,6 @@ public final class GeoWorldPreviewScreen extends Screen {
     private int lakeSamples;
     private int riverSamples;
 
-    private int infoLeft;
-    private int infoTop;
-    private int infoWidth;
-    private int infoHeight;
     private int mapLeft;
     private int mapTop;
     private int mapWidth;
@@ -442,19 +439,8 @@ public final class GeoWorldPreviewScreen extends Screen {
             80,
             this.height - header - footer - 34
         );
-        this.infoWidth = Math.min(
-            INFO_PANEL_TARGET_WIDTH,
-            Math.max(190, this.width / 4)
-        );
-        this.infoLeft = 12;
-        this.infoTop = header + 5;
-        this.infoHeight = availableHeight;
-
-        int mapAreaLeft = this.infoLeft + this.infoWidth + 12;
-        int mapAreaWidth = Math.max(
-            120,
-            this.width - mapAreaLeft - 12
-        );
+        int mapAreaLeft = 12;
+        int mapAreaWidth = Math.max(120, this.width - 24);
 
         double aspect = this.viewSpanX / this.viewSpanZ;
         if (!Double.isFinite(aspect) || aspect <= 0.0) {
@@ -489,13 +475,6 @@ public final class GeoWorldPreviewScreen extends Screen {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
         this.updateMapRect();
 
-        graphics.fill(
-            this.infoLeft,
-            this.infoTop,
-            this.infoLeft + this.infoWidth,
-            this.infoTop + this.infoHeight,
-            0xD0101418
-        );
         graphics.fill(
             this.mapLeft - 3,
             this.mapTop - 3,
@@ -694,27 +673,18 @@ public final class GeoWorldPreviewScreen extends Screen {
         int mouseX,
         int mouseY
     ) {
-        double worldX;
-        double worldZ;
-        if (this.isInsideMap(mouseX, mouseY)) {
-            double fx =
-                (double)(mouseX - this.mapLeft) / this.mapWidth;
-            double fz =
-                (double)(mouseY - this.mapTop) / this.mapHeight;
-            worldX =
-                this.viewOriginX + clamp(fx, 0.0, 1.0) * this.viewSpanX;
-            worldZ =
-                this.viewOriginZ + clamp(fz, 0.0, 1.0) * this.viewSpanZ;
-        } else if (this.selectedX != null && this.selectedZ != null) {
-            worldX = this.selectedX;
-            worldZ = this.selectedZ;
-        } else if (this.focusX != null && this.focusZ != null) {
-            worldX = this.focusX;
-            worldZ = this.focusZ;
-        } else {
-            worldX = this.viewOriginX + this.viewSpanX * 0.5;
-            worldZ = this.viewOriginZ + this.viewSpanZ * 0.5;
+        if (!this.isInsideMap(mouseX, mouseY) || this.draggingMap) {
+            return;
         }
+
+        double fx =
+            (double)(mouseX - this.mapLeft) / this.mapWidth;
+        double fz =
+            (double)(mouseY - this.mapTop) / this.mapHeight;
+        double worldX =
+            this.viewOriginX + clamp(fx, 0.0, 1.0) * this.viewSpanX;
+        double worldZ =
+            this.viewOriginZ + clamp(fz, 0.0, 1.0) * this.viewSpanZ;
 
         GeoWorldV1.RuntimeSample sample =
             this.model.sample(worldX, worldZ);
@@ -770,51 +740,44 @@ public final class GeoWorldPreviewScreen extends Screen {
                 "geoworld.preview.hover_climate_unavailable"
             );
 
-        Component[] lines = {
-            Component.translatable("geoworld.preview.info_title"),
-            line1,
-            line2,
-            Component.translatable(
-                "geoworld.preview.hover_profile",
-                localizedValue(sample.biomeFamily()),
-                localizedValue(sample.terrainVariant()),
-                localizedValue(sample.surfaceProfile())
-            ),
-            Component.translatable(
-                "geoworld.preview.hover_minecraft",
-                localizedMinecraftBiome(minecraftBiome),
-                localizedValue(sample.vegetationProfile())
-            ),
-            climateLine
-        };
-
-        int x = this.infoLeft + 8;
-        int y = this.infoTop + 10;
-        for (int i = 0; i < lines.length; i++) {
-            graphics.text(
-                this.font,
-                lines[i],
-                x,
-                y + i * 18,
-                i == 0 ? 0xFFFFFFFF : 0xFFD7D7D7
-            );
-        }
+        java.util.List<Component> lines = new java.util.ArrayList<>();
+        lines.add(Component.translatable("geoworld.preview.info_title"));
+        lines.add(line1);
+        lines.add(line2);
+        lines.add(Component.translatable(
+            "geoworld.preview.hover_profile",
+            localizedValue(sample.biomeFamily()),
+            localizedValue(sample.terrainVariant()),
+            localizedValue(sample.surfaceProfile())
+        ));
+        lines.add(Component.translatable(
+            "geoworld.preview.hover_minecraft",
+            localizedMinecraftBiome(minecraftBiome),
+            localizedValue(sample.vegetationProfile())
+        ));
+        lines.add(climateLine);
 
         if (this.selectedX != null && this.selectedZ != null) {
-            graphics.text(
-                this.font,
-                Component.translatable(
-                    "geoworld.preview.selected",
-                    Math.round(this.selectedX),
-                    Math.round(this.selectedZ)
-                ),
-                x,
-                y + 102,
-                0xFFFFD54F
-            );
+            lines.add(Component.translatable(
+                "geoworld.preview.selected",
+                Math.round(this.selectedX),
+                Math.round(this.selectedZ)
+            ));
         }
-    }
 
+        int wrapWidth = Math.max(180, Math.min(360, this.width / 2));
+        java.util.ArrayList<net.minecraft.util.FormattedCharSequence> tooltip =
+            new java.util.ArrayList<>();
+        for (Component line : lines) {
+            tooltip.addAll(this.font.split(line, wrapWidth));
+        }
+        graphics.setTooltipForNextFrame(
+            this.font,
+            tooltip,
+            mouseX,
+            mouseY
+        );
+    }
     @Override
     public boolean mouseClicked(
         MouseButtonEvent event,
@@ -822,7 +785,7 @@ public final class GeoWorldPreviewScreen extends Screen {
     ) {
         this.updateMapRect();
         if (
-            event.button() == 0 &&
+            event.button() == PRIMARY_MOUSE_BUTTON &&
             this.isInsideMap(event.x(), event.y())
         ) {
             this.mapPressActive = true;
@@ -840,7 +803,7 @@ public final class GeoWorldPreviewScreen extends Screen {
         double dx,
         double dy
     ) {
-        if (this.mapPressActive && event.button() == 0) {
+        if (this.mapPressActive && event.button() == PRIMARY_MOUSE_BUTTON) {
             this.mapPressTravel += Math.hypot(dx, dy);
             if (this.mapPressTravel >= 3.0) {
                 this.mapPressMoved = true;
@@ -856,7 +819,7 @@ public final class GeoWorldPreviewScreen extends Screen {
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
-        if (event.button() == 0 && this.mapPressActive) {
+        if (event.button() == PRIMARY_MOUSE_BUTTON && this.mapPressActive) {
             boolean wasClick =
                 !this.mapPressMoved &&
                 this.isInsideMap(event.x(), event.y());

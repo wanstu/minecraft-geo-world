@@ -1480,3 +1480,12 @@ Phase 6.2 正式完成。下一步 Phase 6.3：最小持久化 schema、原子�
 - Minecraft storage/save writer 验证通过。
 - Java GoldenVerifier 15/15。
 - build.cmd verifyGeoWorldEngine verifyGeoWorldSpawn 通过并自动部署 HMCL 26.3。
+
+## 2026-10-03 · 预览鼠标交互根因修复
+
+- 用户反馈最新版中地图仍无法点击、拖动、传送。
+- 根因已确认：Minecraft 26.3 的 MouseButtonInfo 使用 1 表示主/左键；GeoWorldPreviewScreen 之前仍按传统 GLFW 值 0 判断左键。因此地图区域的 click/drag/release 分支实际上从未进入。原版 AbstractWidget.isValidClickButton() 同样明确判断 buttonInfo.button() == 1。
+- 统一新增 PRIMARY_MOUSE_BUTTON = 1，并修复地图点击、拖动、释放三处判断。现在左键单击会生成黄色传送目标，按住左键移动 >=3px 会平移地图，松开结束拖动；传送按钮在目标选中后启用。
+- 去掉固定左侧信息栏，地图重新占用整个可用宽度；位置信息改为鼠标悬停时使用 Minecraft 原生 tooltip 显示，并按屏幕宽度自动折行。
+- 保留红色玩家朝向箭头、黄色目标菱形、滚轮缩放和底部图层/重置/传送操作。
+- NeoForge compileJava --rerun-tasks 通过；build.cmd verifyGeoWorldEngine verifyGeoWorldSpawn 通过并已部署 HMCL 26.3。
