@@ -10,6 +10,7 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.locale.Language;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
@@ -401,14 +402,13 @@ public final class GeoWorldPreviewScreen extends Screen {
         );
         double zoom = manifest.geometry().spanXBlocks() / this.viewSpanX;
 
-        String summary = String.format(
-            Locale.ROOT,
-            "Seed %d · %.1fx · %.0f×%.0f blocks · %.1f blocks/sample",
+        Component summary = Component.translatable(
+            "geoworld.preview.summary",
             manifest.seed(),
-            zoom,
-            this.viewSpanX,
-            this.viewSpanZ,
-            sampleScale
+            String.format(Locale.ROOT, "%.1f", zoom),
+            Math.round(this.viewSpanX),
+            Math.round(this.viewSpanZ),
+            String.format(Locale.ROOT, "%.1f", sampleScale)
         );
 
         int textY = this.mapTop + this.mapHeight + 6;
@@ -482,7 +482,7 @@ public final class GeoWorldPreviewScreen extends Screen {
             );
             line2 = Component.translatable(
                 "geoworld.preview.hover_water",
-                sample.waterKind(),
+                localizedValue(sample.waterKind()),
                 waterBoundary - 1,
                 depthBlocks
             );
@@ -494,14 +494,14 @@ public final class GeoWorldPreviewScreen extends Screen {
 
         Component line3 = Component.translatable(
             "geoworld.preview.hover_profile",
-            sample.biomeFamily(),
-            sample.terrainVariant(),
-            sample.surfaceProfile()
+            localizedValue(sample.biomeFamily()),
+            localizedValue(sample.terrainVariant()),
+            localizedValue(sample.surfaceProfile())
         );
         Component line4 = Component.translatable(
             "geoworld.preview.hover_minecraft",
-            minecraftBiome,
-            sample.vegetationProfile()
+            localizedMinecraftBiome(minecraftBiome),
+            localizedValue(sample.vegetationProfile())
         );
 
         Component[] lines = {line1, line2, line3, line4};
@@ -640,6 +640,42 @@ public final class GeoWorldPreviewScreen extends Screen {
     @Override
     public void onClose() {
         this.minecraft.gui.setScreen(this.parent);
+    }
+
+    private static Component localizedValue(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Component.translatable("geoworld.value.unknown");
+        }
+
+        String slug = raw
+            .toLowerCase(Locale.ROOT)
+            .replaceAll("[^a-z0-9]+", "_")
+            .replaceAll("^_+|_+$", "");
+        String key = "geoworld.value." + slug;
+        if (Language.getInstance().has(key)) {
+            return Component.translatable(key);
+        }
+        return Component.literal(raw);
+    }
+
+    private static Component localizedMinecraftBiome(String biomeId) {
+        if (biomeId == null || biomeId.isBlank()) {
+            return Component.translatable("geoworld.value.unknown");
+        }
+
+        int separator = biomeId.indexOf(':');
+        String namespace = separator >= 0
+            ? biomeId.substring(0, separator)
+            : "minecraft";
+        String path = separator >= 0
+            ? biomeId.substring(separator + 1)
+            : biomeId;
+        String key = "biome." + namespace + "." +
+            path.replace('/', '.');
+        if (Language.getInstance().has(key)) {
+            return Component.translatable(key);
+        }
+        return Component.literal(biomeId);
     }
 
     private void count(GeoWorldV1.RuntimeSample sample) {

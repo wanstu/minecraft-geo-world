@@ -1374,3 +1374,13 @@ Phase 6.2 正式完成。下一步 Phase 6.3：最小持久化 schema、原子�
 验收注意：
 - 河口链路和最小河床下切属于 World Model 生成结果，已有 test11 的 `.geoworld` 不会自动替换；要验证 1/2 最稳妥的是新建 GeoWorld。
 - River biome 对尚未生成的新 Chunk 会生效；已经生成并写盘的旧 Chunk biome 不会被 MOD 自动重写。
+
+## 2026-10-03 · 预览信息本地化
+
+- GeoWorld 预览中的摘要、悬停信息、GeoWorld Profile 枚举不再直接显示英文内部值。
+- 所有预览文本改为 Minecraft Component.translatable(...)，因此直接跟随当前游戏语言；当前提供 zh_cn / en_us。
+- GeoWorld 内部值（WaterKind、BiomeFamily、TerrainVariant、SurfaceProfile、VegetationProfile）补齐本地化键；中文示例包括“热带雨林 / 丘陵 / 森林壤土 / 阔叶林 / 河流”等。
+- Minecraft biome 不再显示 minecraft:birch_forest 这类原始 ID；优先使用 Minecraft 自带 biome.<namespace>.<path> 翻译，因此会自动跟随当前语言包。
+- 全局/局部预览摘要中的 Seed/zoom/span/blocks/sample 已整体改为翻译资源；中文创建页中的 Seed、blocks/node、模型范围也同步中文化。
+- 未知或未来新增值若暂时没有 GeoWorld 翻译键，会安全回退原始内部名称，不会显示缺失翻译 key。
+- gradlew compileJava 与完整 build.cmd 均通过，最新 JAR 已自动部署到 HMCL 26.3。
