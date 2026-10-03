@@ -1,6 +1,8 @@
 package geoworld.neoforge.client;
 
+import geoworld.minecraft.v26_3common.Minecraft26_3HeightMapping;
 import geoworld.neoforge.engine.GeoWorldEngineBridge;
+import geoworld.neoforge.worldgen.GeoWorldBiomeSource;
 
 import geoworld.runtime.GeoWorldV1;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -18,13 +20,21 @@ public final class GeoWorldPreviewScreen extends Screen {
         Component.translatable("geoworld.preview.title");
     private static final int MAX_COLUMNS = 128;
     private static final int MAX_ROWS = 80;
+    private static final double LOCAL_BLOCKS_PER_SAMPLE = 8.0;
+    private static final Minecraft26_3HeightMapping HEIGHTS =
+        new Minecraft26_3HeightMapping();
 
     private final Screen parent;
     private final GeoWorldV1 model;
     private final Double focusX;
     private final Double focusZ;
-    private final HeaderAndFooterLayout layout =
-        new HeaderAndFooterLayout(this, 29, 33);
+    private HeaderAndFooterLayout layout;
+    private Button viewModeButton;
+    private boolean localView;
+    private double viewOriginX;
+    private double viewOriginZ;
+    private double viewSpanX;
+    private double viewSpanZ;
 
     private int columns;
     private int rows;
@@ -52,15 +62,27 @@ public final class GeoWorldPreviewScreen extends Screen {
         this.model = model;
         this.focusX = focusX;
         this.focusZ = focusZ;
+        this.localView = focusX != null && focusZ != null;
         this.buildPreview();
     }
 
     @Override
     protected void init() {
+        this.layout = new HeaderAndFooterLayout(this, 29, 33);
         this.layout.addTitleHeader(this.title, this.font);
         LinearLayout footer = this.layout.addToFooter(
             LinearLayout.horizontal().spacing(8)
         );
+        if (this.focusX != null && this.focusZ != null) {
+            this.viewModeButton = footer.addChild(
+                Button.builder(
+                    this.viewModeLabel(),
+                    button -> this.toggleViewMode()
+                )
+                    .width(150)
+                    .build()
+            );
+        }
         footer.addChild(
             Button.builder(CommonComponents.GUI_BACK, button -> this.onClose())
                 .width(150)
@@ -70,46 +92,112 @@ public final class GeoWorldPreviewScreen extends Screen {
         this.repositionElements();
     }
 
+    private void toggleViewMode() {
+        if (this.focusX == null || this.focusZ == null) {
+            return;
+        }
+        this.localView = !this.localView;
+        this.buildPreview();
+        if (this.viewModeButton != null) {
+            this.viewModeButton.setMessage(this.viewModeLabel());
+        }
+    }
+
+    private Component viewModeLabel() {
+        return Component.translatable(
+            this.localView
+                ? "geoworld.preview.show_global"
+                : "geoworld.preview.show_local"
+        );
+    }
+
     private void buildPreview() {
         GeoWorldV1.Geometry geometry =
             this.model.manifest().geometry();
 
-        double aspect = geometry.spanXBlocks() / geometry.spanZBlocks();
-        if (!Double.isFinite(aspect) || aspect <= 0.0) {
-            aspect = 1.0;
-        }
-
-        if (aspect >= 1.0) {
+        if (
+            this.localView &&
+            this.focusX != null &&
+            this.focusZ != null
+        ) {
             this.columns = MAX_COLUMNS;
-            this.rows = Math.max(
-                24,
-                Math.min(MAX_ROWS, (int)Math.round(MAX_COLUMNS / aspect))
+            this.rows = MAX_ROWS;
+            this.viewSpanX = Math.min(
+                geometry.spanXBlocks(),
+                (this.columns - 1) * LOCAL_BLOCKS_PER_SAMPLE
+            );
+            this.viewSpanZ = Math.min(
+                geometry.spanZBlocks(),
+                (this.rows - 1) * LOCAL_BLOCKS_PER_SAMPLE
+            );
+            this.viewOriginX = clamp(
+                this.focusX - this.viewSpanX * 0.5,
+                geometry.originX(),
+                geometry.originX() +
+                    geometry.spanXBlocks() -
+                    this.viewSpanX
+            );
+            this.viewOriginZ = clamp(
+                this.focusZ - this.viewSpanZ * 0.5,
+                geometry.originZ(),
+                geometry.originZ() +
+                    geometry.spanZBlocks() -
+                    this.viewSpanZ
             );
         } else {
-            this.rows = MAX_ROWS;
-            this.columns = Math.max(
-                24,
-                Math.min(MAX_COLUMNS, (int)Math.round(MAX_ROWS * aspect))
-            );
+            double aspect =
+                geometry.spanXBlocks() / geometry.spanZBlocks();
+            if (!Double.isFinite(aspect) || aspect <= 0.0) {
+                aspect = 1.0;
+            }
+
+            if (aspect >= 1.0) {
+                this.columns = MAX_COLUMNS;
+                this.rows = Math.max(
+                    24,
+                    Math.min(
+                        MAX_ROWS,
+                        (int)Math.round(MAX_COLUMNS / aspect)
+                    )
+                );
+            } else {
+                this.rows = MAX_ROWS;
+                this.columns = Math.max(
+                    24,
+                    Math.min(
+                        MAX_COLUMNS,
+                        (int)Math.round(MAX_ROWS * aspect)
+                    )
+                );
+            }
+            this.viewOriginX = geometry.originX();
+            this.viewOriginZ = geometry.originZ();
+            this.viewSpanX = geometry.spanXBlocks();
+            this.viewSpanZ = geometry.spanZBlocks();
         }
 
+        this.landSamples = 0;
+        this.oceanSamples = 0;
+        this.lakeSamples = 0;
+        this.riverSamples = 0;
         this.colors = new int[Math.multiplyExact(this.columns, this.rows)];
 
         for (int row = 0; row < this.rows; row++) {
             double fz = this.rows == 1
                 ? 0.5
                 : (double)row / (this.rows - 1);
-            double z = geometry.originZ() + fz * geometry.spanZBlocks();
+            double z = this.viewOriginZ + fz * this.viewSpanZ;
 
             for (int column = 0; column < this.columns; column++) {
                 double fx = this.columns == 1
                     ? 0.5
                     : (double)column / (this.columns - 1);
-                double x = geometry.originX() + fx * geometry.spanXBlocks();
+                double x = this.viewOriginX + fx * this.viewSpanX;
 
                 GeoWorldV1.RuntimeSample sample =
                     this.model.sample(x, z);
-                this.colors[row * this.columns + column] = color(sample);
+                this.colors[row * this.columns + column] =
+                    color(this.model, x, z, sample);
                 count(sample);
             }
         }
@@ -130,7 +218,7 @@ public final class GeoWorldPreviewScreen extends Screen {
             this.height -
             this.layout.getHeaderHeight() -
             this.layout.getFooterHeight() -
-            54
+            70
         );
 
         int pixel = Math.max(
@@ -180,21 +268,20 @@ public final class GeoWorldPreviewScreen extends Screen {
         }
 
         GeoWorldV1.Manifest manifest = this.model.manifest();
-        GeoWorldV1.Geometry geometry = manifest.geometry();
         boolean focusVisible =
             this.focusX != null &&
             this.focusZ != null &&
-            geometry.spanXBlocks() > 0 &&
-            geometry.spanZBlocks() > 0 &&
-            this.focusX >= geometry.originX() &&
-            this.focusX <= geometry.originX() + geometry.spanXBlocks() &&
-            this.focusZ >= geometry.originZ() &&
-            this.focusZ <= geometry.originZ() + geometry.spanZBlocks();
+            this.viewSpanX > 0.0 &&
+            this.viewSpanZ > 0.0 &&
+            this.focusX >= this.viewOriginX &&
+            this.focusX <= this.viewOriginX + this.viewSpanX &&
+            this.focusZ >= this.viewOriginZ &&
+            this.focusZ <= this.viewOriginZ + this.viewSpanZ;
         if (focusVisible) {
             double fx =
-                (this.focusX - geometry.originX()) / geometry.spanXBlocks();
+                (this.focusX - this.viewOriginX) / this.viewSpanX;
             double fz =
-                (this.focusZ - geometry.originZ()) / geometry.spanZBlocks();
+                (this.focusZ - this.viewOriginZ) / this.viewSpanZ;
             int markerX = left + (int)Math.round(fx * mapWidth);
             int markerY = top + (int)Math.round(fz * mapHeight);
             graphics.fill(
@@ -213,18 +300,26 @@ public final class GeoWorldPreviewScreen extends Screen {
             );
         }
 
+        double sampleScale = Math.max(
+            this.columns > 1
+                ? this.viewSpanX / (this.columns - 1)
+                : this.viewSpanX,
+            this.rows > 1
+                ? this.viewSpanZ / (this.rows - 1)
+                : this.viewSpanZ
+        );
         String summary = String.format(
             Locale.ROOT,
-            "Seed %d · %dx%d nodes · %.0fx%.0f blocks · land %d · ocean %d · lake %d · river %d",
+            "Seed %d · %s · %.0f×%.0f blocks · %.1f blocks/sample",
             manifest.seed(),
-            manifest.geometry().width(),
-            manifest.geometry().height(),
-            manifest.geometry().spanXBlocks(),
-            manifest.geometry().spanZBlocks(),
-            this.landSamples,
-            this.oceanSamples,
-            this.lakeSamples,
-            this.riverSamples
+            Component.translatable(
+                this.localView
+                    ? "geoworld.preview.local_view"
+                    : "geoworld.preview.global_view"
+            ).getString(),
+            this.viewSpanX,
+            this.viewSpanZ,
+            sampleScale
         );
         int textY = top + mapHeight + 8;
         graphics.text(
@@ -234,11 +329,19 @@ public final class GeoWorldPreviewScreen extends Screen {
             textY,
             0xFFFFFFFF
         );
+
         if (this.focusX != null && this.focusZ != null) {
+            GeoWorldV1.RuntimeSample focusSample =
+                this.model.sample(this.focusX, this.focusZ);
+            int surfaceY =
+                HEIGHTS.boundaryY(focusSample.groundHeight()) - 1;
             Component positionText = Component.translatable(
-                "geoworld.preview.current_position",
+                "geoworld.preview.current_detail",
                 Math.round(this.focusX),
-                Math.round(this.focusZ)
+                Math.round(this.focusZ),
+                surfaceY,
+                focusSample.biomeFamily(),
+                focusSample.surfaceProfile()
             );
             graphics.text(
                 this.font,
@@ -249,6 +352,22 @@ public final class GeoWorldPreviewScreen extends Screen {
                 ),
                 textY + 11,
                 focusVisible ? 0xFFFF7770 : 0xFFB0B0B0
+            );
+        } else {
+            String counts = String.format(
+                Locale.ROOT,
+                "land %d · ocean %d · lake %d · river %d",
+                this.landSamples,
+                this.oceanSamples,
+                this.lakeSamples,
+                this.riverSamples
+            );
+            graphics.text(
+                this.font,
+                counts,
+                Math.max(6, (this.width - this.font.width(counts)) / 2),
+                textY + 11,
+                0xFFB0B0B0
             );
         }
     }
@@ -276,12 +395,17 @@ public final class GeoWorldPreviewScreen extends Screen {
         }
     }
 
-    private static int color(GeoWorldV1.RuntimeSample sample) {
+    private static int color(
+        GeoWorldV1 model,
+        double x,
+        double z,
+        GeoWorldV1.RuntimeSample sample
+    ) {
         return switch (sample.waterKind()) {
             case "Ocean" -> oceanColor(sample);
             case "Lake" -> 0xFF3F9FD0;
             case "River" -> 0xFF55B9E8;
-            default -> landColor(sample);
+            default -> landColor(model, x, z, sample);
         };
     }
 
@@ -292,7 +416,12 @@ public final class GeoWorldPreviewScreen extends Screen {
         return 0xFF3477A7;
     }
 
-    private static int landColor(GeoWorldV1.RuntimeSample sample) {
+    private static int landColor(
+        GeoWorldV1 model,
+        double x,
+        double z,
+        GeoWorldV1.RuntimeSample sample
+    ) {
         String surface = sample.surfaceProfile();
         if (surface != null) {
             String surfaceValue = surface.toLowerCase(Locale.ROOT);
@@ -302,6 +431,21 @@ public final class GeoWorldPreviewScreen extends Screen {
             if (surfaceValue.contains("alpine rock")) {
                 return 0xFF96958D;
             }
+        }
+
+        String minecraftBiome =
+            GeoWorldBiomeSource.minecraftBiomeId(model, x, z);
+        if ("minecraft:jungle".equals(minecraftBiome)) {
+            return 0xFF2D7546;
+        }
+        if ("minecraft:sparse_jungle".equals(minecraftBiome)) {
+            return 0xFF43845A;
+        }
+        if ("minecraft:forest".equals(minecraftBiome)) {
+            return 0xFF4E8150;
+        }
+        if ("minecraft:birch_forest".equals(minecraftBiome)) {
+            return 0xFF67935A;
         }
 
         String biome = sample.biomeFamily();
@@ -327,6 +471,17 @@ public final class GeoWorldPreviewScreen extends Screen {
             return 0xFFDCE5E2;
         }
         return heightColor(sample.groundHeight());
+    }
+
+    private static double clamp(
+        double value,
+        double min,
+        double max
+    ) {
+        if (max < min) {
+            return min;
+        }
+        return Math.max(min, Math.min(max, value));
     }
 
     private static int heightColor(double height) {

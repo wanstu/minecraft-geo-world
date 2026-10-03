@@ -5,7 +5,7 @@
 ## 当前目标与阶段
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。
 
-**World Model V1、Java Runtime、Minecraft 26.3 静态 QA writer 与 NeoForge 26.3 动态 GeoWorld worldgen 已接通。当前主线已转为真实客户端可用性与地形/生态质量验收：创建页、动态 ChunkGenerator、创建页预览、存档内 `.geoworld` 与 Java Runtime 共用同一模型。群系边界在低频 domain warp 之外新增近边界竞争噪声，使相邻生态在几十方块尺度内互相“侵蚀”而不是直线硬切；Go/Java 使用同一算法。单人游戏暂停菜单新增 `GeoWorld 预览`，直接打开当前存档绑定模型，并用红色十字标记玩家当前位置，方便和真实生成世界对照。**
+**World Model V1、Java Runtime、Minecraft 26.3 静态 QA writer 与 NeoForge 26.3 动态 GeoWorld worldgen 已接通。当前主线是 HMCL 真实客户端可用性与地形/生态质量验收。创建页内外 Seed 已补齐双向视觉同步；雨林边缘除 Runtime 的 domain warp / 竞争侵蚀外，Minecraft 实现层新增 Sparse Jungle + Forest 过渡肩带，避免 Jungle 直接切到 Birch Forest 形成树冠墙。游戏内 `GeoWorld 预览` 已确认读取当前存档绑定的同一 `.geoworld`：全局图仅用于世界概览，暂停菜单打开时默认显示玩家附近约 1016×632 blocks 的局部图（8 blocks/sample），并显示精确当前位置的模型地表高度、BiomeFamily 与 SurfaceProfile，以便和实际 Chunk 对拍。**
 
 ## 仓库与基线
 - 仓库：D:\projects\minecraft-geo-world

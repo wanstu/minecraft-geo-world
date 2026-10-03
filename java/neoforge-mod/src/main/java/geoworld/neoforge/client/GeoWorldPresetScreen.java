@@ -31,6 +31,8 @@ public final class GeoWorldPresetScreen extends Screen {
         Component.translatable("geoworld.create.title");
     private static final Component SEED_LABEL =
         Component.translatable("geoworld.create.seed");
+    private static final Component VANILLA_SEED_LABEL =
+        Component.translatable("selectWorld.enterSeed");
     private static final Component WIDTH_LABEL =
         Component.translatable("geoworld.create.width");
     private static final Component HEIGHT_LABEL =
@@ -97,7 +99,7 @@ public final class GeoWorldPresetScreen extends Screen {
         String seedValue = this.parent.getUiState().getSeed();
         if (seedValue == null || seedValue.isBlank()) {
             seedValue = Long.toString(ThreadLocalRandom.current().nextLong());
-            this.parent.getUiState().setSeed(seedValue);
+            this.setSharedSeed(seedValue);
             GeoWorldCreationSession.invalidateGenerated(
                 this.parent.getUiState()
             );
@@ -108,7 +110,7 @@ public final class GeoWorldPresetScreen extends Screen {
             seedValue
         );
         this.seedEdit.setResponder(value -> {
-            this.parent.getUiState().setSeed(value);
+            this.setSharedSeed(value);
             this.generationSerial++;
             GeoWorldCreationSession.invalidateGenerated(
                 this.parent.getUiState()
@@ -562,8 +564,32 @@ public final class GeoWorldPresetScreen extends Screen {
             });
     }
 
+    private void setSharedSeed(String value) {
+        this.parent.getUiState().setSeed(value);
+
+        // Vanilla's World tab only copies UiState -> seed EditBox once in the
+        // tab constructor. It does not subscribe that EditBox to later UiState
+        // changes, so changing the seed inside a preset editor leaves the outer
+        // field visually stale even though the actual world options are already
+        // updated. Keep that existing widget synchronized while this editor is
+        // open.
+        for (var listener : this.parent.children()) {
+            if (
+                listener instanceof EditBox box &&
+                box.getWidth() == 308 &&
+                box.getMessage().getString().equals(
+                    VANILLA_SEED_LABEL.getString()
+                ) &&
+                !box.getValue().equals(value)
+            ) {
+                box.setValue(value);
+                break;
+            }
+        }
+    }
+
     private long syncSeedFromEditor() {
-        this.parent.getUiState().setSeed(this.seedEdit.getValue());
+        this.setSharedSeed(this.seedEdit.getValue());
         return this.parent
             .getUiState()
             .getSettings()

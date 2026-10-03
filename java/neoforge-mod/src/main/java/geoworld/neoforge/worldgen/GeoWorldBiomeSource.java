@@ -74,6 +74,7 @@ public final class GeoWorldBiomeSource extends BiomeSource {
             biomes.getOrThrow(Biomes.SAVANNA),
             biomes.getOrThrow(Biomes.BIRCH_FOREST),
             biomes.getOrThrow(Biomes.JUNGLE),
+            biomes.getOrThrow(Biomes.SPARSE_JUNGLE),
             biomes.getOrThrow(Biomes.SWAMP)
         ));
     }
@@ -105,11 +106,103 @@ public final class GeoWorldBiomeSource extends BiomeSource {
 
         int blockX = QuartPos.toBlock(quartX);
         int blockZ = QuartPos.toBlock(quartZ);
-        GeoWorldV1.RuntimeSample sample = current.sample(blockX, blockZ);
-        String biomeId = Minecraft26_3ProfileMapping.biomeId(
-            sample.biomeFamily()
-        );
+        String biomeId = minecraftBiomeId(current, blockX, blockZ);
         return this.byId.getOrDefault(biomeId, this.fallback);
+    }
+
+    public static String minecraftBiomeId(
+        GeoWorldV1 model,
+        double blockX,
+        double blockZ
+    ) {
+        GeoWorldV1.RuntimeSample sample = model.sample(blockX, blockZ);
+        String family = sample.biomeFamily();
+
+        // The model already has a broad tropical -> subtropical -> temperate
+        // climate transition, but mapping Tropical Rainforest directly to
+        // vanilla JUNGLE makes the canopy stop like a wall. Use vanilla's
+        // SPARSE_JUNGLE as a visual/ecological edge biome on both sides of the
+        // tropical boundary, then a short FOREST shoulder before the normal
+        // subtropical birch forest. This does not alter terrain/water/profile
+        // semantics; it only makes the Minecraft biome realization match the
+        // intended "mutual erosion" look.
+        if (isTropicalForest(family)) {
+            if (nearNonTropicalLand(model, blockX, blockZ, 64.0)) {
+                return "minecraft:sparse_jungle";
+            }
+        } else if ("Subtropical Forest".equals(family)) {
+            if (nearTropicalLand(model, blockX, blockZ, 40.0)) {
+                return "minecraft:sparse_jungle";
+            }
+            if (nearTropicalLand(model, blockX, blockZ, 80.0)) {
+                return "minecraft:forest";
+            }
+        }
+
+        return Minecraft26_3ProfileMapping.biomeId(family);
+    }
+
+    private static boolean nearTropicalLand(
+        GeoWorldV1 model,
+        double x,
+        double z,
+        double radius
+    ) {
+        return anyNearby(
+            model,
+            x,
+            z,
+            radius,
+            sample -> sample.sourceLand() &&
+                isTropicalForest(sample.biomeFamily())
+        );
+    }
+
+    private static boolean nearNonTropicalLand(
+        GeoWorldV1 model,
+        double x,
+        double z,
+        double radius
+    ) {
+        return anyNearby(
+            model,
+            x,
+            z,
+            radius,
+            sample -> sample.sourceLand() &&
+                !isTropicalForest(sample.biomeFamily())
+        );
+    }
+
+    private static boolean anyNearby(
+        GeoWorldV1 model,
+        double x,
+        double z,
+        double radius,
+        java.util.function.Predicate<GeoWorldV1.RuntimeSample> predicate
+    ) {
+        double diagonal = radius * 0.7071067811865476;
+        double[][] offsets = {
+            {radius, 0.0},
+            {-radius, 0.0},
+            {0.0, radius},
+            {0.0, -radius},
+            {diagonal, diagonal},
+            {diagonal, -diagonal},
+            {-diagonal, diagonal},
+            {-diagonal, -diagonal}
+        };
+        for (double[] offset : offsets) {
+            if (predicate.test(model.sample(x + offset[0], z + offset[1]))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isTropicalForest(String family) {
+        return "Tropical Rainforest".equals(family) ||
+            "Tropical Monsoon Forest".equals(family);
     }
 
     @Override

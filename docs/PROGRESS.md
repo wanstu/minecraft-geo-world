@@ -1312,3 +1312,28 @@ Phase 6.2 正式完成。下一步 Phase 6.3：最小持久化 schema、原子�
 - `javap` 已确认最终 client class 包含 `addPausePreviewButton(ScreenEvent.Init.Post)`，不是只改源码未编译。
 
 验收注意：本轮 Runtime Profile 算法改变会影响尚未生成的新 Chunk。为了判断“群系侵蚀”观感，应优先新建 GeoWorld；旧世界已经落盘的 Chunk 不会被重写，而新 Chunk 会走新 Runtime，旧测试世界可能因此故意暴露新旧边界差异。
+
+## 2026-10-03 · Seed 联动、雨林边缘与游戏内局部预览修正
+
+用户在 HMCL 26.3 实测发现三类问题：GeoWorld 自定义页随机 Seed 与外层“世界生成器的种子”显示未联动；雨林树冠与相邻森林仍形成明显硬切；暂停菜单的全局 GeoWorld 预览在玩家雪山位置显示成绿色，疑似与实际世界不一致。
+
+定位结果：
+- Seed 的实际 `WorldCreationUiState` 早已同步，问题是 Vanilla `CreateWorldScreen.WorldTab` 的 Seed EditBox 只在构造时从 UiState 读取一次，之后只做 EditBox -> UiState 单向 responder，没有 UiState -> EditBox listener，因此外层显示陈旧。
+- 雨林模型本身在实测区域已有 Tropical Rainforest -> Subtropical Forest -> Temperate Forest 的宽过渡；硬边主要发生在 Minecraft 映射层：Tropical Rainforest 直接映射 `minecraft:jungle`，Subtropical Forest 直接映射 `minecraft:birch_forest`，密集 Jungle 树冠因此像墙一样结束。
+- 当前实测存档 `world.geoworld` Seed=4577469160985922023。直接加载持久化模型采样玩家截图坐标 X=1649.5/Z=939.5，结果为 Ground≈0.804736、BiomeFamily=Alpine、Terrain=Mountain、SurfaceProfile=Alpine Snow；与游戏里 Y≈222 的大面积雪山一致。旧预览不一致不是模型/Chunk 错位，而是 40832×25472 blocks 的全局图只有约 128×80 样点，每像素约 322 blocks，红十字虽然是精确玩家坐标，底下颜色却可能来自数百格外的样点。
+
+本轮修正：
+- GeoWorld 自定义 Seed 改动仍写入同一 `WorldCreationUiState`，并同步更新父级 Vanilla WorldTab 中现存的 Seed EditBox；随机 Seed、手动输入、生成预览、完成时都走同一 helper。
+- `GeoWorldBiomeSource` 增加 `minecraft:sparse_jungle`，Minecraft 群系实现层对热带边缘做局部邻域判定：雨林内侧靠边区域改为 Sparse Jungle；Subtropical Forest 靠雨林一侧先经过 Sparse Jungle，再经过一小段普通 Forest，最后才进入 Birch Forest。Terrain/Water/GeoWorld Profile 本身不被改写。
+- `GeoWorldPreviewScreen` 在有玩家焦点时默认使用局部视图：128×80、约 8 blocks/sample，即约 1016×632 blocks；保留“查看全局/查看当前位置”切换。局部/全局摘要都会明确显示 blocks/sample。
+- 预览红十字按当前视图范围计算；当前位置附带精确模型地表 Y、BiomeFamily、SurfaceProfile，便于直接与 F3/地表外观对拍。
+- 预览的陆地颜色改为复用 `GeoWorldBiomeSource.minecraftBiomeId(...)`，因此 Sparse Jungle / Forest / Birch Forest 过渡在预览和真实新生成 Chunk 中使用同一 Minecraft 群系实现逻辑；Alpine Snow 继续优先显示白色。
+
+验证：
+- 当前实测模型精确坐标 X=1649.5/Z=939.5 确认为 Alpine / Alpine Snow，证明存档模型和真实雪山一致。
+- `gradlew.bat compileJava --no-daemon` 成功。
+- `go test ./... -count=1` 全绿。
+- zh_cn/en_us 语言 JSON 使用 Node UTF-8 `JSON.parse` 验证通过。
+- `git diff --check` 通过。
+
+验收注意：雨林 Minecraft biome 映射只影响新生成 Chunk。已经生成过的 Chunk 不会被重写；观察新过渡带时应新建 GeoWorld 或前往此前从未加载过的区域。
