@@ -57,6 +57,9 @@ public final class GeoWorldPreviewScreen extends Screen {
     private PreviewLayer previewLayer = PreviewLayer.BIOME;
     private boolean localView;
     private boolean draggingMap;
+    private boolean mapPressActive;
+    private boolean mapPressMoved;
+    private double mapPressTravel;
     private Double selectedX;
     private Double selectedZ;
     private double viewOriginX;
@@ -558,20 +561,37 @@ public final class GeoWorldPreviewScreen extends Screen {
         int markerY =
             this.mapTop + (int)Math.round(fz * this.mapHeight);
 
-        graphics.fill(
-            markerX - 5,
-            markerY - 1,
-            markerX + 6,
-            markerY + 2,
-            0xFFFF3B30
-        );
-        graphics.fill(
-            markerX - 1,
-            markerY - 5,
-            markerX + 2,
-            markerY + 6,
-            0xFFFF3B30
-        );
+        float yaw = 0.0F;
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.player != null) {
+            yaw = minecraft.player.getYRot();
+        }
+        double radians = Math.toRadians(yaw);
+        // Minecraft yaw 0 faces +Z. Map +Z points down the screen.
+        double dirX = -Math.sin(radians);
+        double dirY = Math.cos(radians);
+        double sideX = dirY;
+        double sideY = -dirX;
+
+        int tipX = markerX + (int)Math.round(dirX * 8.0);
+        int tipY = markerY + (int)Math.round(dirY * 8.0);
+        int leftX = markerX - (int)Math.round(dirX * 2.0)
+            + (int)Math.round(sideX * 4.0);
+        int leftY = markerY - (int)Math.round(dirY * 2.0)
+            + (int)Math.round(sideY * 4.0);
+        int rightX = markerX - (int)Math.round(dirX * 2.0)
+            - (int)Math.round(sideX * 4.0);
+        int rightY = markerY - (int)Math.round(dirY * 2.0)
+            - (int)Math.round(sideY * 4.0);
+        int tailX = markerX - (int)Math.round(dirX * 5.0);
+        int tailY = markerY - (int)Math.round(dirY * 5.0);
+
+        int color = 0xFFFF3B30;
+        this.drawMapLine(graphics, tipX, tipY, leftX, leftY, color);
+        this.drawMapLine(graphics, tipX, tipY, rightX, rightY, color);
+        this.drawMapLine(graphics, leftX, leftY, tailX, tailY, color);
+        this.drawMapLine(graphics, rightX, rightY, tailX, tailY, color);
+        this.drawMapLine(graphics, tailX, tailY, markerX, markerY, color);
     }
 
     private void renderSelectionMarker(GuiGraphicsExtractor graphics) {
@@ -595,20 +615,33 @@ public final class GeoWorldPreviewScreen extends Screen {
         int markerY =
             this.mapTop + (int)Math.round(fz * this.mapHeight);
 
-        graphics.fill(
-            markerX - 5,
-            markerY - 1,
-            markerX + 6,
-            markerY + 2,
-            0xFFFFD54F
-        );
-        graphics.fill(
-            markerX - 1,
-            markerY - 5,
-            markerX + 2,
-            markerY + 6,
-            0xFFFFD54F
-        );
+        int color = 0xFFFFD54F;
+        graphics.fill(markerX, markerY - 4, markerX + 1, markerY + 5, color);
+        graphics.fill(markerX - 1, markerY - 3, markerX + 2, markerY + 4, color);
+        graphics.fill(markerX - 2, markerY - 2, markerX + 3, markerY + 3, color);
+        graphics.fill(markerX - 3, markerY - 1, markerX + 4, markerY + 2, color);
+    }
+
+    private void drawMapLine(
+        GuiGraphicsExtractor graphics,
+        int x0,
+        int y0,
+        int x1,
+        int y1,
+        int color
+    ) {
+        int dx = x1 - x0;
+        int dy = y1 - y0;
+        int steps = Math.max(Math.abs(dx), Math.abs(dy));
+        if (steps == 0) {
+            graphics.fill(x0, y0, x0 + 1, y0 + 1, color);
+            return;
+        }
+        for (int i = 0; i <= steps; i++) {
+            int x = x0 + (int)Math.round((double)dx * i / steps);
+            int y = y0 + (int)Math.round((double)dy * i / steps);
+            graphics.fill(x - 1, y - 1, x + 2, y + 2, color);
+        }
     }
 
     private void renderSummary(GuiGraphicsExtractor graphics) {
@@ -792,8 +825,10 @@ public final class GeoWorldPreviewScreen extends Screen {
             event.button() == 0 &&
             this.isInsideMap(event.x(), event.y())
         ) {
-            this.selectMapPoint(event.x(), event.y());
-            this.draggingMap = true;
+            this.mapPressActive = true;
+            this.mapPressMoved = false;
+            this.mapPressTravel = 0.0;
+            this.draggingMap = false;
             return true;
         }
         return super.mouseClicked(event, doubleClick);
@@ -805,8 +840,15 @@ public final class GeoWorldPreviewScreen extends Screen {
         double dx,
         double dy
     ) {
-        if (this.draggingMap && event.button() == 0) {
-            this.panByPixels(dx, dy);
+        if (this.mapPressActive && event.button() == 0) {
+            this.mapPressTravel += Math.hypot(dx, dy);
+            if (this.mapPressTravel >= 3.0) {
+                this.mapPressMoved = true;
+                this.draggingMap = true;
+            }
+            if (this.draggingMap) {
+                this.panByPixels(dx, dy);
+            }
             return true;
         }
         return super.mouseDragged(event, dx, dy);
@@ -814,8 +856,15 @@ public final class GeoWorldPreviewScreen extends Screen {
 
     @Override
     public boolean mouseReleased(MouseButtonEvent event) {
-        if (event.button() == 0 && this.draggingMap) {
+        if (event.button() == 0 && this.mapPressActive) {
+            boolean wasClick =
+                !this.mapPressMoved &&
+                this.isInsideMap(event.x(), event.y());
+            this.mapPressActive = false;
             this.draggingMap = false;
+            if (wasClick) {
+                this.selectMapPoint(event.x(), event.y());
+            }
             return true;
         }
         return super.mouseReleased(event);

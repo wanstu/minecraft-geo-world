@@ -1452,3 +1452,31 @@ Phase 6.2 正式完成。下一步 Phase 6.3：最小持久化 schema、原子�
 - 地下 Y 维度开始使用洞穴群系：滴水石洞穴、繁茂洞穴、幽匿深暗之域、硫磺洞穴；不会把 Nether / End 群系硬塞进主世界。
 - 对当前 t2/world.geoworld 做全图规则扫描：52 个主世界地表原版群系全部出现；4 个主世界洞穴群系全部出现。即 26.3 Biomes 中除 THE_VOID 以及 Nether/End 专属群系外，主世界可用群系均已进入 GeoWorld 实现路径。
 - Go 全仓、Java Golden 15/15、Minecraft storage/save writer、NeoForge build、Engine bridge、Spawn verifier 全通过；最新 MOD 已自动部署 HMCL 26.3。
+
+## 2026-10-03 · 标签化 Vanilla 群系匹配 + 预览选点/箭头修复 + Savanna 草面
+
+用户确认前一版 HMCL JAR 仍显示十字标记且无法选出传送目标，并指出热带草原表面是泥土；同时提出 Vanilla 主世界群系与 GeoWorld 地区都应打语义标签，在相似候选中按 Seed 做稳定的区域级随机选择（例如橡树林/桦木林）。
+
+本轮处理：
+
+- 核对 HMCL 原 JAR：时间 21:00:17、SHA256 CB8E...，对应 commit d13835f。该版本确实仍在 GeoWorldPreviewScreen 中把玩家和目标都画成十字；之前称“已换成箭头”不准确。
+- 预览玩家标记改为真正的红色方向箭头。箭头直接读取当前玩家 yaw，地图 +Z 向下，因此 0° 朝南会指向地图下方，东西北方向同步旋转。
+- 传送目标改为小型黄色菱形，不再与玩家位置混淆。
+- 地图输入重新实现为“点击/拖动阈值”模型：左键按下仅进入 pending，累计移动 >=3px 才开始平移；若释放前未达到拖动阈值，则在释放坐标创建传送目标并启用传送按钮。解决旧逻辑把点击与拖动绑定到同一次 press，导致选点交互不稳定的问题。
+- 传送仍只允许游戏内单人世界预览；选择成功后目标按钮启用，服务端先加载目标 Chunk，再取 WORLD_SURFACE 实际高度后 teleport。
+- Savanna 在当前 t4 模型中 581/581 个抽样点的 SurfaceProfile 都是 Dry Grass Soil。此前 ProfileMapping 将 Dry Grass Soil 映射为 coarse_dirt，因此“热带草原是泥土”来自 Minecraft 表现映射，而非生态模型错误。现改为 Dry Grass Soil -> grass_block；Shrub Soil 仍保留 coarse_dirt。
+- 新增 Minecraft26_3BiomeCatalog：
+  - Vanilla 群系拥有温度、湿度、生态、地貌、土壤/表层、季风、海岸等语义标签和权重；
+  - GeoWorld 每个地区从真实 Runtime 的 BiomeFamily、TerrainVariant、SurfaceProfile、VegetationProfile、年均温、年降水、季风、是否近海生成同一套标签；
+  - 先过滤不兼容候选，再按匹配分数选出“足够接近”的候选集合，最后使用 Seed + 360/150 blocks 平滑区域噪声做确定性随机选择；
+  - 因此同一片温带森林可自然形成 forest / birch_forest / dappled_forest / flower_forest / old_growth_birch_forest 等连续斑块，而不是每个格子随机跳变，也不再“一种 GeoWorld family 永远只对应一个 Vanilla biome”。
+- 海洋、河流、湖泊、海岸和洞穴仍保持强物理约束，不交给泛化随机池；例如 River 一定是 river/frozen_river，Ocean 仍按温度与深度分层。
+
+验证：
+- 当前 t4（Seed 6311471718325446117）96-block 全图抽样得到 48 种地表主世界群系；温带/亚热带森林实际出现 forest、birch_forest、dappled_forest、flower_forest、dark_forest、old_growth_birch_forest 等多个匹配变体。
+- t4 的 Savanna SurfaceProfile 全部为 Dry Grass Soil，新 Minecraft 表面映射全部为 grass_block。
+- go test ./... -count=1 全绿。
+- NeoForge compileJava --rerun-tasks 通过。
+- Minecraft storage/save writer 验证通过。
+- Java GoldenVerifier 15/15。
+- build.cmd verifyGeoWorldEngine verifyGeoWorldSpawn 通过并自动部署 HMCL 26.3。
