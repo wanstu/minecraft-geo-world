@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"geoworld/internal/generator"
+	"geoworld/internal/mcprofile"
+	"geoworld/internal/runtimeprofile"
 	"geoworld/internal/world"
 	"geoworld/internal/worldmodelio"
 )
@@ -26,6 +28,24 @@ func TestSanitizeFolderName(t *testing.T) {
 		if got := sanitizeFolderName(tt.in); got != tt.want {
 			t.Fatalf("sanitizeFolderName(%q) = %q, want %q", tt.in, got, tt.want)
 		}
+	}
+}
+
+func TestQualityLayerPalettesDistinguishTerrainAndSurface(t *testing.T) {
+	plain := runtimeprofile.Sample{TerrainVariant: mcprofile.TerrainPlain}
+	mountain := runtimeprofile.Sample{TerrainVariant: mcprofile.TerrainMountain}
+	if landformColor(plain) == landformColor(mountain) {
+		t.Fatal("plain and mountain must use different landform colors")
+	}
+
+	sand := runtimeprofile.Sample{SurfaceProfile: mcprofile.SurfaceDesertSand}
+	gravel := runtimeprofile.Sample{SurfaceProfile: mcprofile.SurfaceDesertGravel}
+	snow := runtimeprofile.Sample{SurfaceProfile: mcprofile.SurfaceAlpineSnow}
+	if surfaceColor(sand) == surfaceColor(gravel) {
+		t.Fatal("desert sand and legacy desert gravel must be visually distinguishable")
+	}
+	if surfaceColor(snow) == surfaceColor(sand) {
+		t.Fatal("alpine snow and desert sand must be visually distinguishable")
 	}
 }
 

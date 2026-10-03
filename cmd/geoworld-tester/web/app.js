@@ -503,6 +503,8 @@ function layerName(v){
     lakes:'湖泊',
     water:'最终水体',
     biome:'群系',
+    landform:'地貌类型',
+    surface:'地表方案',
     profile:'配置置信度',
     anomalies:'最终异常'
   })[v]||v;
@@ -517,7 +519,9 @@ function updateLayerHelp(){
     rivers:'河网：直接绘制正式 Waterbed 河段；线宽为验收可视化宽度，不代表地图像素就是实际河宽。',
     lakes:'湖泊：直接绘制正式 Waterbed 湖泊节点和影响半径，便于检查湖泊分布与聚集区域。',
     water:'最终水体：按 Runtime 逐点显示海洋、湖泊和河流的最终水体判定。',
-    biome:'群系：显示最终 Minecraft 生物群系家族。',
+    biome:'群系：显示最终 Minecraft 生物群系家族；用于检查气候/生态区域是否出现不自然的直线或矩形切割。',
+    landform:'地貌类型：直接显示 Runtime 的 Plain / Hills / Foothills / Mountain / Plateau / Floodplain 等地貌分类，用来检查平原、丘陵、山麓和山地是否形成合理连续区域。',
+    surface:'地表方案：显示最终 SurfaceProfile。沙漠沙地、森林土壤、湿地、Alpine Rock / Alpine Snow 等会分别着色，便于不进游戏就检查大片沙砾和山顶雪线。',
     profile:'配置置信度：颜色越异常越需要检查；语义 fallback / mismatch 会高亮。',
     anomalies:'最终异常：红=海岸冲突，橙=河床逆坡，青=湖床违规，黄=Runtime 回退，紫=Runtime 语义冲突。没有标记表示当前最终审计为 0。'
   };

@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"geoworld/internal/generator"
+	"geoworld/internal/mcprofile"
 	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
@@ -1403,6 +1404,10 @@ func layerColor(layer string, s runtimeprofile.Sample) color.RGBA {
 		}
 	case "biome":
 		return biomeColor(s)
+	case "landform":
+		return landformColor(s)
+	case "surface":
+		return surfaceColor(s)
 	case "profile":
 		return profileColor(s)
 	default:
@@ -1457,6 +1462,78 @@ func biomeColor(s runtimeprofile.Sample) color.RGBA {
 		return color.RGBA{55, 139, 126, 255}
 	default:
 		return color.RGBA{104, 132, 91, 255}
+	}
+}
+
+func landformColor(s runtimeprofile.Sample) color.RGBA {
+	if s.World.WaterKind == reconcile.WaterOcean {
+		return color.RGBA{34, 86, 123, 255}
+	}
+	switch s.TerrainVariant {
+	case mcprofile.TerrainPlain:
+		return color.RGBA{127, 166, 91, 255}
+	case mcprofile.TerrainRollingPlain:
+		return color.RGBA{150, 169, 88, 255}
+	case mcprofile.TerrainHills:
+		return color.RGBA{167, 143, 79, 255}
+	case mcprofile.TerrainFoothills:
+		return color.RGBA{157, 120, 83, 255}
+	case mcprofile.TerrainMountain:
+		return color.RGBA{122, 111, 107, 255}
+	case mcprofile.TerrainPlateau:
+		return color.RGBA{177, 132, 87, 255}
+	case mcprofile.TerrainFloodplain:
+		return color.RGBA{93, 151, 105, 255}
+	case mcprofile.TerrainAlluvialPlain:
+		return color.RGBA{113, 159, 112, 255}
+	case mcprofile.TerrainAlluvialFan:
+		return color.RGBA{160, 149, 101, 255}
+	case mcprofile.TerrainCanyon:
+		return color.RGBA{143, 91, 73, 255}
+	default:
+		return color.RGBA{104, 119, 98, 255}
+	}
+}
+
+func surfaceColor(s runtimeprofile.Sample) color.RGBA {
+	switch s.SurfaceProfile {
+	case mcprofile.SurfaceOceanSand:
+		return color.RGBA{62, 126, 156, 255}
+	case mcprofile.SurfaceOceanGravel:
+		return color.RGBA{67, 101, 127, 255}
+	case mcprofile.SurfaceFrozenOcean:
+		return color.RGBA{176, 207, 218, 255}
+	case mcprofile.SurfaceIceSnow:
+		return color.RGBA{235, 240, 239, 255}
+	case mcprofile.SurfaceTundraSoil:
+		return color.RGBA{159, 159, 132, 255}
+	case mcprofile.SurfaceAlpineRock:
+		return color.RGBA{144, 143, 139, 255}
+	case mcprofile.SurfaceAlpineSnow:
+		return color.RGBA{244, 245, 242, 255}
+	case mcprofile.SurfaceForestLoam:
+		return color.RGBA{92, 119, 74, 255}
+	case mcprofile.SurfacePodzol:
+		return color.RGBA{89, 92, 65, 255}
+	case mcprofile.SurfaceGrassLoam:
+		return color.RGBA{124, 153, 78, 255}
+	case mcprofile.SurfaceDryGrass:
+		return color.RGBA{166, 151, 77, 255}
+	case mcprofile.SurfaceShrubSoil:
+		return color.RGBA{150, 126, 84, 255}
+	case mcprofile.SurfaceDesertSand:
+		return color.RGBA{218, 190, 116, 255}
+	case mcprofile.SurfaceDesertGravel:
+		// Keep legacy gravel visually distinct so old models are easy to spot.
+		return color.RGBA{174, 157, 132, 255}
+	case mcprofile.SurfaceAlluvialSilt:
+		return color.RGBA{139, 132, 91, 255}
+	case mcprofile.SurfaceWetMud:
+		return color.RGBA{92, 105, 76, 255}
+	case mcprofile.SurfacePeat:
+		return color.RGBA{72, 82, 64, 255}
+	default:
+		return color.RGBA{110, 119, 101, 255}
 	}
 }
 
