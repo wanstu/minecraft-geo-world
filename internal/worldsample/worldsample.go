@@ -111,7 +111,12 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 				depth = backwaterDepth
 			}
 		}
-		if depth > 1e-12 {
+		// The continuous river profile tapers to zero at the bank, but
+		// Minecraft renders whole blocks. Exposing sub-block-thin water here
+		// makes a full water block appear as a sheet sitting on the bank.
+		// Keep that shallow fringe as carved/damp bank and only expose actual
+		// river water once there is enough physical depth.
+		if depth >= m.Config.MinRiverWaterDepthNormalized {
 			surface := math.Min(1, ground.FinalHeight+depth)
 			if surface > ground.FinalHeight {
 				out.WaterKind = reconcile.WaterRiver
@@ -132,6 +137,14 @@ func normalizeConfig(cfg Config) (Config, error) {
 		cfg.RiverCenterDepthNormalized <= 0 ||
 		cfg.RiverCenterDepthNormalized >= 0.05 {
 		return Config{}, errors.New("worldsample: river center depth must be finite and inside (0,0.05)")
+	}
+	if cfg.MinRiverWaterDepthNormalized == 0 {
+		cfg.MinRiverWaterDepthNormalized = 0.0015
+	}
+	if !finite(cfg.MinRiverWaterDepthNormalized) ||
+		cfg.MinRiverWaterDepthNormalized <= 0 ||
+		cfg.MinRiverWaterDepthNormalized >= cfg.RiverCenterDepthNormalized {
+		return Config{}, errors.New("worldsample: minimum river water depth must be finite, positive and below center depth")
 	}
 
 	if cfg.OceanEligibilityThreshold == 0 {

@@ -247,6 +247,7 @@ public final class GeoWorldV1 {
 
     private record WorldSampleConfig(
         double riverCenterDepthNormalized,
+        double minRiverWaterDepthNormalized,
         double oceanEligibilityThreshold
     ) {}
 
@@ -475,8 +476,16 @@ public final class GeoWorldV1 {
             Json.required(config, "WorldSample"),
             "config.WorldSample"
         );
+        Object minRiverWaterDepthRaw =
+            worldSampleObject.get("MinRiverWaterDepthNormalized");
         WorldSampleConfig worldSampleConfig = new WorldSampleConfig(
             Json.doubleValue(worldSampleObject, "RiverCenterDepthNormalized"),
+            minRiverWaterDepthRaw == null
+                ? 0.0015
+                : Json.doubleValue(
+                    worldSampleObject,
+                    "MinRiverWaterDepthNormalized"
+                ),
             Json.doubleValue(worldSampleObject, "OceanEligibilityThreshold")
         );
 
@@ -668,7 +677,7 @@ public final class GeoWorldV1 {
                     depth = backwaterDepth;
                 }
             }
-            if (depth > 1e-12) {
+            if (depth >= worldSampleConfig.minRiverWaterDepthNormalized()) {
                 double surface = Math.min(1.0, ground.finalHeight() + depth);
                 if (surface > ground.finalHeight()) {
                     return new WorldSample(

@@ -1417,3 +1417,28 @@ Phase 6.2 正式完成。下一步 Phase 6.3：最小持久化 schema、原子�
 - t2 旧模型在 Go/Java 均可重新加载；旧模型 climate unavailable，新同 Seed 模型 climate 可采样。
 - 新同 Seed模型 output/t2-v5-check.geoworld 的 Climate payload 正常；湖缘薄水位置按新岸带逻辑转为干岸。
 - 最新 MOD 已由 build.cmd 自动部署至 HMCL 26.3。
+
+## 2026-10-03 · t2 河床 / River biome / 冲积平原诊断与修正
+
+用户在 t2（Seed 4061520997047253165）坐标约 X=2248 / Z=-5876 实测发现河水仍像铺在地表、地图群系显示平原而模型预览显示河流、河旁大块黑色地表，以及怀疑河道不连续。
+
+精确模型诊断：
+- 玩家截图坐标 (2248.691,-5875.576)：Runtime 原先 WaterKind=River，但 RiverWeight 只有 0.056，连续水深仅 0.000141 normalized，折算当前高度约 0.07 个方块。也就是说模型把几乎没有物理深度的河岸 fringe 仍标成 River；Minecraft 整块量化后可能突然出现一整格水，形成“水铺在地面上”的视觉。
+- 河中心 (2241,-5894)：RiverWeight=0.973，水深约 0.002432 normalized ≈ 1.25 blocks，是真正河道。
+- 该区域生态不是红树林。模型是 Temperate Grassland / Alluvial Plain / Alluvial Silt / Grassland。黑色来自 Minecraft surface mapping 把 Alluvial Silt 直接映成 minecraft:mud；这是表现层过度，不是模型判定成沼泽/红树林。
+- 当前河网拓扑本身连续：#3 (2112,-6208)->#43->#71 (2240,-5952 -> 2240,-5824)->#93->#113，最终到接收水体；全模型未发现“无 receiver 的内部断头河”。截图里看起来断续主要来自可见水深/方块量化与地图显示，不是 Hydrology 链路中间缺 segment。
+- 模型在河中心目标 Minecraft biome 明确应为 minecraft:river。第三方地图仍显示“平原”说明实际已生成 Chunk 的 biome 数据和模型目标存在不一致。
+
+本轮修正：
+- WorldSample 增加 MinRiverWaterDepthNormalized，默认 0.0015。低于该物理深度的河流 fringe 只保留河床/岸坡，不再暴露 River 水面，也不再把该点标成 River biome；Go/Java Runtime 同步，旧模型缺字段时使用相同默认值。
+- 对当前 t2 旧模型重新采样：原 (2248.691,-5875.576) 已从 River 变为 dry bank；河中心 (2241,-5894) 仍保持 River，水深约 1.25 blocks。
+- Minecraft surface mapping 将 Alluvial Silt 从 mud 改为 grass_block；Wet Mud / Peat 仍使用 mud。也就是普通冲积平原回到草地视觉，真正湿泥/泥炭区才黑。
+- GeoWorldChunkGenerator.createBiomes 不再只依赖通用 super resolver 路径；在确保 Runtime model 已 attach 后，直接用 GeoWorldBiomeSource 填充 chunk biome，避免 chunk 捕获 fallback resolver 后把 River 存成周边 Plains/Forest。
+- 预览中的“Minecraft 群系”改名为“模型目标群系”，避免把模型期望值误当成已落盘 Chunk 的实际 biome。
+- Engine cache key v5 -> v6，确保相同 Seed/参数新世界不会继续复用旧水面/biome 语义缓存。
+
+验证：
+- go test ./... -count=1 全绿。
+- Golden fixture 已重建，Java/Go GoldenVerifier 15/15。
+- NeoForge compileJava、build.cmd verifyGeoWorldEngine verifyGeoWorldSpawn 全通过。
+- 最新 MOD 已自动部署到 HMCL 26.3。

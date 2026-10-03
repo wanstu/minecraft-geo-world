@@ -10,8 +10,9 @@ import (
 // Config defines Runtime-facing water semantics. River depth remains normalized
 // until Phase 6.3/6.4 freezes the normalized-height <-> Minecraft Y mapping.
 type Config struct {
-	RiverCenterDepthNormalized float64
-	OceanEligibilityThreshold  float64
+	RiverCenterDepthNormalized   float64
+	MinRiverWaterDepthNormalized float64 `json:",omitempty"`
+	OceanEligibilityThreshold    float64
 }
 
 type Model struct {

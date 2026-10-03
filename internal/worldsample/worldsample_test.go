@@ -118,12 +118,17 @@ func TestRiverDepthTapersSmoothlyToBank(t *testing.T) {
 		t.Fatalf("river center depth wrong: %+v", center)
 	}
 
-	nearBank := m.Sample(midX, z0+17)
+	nearBank := m.Sample(midX, z0+8)
 	if nearBank.WaterKind != reconcile.WaterRiver || !nearBank.WaterSurfaceDefined {
-		t.Fatalf("expected tapered river water near bank, got %+v", nearBank)
+		t.Fatalf("expected tapered river water inside bank, got %+v", nearBank)
 	}
 	if !(nearBank.WaterDepth > 0 && nearBank.WaterDepth < center.WaterDepth) {
 		t.Fatalf("river depth did not taper: center=%.6f bank=%.6f", center.WaterDepth, nearBank.WaterDepth)
+	}
+
+	shallowFringe := m.Sample(midX, z0+17)
+	if shallowFringe.WaterKind != reconcile.WaterNone || shallowFringe.WaterSurfaceDefined {
+		t.Fatalf("sub-block river fringe should be dry bank, got %+v", shallowFringe)
 	}
 
 	outside := m.Sample(midX, z0+20)

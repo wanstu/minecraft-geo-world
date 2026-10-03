@@ -28,7 +28,7 @@
   "geoworld.preview.hover_water": "Water: %s · surface Y≈%s · depth≈%s blocks",
   "geoworld.preview.hover_dry": "Water: none",
   "geoworld.preview.hover_profile": "GeoWorld: %s · %s · %s",
-  "geoworld.preview.hover_minecraft": "Minecraft biome: %s · vegetation: %s",
+  "geoworld.preview.hover_minecraft": "Target Minecraft biome: %s · vegetation: %s",
   "geoworld.create.preview_generating": "Generating GeoWorld model…",
   "geoworld.create.preview_restoring": "Restoring the generated GeoWorld preview…",
   "geoworld.create.preview_ready": "Model ready: schema %s · %s · %s ms · %s",

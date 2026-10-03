@@ -28,7 +28,7 @@
   "geoworld.preview.hover_water": "水体：%s · 水面 Y≈%s · 深度≈%s 格",
   "geoworld.preview.hover_dry": "水体：无",
   "geoworld.preview.hover_profile": "GeoWorld：%s · %s · %s",
-  "geoworld.preview.hover_minecraft": "Minecraft 群系：%s · 植被：%s",
+  "geoworld.preview.hover_minecraft": "模型目标群系：%s · 植被：%s",
   "geoworld.create.preview_generating": "正在生成 GeoWorld 模型…",
   "geoworld.create.preview_restoring": "正在恢复已生成的 GeoWorld 预览…",
   "geoworld.create.preview_ready": "模型已就绪：schema %s · %s · %s ms · %s",

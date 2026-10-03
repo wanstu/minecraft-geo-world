@@ -10,10 +10,10 @@ public final class Minecraft26_3ProfileMapping {
             case "Frozen Ocean" -> "minecraft:gravel";
             case "Ice / Snow", "Alpine Snow" -> "minecraft:snow_block";
             case "Alpine Rock" -> "minecraft:stone";
-            case "Forest Loam", "Grass Loam" -> "minecraft:grass_block";
+            case "Forest Loam", "Grass Loam", "Alluvial Silt" -> "minecraft:grass_block";
             case "Podzol" -> "minecraft:podzol";
             case "Tundra Soil", "Dry Grass Soil", "Shrub Soil" -> "minecraft:coarse_dirt";
-            case "Alluvial Silt", "Wet Mud", "Peat" -> "minecraft:mud";
+            case "Wet Mud", "Peat" -> "minecraft:mud";
             default -> "minecraft:grass_block";
         };
     }

@@ -7,6 +7,7 @@ import geoworld.minecraft.v26_3common.Minecraft26_3ProfileMapping;
 import geoworld.neoforge.creation.GeoWorldCreationConfig;
 import geoworld.neoforge.engine.GeoWorldEngineBridge;
 import geoworld.runtime.GeoWorldV1;
+import net.minecraft.util.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
@@ -125,7 +126,21 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         StructureManager structureManager,
         ChunkAccess protoChunk
     ) {
-        this.ensureModel(randomState.seed());
+        GeoWorldV1 runtime = this.ensureModel(randomState.seed());
+        if (this.biomeSource instanceof GeoWorldBiomeSource source) {
+            // Fill from the GeoWorld resolver directly. This avoids any chance
+            // that a chunk captures a fallback resolver before the persisted
+            // Runtime model is attached, which would leave river cells stored
+            // as the surrounding Plains/Forest biome.
+            source.attachModel(runtime);
+            return CompletableFuture.supplyAsync(
+                () -> {
+                    protoChunk.fillBiomesFromNoise(source::getNoiseBiome);
+                    return protoChunk;
+                },
+                Util.backgroundExecutor().forName("geoworld-biomes")
+            );
+        }
         return super.createBiomes(
             randomState,
             blender,
