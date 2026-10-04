@@ -113,17 +113,29 @@ func TestRiverDepthTapersSmoothlyToBank(t *testing.T) {
 	if center.WaterKind != reconcile.WaterRiver || !center.WaterSurfaceDefined {
 		t.Fatalf("expected river center water, got %+v", center)
 	}
+	widthT := (wb.Rivers[0].HalfWidth - wb.Config.MinRiverHalfWidthBlocks) /
+		(wb.Config.MaxRiverHalfWidthBlocks - wb.Config.MinRiverHalfWidthBlocks)
+	expectedCenterDepth := 0.01 * (1 + 2*math.Pow(widthT, 1.15))
 	if math.Abs(center.RiverWeight-1) > 1e-12 ||
-		math.Abs(center.WaterDepth-0.01) > 1e-12 {
-		t.Fatalf("river center depth wrong: %+v", center)
+		math.Abs(center.WaterDepth-expectedCenterDepth) > 1e-12 {
+		t.Fatalf(
+			"river center depth wrong: got=%.6f want=%.6f sample=%+v",
+			center.WaterDepth, expectedCenterDepth, center,
+		)
 	}
 
-	nearBank := m.Sample(midX, z0+8)
+	nearBank := m.Sample(midX, z0+6)
 	if nearBank.WaterKind != reconcile.WaterRiver || !nearBank.WaterSurfaceDefined {
-		t.Fatalf("expected tapered river water inside bank, got %+v", nearBank)
+		t.Fatalf("expected river water inside bank, got %+v", nearBank)
 	}
 	if !(nearBank.WaterDepth > 0 && nearBank.WaterDepth < center.WaterDepth) {
 		t.Fatalf("river depth did not taper: center=%.6f bank=%.6f", center.WaterDepth, nearBank.WaterDepth)
+	}
+	if math.Abs(nearBank.WaterSurfaceElevation-center.WaterSurfaceElevation) > 1e-12 {
+		t.Fatalf(
+			"river cross-section water plane is not flat: center=%.6f bank=%.6f",
+			center.WaterSurfaceElevation, nearBank.WaterSurfaceElevation,
+		)
 	}
 
 	shallowFringe := m.Sample(midX, z0+17)

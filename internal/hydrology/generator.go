@@ -139,7 +139,10 @@ func normalizeConfig(cfg Config) Config {
 		cfg.SeasonalityRunoffBoost = 0.22
 	}
 	if cfg.RiverQuantile <= 0.5 || cfg.RiverQuantile >= 1 {
-		cfg.RiverQuantile = 0.965
+		// Keep the large drainage skeleton selective, but admit enough
+		// headwater cells to form visible tributary trees instead of isolated
+		// trunk fragments.
+		cfg.RiverQuantile = 0.95
 	}
 	if cfg.MinRiverAccumulation <= 0 {
 		cfg.MinRiverAccumulation = 5000

@@ -7,8 +7,9 @@ import (
 	"geoworld/internal/world"
 )
 
-// Config defines Runtime-facing water semantics. River depth remains normalized
-// until Phase 6.3/6.4 freezes the normalized-height <-> Minecraft Y mapping.
+// Config defines Runtime-facing water semantics. RiverCenterDepthNormalized is
+// the headwater/base center depth; larger Waterbed channels scale it upward
+// deterministically while keeping one level cross-section water datum.
 type Config struct {
 	RiverCenterDepthNormalized   float64
 	MinRiverWaterDepthNormalized float64 `json:",omitempty"`

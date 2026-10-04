@@ -83,7 +83,8 @@ func TestRiverCorridorNeverRaisesBroadTerrain(t *testing.T) {
 	x0, z0 := g.NodePosition(0, 1)
 	x1, _ := g.NodePosition(1, 1)
 	got := m.Sample((x0+x1)*0.5, z0)
-	want := 0.60 - m.Config.MinRiverBedDepthNormalized
+	want := 0.60 - m.Config.MinRiverBedDepthNormalized*
+		(1+1.5*riverWidthFraction(m.Config, m.Rivers[0].HalfWidth))
 	if math.Abs(got.FinalHeight-want) > 1e-12 || got.RiverCarve <= 0 {
 		t.Fatalf("river centerline was not embedded into broad terrain: got=%+v wantHeight=%.6f", got, want)
 	}
@@ -167,6 +168,55 @@ func TestLakeBasinCarvesToCeilingAndExposesWaterSurface(t *testing.T) {
 	far := m.Sample(x+100, z)
 	if math.Abs(far.FinalHeight-0.70) > 1e-12 || far.LakeCarve != 0 {
 		t.Fatalf("lake carve leaked outside local footprint: %+v", far)
+	}
+}
+
+func TestLakeSurfaceCapsAtDetailedSpillRim(t *testing.T) {
+	g := testGeometry()
+	// The macro lake claims a 0.70 datum but detailed terrain around its
+	// rendered footprint is only 0.55. A physically valid lake must spill/lower
+	// instead of standing as a raised wall above the surrounding land.
+	base := testTerrain(t, g, 0.55)
+	n := g.Width * g.Height
+	center := 4
+	rec := &reconcile.Model{
+		Geometry:              g,
+		Config:                reconcile.Config{RiverStrengthThreshold: 0.20},
+		RiverBaseElevation:    filled(n, 0.55),
+		RiverBedTarget:        filled(n, 0.55),
+		LakeBedCeilingDefined: make([]bool, n),
+		LakeBedCeiling:        make([]float64, n),
+		WaterKind:             make([]reconcile.WaterKind, n),
+		WaterSurfaceDefined:   make([]bool, n),
+		WaterSurfaceElevation: make([]float64, n),
+	}
+	rec.LakeBedCeilingDefined[center] = true
+	rec.LakeBedCeiling[center] = 0.65
+	rec.WaterKind[center] = reconcile.WaterLake
+	rec.WaterSurfaceDefined[center] = true
+	rec.WaterSurfaceElevation[center] = 0.70
+
+	h := emptyHydrology(g)
+	h.LakeID[center] = 1
+	m, err := Build(base, rec, h, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Lakes) != 1 {
+		t.Fatalf("lake nodes=%d want=1", len(m.Lakes))
+	}
+	lake := m.Lakes[0]
+	if lake.WaterSurface >= 0.55 {
+		t.Fatalf(
+			"invalid raised lake survived detailed spill rim: surface=%.6f rim=0.55",
+			lake.WaterSurface,
+		)
+	}
+	if lake.BedCeiling >= lake.WaterSurface {
+		t.Fatalf(
+			"lake bed not kept below capped surface: bed=%.6f surface=%.6f",
+			lake.BedCeiling, lake.WaterSurface,
+		)
 	}
 }
 
@@ -332,7 +382,9 @@ func TestTerminalRiverSegmentInheritsOceanSurfaceAtItsEndpoint(t *testing.T) {
 
 func TestDiagonalRiverSeesSquareLakeReceiver(t *testing.T) {
 	g := testGeometry()
-	base := testTerrain(t, g, 0.55)
+	// Keep the detailed rim above the synthetic 0.60 lake datum; this test is
+	// about diagonal river/lake intersection, not spill-rim correction.
+	base := testTerrain(t, g, 0.70)
 	n := g.Width * g.Height
 
 	rec := &reconcile.Model{

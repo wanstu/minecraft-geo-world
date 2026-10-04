@@ -243,7 +243,13 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		worldZ,
 		560,
 	))
-	summit := math.Pow(ridgeIntersection, 2.35) * 0.085 * summitMod
+	summit := math.Pow(ridgeIntersection, 2.35) * 0.075 * summitMod
+	// Add sparse, localized summit nodes along the ridge network. The previous
+	// ridge-only term made elevated crests, but from eye level they could still
+	// read as long rounded backs rather than individual peaks.
+	peakBlob := cellularPeak(m.Config.Seed+547, worldX, worldZ, 720)
+	localizedSummit := math.Pow(peakBlob, 2.6) *
+		smoothstep01(0.42, 0.82, crest) * 0.105
 
 	// Low parts of the same ridge field become saddles / dry head valleys.
 	// River-cut valleys are handled separately below by the real hydrologic
@@ -257,7 +263,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		plain*plainDetail +
 			hill*hillDetail +
 			foothill*foothillDetail +
-			mountain*(mountainDetail+mountainCrest+summit+slopeWave-structuralSaddle) +
+			mountain*(mountainDetail+mountainCrest+summit+localizedSummit+slopeWave-structuralSaddle) +
 			plateau*plateauDetail
 
 	// Broad depositional lowlands should be smoother than surrounding terrain.
@@ -387,6 +393,31 @@ func fbm(seed int64, x, z, wavelength float64, octaves int) float64 {
 		return 0
 	}
 	return sum / sumAmplitude
+}
+
+func cellularPeak(seed int64, x, z, cellSize float64) float64 {
+	if cellSize <= 0 {
+		return 0
+	}
+	gx := int64(math.Floor(x / cellSize))
+	gz := int64(math.Floor(z / cellSize))
+	best := 0.0
+	for dz := int64(-1); dz <= 1; dz++ {
+		for dx := int64(-1); dx <= 1; dx++ {
+			cx := gx + dx
+			cz := gz + dz
+			ux := 0.5 + 0.5*hashValue(seed+17, cx, cz)
+			uz := 0.5 + 0.5*hashValue(seed+53, cx, cz)
+			px := (float64(cx) + 0.16 + 0.68*ux) * cellSize
+			pz := (float64(cz) + 0.16 + 0.68*uz) * cellSize
+			d := math.Hypot(x-px, z-pz) / (cellSize * 0.46)
+			blob := 1 - smoothstep01(0.08, 1, d)
+			if blob > best {
+				best = blob
+			}
+		}
+	}
+	return clamp(best, 0, 1)
 }
 
 func ridgedFbm(seed int64, x, z, wavelength float64, octaves int) float64 {

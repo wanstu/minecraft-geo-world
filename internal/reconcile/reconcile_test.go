@@ -184,6 +184,57 @@ func TestRiverConstraintKeepsTerminalEdgeIntoOcean(t *testing.T) {
 	}
 }
 
+func TestRiverTopologyClosesWeakAndFlatDownstreamToOcean(t *testing.T) {
+	raw := []float64{0.64, 0.64, 0.63, 0.49}
+	m := &Model{
+		Config: Config{
+			RiverStrengthThreshold:    0.20,
+			OriginalDownhillEpsilon:   1e-6,
+			FinalUpslopeEpsilon:       1e-5,
+			MinRiverBedDropNormalized: 1e-5,
+		},
+		RawTerrainElevation:   append([]float64(nil), raw...),
+		RiverBedTarget:        append([]float64(nil), raw...),
+		WaterKind:             []WaterKind{WaterNone, WaterNone, WaterNone, WaterOcean},
+		WaterSurfaceDefined:   []bool{false, false, false, true},
+		WaterSurfaceElevation: []float64{0, 0, 0, 0.50},
+		RiverBedActive:        make([]bool, len(raw)),
+	}
+	h := &hydrology.Model{
+		Width:    4,
+		Height:   1,
+		LandMask: []bool{true, true, true, false},
+		FlowTo:   []int{1, 2, 3, -1},
+		LakeID:   []int{0, 0, 0, 0},
+		// Only the headwater qualifies. The downstream cells deliberately fall
+		// below threshold; topology must still keep 0->1->2->ocean continuous.
+		RiverStrength: []float64{0.35, 0.10, 0.0, 0},
+	}
+	macro := []float64{0.70, 0.70, 0.62, 0.40}
+
+	if err := m.buildRiverConstraints(macro, h, raw); err != nil {
+		t.Fatal(err)
+	}
+	if len(m.RiverEdges) != 3 {
+		t.Fatalf("closed river edges=%d want=3", len(m.RiverEdges))
+	}
+	want := [][2]int{{0, 1}, {1, 2}, {2, 3}}
+	for i, edge := range m.RiverEdges {
+		if edge.From != want[i][0] || edge.To != want[i][1] {
+			t.Fatalf(
+				"edge[%d]=%d->%d want=%d->%d",
+				i, edge.From, edge.To, want[i][0], want[i][1],
+			)
+		}
+	}
+	if m.WaterKind[1] != WaterRiver || m.WaterKind[2] != WaterRiver {
+		t.Fatalf("weak downstream cells were not retained as river: %v", m.WaterKind)
+	}
+	if m.TargetUpslopeRiverEdges != 0 {
+		t.Fatalf("closed river still has %d target upslope edges", m.TargetUpslopeRiverEdges)
+	}
+}
+
 func TestLakeConstraintExposesWaterSurfaceAndBedCeiling(t *testing.T) {
 	m := &Model{
 		Config:                Config{LakeBedClearanceNormalized: 0.01},

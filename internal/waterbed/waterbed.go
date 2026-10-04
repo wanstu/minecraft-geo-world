@@ -112,13 +112,14 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 		draft := drafts[edgeID]
 		bed0 := effectiveBed[draft.edge.From]
 		bed1 := math.Min(effectiveBed[draft.edge.To], bed0)
+		widthT := riverWidthFraction(cfg, draft.halfWidth)
 		profile := buildRiverProfile(
 			base,
 			draft.x0, draft.z0,
 			draft.x1, draft.z1,
 			bed0, bed1,
 			cfg.RiverProfileStepBlocks,
-			cfg.MinRiverBedDepthNormalized,
+			cfg.MinRiverBedDepthNormalized*(1+1.5*widthT),
 		)
 		if len(profile) == 0 {
 			return nil, errors.New("waterbed: river profile is empty")
@@ -147,17 +148,6 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 	}
 	if processed != len(drafts) {
 		return nil, errors.New("waterbed: river graph contains a cycle")
-	}
-
-	for i := range m.Rivers {
-		surface, ok, err := downstreamReceiverSurface(m.Rivers[i].To, rec, hydro)
-		if err != nil {
-			return nil, err
-		}
-		if ok {
-			m.Rivers[i].ReceiverSurfaceDefined = true
-			m.Rivers[i].ReceiverSurface = surface
-		}
 	}
 
 	spacing := base.Geometry.SpacingX()
@@ -192,6 +182,35 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 	// Treat any such spatial intersection as the same receiving-water backwater
 	// constraint so Runtime does not jump upward from shallow river water to the
 	// lake datum at the footprint boundary.
+	// Macro hydrology finds closed basins at 128-block control points, while
+	// the detailed terrain adds sub-cell relief afterwards. Recheck every lake
+	// against the actual detailed terrain around the union of its rendered
+	// footprint. If a lower local spill route exists, lower the lake datum to
+	// that rim instead of rendering a raised reservoir wall.
+	capLakeSurfacesToDetailedRims(base, m.Lakes)
+
+	lakeSurfaces := make(map[int]float64)
+	for _, lake := range m.Lakes {
+		if old, ok := lakeSurfaces[lake.LakeID]; !ok || lake.WaterSurface < old {
+			lakeSurfaces[lake.LakeID] = lake.WaterSurface
+		}
+	}
+	for i := range m.Rivers {
+		surface, ok, err := downstreamReceiverSurface(
+			m.Rivers[i].To,
+			rec,
+			hydro,
+			lakeSurfaces,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			m.Rivers[i].ReceiverSurfaceDefined = true
+			m.Rivers[i].ReceiverSurface = surface
+		}
+	}
+
 	for i := range m.Rivers {
 		seg := &m.Rivers[i]
 		for _, lake := range m.Lakes {
@@ -209,6 +228,72 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 	}
 
 	return m, nil
+}
+
+func capLakeSurfacesToDetailedRims(base *terrain.Model, lakes []LakeNode) {
+	if base == nil || len(lakes) == 0 {
+		return
+	}
+	groups := make(map[int][]int)
+	for i := range lakes {
+		groups[lakes[i].LakeID] = append(groups[lakes[i].LakeID], i)
+	}
+
+	spacing := base.Geometry.SpacingX()
+	rimOffset := math.Max(2, spacing*0.025)
+	const angularSamples = 48
+	const bankClearance = 0.0007
+	const minLakeDepth = 0.004
+
+	for _, ids := range groups {
+		minRim := math.Inf(1)
+		for _, id := range ids {
+			node := lakes[id]
+			radius := node.OuterRadius + rimOffset
+			for j := 0; j < angularSamples; j++ {
+				angle := 2 * math.Pi * float64(j) / angularSamples
+				x := node.X + math.Cos(angle)*radius
+				z := node.Z + math.Sin(angle)*radius
+
+				// Only inspect exposed portions of the union boundary. A sample
+				// still covered by a sibling node belongs to the lake interior.
+				insideSibling := false
+				for _, otherID := range ids {
+					other := lakes[otherID]
+					if math.Hypot(x-other.X, z-other.Z) < other.OuterRadius {
+						insideSibling = true
+						break
+					}
+				}
+				if insideSibling {
+					continue
+				}
+				h := base.SampleNormalized(x, z)
+				if h < minRim {
+					minRim = h
+				}
+			}
+		}
+		if !finite(minRim) {
+			continue
+		}
+
+		for _, id := range ids {
+			node := &lakes[id]
+			cappedSurface := math.Min(
+				node.WaterSurface,
+				math.Max(0, minRim-bankClearance),
+			)
+			if cappedSurface >= node.WaterSurface-1e-12 {
+				continue
+			}
+			node.WaterSurface = cappedSurface
+			maxBed := math.Max(0, cappedSurface-minLakeDepth)
+			if node.BedCeiling > maxBed {
+				node.BedCeiling = maxBed
+			}
+		}
+	}
 }
 
 func (m *Model) SampleNormalized(worldX, worldZ float64) float64 {
@@ -229,6 +314,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		return sample
 	}
 
+	riverDatumWeight := -1.0
 	for _, id := range m.riverBuckets[bucket] {
 		seg := m.Rivers[id]
 		t, distance := pointSegment(worldX, worldZ, seg.X0, seg.Z0, seg.X1, seg.Z1)
@@ -239,6 +325,19 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		weight := 1 - smoothstep(0, seg.HalfWidth, distance)
 		if weight > sample.RiverWeight {
 			sample.RiverWeight = weight
+		}
+		// Water level should follow the channel that actually owns this point,
+		// not a deeper neighbouring branch whose bank merely overlaps here.
+		// Prefer the segment with the strongest lateral weight; at an exact
+		// confluence tie, prefer the higher upstream bed so water cannot vanish
+		// between two connected centerlines.
+		if !sample.RiverBedDefined ||
+			weight > riverDatumWeight+1e-12 ||
+			(math.Abs(weight-riverDatumWeight) <= 1e-12 && bed > sample.RiverBedElevation) {
+			sample.RiverBedDefined = true
+			sample.RiverBedElevation = bed
+			sample.RiverHalfWidth = seg.HalfWidth
+			riverDatumWeight = weight
 		}
 		if seg.ReceiverSurfaceDefined &&
 			(!sample.RiverReceiverSurfaceDefined || seg.ReceiverSurface > sample.RiverReceiverSurface) {
@@ -403,7 +502,12 @@ func sampleRiverProfile(seg RiverSegment, t float64) float64 {
 	return lerp(seg.Profile[i0], seg.Profile[i1], f)
 }
 
-func downstreamReceiverSurface(start int, rec *reconcile.Model, hydro *hydrology.Model) (float64, bool, error) {
+func downstreamReceiverSurface(
+	start int,
+	rec *reconcile.Model,
+	hydro *hydrology.Model,
+	lakeSurfaces map[int]float64,
+) (float64, bool, error) {
 	n := len(hydro.FlowTo)
 	if start < 0 || start >= n {
 		return 0, false, errors.New("waterbed: receiver search start is out of range")
@@ -412,10 +516,19 @@ func downstreamReceiverSurface(start int, rec *reconcile.Model, hydro *hydrology
 	for steps := 0; steps < n; steps++ {
 		if rec.WaterSurfaceDefined[node] {
 			switch rec.WaterKind[node] {
-			case reconcile.WaterLake, reconcile.WaterOcean:
+			case reconcile.WaterLake:
+				if surface, ok := lakeSurfaces[hydro.LakeID[node]]; ok {
+					return surface, true, nil
+				}
 				surface := rec.WaterSurfaceElevation[node]
 				if !finite(surface) || surface < 0 || surface > 1 {
-					return 0, false, errors.New("waterbed: invalid downstream receiver surface")
+					return 0, false, errors.New("waterbed: invalid downstream lake surface")
+				}
+				return surface, true, nil
+			case reconcile.WaterOcean:
+				surface := rec.WaterSurfaceElevation[node]
+				if !finite(surface) || surface < 0 || surface > 1 {
+					return 0, false, errors.New("waterbed: invalid downstream ocean surface")
 				}
 				return surface, true, nil
 			}
@@ -443,6 +556,11 @@ func riverHalfWidth(cfg Config, threshold, strength float64) float64 {
 	// rivers abruptly wide.
 	t = math.Sqrt(t)
 	return lerp(cfg.MinRiverHalfWidthBlocks, cfg.MaxRiverHalfWidthBlocks, t)
+}
+
+func riverWidthFraction(cfg Config, halfWidth float64) float64 {
+	denom := math.Max(1e-9, cfg.MaxRiverHalfWidthBlocks-cfg.MinRiverHalfWidthBlocks)
+	return clamp((halfWidth-cfg.MinRiverHalfWidthBlocks)/denom, 0, 1)
 }
 
 func pointSegment(px, pz, x0, z0, x1, z1 float64) (float64, float64) {

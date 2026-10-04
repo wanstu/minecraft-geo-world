@@ -372,18 +372,60 @@ func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Mod
 		edgeTo[i] = -1
 	}
 
-	for i, to := range h.FlowTo {
-		// Keep the final land -> lake/ocean edge. The receiver itself does not
-		// need to be land: Waterbed needs this geometric segment so the rendered
-		// channel reaches the receiving waterbody instead of ending one macro
-		// cell inland.
-		if to < 0 || to >= n ||
-			!h.LandMask[i] ||
-			h.LakeID[i] != 0 ||
-			h.RiverStrength[i] < m.Config.RiverStrengthThreshold {
+	// RiverStrength decides where visible tributaries begin, but once a stream
+	// has begun its downstream FlowTo chain is topology, not an optional local
+	// classification. Trace every qualifying source all the way into a lake,
+	// ocean, or model outlet. This prevents a main stem from disappearing
+	// because one downstream macro cell is flat or falls just below a local
+	// strength threshold.
+	for seed := range h.FlowTo {
+		if !h.LandMask[seed] ||
+			h.LakeID[seed] != 0 ||
+			h.RiverStrength[seed] < m.Config.RiverStrengthThreshold {
+			continue
+		}
+		to := h.FlowTo[seed]
+		if to < 0 || to >= n {
 			continue
 		}
 		m.QualifyingRiverEdges++
+
+		cur := seed
+		for steps := 0; steps < n; steps++ {
+			if cur < 0 || cur >= n ||
+				!h.LandMask[cur] ||
+				h.LakeID[cur] != 0 {
+				break
+			}
+			next := h.FlowTo[cur]
+			if next < 0 || next >= n {
+				break
+			}
+			if active[cur] {
+				// This source has joined a downstream chain already traced by
+				// another source. The rest of the route is already guaranteed.
+				break
+			}
+
+			active[cur] = true
+			edgeTo[cur] = next
+			indegree[next]++
+			m.RiverBedActive[cur] = true
+			m.RiverBedActive[next] = true
+
+			// Keep the terminal land -> receiving-water edge, then stop.
+			if !h.LandMask[next] || h.LakeID[next] != 0 {
+				break
+			}
+			cur = next
+		}
+	}
+
+	for i, isActive := range active {
+		if !isActive {
+			continue
+		}
+		to := edgeTo[i]
 		if m.WaterKind[i] == WaterNone {
 			m.WaterKind[i] = WaterRiver
 		}
@@ -392,24 +434,21 @@ func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Mod
 		}
 
 		originalDrop := macroElevation[i] - macroElevation[to]
-		if originalDrop <= m.Config.OriginalDownhillEpsilon {
-			continue
+		if originalDrop > m.Config.OriginalDownhillEpsilon {
+			m.OriginallyDownhillEdges++
 		}
-		m.OriginallyDownhillEdges++
-
 		rawRise := bedBase[to] - bedBase[i]
 		if rawRise > m.Config.FinalUpslopeEpsilon {
 			m.RawUpslopeRiverEdges++
 		}
 
-		active[i] = true
-		edgeTo[i] = to
-		indegree[to]++
-		m.RiverBedActive[i] = true
-		m.RiverBedActive[to] = true
+		strength := math.Max(
+			h.RiverStrength[i],
+			m.Config.RiverStrengthThreshold,
+		)
 		m.RiverEdges = append(m.RiverEdges, RiverEdgeConstraint{
 			From: i, To: to,
-			RiverStrength:  h.RiverStrength[i],
+			RiverStrength:  strength,
 			OriginalDrop:   originalDrop,
 			RawTerrainRise: rawRise,
 		})
@@ -552,7 +591,10 @@ func normalizeConfig(cfg Config, seaLevel float64) (Config, error) {
 		return Config{}, errors.New("reconcile: coast margin must be finite, positive and fit inside normalized height range")
 	}
 	if cfg.RiverStrengthThreshold == 0 {
-		cfg.RiverStrengthThreshold = 0.30
+		// Hydrology's first valid river cells are ~0.227 strength at the
+		// accumulation threshold. Keep reconciliation below that so small
+		// tributaries are not silently discarded before topology closure.
+		cfg.RiverStrengthThreshold = 0.20
 	}
 	if !finite(cfg.RiverStrengthThreshold) || cfg.RiverStrengthThreshold <= 0 || cfg.RiverStrengthThreshold > 1 {
 		return Config{}, errors.New("reconcile: river strength threshold must be finite and inside (0,1]")

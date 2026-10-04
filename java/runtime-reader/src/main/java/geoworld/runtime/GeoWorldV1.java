@@ -199,6 +199,9 @@ public final class GeoWorldV1 {
     private record GroundSample(
         double finalHeight,
         double riverWeight,
+        double riverHalfWidth,
+        boolean riverBedDefined,
+        double riverBedElevation,
         boolean riverReceiverSurfaceDefined,
         double riverReceiverSurface,
         WaterKind waterKind,
@@ -251,12 +254,18 @@ public final class GeoWorldV1 {
         double oceanEligibilityThreshold
     ) {}
 
+    private record WaterbedConfig(
+        double minRiverHalfWidthBlocks,
+        double maxRiverHalfWidthBlocks
+    ) {}
+
     private final Manifest manifest;
     private final Geometry geometry;
     private final boolean[] landMask;
     private final Terrain terrain;
     private final List<RiverSegment> rivers;
     private final List<LakeNode> lakes;
+    private final WaterbedConfig waterbedConfig;
     private final ScalarGrid oceanEligibility;
     private final WorldSampleConfig worldSampleConfig;
     private final ScalarGrid climateTemp;
@@ -278,6 +287,7 @@ public final class GeoWorldV1 {
         Terrain terrain,
         List<RiverSegment> rivers,
         List<LakeNode> lakes,
+        WaterbedConfig waterbedConfig,
         WorldSampleConfig worldSampleConfig,
         ScalarGrid climateTemp,
         ScalarGrid climatePrecip,
@@ -298,6 +308,7 @@ public final class GeoWorldV1 {
         this.terrain = terrain;
         this.rivers = rivers;
         this.lakes = lakes;
+        this.waterbedConfig = waterbedConfig;
         this.worldSampleConfig = worldSampleConfig;
         this.climateTemp = climateTemp;
         this.climatePrecip = climatePrecip;
@@ -458,6 +469,20 @@ public final class GeoWorldV1 {
             Json.required(payload, "waterbed"),
             "payload.waterbed"
         );
+        Map<String, Object> waterbedConfigObject = Json.object(
+            Json.required(waterbedObject, "config"),
+            "waterbed.config"
+        );
+        WaterbedConfig waterbedConfig = new WaterbedConfig(
+            Json.doubleValue(
+                waterbedConfigObject,
+                "MinRiverHalfWidthBlocks"
+            ),
+            Json.doubleValue(
+                waterbedConfigObject,
+                "MaxRiverHalfWidthBlocks"
+            )
+        );
         List<RiverSegment> rivers = parseRivers(
             Json.arrayOrEmpty(
                 Json.required(waterbedObject, "rivers"),
@@ -613,6 +638,7 @@ public final class GeoWorldV1 {
             terrain,
             List.copyOf(rivers),
             List.copyOf(lakes),
+            waterbedConfig,
             worldSampleConfig,
             climateTemp,
             climatePrecip,
@@ -665,27 +691,43 @@ public final class GeoWorldV1 {
         }
 
         if (ground.waterKind() == WaterKind.RIVER && ground.riverWeight() > 0) {
-            double depth =
-                worldSampleConfig.riverCenterDepthNormalized() * ground.riverWeight();
-            if (
-                ground.riverReceiverSurfaceDefined() &&
-                ground.riverReceiverSurface() > ground.finalHeight()
-            ) {
-                double backwaterDepth =
-                    (ground.riverReceiverSurface() - ground.finalHeight()) * ground.riverWeight();
-                if (backwaterDepth > depth) {
-                    depth = backwaterDepth;
+            double widthSpan = Math.max(
+                1.0e-9,
+                waterbedConfig.maxRiverHalfWidthBlocks() -
+                    waterbedConfig.minRiverHalfWidthBlocks()
+            );
+            double widthT = clamp(
+                (ground.riverHalfWidth() -
+                    waterbedConfig.minRiverHalfWidthBlocks()) /
+                    widthSpan,
+                0,
+                1
+            );
+            double centerDepth =
+                worldSampleConfig.riverCenterDepthNormalized() *
+                (1 + 2 * Math.pow(widthT, 1.15));
+            if (ground.riverBedDefined()) {
+                double surface =
+                    ground.riverBedElevation() + centerDepth;
+                if (
+                    ground.riverReceiverSurfaceDefined() &&
+                    ground.riverReceiverSurface() > surface
+                ) {
+                    surface = ground.riverReceiverSurface();
                 }
-            }
-            if (depth >= worldSampleConfig.minRiverWaterDepthNormalized()) {
-                double surface = Math.min(1.0, ground.finalHeight() + depth);
-                if (surface > ground.finalHeight()) {
+                surface = Math.min(1.0, surface);
+                double localDepth =
+                    surface - ground.finalHeight();
+                if (
+                    localDepth >=
+                    worldSampleConfig.minRiverWaterDepthNormalized()
+                ) {
                     return new WorldSample(
                         ground.finalHeight(),
                         WaterKind.RIVER,
                         true,
                         surface,
-                        surface - ground.finalHeight(),
+                        localDepth,
                         ocean,
                         ground.riverWeight()
                     );
@@ -708,6 +750,10 @@ public final class GeoWorldV1 {
         double baseHeight = terrain.sampleNormalized(x, z);
         double finalHeight = baseHeight;
         double riverWeight = 0;
+        double riverHalfWidth = 0;
+        boolean riverBedDefined = false;
+        double riverBedElevation = 0;
+        double riverDatumWeight = -1;
         boolean receiverDefined = false;
         double receiverSurface = 0;
         WaterKind kind = WaterKind.NONE;
@@ -725,6 +771,19 @@ public final class GeoWorldV1 {
             double weight = 1 - smoothstep(0, segment.halfWidth(), point.distance());
             if (weight > riverWeight) {
                 riverWeight = weight;
+            }
+            if (
+                !riverBedDefined ||
+                weight > riverDatumWeight + 1.0e-12 ||
+                (
+                    Math.abs(weight - riverDatumWeight) <= 1.0e-12 &&
+                    bed > riverBedElevation
+                )
+            ) {
+                riverBedDefined = true;
+                riverBedElevation = bed;
+                riverHalfWidth = segment.halfWidth();
+                riverDatumWeight = weight;
             }
             if (
                 segment.receiverSurfaceDefined() &&
@@ -776,6 +835,9 @@ public final class GeoWorldV1 {
         return new GroundSample(
             finalHeight,
             riverWeight,
+            riverHalfWidth,
+            riverBedDefined,
+            riverBedElevation,
             receiverDefined,
             receiverSurface,
             kind,
@@ -1567,8 +1629,18 @@ public final class GeoWorldV1 {
                 );
             double summit =
                 Math.pow(ridgeIntersection, 2.35) *
-                0.085 *
+                0.075 *
                 summitMod;
+            double peakBlob = cellularPeak(
+                config.seed() + 547,
+                x,
+                z,
+                720
+            );
+            double localizedSummit =
+                Math.pow(peakBlob, 2.6) *
+                smoothstep(0.42, 0.82, crest) *
+                0.105;
             double structuralSaddle =
                 Math.pow(clamp(1 - crest, 0, 1), 2.4) *
                 0.028;
@@ -1587,6 +1659,7 @@ public final class GeoWorldV1 {
                     mountainDetail +
                     mountainCrest +
                     summit +
+                    localizedSummit +
                     slopeWave -
                     structuralSaddle
                 ) +
@@ -1775,6 +1848,43 @@ public final class GeoWorldV1 {
             currentWavelength *= 0.5;
         }
         return sumAmplitude <= 0 ? 0 : sum / sumAmplitude;
+    }
+
+    private static double cellularPeak(
+        long seed,
+        double x,
+        double z,
+        double cellSize
+    ) {
+        if (cellSize <= 0) {
+            return 0;
+        }
+        long gx = (long)Math.floor(x / cellSize);
+        long gz = (long)Math.floor(z / cellSize);
+        double best = 0;
+        for (long dz = -1; dz <= 1; dz++) {
+            for (long dx = -1; dx <= 1; dx++) {
+                long cx = gx + dx;
+                long cz = gz + dz;
+                double ux =
+                    0.5 + 0.5 * hashValue(seed + 17, cx, cz);
+                double uz =
+                    0.5 + 0.5 * hashValue(seed + 53, cx, cz);
+                double px =
+                    (cx + 0.16 + 0.68 * ux) * cellSize;
+                double pz =
+                    (cz + 0.16 + 0.68 * uz) * cellSize;
+                double d =
+                    Math.hypot(x - px, z - pz) /
+                    (cellSize * 0.46);
+                double blob =
+                    1 - smoothstep(0.08, 1, d);
+                if (blob > best) {
+                    best = blob;
+                }
+            }
+        }
+        return clamp(best, 0, 1);
     }
 
     private static double ridgedFbm(

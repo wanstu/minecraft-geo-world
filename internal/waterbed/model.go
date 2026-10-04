@@ -82,6 +82,9 @@ type Sample struct {
 
 	RiverCarve                  float64
 	RiverWeight                 float64
+	RiverHalfWidth              float64
+	RiverBedDefined             bool
+	RiverBedElevation           float64
 	RiverReceiverSurfaceDefined bool
 	RiverReceiverSurface        float64
 	LakeCarve                   float64

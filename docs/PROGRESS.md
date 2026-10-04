@@ -1532,3 +1532,34 @@ t5 实测变化：
 - Minecraft storage/save writer 通过；
 - verifyGeoWorldEngine / verifyGeoWorldSpawn 通过；
 - 最新 MOD 已自动部署 HMCL 26.3。
+
+## 2026-10-04 · 河网连续性、湖泊泄洪口、河面与山峰收口
+
+用户针对 t7 / Seed=123456 实测反馈：
+- 山脉已有趋势但缺少明确峰体；
+- X≈9769 Z≈-474 附近湖泊出现高架水库/水墙；
+- 河流缺少支脉，主脉/支脉存在断流；
+- 河流水面仍有两侧有水、中间无水的情况，希望直接检查已加载 Chunk。
+
+调查与修复：
+- 核对 t7 的实际存档与 Region：截图位置属于 overworld Region r.19.-1.mca，确认问题来自真实 ChunkGenerator 结果，不是地图 MOD 显示误差。
+- 河网拓扑闭合：RiverStrength 只决定河流从哪里开始；一旦开始，后续沿 FlowTo 持续追踪直到湖泊、海洋或模型出口，不再因为下游局部 strength/坡度不足而中断。
+- Reconcile 默认 RiverStrengthThreshold 0.30 -> 0.20；Hydrology RiverQuantile 0.965 -> 0.95，保留更多合理支流。
+- 新 Seed=123456 模型：RiverSegment 由旧约 368 增至 948；70 个终点，错误终点 0。
+- 主脉深度随河宽增加：headwater/base depth 保持原值，宽河可达到约 3x 基础中心深度；河床 profile 同样随 width 加深。
+- 修复重叠河段造成的断水：River 水面 datum 绑定“横向权重最高的实际所属河段”，而不是误取邻近更深分支；在 exact confluence tie 时取较高上游 bed，避免两条已连接中心线之间出现干格。
+- 对 Seed=123456 的 948 条河流中心线按约 2 blocks 间隔全量采样：67398 个采样点，dry=0。
+- 河流横断面改成同一水面 datum，靠河床/河岸起伏产生深度变化；946 个抽查横断面 nonFlat=0。
+- 湖泊增加 detailed spill-rim 复核：宏观 hydrology 判定 lake 后，再沿实际细节地形外缘寻找低泄洪口；若低于原湖面则主动降低 lake datum，并同步压低 lake bed ceiling，避免高架水库墙。
+- t7 截图附近原问题湖的旧 lake surface 约 Y124；新模型按真实 rim 修正后约 Y108。
+- 山地增加 cellular localized summit：约 720 blocks 分布尺度的稀疏峰节点叠加在 ridge network 上，不再只生成长而圆的山脊；保持已有 saddle / hydrologic valley 结构。
+
+验证：
+- go test ./... -count=1 全绿；
+- 新增 Reconcile downstream topology closure、Lake detailed spill-rim 等回归测试；
+- golden vectors 重新生成；
+- Java Runtime GoldenVerifier 15/15；
+- Minecraft save writer/storage 验证通过；
+- NeoForge compileJava --rerun-tasks 通过；
+- build.cmd verifyGeoWorldEngine verifyGeoWorldSpawn 通过；
+- 最新 MOD 已自动部署 HMCL 26.3。

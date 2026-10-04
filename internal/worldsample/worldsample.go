@@ -104,25 +104,44 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	// RiverWeight, so it raises water depth inside the channel without flooding
 	// the surrounding broad terrain.
 	if ground.WaterKind == reconcile.WaterRiver && ground.RiverWeight > 0 {
-		depth := m.Config.RiverCenterDepthNormalized * ground.RiverWeight
-		if ground.RiverReceiverSurfaceDefined && ground.RiverReceiverSurface > ground.FinalHeight {
-			backwaterDepth := (ground.RiverReceiverSurface - ground.FinalHeight) * ground.RiverWeight
-			if backwaterDepth > depth {
-				depth = backwaterDepth
+		// River size is already encoded by Waterbed half-width. Make the main
+		// stem physically deeper than headwater tributaries while preserving the
+		// same smoothly tapered banks.
+		widthSpan := math.Max(
+			1e-9,
+			m.Ground.Config.MaxRiverHalfWidthBlocks-
+				m.Ground.Config.MinRiverHalfWidthBlocks,
+		)
+		widthT := math.Max(
+			0,
+			math.Min(
+				1,
+				(ground.RiverHalfWidth-m.Ground.Config.MinRiverHalfWidthBlocks)/
+					widthSpan,
+			),
+		)
+		centerDepth := m.Config.RiverCenterDepthNormalized *
+			(1 + 2*math.Pow(widthT, 1.15))
+		// A real river cross-section has an approximately level water surface;
+		// depth changes toward the bank because the bed rises, not because the
+		// water plane itself tilts sideways. Use the centerline bed to define one
+		// local datum and let the carved bank decide where that datum intersects
+		// terrain.
+		if ground.RiverBedDefined {
+			surface := ground.RiverBedElevation + centerDepth
+			if ground.RiverReceiverSurfaceDefined &&
+				ground.RiverReceiverSurface > surface {
+				surface = ground.RiverReceiverSurface
 			}
-		}
-		// The continuous river profile tapers to zero at the bank, but
-		// Minecraft renders whole blocks. Exposing sub-block-thin water here
-		// makes a full water block appear as a sheet sitting on the bank.
-		// Keep that shallow fringe as carved/damp bank and only expose actual
-		// river water once there is enough physical depth.
-		if depth >= m.Config.MinRiverWaterDepthNormalized {
-			surface := math.Min(1, ground.FinalHeight+depth)
-			if surface > ground.FinalHeight {
+			surface = math.Min(1, surface)
+			localDepth := surface - ground.FinalHeight
+			// Minecraft renders whole water blocks. Keep sub-block-thin fringe
+			// dry, but never slope the water plane toward the bank.
+			if localDepth >= m.Config.MinRiverWaterDepthNormalized {
 				out.WaterKind = reconcile.WaterRiver
 				out.WaterSurfaceDefined = true
 				out.WaterSurfaceElevation = surface
-				out.WaterDepth = surface - ground.FinalHeight
+				out.WaterDepth = localDepth
 			}
 		}
 	}
