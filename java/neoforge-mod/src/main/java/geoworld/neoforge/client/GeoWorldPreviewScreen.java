@@ -39,6 +39,7 @@ public final class GeoWorldPreviewScreen extends Screen {
     private static final double MIN_VIEW_SPAN_X = 128.0;
     private static final double MIN_VIEW_SPAN_Z = 80.0;
     private static final double ZOOM_STEP = 0.78;
+    private static final long DRAG_REBUILD_INTERVAL_NANOS = 50_000_000L;
     // Minecraft 26.3's MouseButtonInfo uses 1 for the primary/left button.
     private static final int PRIMARY_MOUSE_BUTTON = 1;
 
@@ -61,6 +62,8 @@ public final class GeoWorldPreviewScreen extends Screen {
     private boolean mapPressActive;
     private boolean mapPressMoved;
     private double mapPressTravel;
+    private boolean samplesDirty;
+    private long lastSampleRebuildNanos;
     private Double selectedX;
     private Double selectedZ;
     private double viewOriginX;
@@ -260,7 +263,15 @@ public final class GeoWorldPreviewScreen extends Screen {
             geometry.spanZBlocks(),
             this.viewSpanZ
         );
-        this.rebuildSamples();
+
+        this.samplesDirty = true;
+        long now = System.nanoTime();
+        if (
+            now - this.lastSampleRebuildNanos >=
+            DRAG_REBUILD_INTERVAL_NANOS
+        ) {
+            this.rebuildSamples();
+        }
     }
 
     private void toggleViewMode() {
@@ -400,6 +411,8 @@ public final class GeoWorldPreviewScreen extends Screen {
             );
         }
 
+        this.samplesDirty = false;
+        this.lastSampleRebuildNanos = System.nanoTime();
         this.landSamples = 0;
         this.oceanSamples = 0;
         this.lakeSamples = 0;
@@ -827,6 +840,8 @@ public final class GeoWorldPreviewScreen extends Screen {
             this.draggingMap = false;
             if (wasClick) {
                 this.selectMapPoint(event.x(), event.y());
+            } else if (this.samplesDirty) {
+                this.rebuildSamples();
             }
             return true;
         }
@@ -1123,7 +1138,7 @@ public final class GeoWorldPreviewScreen extends Screen {
             case "Ocean" -> oceanColor(sample);
             case "Lake" -> 0xFF3F9FD0;
             case "River" -> 0xFF4AAFE6;
-            default -> landColor(model, x, z, sample);
+            default -> landColor(sample);
         };
     }
 
@@ -1134,12 +1149,7 @@ public final class GeoWorldPreviewScreen extends Screen {
         return 0xFF3477A7;
     }
 
-    private static int landColor(
-        GeoWorldV1 model,
-        double x,
-        double z,
-        GeoWorldV1.RuntimeSample sample
-    ) {
+    private static int landColor(GeoWorldV1.RuntimeSample sample) {
         String surface = sample.surfaceProfile();
         if (surface != null) {
             String surfaceValue = surface.toLowerCase(Locale.ROOT);
@@ -1154,21 +1164,10 @@ public final class GeoWorldPreviewScreen extends Screen {
             }
         }
 
-        String minecraftBiome =
-            GeoWorldBiomeSource.minecraftBiomeId(model, x, z);
-        if ("minecraft:jungle".equals(minecraftBiome)) {
-            return 0xFF2D7546;
-        }
-        if ("minecraft:sparse_jungle".equals(minecraftBiome)) {
-            return 0xFF43845A;
-        }
-        if ("minecraft:forest".equals(minecraftBiome)) {
-            return 0xFF4E8150;
-        }
-        if ("minecraft:birch_forest".equals(minecraftBiome)) {
-            return 0xFF67935A;
-        }
-
+        // The overview represents GeoWorld's ecological family layer.
+        // Resolving the final Minecraft biome for every preview pixel performs
+        // neighbourhood matching and dominates preview latency. The exact
+        // Minecraft biome is still resolved for the hovered/selected point.
         String biome = sample.biomeFamily();
         if (biome == null) {
             return heightColor(sample.groundHeight());

@@ -10,6 +10,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
@@ -204,6 +205,7 @@ public final class GeoWorldV1 {
         double riverBedElevation,
         boolean riverReceiverSurfaceDefined,
         double riverReceiverSurface,
+        double riverReceiverWeight,
         WaterKind waterKind,
         boolean waterSurfaceDefined,
         double waterSurfaceElevation
@@ -265,6 +267,9 @@ public final class GeoWorldV1 {
     private final Terrain terrain;
     private final List<RiverSegment> rivers;
     private final List<LakeNode> lakes;
+    private final double featureBucketSize;
+    private final Map<Long, List<RiverSegment>> riverBuckets;
+    private final Map<Long, List<LakeNode>> lakeBuckets;
     private final WaterbedConfig waterbedConfig;
     private final ScalarGrid oceanEligibility;
     private final WorldSampleConfig worldSampleConfig;
@@ -308,6 +313,9 @@ public final class GeoWorldV1 {
         this.terrain = terrain;
         this.rivers = rivers;
         this.lakes = lakes;
+        this.featureBucketSize = Math.max(64.0, this.geometry.cellSize());
+        this.riverBuckets = this.buildRiverBuckets(rivers);
+        this.lakeBuckets = this.buildLakeBuckets(lakes);
         this.waterbedConfig = waterbedConfig;
         this.worldSampleConfig = worldSampleConfig;
         this.climateTemp = climateTemp;
@@ -328,6 +336,90 @@ public final class GeoWorldV1 {
             ocean[i] = landMask[i] ? 0.0 : 1.0;
         }
         this.oceanEligibility = new ScalarGrid(geometry, ocean);
+    }
+
+    private Map<Long, List<RiverSegment>> buildRiverBuckets(
+        List<RiverSegment> segments
+    ) {
+        Map<Long, List<RiverSegment>> buckets = new HashMap<>();
+        for (RiverSegment segment : segments) {
+            double minX =
+                Math.min(segment.x0(), segment.x1()) - segment.halfWidth();
+            double maxX =
+                Math.max(segment.x0(), segment.x1()) + segment.halfWidth();
+            double minZ =
+                Math.min(segment.z0(), segment.z1()) - segment.halfWidth();
+            double maxZ =
+                Math.max(segment.z0(), segment.z1()) + segment.halfWidth();
+            int minBX = this.featureBucketX(minX);
+            int maxBX = this.featureBucketX(maxX);
+            int minBZ = this.featureBucketZ(minZ);
+            int maxBZ = this.featureBucketZ(maxZ);
+            for (int bz = minBZ; bz <= maxBZ; bz++) {
+                for (int bx = minBX; bx <= maxBX; bx++) {
+                    buckets
+                        .computeIfAbsent(
+                            featureBucketKey(bx, bz),
+                            ignored -> new ArrayList<>()
+                        )
+                        .add(segment);
+                }
+            }
+        }
+        return buckets;
+    }
+
+    private Map<Long, List<LakeNode>> buildLakeBuckets(
+        List<LakeNode> nodes
+    ) {
+        Map<Long, List<LakeNode>> buckets = new HashMap<>();
+        for (LakeNode lake : nodes) {
+            int minBX = this.featureBucketX(lake.x() - lake.outerRadius());
+            int maxBX = this.featureBucketX(lake.x() + lake.outerRadius());
+            int minBZ = this.featureBucketZ(lake.z() - lake.outerRadius());
+            int maxBZ = this.featureBucketZ(lake.z() + lake.outerRadius());
+            for (int bz = minBZ; bz <= maxBZ; bz++) {
+                for (int bx = minBX; bx <= maxBX; bx++) {
+                    buckets
+                        .computeIfAbsent(
+                            featureBucketKey(bx, bz),
+                            ignored -> new ArrayList<>()
+                        )
+                        .add(lake);
+                }
+            }
+        }
+        return buckets;
+    }
+
+    private List<RiverSegment> riverCandidates(double x, double z) {
+        return this.riverBuckets.getOrDefault(
+            featureBucketKey(this.featureBucketX(x), this.featureBucketZ(z)),
+            List.of()
+        );
+    }
+
+    private List<LakeNode> lakeCandidates(double x, double z) {
+        return this.lakeBuckets.getOrDefault(
+            featureBucketKey(this.featureBucketX(x), this.featureBucketZ(z)),
+            List.of()
+        );
+    }
+
+    private int featureBucketX(double x) {
+        return (int)Math.floor(
+            (x - this.geometry.originX()) / this.featureBucketSize
+        );
+    }
+
+    private int featureBucketZ(double z) {
+        return (int)Math.floor(
+            (z - this.geometry.originZ()) / this.featureBucketSize
+        );
+    }
+
+    private static long featureBucketKey(int x, int z) {
+        return ((long)x << 32) ^ (z & 0xFFFFFFFFL);
     }
 
     public Manifest manifest() {
@@ -711,9 +803,12 @@ public final class GeoWorldV1 {
                     ground.riverBedElevation() + centerDepth;
                 if (
                     ground.riverReceiverSurfaceDefined() &&
-                    ground.riverReceiverSurface() > surface
+                    ground.riverReceiverSurface() > surface &&
+                    ground.riverReceiverWeight() > 0
                 ) {
-                    surface = ground.riverReceiverSurface();
+                    surface +=
+                        (ground.riverReceiverSurface() - surface) *
+                        ground.riverReceiverWeight();
                 }
                 surface = Math.min(1.0, surface);
                 double localDepth =
@@ -756,9 +851,10 @@ public final class GeoWorldV1 {
         double riverDatumWeight = -1;
         boolean receiverDefined = false;
         double receiverSurface = 0;
+        double receiverWeight = 0;
         WaterKind kind = WaterKind.NONE;
 
-        for (RiverSegment segment : rivers) {
+        for (RiverSegment segment : this.riverCandidates(x, z)) {
             PointSegment point = pointSegment(
                 x, z,
                 segment.x0(), segment.z0(),
@@ -783,14 +879,10 @@ public final class GeoWorldV1 {
                 riverBedDefined = true;
                 riverBedElevation = bed;
                 riverHalfWidth = segment.halfWidth();
-                riverDatumWeight = weight;
-            }
-            if (
-                segment.receiverSurfaceDefined() &&
-                (!receiverDefined || segment.receiverSurface() > receiverSurface)
-            ) {
-                receiverDefined = true;
+                receiverDefined = segment.receiverSurfaceDefined();
                 receiverSurface = segment.receiverSurface();
+                receiverWeight = smoothstep(0.68, 1.0, point.t());
+                riverDatumWeight = weight;
             }
             double candidate =
                 baseHeight - Math.max(0, baseHeight - bed) * weight;
@@ -805,10 +897,20 @@ public final class GeoWorldV1 {
         boolean waterSurfaceDefined = false;
         double waterSurface = 0;
         double bestLakeSurface = Double.NEGATIVE_INFINITY;
-        for (LakeNode lake : lakes) {
+        for (LakeNode lake : this.lakeCandidates(x, z)) {
+            // The macro lake mask identifies a depression, but the detailed
+            // terrain owns the final shoreline. Do not dig high terrain down
+            // merely because it lies inside a macro lake cell.
+            final double lakeShoreAllowanceNormalized = 0.0015;
+            if (
+                baseHeight >
+                lake.waterSurface() + lakeShoreAllowanceNormalized
+            ) {
+                continue;
+            }
             double dx = x - lake.x();
             double dz = z - lake.z();
-            double distance = Math.hypot(dx, dz);
+            double distance = lakeDistance(dx, dz);
             if (distance >= lake.outerRadius()) {
                 continue;
             }
@@ -840,6 +942,7 @@ public final class GeoWorldV1 {
             riverBedElevation,
             receiverDefined,
             receiverSurface,
+            receiverWeight,
             kind,
             waterSurfaceDefined,
             waterSurface
@@ -1227,6 +1330,15 @@ public final class GeoWorldV1 {
     }
 
     private record PointSegment(double t, double distance) {}
+
+    private static double lakeDistance(double dx, double dz) {
+        double ax = Math.abs(dx);
+        double az = Math.abs(dz);
+        return Math.pow(
+            ax * ax * ax * ax + az * az * az * az,
+            0.25
+        );
+    }
 
     private static PointSegment pointSegment(
         double px, double pz,

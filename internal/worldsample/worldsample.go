@@ -130,8 +130,12 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		if ground.RiverBedDefined {
 			surface := ground.RiverBedElevation + centerDepth
 			if ground.RiverReceiverSurfaceDefined &&
-				ground.RiverReceiverSurface > surface {
-				surface = ground.RiverReceiverSurface
+				ground.RiverReceiverSurface > surface &&
+				ground.RiverReceiverWeight > 0 {
+				// Receiver backwater is a local transition at the mouth, not
+				// a flat datum propagated across every upstream segment.
+				surface += (ground.RiverReceiverSurface - surface) *
+					ground.RiverReceiverWeight
 			}
 			surface = math.Min(1, surface)
 			localDepth := surface - ground.FinalHeight

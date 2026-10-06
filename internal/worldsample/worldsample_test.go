@@ -54,8 +54,8 @@ func TestEnclosedBelowSeaLandStaysDryWithoutLake(t *testing.T) {
 
 func TestExplicitLakeUsesHydrologyWaterDatum(t *testing.T) {
 	g := testGeometry()
-	base := testTerrain(t, g, 0.70)
-	rec := baseReconciliation(g, 0.70)
+	base := testTerrain(t, g, 0.60)
+	rec := baseReconciliation(g, 0.60)
 	center := g.Width + 1
 	rec.LakeBedCeilingDefined[center] = true
 	rec.LakeBedCeiling[center] = 0.55
@@ -77,9 +77,10 @@ func TestExplicitLakeUsesHydrologyWaterDatum(t *testing.T) {
 	if got.WaterKind != reconcile.WaterLake || !got.WaterSurfaceDefined {
 		t.Fatalf("expected explicit lake, got %+v", got)
 	}
+	wantSurface := wb.Lakes[0].WaterSurface
 	if math.Abs(got.GroundHeight-0.55) > 1e-12 ||
-		math.Abs(got.WaterSurfaceElevation-0.60) > 1e-12 ||
-		math.Abs(got.WaterDepth-0.05) > 1e-12 {
+		math.Abs(got.WaterSurfaceElevation-wantSurface) > 1e-12 ||
+		math.Abs(got.WaterDepth-(wantSurface-0.55)) > 1e-12 {
 		t.Fatalf("lake ground/surface/depth wrong: %+v", got)
 	}
 }
@@ -146,6 +147,63 @@ func TestRiverDepthTapersSmoothlyToBank(t *testing.T) {
 	outside := m.Sample(midX, z0+20)
 	if outside.WaterKind != reconcile.WaterNone || outside.WaterSurfaceDefined {
 		t.Fatalf("river water leaked outside corridor: %+v", outside)
+	}
+}
+
+func TestReceiverBackwaterOnlyRaisesRiverNearMouth(t *testing.T) {
+	g := testGeometry()
+	base := testTerrain(t, g, 0.55)
+	rec := baseReconciliation(g, 0.55)
+	rec.WaterKind = make([]reconcile.WaterKind, g.Width*g.Height)
+	from, to := g.Width, g.Width+1
+	rec.RiverBedTarget[from] = 0.44
+	rec.RiverBedTarget[to] = 0.43
+	rec.RiverEdges = []reconcile.RiverEdgeConstraint{{
+		From: from, To: to, RiverStrength: 1,
+	}}
+	rec.WaterKind[to] = reconcile.WaterOcean
+	rec.WaterSurfaceDefined[to] = true
+	rec.WaterSurfaceElevation[to] = 0.50
+
+	h := emptyHydrology(g)
+	h.FlowTo[from] = to
+	wb, err := waterbed.Build(base, rec, h, waterbed.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !wb.Rivers[0].ReceiverSurfaceDefined {
+		t.Fatal("terminal segment did not receive direct ocean datum")
+	}
+
+	m, err := Build(
+		testSurface(g, true),
+		wb,
+		Config{RiverCenterDepthNormalized: 0.01},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x0, z0 := g.NodePosition(0, 1)
+	x1, _ := g.NodePosition(1, 1)
+	upstream := m.Sample(x0+(x1-x0)*0.25, z0)
+	mouth := m.Sample(x0+(x1-x0)*0.95, z0)
+	if upstream.WaterKind != reconcile.WaterRiver ||
+		mouth.WaterKind != reconcile.WaterRiver {
+		t.Fatalf("expected river samples, upstream=%+v mouth=%+v", upstream, mouth)
+	}
+	if upstream.WaterSurfaceElevation >= 0.49 {
+		t.Fatalf(
+			"receiver datum leaked too far upstream: surface=%.6f",
+			upstream.WaterSurfaceElevation,
+		)
+	}
+	if mouth.WaterSurfaceElevation <= upstream.WaterSurfaceElevation+0.02 {
+		t.Fatalf(
+			"mouth did not transition toward receiver: upstream=%.6f mouth=%.6f",
+			upstream.WaterSurfaceElevation,
+			mouth.WaterSurfaceElevation,
+		)
 	}
 }
 

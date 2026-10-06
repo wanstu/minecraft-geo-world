@@ -11,11 +11,12 @@ type Config struct {
 	SeasonalityRunoffBoost float64
 	RiverQuantile          float64
 	// Accumulation scales remain in reference-cell-equivalent runoff units.
-	MinRiverAccumulation     float64
-	LakeDepthScale           float64
-	WetlandAccumulationScale float64
-	LakePotentialThreshold   float64
-	MinLakeAreaBlocks2       float64
+	MinRiverAccumulation           float64
+	LakeDepthScale                 float64
+	WetlandAccumulationScale       float64
+	LakePotentialThreshold         float64
+	LakeSurfaceToleranceNormalized float64 `json:",omitempty"`
+	MinLakeAreaBlocks2             float64
 }
 
 type Input struct {

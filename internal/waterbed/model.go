@@ -41,10 +41,10 @@ type RiverSegment struct {
 	// From to To. It is sampled from the actual broad terrain, not only endpoints.
 	Profile []float64
 
-	// ReceiverSurface is the downstream lake/ocean datum reachable from this
-	// segment. It is propagated upstream through the river DAG so Runtime water
-	// can form a flat backwater where the natural shallow river surface would
-	// otherwise sit below the receiving waterbody.
+	// ReceiverSurface is defined only when this segment directly enters a
+	// lake/ocean receiver. Runtime blends that datum over the downstream end of
+	// the segment so backwater is local to the mouth rather than propagating a
+	// raised water plane through the whole upstream network.
 	ReceiverSurfaceDefined bool
 	ReceiverSurface        float64
 }
@@ -87,6 +87,7 @@ type Sample struct {
 	RiverBedElevation           float64
 	RiverReceiverSurfaceDefined bool
 	RiverReceiverSurface        float64
+	RiverReceiverWeight         float64
 	LakeCarve                   float64
 
 	WaterKind             reconcile.WaterKind

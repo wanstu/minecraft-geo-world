@@ -131,7 +131,7 @@ func TestRiverBankBlendIsContinuous(t *testing.T) {
 
 func TestLakeBasinCarvesToCeilingAndExposesWaterSurface(t *testing.T) {
 	g := testGeometry()
-	base := testTerrain(t, g, 0.70)
+	base := testTerrain(t, g, 0.60)
 	n := g.Width * g.Height
 	center := 4
 	rec := &reconcile.Model{
@@ -160,14 +160,57 @@ func TestLakeBasinCarvesToCeilingAndExposesWaterSurface(t *testing.T) {
 	if math.Abs(got.FinalHeight-0.55) > 1e-12 {
 		t.Fatalf("lake center bed=%.12f want=0.55", got.FinalHeight)
 	}
-	if got.WaterKind != reconcile.WaterLake || !got.WaterSurfaceDefined ||
-		math.Abs(got.WaterSurfaceElevation-0.60) > 1e-12 {
+	if got.WaterKind != reconcile.WaterLake || !got.WaterSurfaceDefined {
 		t.Fatalf("lake water metadata wrong: %+v", got)
+	}
+	if math.Abs(got.WaterSurfaceElevation-m.Lakes[0].WaterSurface) > 1e-12 {
+		t.Fatalf(
+			"lake sample surface=%.12f model datum=%.12f",
+			got.WaterSurfaceElevation, m.Lakes[0].WaterSurface,
+		)
 	}
 
 	far := m.Sample(x+100, z)
-	if math.Abs(far.FinalHeight-0.70) > 1e-12 || far.LakeCarve != 0 {
+	if math.Abs(far.FinalHeight-0.60) > 1e-12 || far.LakeCarve != 0 {
 		t.Fatalf("lake carve leaked outside local footprint: %+v", far)
+	}
+}
+
+func TestLakeDoesNotExcavateHighDetailedTerrain(t *testing.T) {
+	g := testGeometry()
+	base := testTerrain(t, g, 0.70)
+	n := g.Width * g.Height
+	center := 4
+	rec := &reconcile.Model{
+		Geometry:              g,
+		Config:                reconcile.Config{RiverStrengthThreshold: 0.30},
+		RiverBaseElevation:    filled(n, 0.70),
+		RiverBedTarget:        filled(n, 0.70),
+		LakeBedCeilingDefined: make([]bool, n),
+		LakeBedCeiling:        make([]float64, n),
+		WaterKind:             make([]reconcile.WaterKind, n),
+		WaterSurfaceDefined:   make([]bool, n),
+		WaterSurfaceElevation: make([]float64, n),
+	}
+	rec.LakeBedCeilingDefined[center] = true
+	rec.LakeBedCeiling[center] = 0.55
+	rec.WaterKind[center] = reconcile.WaterLake
+	rec.WaterSurfaceDefined[center] = true
+	rec.WaterSurfaceElevation[center] = 0.60
+	h := emptyHydrology(g)
+	h.LakeID[center] = 1
+
+	m, err := Build(base, rec, h, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	x, z := g.NodePosition(1, 1)
+	got := m.Sample(x, z)
+	if math.Abs(got.FinalHeight-0.70) > 1e-12 || got.LakeCarve != 0 {
+		t.Fatalf("high detailed terrain was excavated into lake: %+v", got)
+	}
+	if got.WaterKind == reconcile.WaterLake || got.WaterSurfaceDefined {
+		t.Fatalf("lake flooded terrain above its spill datum: %+v", got)
 	}
 }
 
@@ -380,11 +423,11 @@ func TestTerminalRiverSegmentInheritsOceanSurfaceAtItsEndpoint(t *testing.T) {
 	}
 }
 
-func TestDiagonalRiverSeesSquareLakeReceiver(t *testing.T) {
+func TestDiagonalLakeFootprintOverridesCrossingRiverWithoutGlobalBackwater(t *testing.T) {
 	g := testGeometry()
-	// Keep the detailed rim above the synthetic 0.60 lake datum; this test is
-	// about diagonal river/lake intersection, not spill-rim correction.
-	base := testTerrain(t, g, 0.70)
+	// Keep detailed terrain close to the synthetic lake datum so the lake owns
+	// the crossing without requiring excavation of high dry terrain.
+	base := testTerrain(t, g, 0.60)
 	n := g.Width * g.Height
 
 	rec := &reconcile.Model{
@@ -405,10 +448,9 @@ func TestDiagonalRiverSeesSquareLakeReceiver(t *testing.T) {
 	rec.RiverBedTarget[4] = 0.52
 
 	// Node 1 is at (128,0). The diagonal segment 0 -> 4 passes through the
-	// square lake footprint near (64,64): Chebyshev distance=64 blocks while
-	// Euclidean distance is about 90.5 blocks. With the default 76.8-block lake
-	// outer radius, circle-based intersection misses it but the raster footprint
-	// correctly contains it.
+	// rounded-square lake footprint near (64,64). The lake itself should own
+	// that overlap; merely crossing its footprint must not lift the entire
+	// 128-block river segment to the lake datum.
 	lake := 1
 	rec.LakeBedCeilingDefined[lake] = true
 	rec.LakeBedCeiling[lake] = 0.50
@@ -428,10 +470,21 @@ func TestDiagonalRiverSeesSquareLakeReceiver(t *testing.T) {
 		t.Fatalf("river segments=%d want=1", len(m.Rivers))
 	}
 	seg := m.Rivers[0]
-	if !seg.ReceiverSurfaceDefined {
-		t.Fatal("diagonal river did not inherit intersected lake receiver surface")
+	if seg.ReceiverSurfaceDefined {
+		t.Fatalf(
+			"spatial lake crossing incorrectly backwatered whole river segment: %+v",
+			seg,
+		)
 	}
-	if math.Abs(seg.ReceiverSurface-0.60) > 1e-12 {
-		t.Fatalf("receiver surface=%.12f want=0.60", seg.ReceiverSurface)
+	mid := m.Sample(64, 64)
+	if mid.WaterKind != reconcile.WaterLake || !mid.WaterSurfaceDefined {
+		t.Fatalf("diagonal lake footprint is not continuous at crossing: %+v", mid)
+	}
+	if math.Abs(mid.WaterSurfaceElevation-m.Lakes[0].WaterSurface) > 1e-12 {
+		t.Fatalf(
+			"lake surface=%.12f model datum=%.12f",
+			mid.WaterSurfaceElevation,
+			m.Lakes[0].WaterSurface,
+		)
 	}
 }

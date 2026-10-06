@@ -1563,3 +1563,37 @@ t5 实测变化：
 - NeoForge compileJava --rerun-tasks 通过；
 - build.cmd verifyGeoWorldEngine verifyGeoWorldSpawn 通过；
 - 最新 MOD 已自动部署 HMCL 26.3。
+
+## 2026-10-06 · 预览性能、湖泊连续性与悬河修复
+
+针对 Seed=123456 / t8 实测截图：
+- 世界预览打开及拖动明显卡顿；
+- 大型湖泊面积异常且视觉上破碎；
+- 河流水面被下游湖/海水位抬高后形成明显“地上悬河”。
+
+根因与修复：
+- Java Runtime 原先每次 sample 都线性扫描全部 RiverSegment / LakeNode；当前 Seed=123456 有约 948 条河段，预览 160x100 一次就会产生大量无效相交计算。GeoWorldV1 现按 128-block 级 feature bucket 建立河流/湖泊空间索引，只检查当前位置附近候选。
+- 生态总览原先每个预览像素还会再次调用 Minecraft26_3BiomeRealizer 做邻域群系匹配。总览颜色现在直接使用 GeoWorld Runtime 的 biomeFamily / surfaceProfile；最终 Minecraft 群系仍在悬停/选中点时精确解析。
+- 地图拖动不再每个 mouseDragged 事件同步全量重算；约 50 ms 节流，并在释放鼠标时保证最后一次精确重建。
+- 160x100（16000 点）本机基准：旧逻辑约 2996 ms；空间索引后且生态总览不做逐像素最终 MC 群系解析后，首轮约 100 ms、JIT 热身后约 32-34 ms。
+
+湖泊：
+- Hydrology lake candidate 继续来源于真实 depression/fill/spill 结果，但同一显式湖组件要求 BasinID 一致且 spill/fill level 在约 0.003 normalized 容差内，避免不同水位的相邻洼地被简单 D8 连通成一个湖。
+- Waterbed 湖泊 footprint 使用可覆盖 D8 对角邻居的 rounded-square/superellipse 支撑；outer radius 约 0.72 cell，避免合法同一湖内部出现棋盘式空洞。
+- 详细地形最终决定真实岸线：若 detailed terrain 已高于 spill-controlled lake datum，则不再为了宏观湖候选强行向下挖成水面。
+- detailed spill-rim 仍会压低湖面，防止高架水库/竖直水墙。
+- 对 t8 截图对应的大湖区域按 16-block 网格复核：旧持久化模型约 7805 个 lake sample；新模型约 1778，减少约 77%；新结果仅 2 个连通水体，对应模型中的 2 个湖，不再由一个湖内部碎成大量孤立水块。
+
+河流 / 悬河：
+- ReceiverSurface 不再沿整条 downstream graph 反向传播到所有上游河段，只允许“直接进入湖泊/海洋”的最终河段拥有 receiver datum。
+- Receiver backwater 仅在终端河段靠近河口的末段平滑生效，避免整条上游河被抬到湖面/海面高度。
+- 河床 profile 额外参考河道两侧 detailed terrain 的局部低廊道；宏观 D8 直线跨过细节小脊时会向低地切入，不再把河架在邻近低地上。
+- Seed=123456 dry-bank audit（河心水面高于明确干岸 1.5 blocks 以上）：旧 t8 = 275 侧、最大约 17.87 blocks；新模型 = 3 侧、最大约 2.39 blocks。
+
+兼容与验证：
+- GeoWorld engine cache key 升级 v6 -> v7，避免新世界误复用旧水文模型。
+- go test ./... -count=1 全绿。
+- Golden vectors 已刷新，Java GoldenVerifier 15/15。
+- NeoForge compileJava、verifyGeoWorldEngine、verifyGeoWorldSpawn 全绿。
+- 最新 MOD 已自动部署到 HMCL 26.3。
+- 已存在的 t7/t8 会继续读取自己持久化的旧 world.geoworld 和旧 Chunk；必须新建世界验证本轮地形/水文变化。

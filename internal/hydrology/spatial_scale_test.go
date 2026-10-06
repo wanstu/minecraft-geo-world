@@ -186,6 +186,59 @@ func TestMinimumLakeAreaUsesPhysicalArea(t *testing.T) {
 	}
 }
 
+func TestLakeComponentsDoNotMergeAcrossDifferentWaterLevels(t *testing.T) {
+	width, height := 6, 3
+	g := world.GridGeometry{
+		Width: width, Height: height,
+		SpanXBlocks: float64(width-1) * world.DefaultMacroSpacingBlocks,
+		SpanZBlocks: float64(height-1) * world.DefaultMacroSpacingBlocks,
+	}
+	n := width * height
+	m := &Model{
+		Config:           normalizeConfig(Config{}),
+		Geometry:         g,
+		Width:            width,
+		Height:           height,
+		LandMask:         make([]bool, n),
+		FilledElevation:  make([]float64, n),
+		FillDepth:        make([]float64, n),
+		FlowTo:           make([]int, n),
+		FlowAccumulation: make([]float64, n),
+		BasinID:          make([]int, n),
+		LakePotential:    make([]float64, n),
+		LakeID:           make([]int, n),
+	}
+	for i := range m.FlowTo {
+		m.FlowTo[i] = -1
+	}
+	for x := 1; x <= 4; x++ {
+		i := width + x
+		m.LandMask[i] = true
+		m.FillDepth[i] = 0.05
+		m.LakePotential[i] = 1
+		m.FlowAccumulation[i] = 1000
+		m.BasinID[i] = 7
+		if x <= 2 {
+			m.FilledElevation[i] = 0.70
+		} else {
+			m.FilledElevation[i] = 0.72
+		}
+	}
+
+	m.identifyLakes()
+	if len(m.Lakes) != 2 {
+		t.Fatalf(
+			"adjacent depressions at different spill levels merged: lakes=%d",
+			len(m.Lakes),
+		)
+	}
+	for _, lake := range m.Lakes {
+		if lake.CellCount != 2 {
+			t.Fatalf("lake %d cell count=%d want=2", lake.ID, lake.CellCount)
+		}
+	}
+}
+
 func TestHydrologyRejectsGeometryDimensionMismatch(t *testing.T) {
 	in := makeBorderOceanInput(5, 5, 0.7)
 	in.Geometry = world.GridGeometry{Width: 6, Height: 5, SpanXBlocks: 640, SpanZBlocks: 512}

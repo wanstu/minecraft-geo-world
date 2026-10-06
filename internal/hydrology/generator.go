@@ -156,6 +156,14 @@ func normalizeConfig(cfg Config) Config {
 	if cfg.LakePotentialThreshold <= 0 || cfg.LakePotentialThreshold >= 1 {
 		cfg.LakePotentialThreshold = 0.35
 	}
+	if cfg.LakeSurfaceToleranceNormalized <= 0 ||
+		cfg.LakeSurfaceToleranceNormalized > 0.02 {
+		// One physical lake must have one water level. Priority-flood adds a
+		// tiny drainage epsilon, so allow about 1-2 Minecraft blocks of
+		// normalized variation, but do not chain neighbouring depressions with
+		// different spill elevations into one giant waterbody.
+		cfg.LakeSurfaceToleranceNormalized = 0.003
+	}
 	if cfg.MinLakeAreaBlocks2 <= 0 {
 		cfg.MinLakeAreaBlocks2 = 2 * world.DefaultMacroSpacingBlocks * world.DefaultMacroSpacingBlocks
 	}
@@ -616,6 +624,8 @@ func (m *Model) identifyLakes() {
 		queue := []int{start}
 		visited[start] = true
 		component := make([]int, 0, 8)
+		startSurface := m.FilledElevation[start]
+		startBasin := m.BasinID[start]
 
 		for head := 0; head < len(queue); head++ {
 			i := queue[head]
@@ -627,10 +637,18 @@ func (m *Model) identifyLakes() {
 					continue
 				}
 				ni := nz*m.Width + nx
-				if candidate[ni] && !visited[ni] {
-					visited[ni] = true
-					queue = append(queue, ni)
+				if !candidate[ni] || visited[ni] {
+					continue
 				}
+				if m.BasinID[ni] != startBasin {
+					continue
+				}
+				if math.Abs(m.FilledElevation[ni]-startSurface) >
+					m.Config.LakeSurfaceToleranceNormalized {
+					continue
+				}
+				visited[ni] = true
+				queue = append(queue, ni)
 			}
 		}
 
