@@ -1643,3 +1643,26 @@ t5 实测变化：
 - verifyGeoWorldEngine / verifyGeoWorldSpawn 通过。
 - NeoForge build SUCCESSFUL，最新 JAR 已自动部署 HMCL 26.3。
 - 已生成的 t9 Chunk biome palette 不会被 MOD 自动重写；新建 GeoWorld 可验证精确 biome，t9 尚未生成的新 Chunk 会使用兼容 fallback，不再因缺 Holder 直接退回 Plains。
+
+## 2026-10-07 · 河/湖/海短岸带与稳定水边
+
+用户确认群系落地修复后，继续优化河湖海岸：既要消除河边低一格空槽被 Minecraft 流体更新填成非水源水的问题，又不能把所有岸线做成统一高一格堤坝；同时需要保留甘蔗等原版滨水植物的自然生长条件。
+
+实现：
+- 新增 GeoWorldShoreline，作为 Minecraft 方块落地层的短距离 shoreline pass，不改宏观水文/河湖拓扑。
+- buildTerrain、getBaseHeight、getBaseColumn 统一使用同一 Column plan，避免实际方块、结构高度查询和 NoiseColumn 对岸线高度认识不一致。
+- 直接邻接源水的 dry column 若因整数高度量化落到水面以下，则补到稳定水边界；实现层硬限制最多补 2 格，避免未来异常模型被掩盖成人工高堤。当前 Seed=123456 fresh model 验证最大补高 2 格，湖/海最大 1 格。
+- 低坡岸允许形成 1~2 格 littoral shelf；陡岸、高山/岩质岸保留 hard bank。美术性削坡最多 1 格。
+- 材质带严格保持短距离：River 最多 2 格、Lake 最多 3 格、Ocean 最多 4 格。使用 coherent Seed noise 形成连续小斑块，不做逐格椒盐噪声。
+- 岸材质按环境选择 sand / mud / dirt / coarse_dirt / gravel，并用少量 clay 点缀；湿地偏 mud，干旱区偏 sand/gravel，岩岸偏 gravel/coarse_dirt，海岸偏 sand。
+- 原版 26.3 SugarCaneBlock 规则已核对：SUPPORTS_SUGAR_CANE 接受 substrate_overworld（dirt/mud/grass 等）和 sand，且要求同高度水平邻接支持甘蔗的水。普通河/湖直接水边因此优先保留这些基质，gravel/clay 仅作少量局部斑块。
+
+验证：
+- 新增 verifyGeoWorldShoreline，并接入 Gradle check；verifier 使用独立临时 engine cache 强制 fresh model，避免长期 v8 cache 污染回归判断。
+- Seed=123456 同时覆盖 River / Lake / Ocean：immediate=615，stable=615，littoral shelves=714，material transitions=941。
+- 适合植物生长的直接邻水岸 caneReady=566/579（约 97.8%）。
+- max aesthetic lowering=1；max stability raising=2（River），Lake=1，Ocean=1；4+ 格人工堤坝=0。
+- go test ./... -count=1 全绿。
+- Java/Go GoldenVerifier 15/15。
+- verifyGeoWorldBiomePreset、verifyGeoWorldShoreline、verifyGeoWorldEngine、verifyGeoWorldSpawn 全绿。
+- NeoForge build SUCCESSFUL，最新 GeoWorld-NeoForge-26.3-0.1.0-dev.jar 已自动部署到 HMCL 26.3。

@@ -163,6 +163,9 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         int baseX = chunk.getPos().getMinBlockX();
         int baseZ = chunk.getPos().getMinBlockZ();
 
+        GeoWorldShoreline.ChunkPlan shoreline =
+            GeoWorldShoreline.planChunk(runtime, baseX, baseZ);
+
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         Heightmap oceanFloor = chunk.getOrCreateHeightmapUnprimed(
             Heightmap.Types.OCEAN_FLOOR_WG
@@ -175,18 +178,12 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
             for (int localX = 0; localX < 16; localX++) {
                 int worldX = baseX + localX;
                 int worldZ = baseZ + localZ;
-                GeoWorldV1.RuntimeSample sample = runtime.sample(
-                    worldX,
-                    worldZ
-                );
+                GeoWorldShoreline.Column column =
+                    shoreline.column(localX, localZ);
+                GeoWorldV1.RuntimeSample sample = column.sample();
 
-                int groundBoundary = HEIGHTS.boundaryY(
-                    sample.groundHeight()
-                );
-                int waterBoundary = waterBoundary(
-                    sample,
-                    groundBoundary
-                );
+                int groundBoundary = column.groundBoundary();
+                int waterBoundary = column.waterBoundary();
 
                 int maxBoundary = Math.min(
                     Minecraft26_3HeightMapping.MAX_Y_EXCLUSIVE,
@@ -199,10 +196,8 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
                     y++
                 ) {
                     BlockState state = blockAt(
-                        sample,
-                        y,
-                        groundBoundary,
-                        waterBoundary
+                        column,
+                        y
                     );
                     if (state.isAir()) {
                         continue;
@@ -229,11 +224,13 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         LevelHeightAccessor heightAccessor,
         RandomState randomState
     ) {
-        GeoWorldV1.RuntimeSample sample = this
-            .ensureModel(randomState.seed())
-            .sample(x, z);
-        int ground = HEIGHTS.boundaryY(sample.groundHeight());
-        int water = waterBoundary(sample, ground);
+        GeoWorldShoreline.Column column = GeoWorldShoreline.plan(
+            this.ensureModel(randomState.seed()),
+            x,
+            z
+        );
+        int ground = column.groundBoundary();
+        int water = column.waterBoundary();
 
         if (
             type == Heightmap.Types.OCEAN_FLOOR ||
@@ -254,11 +251,13 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         LevelHeightAccessor heightAccessor,
         RandomState randomState
     ) {
-        GeoWorldV1.RuntimeSample sample = this
-            .ensureModel(randomState.seed())
-            .sample(x, z);
-        int ground = HEIGHTS.boundaryY(sample.groundHeight());
-        int water = waterBoundary(sample, ground);
+        GeoWorldShoreline.Column column = GeoWorldShoreline.plan(
+            this.ensureModel(randomState.seed()),
+            x,
+            z
+        );
+        int ground = column.groundBoundary();
+        int water = column.waterBoundary();
 
         BlockState[] states = new BlockState[heightAccessor.getHeight()];
         int minY = heightAccessor.getMinY();
@@ -266,10 +265,8 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         for (int index = 0; index < states.length; index++) {
             int y = minY + index;
             states[index] = blockAt(
-                sample,
-                y,
-                ground,
-                water
+                column,
+                y
             );
         }
 
@@ -400,25 +397,6 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         return Optional.ofNullable(this.modelPath);
     }
 
-    private static int waterBoundary(
-        GeoWorldV1.RuntimeSample sample,
-        int groundBoundary
-    ) {
-        if (
-            !sample.waterSurfaceDefined() ||
-            sample.waterSurfaceElevation() == null
-        ) {
-            return groundBoundary;
-        }
-        int mapped = "River".equals(sample.waterKind())
-            ? HEIGHTS.boundaryYCeil(sample.waterSurfaceElevation())
-            : HEIGHTS.boundaryY(sample.waterSurfaceElevation());
-        if ("River".equals(sample.waterKind())) {
-            mapped = Math.max(mapped, groundBoundary + 1);
-        }
-        return Math.max(groundBoundary, mapped);
-    }
-
     private static int clampToHeightAccessor(
         int boundary,
         LevelHeightAccessor heightAccessor
@@ -429,11 +407,13 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
     }
 
     private static BlockState blockAt(
-        GeoWorldV1.RuntimeSample sample,
-        int y,
-        int groundBoundary,
-        int waterBoundary
+        GeoWorldShoreline.Column column,
+        int y
     ) {
+        GeoWorldV1.RuntimeSample sample = column.sample();
+        int groundBoundary = column.groundBoundary();
+        int waterBoundary = column.waterBoundary();
+
         if (
             y < Minecraft26_3HeightMapping.MIN_Y ||
             y >= Minecraft26_3HeightMapping.MAX_Y_EXCLUSIVE
@@ -447,11 +427,17 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         if (y < groundBoundary) {
             int depth = groundBoundary - 1 - y;
             if (depth == 0) {
+                String override = column.surfaceOverride();
                 return blockState(
-                    Minecraft26_3ProfileMapping.surfaceBlock(
-                        sample.surfaceProfile()
-                    )
+                    override != null
+                        ? override
+                        : Minecraft26_3ProfileMapping.surfaceBlock(
+                            sample.surfaceProfile()
+                        )
                 );
+            }
+            if (depth <= 2 && column.underOverride() != null) {
+                return blockState(column.underOverride());
             }
             if (depth <= 3) {
                 return blockState(
