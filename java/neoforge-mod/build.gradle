@@ -229,3 +229,14 @@ tasks.register('verifyGeoWorldSpawn', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'geoworld.neoforge.worldgen.GeoWorldSpawnVerifier'
 }
+
+tasks.register('verifyGeoWorldBiomePreset', JavaExec) {
+    group = 'verification'
+    description = 'Verifies every GeoWorld-realized biome is registered by the world preset.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.worldgen.GeoWorldBiomePresetVerifier'
+}
+
+tasks.named('check').configure {
+    dependsOn tasks.named('verifyGeoWorldBiomePreset')
+}

@@ -224,6 +224,12 @@ public final class Minecraft26_3BiomeCatalog {
 
     private Minecraft26_3BiomeCatalog() {}
 
+    public static Set<String> candidateBiomeIds() {
+        return Set.copyOf(
+            CANDIDATES.stream().map(Candidate::id).toList()
+        );
+    }
+
     public static String choose(
         Region region,
         long worldSeed,

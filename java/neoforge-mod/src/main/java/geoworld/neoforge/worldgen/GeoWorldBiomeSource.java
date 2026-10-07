@@ -148,7 +148,86 @@ public final class GeoWorldBiomeSource extends BiomeSource {
         int blockY = QuartPos.toBlock(quartY);
         int blockZ = QuartPos.toBlock(quartZ);
         String biomeId = minecraftBiomeId(current, blockX, blockY, blockZ);
-        return this.byId.getOrDefault(biomeId, this.fallback);
+        return this.resolveBiomeHolder(biomeId);
+    }
+
+    private Holder<Biome> resolveBiomeHolder(String biomeId) {
+        Holder<Biome> exact = this.byId.get(biomeId);
+        if (exact != null) {
+            return exact;
+        }
+        for (String candidate : compatibilityFallbacks(biomeId)) {
+            Holder<Biome> compatible = this.byId.get(candidate);
+            if (compatible != null) {
+                return compatible;
+            }
+        }
+        return this.fallback;
+    }
+
+    private static List<String> compatibilityFallbacks(String biomeId) {
+        return switch (biomeId) {
+            case "minecraft:stony_peaks",
+                 "minecraft:frozen_peaks",
+                 "minecraft:snowy_slopes",
+                 "minecraft:grove" ->
+                List.of("minecraft:jagged_peaks", "minecraft:snowy_plains");
+            case "minecraft:meadow",
+                 "minecraft:sunflower_plains" ->
+                List.of("minecraft:plains");
+            case "minecraft:flower_forest",
+                 "minecraft:dappled_forest",
+                 "minecraft:dark_forest",
+                 "minecraft:pale_garden",
+                 "minecraft:old_growth_birch_forest",
+                 "minecraft:cherry_grove",
+                 "minecraft:windswept_forest" ->
+                List.of("minecraft:forest", "minecraft:birch_forest");
+            case "minecraft:snowy_taiga",
+                 "minecraft:old_growth_pine_taiga",
+                 "minecraft:old_growth_spruce_taiga" ->
+                List.of("minecraft:taiga", "minecraft:snowy_plains");
+            case "minecraft:sparse_jungle",
+                 "minecraft:bamboo_jungle" ->
+                List.of("minecraft:jungle");
+            case "minecraft:savanna_plateau",
+                 "minecraft:windswept_savanna" ->
+                List.of("minecraft:savanna");
+            case "minecraft:badlands",
+                 "minecraft:eroded_badlands",
+                 "minecraft:wooded_badlands" ->
+                List.of("minecraft:desert");
+            case "minecraft:mangrove_swamp" ->
+                List.of("minecraft:swamp");
+            case "minecraft:windswept_hills",
+                 "minecraft:windswept_gravelly_hills" ->
+                List.of("minecraft:jagged_peaks", "minecraft:plains");
+            case "minecraft:river" ->
+                List.of("minecraft:ocean", "minecraft:plains");
+            case "minecraft:frozen_river" ->
+                List.of("minecraft:frozen_ocean", "minecraft:snowy_plains");
+            case "minecraft:beach",
+                 "minecraft:stony_shore" ->
+                List.of("minecraft:plains");
+            case "minecraft:snowy_beach" ->
+                List.of("minecraft:snowy_plains");
+            case "minecraft:lukewarm_ocean",
+                 "minecraft:deep_lukewarm_ocean" ->
+                List.of("minecraft:warm_ocean", "minecraft:ocean");
+            case "minecraft:deep_ocean" ->
+                List.of("minecraft:ocean");
+            case "minecraft:deep_cold_ocean" ->
+                List.of("minecraft:cold_ocean", "minecraft:ocean");
+            case "minecraft:deep_frozen_ocean" ->
+                List.of("minecraft:frozen_ocean");
+            case "minecraft:mushroom_fields",
+                 "minecraft:dripstone_caves",
+                 "minecraft:lush_caves",
+                 "minecraft:deep_dark",
+                 "minecraft:sulfur_caves" ->
+                List.of("minecraft:plains");
+            default -> List.of();
+        };
     }
 
     public static String minecraftBiomeId(

@@ -1621,3 +1621,25 @@ t5 实测变化：
 - NeoForge compileJava、verifyGeoWorldEngine、verifyGeoWorldSpawn 全绿。
 - Engine cache key v7 -> v8；verifier 已确认 v8 首次生成 cached=false。
 - java/neoforge-mod/build.cmd BUILD SUCCESSFUL，并已自动部署最新 GeoWorld-NeoForge-26.3-0.1.0-dev.jar 到 HMCL 26.3。
+
+## 2026-10-07 · GeoWorld 模型群系正确但 Chunk 落成 Plains 修复
+
+用户在 Seed=123456 / t9 的高山区域发现：游戏地图 X≈1908 Z≈-428 显示 Plains，但 GeoWorld 预览 X≈1945 Z≈-382 明确为 Alpine / Mountain / Alpine Snow，模型目标群系为 Stony Peaks。
+
+定位：
+- 直接加载 t9/data/geoworld/world.geoworld，精确采样 X=1908 Z=-428：BiomeFamily=Alpine、TerrainVariant=Mountain、SurfaceProfile=Alpine Snow，SemanticFallback=false、SemanticMismatch=false；模型本身正确。
+- 直接读取 t9 对应 Chunk (119,-27) 的 Anvil NBT，biome palette 只有 minecraft:plains，证明不是地图 MOD 显示错误，而是 Chunk 群系写入错误。
+- 根因是 world_preset/geoworld.json 仍停留在早期 15 个 biome 的列表，而 Minecraft26_3BiomeRealizer 已可输出数十个 Vanilla 26.3 biome。当前高山点目标为 minecraft:stony_peaks，但旧 preset 没注册该 Holder；GeoWorldBiomeSource 的 getOrDefault 最终静默退回 minecraft:plains。
+
+修复：
+- GeoWorld world preset 的 overworld biome_source 扩充为 56 个当前 Realizer 实际可输出的 biome，包括 stony/frozen/jagged peaks、snowy slopes、grove、river、beach、深海变体、cave biomes 等。
+- GeoWorldBiomeSource 不再对缺失目标 biome 直接无脑退回 Plains；对旧 level.dat 仍只保存旧 biome 列表的世界，按语义选择兼容 fallback。例如 stony_peaks/frozen_peaks/snowy_slopes 优先退回 jagged_peaks/snowy_plains。
+- Minecraft26_3BiomeCatalog 暴露 candidateBiomeIds，Minecraft26_3BiomeRealizer 暴露 requiredBiomeIds。
+- 新增 verifyGeoWorldBiomePreset，并接入 Gradle check。以后 Realizer 增加了新 biome 但 preset 未注册，正式 build 会直接失败。
+
+验证：
+- verifyGeoWorldBiomePreset：preset=56 / required=56，通过。
+- Java/Go GoldenVerifier 15/15 通过。
+- verifyGeoWorldEngine / verifyGeoWorldSpawn 通过。
+- NeoForge build SUCCESSFUL，最新 JAR 已自动部署 HMCL 26.3。
+- 已生成的 t9 Chunk biome palette 不会被 MOD 自动重写；新建 GeoWorld 可验证精确 biome，t9 尚未生成的新 Chunk 会使用兼容 fallback，不再因缺 Holder 直接退回 Plains。

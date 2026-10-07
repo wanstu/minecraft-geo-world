@@ -4,13 +4,41 @@ import geoworld.runtime.GeoWorldV1;
 
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 public final class Minecraft26_3BiomeRealizer {
     private static final Minecraft26_3HeightMapping HEIGHTS =
         new Minecraft26_3HeightMapping();
 
     private Minecraft26_3BiomeRealizer() {}
+
+    public static Set<String> requiredBiomeIds() {
+        LinkedHashSet<String> ids = new LinkedHashSet<>(
+            Minecraft26_3BiomeCatalog.candidateBiomeIds()
+        );
+        ids.add("minecraft:river");
+        ids.add("minecraft:frozen_river");
+        ids.add("minecraft:beach");
+        ids.add("minecraft:snowy_beach");
+        ids.add("minecraft:stony_shore");
+        ids.add("minecraft:warm_ocean");
+        ids.add("minecraft:lukewarm_ocean");
+        ids.add("minecraft:deep_lukewarm_ocean");
+        ids.add("minecraft:ocean");
+        ids.add("minecraft:deep_ocean");
+        ids.add("minecraft:cold_ocean");
+        ids.add("minecraft:deep_cold_ocean");
+        ids.add("minecraft:frozen_ocean");
+        ids.add("minecraft:deep_frozen_ocean");
+        ids.add("minecraft:mushroom_fields");
+        ids.add("minecraft:dripstone_caves");
+        ids.add("minecraft:lush_caves");
+        ids.add("minecraft:deep_dark");
+        ids.add("minecraft:sulfur_caves");
+        return Set.copyOf(ids);
+    }
 
     public static String biomeId(
         GeoWorldV1 model,
