@@ -999,8 +999,15 @@ func buildAnomalyReport(active *activeWorld) anomalyReport {
 			}
 		}
 		for _, lake := range wb.Lakes {
-			h := wb.SampleNormalized(lake.X, lake.Z)
-			excess := h - lake.BedCeiling
+			// Hydrology lake nodes are macro depression candidates. Detailed
+			// terrain owns the final shoreline, so a candidate that Waterbed
+			// intentionally leaves dry must not be reported as a lake-bed error.
+			ground := wb.Sample(lake.X, lake.Z)
+			if ground.WaterKind != reconcile.WaterLake ||
+				!ground.WaterSurfaceDefined {
+				continue
+			}
+			excess := ground.FinalHeight - lake.BedCeiling
 			if excess > epsilon {
 				add(anomalyPoint{
 					Kind: anomalyLakeBed, Label: "最终湖床违规",

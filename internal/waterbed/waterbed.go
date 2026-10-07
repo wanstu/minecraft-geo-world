@@ -11,6 +11,12 @@ import (
 	"geoworld/internal/world"
 )
 
+const (
+	lakeShoreAllowanceNormalized = 0.0015
+	receiverBlendStart           = 0.28
+	receiverBlendEnd             = 0.42
+)
+
 func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cfg Config) (*Model, error) {
 	if base == nil {
 		return nil, errors.New("waterbed: base terrain is required")
@@ -66,6 +72,7 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 	drafts := make([]riverDraft, len(rec.RiverEdges))
 	outgoing := make([]int, n)
 	indegree := make([]int, n)
+	incomingSegments := make([][]int, n)
 	for i := range outgoing {
 		outgoing[i] = -1
 	}
@@ -91,11 +98,13 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 
 	// A sampled upstream profile may become lower than its macro endpoint target
 	// because the broad terrain itself contains a local dip between control
-	// points. Propagate that actual outlet height through the river DAG before
-	// constructing the downstream segment. Without this, an incoming corridor
-	// can carve a confluence below the next segment's start target; as its radial
-	// influence fades downstream, the final bed rises back out of the junction.
+	// points. Propagate both the actual outlet bed and the actual outlet water
+	// surface through the river DAG before constructing the downstream segment.
+	// The surface constraint matters when a tributary enters a wider/deeper main
+	// stem: bed-only continuity can still make bed+depth jump upward.
 	effectiveBed := append([]float64(nil), rec.RiverBedTarget...)
+	effectiveSurface := make([]float64, n)
+	effectiveSurfaceDefined := make([]bool, n)
 	queue := make([]int, 0, n)
 	for i := 0; i < n; i++ {
 		if indegree[i] == 0 {
@@ -105,12 +114,33 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 	processed := 0
 	for head := 0; head < len(queue); head++ {
 		node := queue[head]
+		if len(incomingSegments[node]) > 1 &&
+			effectiveSurfaceDefined[node] {
+			minBed := harmonizeConfluenceProfiles(
+				m.Rivers,
+				incomingSegments[node],
+				effectiveSurface[node],
+				cfg,
+			)
+			if minBed < effectiveBed[node] {
+				effectiveBed[node] = minBed
+			}
+		}
 		edgeID := outgoing[node]
 		if edgeID < 0 {
 			continue
 		}
 		draft := drafts[edgeID]
+		centerDepth := riverCenterDepth(cfg, draft.halfWidth)
 		bed0 := effectiveBed[draft.edge.From]
+		if effectiveSurfaceDefined[draft.edge.From] {
+			// Wider downstream rivers carry deeper water. Lower their bed at
+			// the junction so the resulting water surface never steps upward.
+			bed0 = math.Min(
+				bed0,
+				math.Max(0, effectiveSurface[draft.edge.From]-centerDepth),
+			)
+		}
 		bed1 := math.Min(effectiveBed[draft.edge.To], bed0)
 		widthT := riverWidthFraction(cfg, draft.halfWidth)
 		profile := buildRiverProfile(
@@ -129,6 +159,12 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 		if outlet < effectiveBed[draft.edge.To] {
 			effectiveBed[draft.edge.To] = outlet
 		}
+		outletSurface := outlet + centerDepth
+		if !effectiveSurfaceDefined[draft.edge.To] ||
+			outletSurface < effectiveSurface[draft.edge.To] {
+			effectiveSurfaceDefined[draft.edge.To] = true
+			effectiveSurface[draft.edge.To] = outletSurface
+		}
 		segment := RiverSegment{
 			From: draft.edge.From, To: draft.edge.To,
 			X0: draft.x0, Z0: draft.z0, X1: draft.x1, Z1: draft.z1,
@@ -140,6 +176,10 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 		id := len(m.Rivers)
 		m.Rivers = append(m.Rivers, segment)
 		m.indexRiver(id, segment)
+		incomingSegments[draft.edge.To] = append(
+			incomingSegments[draft.edge.To],
+			id,
+		)
 		processed++
 
 		indegree[draft.edge.To]--
@@ -305,6 +345,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	}
 
 	riverDatumWeight := -1.0
+	riverDatumT := 2.0
 	for _, id := range m.riverBuckets[bucket] {
 		seg := m.Rivers[id]
 		t, distance := pointSegment(worldX, worldZ, seg.X0, seg.Z0, seg.X1, seg.Z1)
@@ -317,20 +358,24 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			sample.RiverWeight = weight
 		}
 		// Water level should follow the channel that actually owns this point,
-		// not a deeper neighbouring branch whose bank merely overlaps here.
-		// Prefer the segment with the strongest lateral weight; at an exact
-		// confluence tie, prefer the higher upstream bed so water cannot vanish
-		// between two connected centerlines.
+		// not a neighbouring branch whose bank merely overlaps here. Prefer the
+		// strongest lateral weight. At an exact confluence centerline tie, the
+		// downstream segment starts at t=0 while incoming segments end at t=1;
+		// prefer that downstream owner, whose bed was surface-capped above.
 		if !sample.RiverBedDefined ||
 			weight > riverDatumWeight+1e-12 ||
-			(math.Abs(weight-riverDatumWeight) <= 1e-12 && bed > sample.RiverBedElevation) {
+			(math.Abs(weight-riverDatumWeight) <= 1e-12 &&
+				(t < riverDatumT-1e-12 ||
+					(math.Abs(t-riverDatumT) <= 1e-12 &&
+						bed < sample.RiverBedElevation))) {
 			sample.RiverBedDefined = true
 			sample.RiverBedElevation = bed
 			sample.RiverHalfWidth = seg.HalfWidth
 			sample.RiverReceiverSurfaceDefined = seg.ReceiverSurfaceDefined
 			sample.RiverReceiverSurface = seg.ReceiverSurface
-			sample.RiverReceiverWeight = smoothstep(0.68, 1, t)
+			sample.RiverReceiverWeight = smoothstep(receiverBlendStart, receiverBlendEnd, t)
 			riverDatumWeight = weight
+			riverDatumT = t
 		}
 		candidate := baseHeight - math.Max(0, baseHeight-bed)*weight
 		if candidate < finalHeight {
@@ -353,7 +398,6 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		// already stands materially above the spill-controlled lake datum,
 		// otherwise a broad macro basin turns into an artificial raised
 		// reservoir with vertical water walls.
-		const lakeShoreAllowanceNormalized = 0.0015
 		if baseHeight > node.WaterSurface+lakeShoreAllowanceNormalized {
 			continue
 		}
@@ -446,6 +490,9 @@ func normalizeConfig(cfg Config) (Config, error) {
 	if cfg.MinRiverBedDepthNormalized == 0 {
 		cfg.MinRiverBedDepthNormalized = 0.004
 	}
+	if cfg.RiverCenterDepthNormalized == 0 {
+		cfg.RiverCenterDepthNormalized = 0.0025
+	}
 	if !finite(cfg.MinRiverHalfWidthBlocks) || !finite(cfg.MaxRiverHalfWidthBlocks) ||
 		cfg.MinRiverHalfWidthBlocks <= 0 ||
 		cfg.MaxRiverHalfWidthBlocks < cfg.MinRiverHalfWidthBlocks {
@@ -459,7 +506,85 @@ func normalizeConfig(cfg Config) (Config, error) {
 		cfg.MinRiverBedDepthNormalized >= 0.05 {
 		return Config{}, errors.New("waterbed: minimum river bed depth must be finite and inside (0,0.05)")
 	}
+	if !finite(cfg.RiverCenterDepthNormalized) ||
+		cfg.RiverCenterDepthNormalized <= 0 ||
+		cfg.RiverCenterDepthNormalized >= 0.05 {
+		return Config{}, errors.New("waterbed: river center depth must be finite and inside (0,0.05)")
+	}
 	return cfg, nil
+}
+
+func harmonizeConfluenceProfiles(
+	rivers []RiverSegment,
+	ids []int,
+	sharedSurface float64,
+	cfg Config,
+) float64 {
+	if len(ids) < 2 || !finite(sharedSurface) {
+		return math.Inf(1)
+	}
+
+	minBed := math.Inf(1)
+	for _, id := range ids {
+		seg := &rivers[id]
+		if len(seg.Profile) == 0 {
+			continue
+		}
+		length := math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0)
+		if length <= 1e-9 {
+			continue
+		}
+
+		depth := riverCenterDepth(cfg, seg.HalfWidth)
+		targetBed := math.Max(0, sharedSurface-depth)
+
+		// All incoming branches share the same downstream node. Their centerline
+		// separation therefore shrinks linearly toward zero. Finish the vertical
+		// convergence before the first sibling river footprints touch, rather
+		// than allowing a high tributary to overlap a much lower carved branch.
+		joinT := 1.0
+		for _, otherID := range ids {
+			if otherID == id {
+				continue
+			}
+			other := rivers[otherID]
+			sourceDistance := math.Hypot(
+				seg.X0-other.X0,
+				seg.Z0-other.Z0,
+			)
+			if sourceDistance <= 1e-9 {
+				joinT = 0
+				break
+			}
+			overlapT := 1 -
+				(seg.HalfWidth+other.HalfWidth)/sourceDistance
+			joinT = math.Min(joinT, clamp(overlapT, 0, 1))
+		}
+
+		blendBlocks := math.Max(32, 2*seg.HalfWidth)
+		startT := math.Max(0, joinT-blendBlocks/length)
+		startBed := sampleRiverProfile(*seg, startT)
+		for j := range seg.Profile {
+			t := float64(j) / float64(len(seg.Profile)-1)
+			if t < startT {
+				continue
+			}
+			blend := smoothstep(startT, joinT, t)
+			cap := lerp(startBed, targetBed, blend)
+			if t >= joinT {
+				cap = targetBed
+			}
+			if seg.Profile[j] > cap {
+				seg.Profile[j] = cap
+			}
+			if j > 0 && seg.Profile[j] > seg.Profile[j-1] {
+				seg.Profile[j] = seg.Profile[j-1]
+			}
+		}
+		seg.Bed1 = seg.Profile[len(seg.Profile)-1]
+		minBed = math.Min(minBed, seg.Bed1)
+	}
+	return minBed
 }
 
 func buildRiverProfile(
@@ -599,6 +724,11 @@ func riverHalfWidth(cfg Config, threshold, strength float64) float64 {
 func riverWidthFraction(cfg Config, halfWidth float64) float64 {
 	denom := math.Max(1e-9, cfg.MaxRiverHalfWidthBlocks-cfg.MinRiverHalfWidthBlocks)
 	return clamp((halfWidth-cfg.MinRiverHalfWidthBlocks)/denom, 0, 1)
+}
+
+func riverCenterDepth(cfg Config, halfWidth float64) float64 {
+	widthT := riverWidthFraction(cfg, halfWidth)
+	return cfg.RiverCenterDepthNormalized * (1 + 2*math.Pow(widthT, 1.15))
 }
 
 func pointSegment(px, pz, x0, z0, x1, z1 float64) (float64, float64) {
@@ -752,6 +882,14 @@ func (m *Model) Audit(samplesPerSegment int, epsilon float64) Diagnostics {
 	}
 
 	for _, lake := range m.Lakes {
+		// Hydrology marks macro depression candidates, but detailed terrain owns
+		// the final shoreline. A candidate node whose detailed terrain stands
+		// above the spill-controlled datum is intentionally dry and is not a
+		// lake-bed invariant violation.
+		if m.Base.SampleNormalized(lake.X, lake.Z) >
+			lake.WaterSurface+lakeShoreAllowanceNormalized {
+			continue
+		}
 		h := m.SampleNormalized(lake.X, lake.Z)
 		excess := h - lake.BedCeiling
 		if excess > epsilon {

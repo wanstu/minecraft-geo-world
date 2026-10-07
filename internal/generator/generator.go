@@ -182,7 +182,13 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 	if err := checkContext(ctx); err != nil {
 		return nil, err
 	}
-	wb, err := waterbed.Build(coastTerrain, rec, h, resolved.Waterbed)
+	waterbedConfig := resolved.Waterbed
+	// Waterbed must use the same width-dependent river depth basis as Runtime
+	// when it lowers downstream beds at confluences. Zero keeps the shared
+	// default; an explicit WorldSample value is mirrored here.
+	waterbedConfig.RiverCenterDepthNormalized =
+		resolved.WorldSample.RiverCenterDepthNormalized
+	wb, err := waterbed.Build(coastTerrain, rec, h, waterbedConfig)
 	if err != nil {
 		return nil, fmt.Errorf("generator: waterbed: %w", err)
 	}

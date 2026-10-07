@@ -50,6 +50,7 @@ type report struct {
 	RuntimeOceanNodeViolations, RuntimeEnclosedOceanLeaks                          int
 	RuntimeLakeNodeViolations, RuntimeRiverUndefinedSteps                          int
 	RuntimeRiverDrySteps, RuntimeRiverSurfaceUpslopeSteps                          int
+	RuntimeReceiverBackwaterSteps                                                  int
 	RuntimeMaxRiverSurfaceRise                                                     float64
 	RuntimeMaxRisePreviousKind, RuntimeMaxRiseCurrentKind                          int
 	RuntimeMaxRiseSegment                                                          int
@@ -139,6 +140,7 @@ func inspect(seed int64, width, height int, cellSize float64) report {
 		r.RuntimeRiverUndefinedSteps = d.riverUndefinedSteps
 		r.RuntimeRiverDrySteps = d.riverDrySteps
 		r.RuntimeRiverSurfaceUpslopeSteps = d.riverSurfaceUpslopeSteps
+		r.RuntimeReceiverBackwaterSteps = d.receiverBackwaterSteps
 		r.RuntimeMaxRiverSurfaceRise = d.maxRiverSurfaceRise
 		r.RuntimeMaxRisePreviousKind = int(d.maxRisePreviousKind)
 		r.RuntimeMaxRiseCurrentKind = int(d.maxRiseCurrentKind)
@@ -269,6 +271,7 @@ type runtimeWaterDiagnostics struct {
 	riverUndefinedSteps      int
 	riverDrySteps            int
 	riverSurfaceUpslopeSteps int
+	receiverBackwaterSteps   int
 	maxRiverSurfaceRise      float64
 	maxRisePreviousKind      reconcile.WaterKind
 	maxRiseCurrentKind       reconcile.WaterKind
@@ -306,10 +309,18 @@ func auditRuntimeWater(model *generator.WorldModel) runtimeWaterDiagnostics {
 			d.enclosedOceanLeaks++
 		}
 		if model.Hydrology.LakeID[i] > 0 {
-			if s.WaterKind != reconcile.WaterLake ||
-				!s.WaterSurfaceDefined ||
-				s.WaterDepth <= 0 {
-				d.lakeNodeViolations++
+			// Hydrology identifies macro depression candidates. Waterbed then
+			// lets detailed terrain reject candidate cells above the final lake
+			// datum. Only nodes that Waterbed actually exposes as lake belong to
+			// the Runtime lake invariant.
+			ground := model.Waterbed.Sample(x, z)
+			if ground.WaterKind == reconcile.WaterLake &&
+				ground.WaterSurfaceDefined {
+				if s.WaterKind != reconcile.WaterLake ||
+					!s.WaterSurfaceDefined ||
+					s.WaterDepth <= 0 {
+					d.lakeNodeViolations++
+				}
 			}
 		}
 	}
@@ -344,18 +355,35 @@ func auditRuntimeWater(model *generator.WorldModel) runtimeWaterDiagnostics {
 			if havePrev {
 				rise := s.WaterSurfaceElevation - prevSurface
 				if rise > epsilon {
-					d.riverSurfaceUpslopeSteps++
-					if rise > d.maxRiverSurfaceRise {
-						d.maxRiverSurfaceRise = rise
-						d.maxRisePreviousKind = prevKind
-						d.maxRiseCurrentKind = s.WaterKind
-						d.maxRiseSegment = segID
-						d.maxRiseT = t
-						d.maxRisePreviousSurface = prevSurface
-						d.maxRiseCurrentSurface = s.WaterSurfaceElevation
-						d.maxRiseReceiverDefined = prevReceiverDefined
-						d.maxRiseReceiverSurface = prevReceiverSurface
-						d.maxRiseRiverWeight = prevRiverWeight
+					// A terminal river may legitimately rise toward a higher
+					// lake/ocean datum inside its short backwater transition.
+					// Treat that separately from unexplained river->river
+					// surface steps, which indicate a broken longitudinal
+					// profile or confluence handoff.
+					receiverDefined := prevReceiverDefined ||
+						ground.RiverReceiverSurfaceDefined
+					receiverSurface := prevReceiverSurface
+					if ground.RiverReceiverSurfaceDefined {
+						receiverSurface = ground.RiverReceiverSurface
+					}
+					if receiverDefined &&
+						s.WaterSurfaceElevation <= receiverSurface+epsilon &&
+						prevSurface < receiverSurface-epsilon {
+						d.receiverBackwaterSteps++
+					} else {
+						d.riverSurfaceUpslopeSteps++
+						if rise > d.maxRiverSurfaceRise {
+							d.maxRiverSurfaceRise = rise
+							d.maxRisePreviousKind = prevKind
+							d.maxRiseCurrentKind = s.WaterKind
+							d.maxRiseSegment = segID
+							d.maxRiseT = t
+							d.maxRisePreviousSurface = prevSurface
+							d.maxRiseCurrentSurface = s.WaterSurfaceElevation
+							d.maxRiseReceiverDefined = prevReceiverDefined
+							d.maxRiseReceiverSurface = prevReceiverSurface
+							d.maxRiseRiverWeight = prevRiverWeight
+						}
 					}
 				}
 			}

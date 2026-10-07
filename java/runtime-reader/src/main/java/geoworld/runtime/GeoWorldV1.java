@@ -849,6 +849,7 @@ public final class GeoWorldV1 {
         boolean riverBedDefined = false;
         double riverBedElevation = 0;
         double riverDatumWeight = -1;
+        double riverDatumT = 2;
         boolean receiverDefined = false;
         double receiverSurface = 0;
         double receiverWeight = 0;
@@ -873,7 +874,13 @@ public final class GeoWorldV1 {
                 weight > riverDatumWeight + 1.0e-12 ||
                 (
                     Math.abs(weight - riverDatumWeight) <= 1.0e-12 &&
-                    bed > riverBedElevation
+                    (
+                        point.t() < riverDatumT - 1.0e-12 ||
+                        (
+                            Math.abs(point.t() - riverDatumT) <= 1.0e-12 &&
+                            bed < riverBedElevation
+                        )
+                    )
                 )
             ) {
                 riverBedDefined = true;
@@ -881,8 +888,9 @@ public final class GeoWorldV1 {
                 riverHalfWidth = segment.halfWidth();
                 receiverDefined = segment.receiverSurfaceDefined();
                 receiverSurface = segment.receiverSurface();
-                receiverWeight = smoothstep(0.68, 1.0, point.t());
+                receiverWeight = smoothstep(0.28, 0.42, point.t());
                 riverDatumWeight = weight;
+                riverDatumT = point.t();
             }
             double candidate =
                 baseHeight - Math.max(0, baseHeight - bed) * weight;

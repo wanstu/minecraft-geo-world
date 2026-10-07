@@ -22,6 +22,12 @@ type Config struct {
 	// downhill. Without this minimum trench depth, Runtime water can sit one or
 	// two blocks on top of an uncarved surface.
 	MinRiverBedDepthNormalized float64 `json:",omitempty"`
+
+	// RiverCenterDepthNormalized mirrors the Runtime river depth basis while
+	// Waterbed constructs the longitudinal profile. It lets a wider downstream
+	// stem lower its bed enough that bed + water depth cannot jump upward at a
+	// confluence. Generator keeps this value identical to WorldSample config.
+	RiverCenterDepthNormalized float64 `json:",omitempty"`
 }
 
 type RiverSegment struct {

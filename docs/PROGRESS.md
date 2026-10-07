@@ -1597,3 +1597,27 @@ t5 实测变化：
 - NeoForge compileJava、verifyGeoWorldEngine、verifyGeoWorldSpawn 全绿。
 - 最新 MOD 已自动部署到 HMCL 26.3。
 - 已存在的 t7/t8 会继续读取自己持久化的旧 world.geoworld 和旧 Chunk；必须新建世界验证本轮地形/水文变化。
+
+## 2026-10-07 · 汇流水面连续性与河口回水收口
+
+继续针对 Seed=123456 的剩余悬河风险做 Runtime 逐点审计后，确认剩余问题不是互不相干河流穿叉，而是真实汇流节点的水面 datum 切换：
+
+- 原模型只保证河床 profile 单调下降，但 Runtime 水面为“河床 + 随河宽增长的中心水深”。支流汇入更宽主河时，即使河床不抬升，也可能因为主河更深而让水面突然上跳。
+- Seed=123456 严格扫描原有 568 次 Runtime 水面上升中，561 次为 River -> River；其中绝大多数发生在汇流节点或刚离开汇流节点。另有 6 次 River -> Ocean、1 次 River -> Lake，来自接收水体已经接管但旧 backwater blend 尚未开始。
+- Waterbed 现在与 WorldSample 共享同一 RiverCenterDepthNormalized，并在构建河网 DAG 时同时传播有效河床和有效水面；下游河变宽时主动降低 junction bed，保证 bed + depth 不向上跳。
+- 多支流汇合时，在几何 footprint 开始重叠之前平滑收敛到共享水面；精确汇流中心的 datum tie 由 downstream segment 接管，Go 与 Java Runtime 使用同一规则。
+- Receiver backwater 从旧的终段 68%-100% 改为约 28%-42% 完成过渡，使水面在实际进入湖泊/海洋 footprint 前已经衔接到接收水位；合法河口回水单独计数，不再与悬河异常混在一起。
+- Hydrology LakeID 继续表示宏观 depression candidate；详细地形高于最终 lake datum 的候选节点允许保持干地。Consistency Audit 与 Tester 的湖床异常统计都同步采用该语义，避免为了“审计归零”重新把高地强挖成湖。
+
+模型验证：
+- Seed=123456：RuntimeRiverSurfaceUpslopeSteps 568 -> 0；RuntimeLakeNodeViolations 268 -> 0；WaterbedRiverUpslopeSteps=0；WaterbedLakeBedViolations=0；合法 Receiver backwater steps=50。
+- 正式 Seed 731894205：Waterbed/Runtime 河湖异常均为 0；合法 Receiver backwater steps=82。
+- 正式 Seed 10400：Waterbed/Runtime 河湖异常均为 0；合法 Receiver backwater steps=152。
+- 当前 strict-final 命令仍会因既存 CoastTerrainMacroSlopeMismatch > 1e-4 门槛退出 1（731894205≈2.39e-4、10400≈4.50e-4、123456≈2.72e-4）。该门槛早于本轮水系改动存在，且与项目文档中“正式 Seed strict-final 应通过”的记录不一致；本轮不通过放宽阈值掩盖这个独立海岸问题。
+
+回归与部署：
+- go test ./... -count=1 全绿。
+- Java/Go GoldenVerifier 15/15，通过 tolerance=1e-9。
+- NeoForge compileJava、verifyGeoWorldEngine、verifyGeoWorldSpawn 全绿。
+- Engine cache key v7 -> v8；verifier 已确认 v8 首次生成 cached=false。
+- java/neoforge-mod/build.cmd BUILD SUCCESSFUL，并已自动部署最新 GeoWorld-NeoForge-26.3-0.1.0-dev.jar 到 HMCL 26.3。

@@ -96,7 +96,12 @@ func TestRiverDepthTapersSmoothlyToBank(t *testing.T) {
 		From: from, To: to, RiverStrength: 1,
 	}}
 	h := emptyHydrology(g)
-	wb, err := waterbed.Build(base, rec, h, waterbed.Config{})
+	wb, err := waterbed.Build(
+		base,
+		rec,
+		h,
+		waterbed.Config{RiverCenterDepthNormalized: 0.01},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,6 +155,66 @@ func TestRiverDepthTapersSmoothlyToBank(t *testing.T) {
 	}
 }
 
+func TestConfluenceWaterSurfaceDoesNotRiseWhenMainStemWidens(t *testing.T) {
+	g := world.GridGeometry{
+		Width: 4, Height: 3,
+		SpanXBlocks: 384, SpanZBlocks: 256,
+	}
+	base := testTerrain(t, g, 0.72)
+	rec := baseReconciliation(g, 0.72)
+	from, junction, downstream := g.Width, g.Width+1, g.Width+2
+	rec.RiverBedTarget[from] = 0.63
+	rec.RiverBedTarget[junction] = 0.62
+	rec.RiverBedTarget[downstream] = 0.60
+	rec.RiverEdges = []reconcile.RiverEdgeConstraint{
+		{From: from, To: junction, RiverStrength: 0.31},
+		{From: junction, To: downstream, RiverStrength: 1.0},
+	}
+
+	h := emptyHydrology(g)
+	const centerDepth = 0.01
+	wb, err := waterbed.Build(
+		base,
+		rec,
+		h,
+		waterbed.Config{RiverCenterDepthNormalized: centerDepth},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := Build(
+		testSurface(g, true),
+		wb,
+		Config{RiverCenterDepthNormalized: centerDepth},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x0, z := g.NodePosition(0, 1)
+	x2, _ := g.NodePosition(2, 1)
+	step := 2.0
+	havePrev := false
+	prev := 0.0
+	for x := x0; x <= x2; x += step {
+		s := m.Sample(x, z)
+		if s.WaterKind != reconcile.WaterRiver || !s.WaterSurfaceDefined {
+			continue
+		}
+		if havePrev && s.WaterSurfaceElevation > prev+1e-9 {
+			t.Fatalf(
+				"river surface rose through widening confluence at x=%.1f: %.9f -> %.9f",
+				x, prev, s.WaterSurfaceElevation,
+			)
+		}
+		prev = s.WaterSurfaceElevation
+		havePrev = true
+	}
+	if !havePrev {
+		t.Fatal("did not sample river water")
+	}
+}
+
 func TestReceiverBackwaterOnlyRaisesRiverNearMouth(t *testing.T) {
 	g := testGeometry()
 	base := testTerrain(t, g, 0.55)
@@ -167,7 +232,12 @@ func TestReceiverBackwaterOnlyRaisesRiverNearMouth(t *testing.T) {
 
 	h := emptyHydrology(g)
 	h.FlowTo[from] = to
-	wb, err := waterbed.Build(base, rec, h, waterbed.Config{})
+	wb, err := waterbed.Build(
+		base,
+		rec,
+		h,
+		waterbed.Config{RiverCenterDepthNormalized: 0.01},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

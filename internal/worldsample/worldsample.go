@@ -41,6 +41,13 @@ func Build(surface *world.Surface, ground *waterbed.Model, cfg Config) (*Model, 
 	if err != nil {
 		return nil, err
 	}
+	if math.Abs(
+		ground.Config.RiverCenterDepthNormalized-cfg.RiverCenterDepthNormalized,
+	) > 1e-12 {
+		return nil, errors.New(
+			"worldsample: river center depth conflicts with waterbed profile",
+		)
+	}
 
 	ocean := make([]float64, n)
 	for i, land := range surface.LandMask {
