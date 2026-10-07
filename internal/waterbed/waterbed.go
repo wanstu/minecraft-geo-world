@@ -12,9 +12,8 @@ import (
 )
 
 const (
-	lakeShoreAllowanceNormalized = 0.0015
-	receiverBlendStart           = 0.28
-	receiverBlendEnd             = 0.42
+	lakeShoreAllowanceNormalized    = 0.0015
+	navigationSurfaceStepNormalized = 0.009
 )
 
 func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cfg Config) (*Model, error) {
@@ -62,12 +61,17 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 		riverBuckets: make([][]int, n),
 		lakeBuckets:  make([][]int, n),
 	}
+	lakeSurfaces, err := buildLakeNodes(base, rec, hydro, m)
+	if err != nil {
+		return nil, err
+	}
 
 	type riverDraft struct {
-		edge      reconcile.RiverEdgeConstraint
-		x0, z0    float64
-		x1, z1    float64
-		halfWidth float64
+		edge          reconcile.RiverEdgeConstraint
+		x0, z0        float64
+		x1, z1        float64
+		halfWidth     float64
+		meanderOffset float64
 	}
 	drafts := make([]riverDraft, len(rec.RiverEdges))
 	outgoing := make([]int, n)
@@ -87,13 +91,35 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 		x1i, z1i := edge.To%base.Geometry.Width, edge.To/base.Geometry.Width
 		x0, z0 := base.Geometry.NodePosition(x0i, z0i)
 		x1, z1 := base.Geometry.NodePosition(x1i, z1i)
+		halfWidth := riverHalfWidth(
+			cfg,
+			rec.Config.RiverStrengthThreshold,
+			edge.RiverStrength,
+		)
+		length := math.Hypot(x1-x0, z1-z0)
 		drafts[id] = riverDraft{
 			edge: edge,
 			x0:   x0, z0: z0, x1: x1, z1: z1,
-			halfWidth: riverHalfWidth(cfg, rec.Config.RiverStrengthThreshold, edge.RiverStrength),
+			halfWidth: halfWidth,
+			meanderOffset: riverMeanderOffset(
+				base.Config.Seed,
+				edge.From,
+				edge.To,
+				length,
+				halfWidth,
+				edge.OriginalDrop,
+			),
 		}
 		outgoing[edge.From] = id
 		indegree[edge.To]++
+	}
+	for id := range drafts {
+		if indegree[drafts[id].edge.To] > 1 {
+			// Approaching branches must not swing across one another long before
+			// their confluence. Keep a visible bend, but tighten the final
+			// approach so sibling channels only begin touching near the junction.
+			drafts[id].meanderOffset *= 0.35
+		}
 	}
 
 	// A sampled upstream profile may become lower than its macro endpoint target
@@ -133,7 +159,15 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 		draft := drafts[edgeID]
 		centerDepth := riverCenterDepth(cfg, draft.halfWidth)
 		bed0 := effectiveBed[draft.edge.From]
-		if effectiveSurfaceDefined[draft.edge.From] {
+		if lakeID := hydro.LakeID[draft.edge.From]; lakeID > 0 {
+			if surface, ok := lakeSurfaces[lakeID]; ok {
+				// An exorheic lake outlet begins at the actual rendered lake
+				// datum, not at the much deeper lake bed.
+				bed0 = math.Max(0, surface-centerDepth)
+				effectiveSurfaceDefined[draft.edge.From] = true
+				effectiveSurface[draft.edge.From] = surface
+			}
+		} else if effectiveSurfaceDefined[draft.edge.From] {
 			// Wider downstream rivers carry deeper water. Lower their bed at
 			// the junction so the resulting water surface never steps upward.
 			bed0 = math.Min(
@@ -149,9 +183,24 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 			draft.x1, draft.z1,
 			bed0, bed1,
 			draft.halfWidth,
+			draft.meanderOffset,
 			cfg.RiverProfileStepBlocks,
 			cfg.MinRiverBedDepthNormalized*(1+1.5*widthT),
 		)
+		rawProfileDrop := profile[0] - profile[len(profile)-1]
+		profile = terraceRiverProfile(
+			profile,
+			cfg.RiverProfileStepBlocks,
+			riverNavigationReachBlocks(draft.halfWidth),
+		)
+		if draft.halfWidth >= 8 && rawProfileDrop <= 0.006 {
+			profile = snapNavigableRiverProfile(
+				profile,
+				cfg,
+				draft.halfWidth,
+				navigationSurfaceStepNormalized,
+			)
+		}
 		if len(profile) == 0 {
 			return nil, errors.New("waterbed: river profile is empty")
 		}
@@ -168,10 +217,11 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 		segment := RiverSegment{
 			From: draft.edge.From, To: draft.edge.To,
 			X0: draft.x0, Z0: draft.z0, X1: draft.x1, Z1: draft.z1,
-			Bed0:      bed0,
-			Bed1:      effectiveBed[draft.edge.To],
-			HalfWidth: draft.halfWidth,
-			Profile:   profile,
+			Bed0:          bed0,
+			Bed1:          effectiveBed[draft.edge.To],
+			HalfWidth:     draft.halfWidth,
+			MeanderOffset: draft.meanderOffset,
+			Profile:       profile,
 		}
 		id := len(m.Rivers)
 		m.Rivers = append(m.Rivers, segment)
@@ -191,6 +241,49 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 		return nil, errors.New("waterbed: river graph contains a cycle")
 	}
 
+	// Lakes were constructed and spill-capped before the river DAG so
+	// lake outlets can begin exactly at the final rendered lake datum.
+	for i := range m.Rivers {
+		surface, ok, err := directReceiverSurface(
+			m.Rivers[i].To,
+			rec,
+			hydro,
+			lakeSurfaces,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			m.Rivers[i].ReceiverSurfaceDefined = true
+			m.Rivers[i].ReceiverSurface = surface
+		}
+		if spatial, hit := spatialLakeReceiverSurface(m, m.Rivers[i]); hit &&
+			(!m.Rivers[i].ReceiverSurfaceDefined ||
+				spatial > m.Rivers[i].ReceiverSurface) {
+			// Final rendered geometry is authoritative for connectivity. If a
+			// curved river actually passes through a rendered lake footprint,
+			// the lake is hydraulically connected even when the coarse FlowTo
+			// topology missed that intersection. Use the lake datum as a
+			// backwater floor so boats never meet an upward water wall.
+			m.Rivers[i].ReceiverSurfaceDefined = true
+			m.Rivers[i].ReceiverSurface = spatial
+		}
+	}
+	propagateReceiverBackwater(
+		m.Rivers,
+		incomingSegments,
+		cfg,
+	)
+
+	return m, nil
+}
+
+func buildLakeNodes(
+	base *terrain.Model,
+	rec *reconcile.Model,
+	hydro *hydrology.Model,
+	m *Model,
+) (map[int]float64, error) {
 	spacing := base.Geometry.SpacingX()
 	inner := spacing * 0.50
 	// Lake cells are rendered with a rounded-square (L4/superellipse)
@@ -204,7 +297,9 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 		}
 		lakeID := hydro.LakeID[i]
 		if lakeID <= 0 || !rec.WaterSurfaceDefined[i] {
-			return nil, errors.New("waterbed: lake bed constraint is missing lake water metadata")
+			return nil, errors.New(
+				"waterbed: lake bed constraint is missing lake water metadata",
+			)
 		}
 		xi, zi := i%base.Geometry.Width, i/base.Geometry.Width
 		x, z := base.Geometry.NodePosition(xi, zi)
@@ -222,41 +317,20 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 		m.indexLake(id, node)
 	}
 
-	// A channel can geometrically pass through the rendered lake footprint even
-	// when its Hydrology FlowTo chain does not point directly at that lake node.
-	// Treat any such spatial intersection as the same receiving-water backwater
-	// constraint so Runtime does not jump upward from shallow river water to the
-	// lake datum at the footprint boundary.
 	// Macro hydrology finds closed basins at 128-block control points, while
-	// the detailed terrain adds sub-cell relief afterwards. Recheck every lake
-	// against the actual detailed terrain around the union of its rendered
-	// footprint. If a lower local spill route exists, lower the lake datum to
-	// that rim instead of rendering a raised reservoir wall.
+	// detailed terrain adds sub-cell relief afterwards. Recheck every lake
+	// against the actual detailed union rim and lower the datum when a lower
+	// spill route exists.
 	capLakeSurfacesToDetailedRims(base, m.Lakes)
 
 	lakeSurfaces := make(map[int]float64)
 	for _, lake := range m.Lakes {
-		if old, ok := lakeSurfaces[lake.LakeID]; !ok || lake.WaterSurface < old {
+		if old, ok := lakeSurfaces[lake.LakeID]; !ok ||
+			lake.WaterSurface < old {
 			lakeSurfaces[lake.LakeID] = lake.WaterSurface
 		}
 	}
-	for i := range m.Rivers {
-		surface, ok, err := directReceiverSurface(
-			m.Rivers[i].To,
-			rec,
-			hydro,
-			lakeSurfaces,
-		)
-		if err != nil {
-			return nil, err
-		}
-		if ok {
-			m.Rivers[i].ReceiverSurfaceDefined = true
-			m.Rivers[i].ReceiverSurface = surface
-		}
-	}
-
-	return m, nil
+	return lakeSurfaces, nil
 }
 
 func capLakeSurfacesToDetailedRims(base *terrain.Model, lakes []LakeNode) {
@@ -348,11 +422,36 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	riverDatumT := 2.0
 	for _, id := range m.riverBuckets[bucket] {
 		seg := m.Rivers[id]
-		t, distance := pointSegment(worldX, worldZ, seg.X0, seg.Z0, seg.X1, seg.Z1)
-		if distance >= seg.HalfWidth {
+		t, distance := pointRiverSegment(worldX, worldZ, seg)
+		bankRadius := seg.HalfWidth + riverBankBlendBlocks(seg.HalfWidth)
+		if distance >= bankRadius {
 			continue
 		}
 		bed := sampleRiverProfile(seg, t)
+
+		if distance >= seg.HalfWidth {
+			// Shape a short dry river valley around the navigable channel.
+			// The river is the local low point; terrain rises smoothly back to
+			// the untouched broad surface instead of meeting water as a noisy
+			// staircase or vertical trench wall.
+			surface := bed + riverCenterDepth(m.Config, seg.HalfWidth)
+			innerBank := math.Min(baseHeight, surface+0.0022)
+			bankWeight := 1 - smoothstep(
+				seg.HalfWidth,
+				bankRadius,
+				distance,
+			)
+			candidate := lerp(baseHeight, innerBank, bankWeight)
+			if candidate < finalHeight {
+				finalHeight = candidate
+				sample.RiverCarve = math.Max(
+					sample.RiverCarve,
+					baseHeight-candidate,
+				)
+			}
+			continue
+		}
+
 		weight := 1 - smoothstep(0, seg.HalfWidth, distance)
 		if weight > sample.RiverWeight {
 			sample.RiverWeight = weight
@@ -361,7 +460,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		// not a neighbouring branch whose bank merely overlaps here. Prefer the
 		// strongest lateral weight. At an exact confluence centerline tie, the
 		// downstream segment starts at t=0 while incoming segments end at t=1;
-		// prefer that downstream owner, whose bed was surface-capped above.
+		// prefer that downstream owner.
 		if !sample.RiverBedDefined ||
 			weight > riverDatumWeight+1e-12 ||
 			(math.Abs(weight-riverDatumWeight) <= 1e-12 &&
@@ -373,11 +472,24 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			sample.RiverHalfWidth = seg.HalfWidth
 			sample.RiverReceiverSurfaceDefined = seg.ReceiverSurfaceDefined
 			sample.RiverReceiverSurface = seg.ReceiverSurface
-			sample.RiverReceiverWeight = smoothstep(receiverBlendStart, receiverBlendEnd, t)
+			if seg.ReceiverSurfaceDefined {
+				// Receiver datum is a backwater floor, not a downstream ramp.
+				// Propagation during Build guarantees the floor continues
+				// upstream far enough to avoid an upward step at segment joins.
+				sample.RiverReceiverWeight = 1
+			} else {
+				sample.RiverReceiverWeight = 0
+			}
 			riverDatumWeight = weight
 			riverDatumT = t
 		}
-		candidate := baseHeight - math.Max(0, baseHeight-bed)*weight
+		surface := bed + riverCenterDepth(m.Config, seg.HalfWidth)
+		channelShoulder := math.Min(baseHeight, surface+0.0022)
+		crossT := smoothstep(0, seg.HalfWidth, distance)
+		candidate := math.Min(
+			baseHeight,
+			lerp(bed, channelShoulder, crossT),
+		)
 		if candidate < finalHeight {
 			finalHeight = candidate
 			sample.RiverCarve = math.Max(sample.RiverCarve, baseHeight-candidate)
@@ -438,7 +550,11 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 
 func (m *Model) indexRiver(id int, seg RiverSegment) {
 	spacing := m.Geometry.SpacingX()
-	expansion := int(math.Ceil(seg.HalfWidth/spacing)) + 1
+	supportRadius :=
+		seg.HalfWidth +
+			math.Abs(seg.MeanderOffset) +
+			riverBankBlendBlocks(seg.HalfWidth)
+	expansion := int(math.Ceil(supportRadius/spacing)) + 1
 	x0, z0 := seg.From%m.Geometry.Width, seg.From/m.Geometry.Width
 	x1, z1 := seg.To%m.Geometry.Width, seg.To/m.Geometry.Width
 	minX, maxX := minInt(x0, x1)-expansion, maxInt(x0, x1)+expansion
@@ -556,8 +672,12 @@ func harmonizeConfluenceProfiles(
 				joinT = 0
 				break
 			}
-			overlapT := 1 -
-				(seg.HalfWidth+other.HalfWidth)/sourceDistance
+			overlapSupport :=
+				seg.HalfWidth +
+					other.HalfWidth +
+					math.Abs(seg.MeanderOffset) +
+					math.Abs(other.MeanderOffset)
+			overlapT := 1 - overlapSupport/sourceDistance
 			joinT = math.Min(joinT, clamp(overlapT, 0, 1))
 		}
 
@@ -592,24 +712,24 @@ func buildRiverProfile(
 	x0, z0, x1, z1,
 	bed0, bed1,
 	halfWidth,
+	meanderOffset,
 	stepBlocks,
 	minBedDepthNormalized float64,
 ) []float64 {
-	dx := x1 - x0
-	dz := z1 - z0
-	length := math.Hypot(dx, dz)
+	length := math.Hypot(x1-x0, z1-z0)
 	steps := maxInt(1, int(math.Ceil(length/stepBlocks)))
 	profile := make([]float64, steps+1)
-	nx, nz := 0.0, 0.0
-	if length > 1e-9 {
-		nx = -dz / length
-		nz = dx / length
-	}
 	bankOffset := halfWidth + 3
 	for j := 0; j <= steps; j++ {
 		t := float64(j) / float64(steps)
-		x := lerp(x0, x1, t)
-		z := lerp(z0, z1, t)
+		x, z, nx, nz := riverCenterAndNormalAt(
+			x0,
+			z0,
+			x1,
+			z1,
+			meanderOffset,
+			t,
+		)
 		target := lerp(bed0, bed1, t)
 		h := base.SampleNormalized(x, z)
 		minimumTrench := math.Max(0, h-minBedDepthNormalized)
@@ -624,11 +744,9 @@ func buildRiverProfile(
 				z-nz*bankOffset,
 			)
 			bankLow := math.Min(left, right)
-			// Macro D8 flow connects node centres, while detailed terrain can
-			// put a small ridge under that straight segment. A river should
-			// occupy the local low corridor instead of becoming an aqueduct
-			// above a lower adjacent bank, so cut the profile below the lower
-			// nearby bank by at least the normal trench allowance.
+			// Detailed relief may put a small ridge under the macro flow edge.
+			// The curved river should still occupy the local low corridor, not
+			// become an aqueduct above a lower nearby bank.
 			bankGuidedTrench := math.Max(
 				0,
 				bankLow-minBedDepthNormalized,
@@ -643,6 +761,164 @@ func buildRiverProfile(
 	return profile
 }
 
+func terraceRiverProfile(
+	profile []float64,
+	stepBlocks,
+	reachBlocks float64,
+) []float64 {
+	if len(profile) <= 1 || stepBlocks <= 0 || reachBlocks <= 0 {
+		return append([]float64(nil), profile...)
+	}
+	totalDrop := profile[0] - profile[len(profile)-1]
+	if totalDrop <= 1e-12 {
+		return append([]float64(nil), profile...)
+	}
+
+	// Only terrace gentle river reaches. Steep mountain streams keep their
+	// continuous descent and naturally become rapids/waterfalls; flattening a
+	// steep 128-block segment to its outlet would carve an implausibly deep,
+	// level canal. Gentle lowland rivers are where Minecraft's integer Y grid
+	// turns a realistic continuous slope into annoying boat-stopping steps.
+	if totalDrop > 0.014 {
+		return append([]float64(nil), profile...)
+	}
+
+	reachSamples := maxInt(
+		1,
+		int(math.Round(reachBlocks/stepBlocks)),
+	)
+	if totalDrop <= 0.006 {
+		// A <=~3-block macro drop is rendered as one long navigable reach.
+		reachSamples = len(profile)
+	}
+	out := append([]float64(nil), profile...)
+	for start := 0; start < len(out); start += reachSamples {
+		end := minInt(len(out), start+reachSamples)
+		low := profile[start]
+		for j := start + 1; j < end; j++ {
+			if profile[j] < low {
+				low = profile[j]
+			}
+		}
+		for j := start; j < end; j++ {
+			out[j] = low
+		}
+	}
+	for j := 1; j < len(out); j++ {
+		if out[j] > out[j-1] {
+			out[j] = out[j-1]
+		}
+	}
+	return out
+}
+
+func snapNavigableRiverProfile(
+	profile []float64,
+	cfg Config,
+	halfWidth,
+	surfaceStepNormalized float64,
+) []float64 {
+	if len(profile) == 0 || surfaceStepNormalized <= 0 {
+		return append([]float64(nil), profile...)
+	}
+	depth := riverCenterDepth(cfg, halfWidth)
+	surface := profile[len(profile)-1] + depth
+	snappedSurface :=
+		math.Floor(surface/surfaceStepNormalized+1e-12) *
+			surfaceStepNormalized
+	targetBed := math.Max(0, snappedSurface-depth)
+	out := append([]float64(nil), profile...)
+	for i := range out {
+		if out[i] > targetBed {
+			out[i] = targetBed
+		}
+		if i > 0 && out[i] > out[i-1] {
+			out[i] = out[i-1]
+		}
+	}
+	return out
+}
+
+func riverNavigationReachBlocks(halfWidth float64) float64 {
+	return clamp(72+3.2*halfWidth, 80, 128)
+}
+
+func riverMeanderOffset(
+	seed int64,
+	from,
+	to int,
+	length,
+	halfWidth,
+	originalDrop float64,
+) float64 {
+	if length <= 1e-9 {
+		return 0
+	}
+	u := riverHashUnit(seed, from, to)
+	// Some reaches really are straight. Keeping a minority untouched also
+	// avoids turning the river network into uniform decorative sine waves.
+	if u < 0.20 {
+		return 0
+	}
+	lowSlope := 1 - smoothstep(
+		0.010,
+		0.050,
+		math.Abs(originalDrop),
+	)
+	if lowSlope <= 1e-6 {
+		return 0
+	}
+	maxOffset := math.Min(length*0.17, 5+1.35*halfWidth)
+	amplitude := maxOffset * lowSlope * (0.55 + 0.45*u)
+	if amplitude < 1.5 {
+		return 0
+	}
+	if riverHashUnit(seed^0x4D45414E444552, to, from) < 0.5 {
+		amplitude = -amplitude
+	}
+	return amplitude
+}
+
+func riverHashUnit(seed int64, from, to int) float64 {
+	h := uint64(seed) ^
+		(uint64(from+1) * 0x9E3779B97F4A7C15) ^
+		(uint64(to+1) * 0xC2B2AE3D27D4EB4F)
+	h ^= h >> 30
+	h *= 0xBF58476D1CE4E5B9
+	h ^= h >> 27
+	h *= 0x94D049BB133111EB
+	h ^= h >> 31
+	return float64(h>>11) / float64(uint64(1)<<53)
+}
+
+func riverCenterAndNormalAt(
+	x0, z0, x1, z1,
+	meanderOffset,
+	t float64,
+) (float64, float64, float64, float64) {
+	t = clamp(t, 0, 1)
+	dx := x1 - x0
+	dz := z1 - z0
+	length := math.Hypot(dx, dz)
+	if length <= 1e-12 {
+		return x0, z0, 1, 0
+	}
+	chordNX := -dz / length
+	chordNZ := dx / length
+	phase := math.Pi * t
+	s := math.Sin(phase)
+	c := math.Cos(phase)
+	x := x0 + dx*t + chordNX*meanderOffset*s
+	z := z0 + dz*t + chordNZ*meanderOffset*s
+	tx := dx + chordNX*meanderOffset*math.Pi*c
+	tz := dz + chordNZ*meanderOffset*math.Pi*c
+	tangentLength := math.Hypot(tx, tz)
+	if tangentLength <= 1e-12 {
+		return x, z, chordNX, chordNZ
+	}
+	return x, z, -tz / tangentLength, tx / tangentLength
+}
+
 func sampleRiverProfile(seg RiverSegment, t float64) float64 {
 	if len(seg.Profile) == 0 {
 		return lerp(seg.Bed0, seg.Bed1, t)
@@ -652,6 +928,105 @@ func sampleRiverProfile(seg RiverSegment, t float64) float64 {
 	i1 := minInt(i0+1, len(seg.Profile)-1)
 	f := pos - float64(i0)
 	return lerp(seg.Profile[i0], seg.Profile[i1], f)
+}
+
+func spatialLakeReceiverSurface(
+	m *Model,
+	seg RiverSegment,
+) (float64, bool) {
+	length := math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0)
+	steps := maxInt(16, int(math.Ceil(length/4)))
+	best := math.Inf(-1)
+	found := false
+	for j := 0; j <= steps; j++ {
+		t := float64(j) / float64(steps)
+		x, z, _, _ := riverCenterAndNormalAt(
+			seg.X0,
+			seg.Z0,
+			seg.X1,
+			seg.Z1,
+			seg.MeanderOffset,
+			t,
+		)
+		bucket := m.bucketIndexForWorld(x, z)
+		if bucket < 0 {
+			continue
+		}
+		baseHeight := m.Base.SampleNormalized(x, z)
+		for _, lakeID := range m.lakeBuckets[bucket] {
+			lake := m.Lakes[lakeID]
+			if baseHeight >
+				lake.WaterSurface+lakeShoreAllowanceNormalized {
+				continue
+			}
+			if lakeDistance(x-lake.X, z-lake.Z) >= lake.OuterRadius {
+				continue
+			}
+			if !found || lake.WaterSurface > best {
+				best = lake.WaterSurface
+				found = true
+			}
+		}
+	}
+	return best, found
+}
+
+func propagateReceiverBackwater(
+	rivers []RiverSegment,
+	incomingSegments [][]int,
+	cfg Config,
+) {
+	queue := make([]int, 0)
+	queued := make([]bool, len(rivers))
+	for id := range rivers {
+		if rivers[id].ReceiverSurfaceDefined {
+			queue = append(queue, id)
+			queued[id] = true
+		}
+	}
+
+	for head := 0; head < len(queue); head++ {
+		id := queue[head]
+		seg := rivers[id]
+		receiver := seg.ReceiverSurface
+		if !seg.ReceiverSurfaceDefined || !finite(receiver) {
+			continue
+		}
+		startSurface :=
+			sampleRiverProfile(seg, 0) +
+				riverCenterDepth(cfg, seg.HalfWidth)
+		if receiver <= startSurface+1e-12 {
+			// Natural river surface already meets the receiver without an
+			// upstream-facing step; backwater does not need to propagate farther.
+			continue
+		}
+
+		node := seg.From
+		if node < 0 || node >= len(incomingSegments) {
+			continue
+		}
+		for _, upstreamID := range incomingSegments[node] {
+			if upstreamID < 0 || upstreamID >= len(rivers) {
+				continue
+			}
+			upstream := &rivers[upstreamID]
+			naturalOutlet :=
+				sampleRiverProfile(*upstream, 1) +
+					riverCenterDepth(cfg, upstream.HalfWidth)
+			if receiver <= naturalOutlet+1e-12 {
+				continue
+			}
+			if !upstream.ReceiverSurfaceDefined ||
+				receiver > upstream.ReceiverSurface {
+				upstream.ReceiverSurfaceDefined = true
+				upstream.ReceiverSurface = receiver
+			}
+			if !queued[upstreamID] {
+				queue = append(queue, upstreamID)
+				queued[upstreamID] = true
+			}
+		}
+	}
 }
 
 func directReceiverSurface(
@@ -729,6 +1104,69 @@ func riverWidthFraction(cfg Config, halfWidth float64) float64 {
 func riverCenterDepth(cfg Config, halfWidth float64) float64 {
 	widthT := riverWidthFraction(cfg, halfWidth)
 	return cfg.RiverCenterDepthNormalized * (1 + 2*math.Pow(widthT, 1.15))
+}
+
+func riverBankBlendBlocks(halfWidth float64) float64 {
+	return clamp(10+0.65*halfWidth, 12, 24)
+}
+
+func pointRiverSegment(
+	px,
+	pz float64,
+	seg RiverSegment,
+) (float64, float64) {
+	dx := seg.X1 - seg.X0
+	dz := seg.Z1 - seg.Z0
+	len2 := dx*dx + dz*dz
+	if len2 <= 1e-18 {
+		return 0, math.Hypot(px-seg.X0, pz-seg.Z0)
+	}
+	length := math.Sqrt(len2)
+	nx := -dz / length
+	nz := dx / length
+	t := clamp(
+		((px-seg.X0)*dx+(pz-seg.Z0)*dz)/len2,
+		0,
+		1,
+	)
+
+	// Newton-refine the nearest point on the curved centerline
+	// P(t)=P0+tD+N*A*sin(pi*t). Offsets are intentionally modest, so the
+	// chord projection is a stable starting point.
+	for iter := 0; iter < 4 && math.Abs(seg.MeanderOffset) > 1e-9; iter++ {
+		phase := math.Pi * t
+		s := math.Sin(phase)
+		c := math.Cos(phase)
+		x := seg.X0 + dx*t + nx*seg.MeanderOffset*s
+		z := seg.Z0 + dz*t + nz*seg.MeanderOffset*s
+		tx := dx + nx*seg.MeanderOffset*math.Pi*c
+		tz := dz + nz*seg.MeanderOffset*math.Pi*c
+		ax := -nx * seg.MeanderOffset * math.Pi * math.Pi * s
+		az := -nz * seg.MeanderOffset * math.Pi * math.Pi * s
+		rx := x - px
+		rz := z - pz
+		f := rx*tx + rz*tz
+		fp := tx*tx + tz*tz + rx*ax + rz*az
+		if math.Abs(fp) <= 1e-12 {
+			break
+		}
+		next := clamp(t-f/fp, 0, 1)
+		if math.Abs(next-t) <= 1e-8 {
+			t = next
+			break
+		}
+		t = next
+	}
+
+	x, z, _, _ := riverCenterAndNormalAt(
+		seg.X0,
+		seg.Z0,
+		seg.X1,
+		seg.Z1,
+		seg.MeanderOffset,
+		t,
+	)
+	return t, math.Hypot(px-x, pz-z)
 }
 
 func pointSegment(px, pz, x0, z0, x1, z1 float64) (float64, float64) {
@@ -851,13 +1289,26 @@ func (m *Model) Audit(samplesPerSegment int, epsilon float64) Diagnostics {
 		if profileSteps := 2 * (len(seg.Profile) - 1); profileSteps > steps {
 			steps = profileSteps
 		}
-		prevX, prevZ := seg.X0, seg.Z0
+		prevX, prevZ, _, _ := riverCenterAndNormalAt(
+			seg.X0,
+			seg.Z0,
+			seg.X1,
+			seg.Z1,
+			seg.MeanderOffset,
+			0,
+		)
 		prev := m.SampleNormalized(prevX, prevZ)
 		prevOwn := sampleRiverProfile(seg, 0)
 		for j := 1; j <= steps; j++ {
 			t := float64(j) / float64(steps)
-			x := lerp(seg.X0, seg.X1, t)
-			z := lerp(seg.Z0, seg.Z1, t)
+			x, z, _, _ := riverCenterAndNormalAt(
+				seg.X0,
+				seg.Z0,
+				seg.X1,
+				seg.Z1,
+				seg.MeanderOffset,
+				t,
+			)
 			current := m.SampleNormalized(x, z)
 			own := sampleRiverProfile(seg, t)
 			rise := current - prev
@@ -908,7 +1359,7 @@ func (m *Model) riverOverlapCount(worldX, worldZ float64) int {
 	count := 0
 	for _, id := range m.riverBuckets[bucket] {
 		seg := m.Rivers[id]
-		_, distance := pointSegment(worldX, worldZ, seg.X0, seg.Z0, seg.X1, seg.Z1)
+		_, distance := pointRiverSegment(worldX, worldZ, seg)
 		if distance < seg.HalfWidth {
 			count++
 		}

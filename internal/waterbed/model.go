@@ -39,18 +39,19 @@ type RiverSegment struct {
 	X1 float64
 	Z1 float64
 
-	Bed0      float64
-	Bed1      float64
-	HalfWidth float64
+	Bed0          float64
+	Bed1          float64
+	HalfWidth     float64
+	MeanderOffset float64
 
 	// Profile is a carve-only, monotonically non-increasing centerline bed from
 	// From to To. It is sampled from the actual broad terrain, not only endpoints.
 	Profile []float64
 
-	// ReceiverSurface is defined only when this segment directly enters a
-	// lake/ocean receiver. Runtime blends that datum over the downstream end of
-	// the segment so backwater is local to the mouth rather than propagating a
-	// raised water plane through the whole upstream network.
+	// ReceiverSurface is a lake/ocean backwater floor. Direct receiver
+	// segments seed the datum, then Waterbed propagates it upstream only while
+	// the natural river surface remains below the receiving water level. Runtime
+	// therefore gets a flat backwater reach instead of an upstream-facing ramp.
 	ReceiverSurfaceDefined bool
 	ReceiverSurface        float64
 }

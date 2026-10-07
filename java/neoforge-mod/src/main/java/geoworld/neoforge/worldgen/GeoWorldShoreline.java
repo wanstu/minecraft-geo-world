@@ -162,6 +162,33 @@ final class GeoWorldShoreline {
         }
 
         WaterNeighbor shore = findNearestWater(neighborhood);
+        if (
+            isWetlandPool(
+                center,
+                neighborhood,
+                shore,
+                seed,
+                worldX,
+                worldZ,
+                originalGround
+            )
+        ) {
+            // Wetlands are not uniformly mud flats. Carve coherent one-block
+            // shallow pools into already-flat wetland ground; macro Hydrology
+            // remains responsible for true rivers/lakes.
+            return new Column(
+                center,
+                originalGround,
+                originalGround - 1,
+                originalGround,
+                Integer.MAX_VALUE,
+                "WetlandPool",
+                originalGround,
+                false,
+                "minecraft:mud",
+                "minecraft:dirt"
+            );
+        }
         if (shore == null) {
             return new Column(
                 center,
@@ -178,23 +205,28 @@ final class GeoWorldShoreline {
         }
 
         int adjustedGround = originalGround;
+        boolean shallowFringe = false;
         int deltaToWater = originalGround - shore.waterBoundary();
 
-        // A dry column immediately next to source water may never sit below
-        // that source-water boundary. Otherwise Minecraft's fluid update fills
-        // the low dry slot with flowing water, producing the long non-source
-        // fringe seen along rivers.
+        // A dry column immediately next to source water may never remain as an
+        // empty slot below that source-water boundary. Repair at most two solid
+        // blocks; if exactly one block of vertical gap remains, make it a
+        // shallow source-water fringe instead of building a 3-block artificial
+        // levee. A deeper remainder is left for the verifier to reject as a
+        // real model problem.
         if (
             shore.distance() == 1 &&
             adjustedGround < shore.waterBoundary()
         ) {
-            // This pass may repair Minecraft integer-quantization gaps, but it
-            // must never manufacture a tall levee to hide a deeper model
-            // problem. Current valid shorelines need at most two blocks.
             adjustedGround = Math.min(
                 shore.waterBoundary(),
                 adjustedGround + 2
             );
+            int remainingGap =
+                shore.waterBoundary() - adjustedGround;
+            if (remainingGap == 1) {
+                shallowFringe = true;
+            }
         }
 
         double shapeNoise = smoothValueNoise(
@@ -260,7 +292,9 @@ final class GeoWorldShoreline {
             center,
             originalGround,
             adjustedGround,
-            adjustedGround,
+            shallowFringe
+                ? shore.waterBoundary()
+                : adjustedGround,
             shore.distance(),
             shore.waterKind(),
             shore.waterBoundary(),
@@ -268,6 +302,63 @@ final class GeoWorldShoreline {
             surface,
             under
         );
+    }
+
+    private static boolean isWetlandPool(
+        GeoWorldV1.RuntimeSample center,
+        Neighborhood neighborhood,
+        WaterNeighbor shore,
+        long seed,
+        int worldX,
+        int worldZ,
+        int originalGround
+    ) {
+        boolean wetland =
+            "Wetland".equals(center.biomeFamily()) ||
+            "Wet Mud".equals(center.surfaceProfile()) ||
+            "Peat".equals(center.surfaceProfile());
+        if (!wetland || isRocky(center)) {
+            return false;
+        }
+        if (shore != null && shore.distance() <= 2) {
+            return false;
+        }
+
+        // Pools belong on flat/very gently undulating marsh ground. Avoid
+        // punching water pockets into a two-block local slope.
+        int maxDelta = 0;
+        for (int[] offset : new int[][]{
+            {1, 0}, {-1, 0}, {0, 1}, {0, -1},
+            {2, 0}, {-2, 0}, {0, 2}, {0, -2}
+        }) {
+            int nearby = HEIGHTS.boundaryY(
+                neighborhood.sample(
+                    offset[0],
+                    offset[1]
+                ).groundHeight()
+            );
+            maxDelta = Math.max(
+                maxDelta,
+                Math.abs(nearby - originalGround)
+            );
+        }
+        if (maxDelta > 1) {
+            return false;
+        }
+
+        double broad = smoothValueNoise(
+            seed ^ 0x5745544C414E4450L,
+            worldX,
+            worldZ,
+            68.0
+        );
+        double detail = smoothValueNoise(
+            seed ^ 0x5348414C4C4F5750L,
+            worldX,
+            worldZ,
+            27.0
+        );
+        return broad > 0.57 && detail > 0.34;
     }
 
     private static WaterNeighbor findNearestWater(

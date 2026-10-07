@@ -221,6 +221,7 @@ public final class GeoWorldV1 {
         double bed0,
         double bed1,
         double halfWidth,
+        double meanderOffset,
         double[] profile,
         boolean receiverSurfaceDefined,
         double receiverSurface
@@ -343,14 +344,18 @@ public final class GeoWorldV1 {
     ) {
         Map<Long, List<RiverSegment>> buckets = new HashMap<>();
         for (RiverSegment segment : segments) {
+            double supportRadius =
+                segment.halfWidth() +
+                Math.abs(segment.meanderOffset()) +
+                riverBankBlendBlocks(segment.halfWidth());
             double minX =
-                Math.min(segment.x0(), segment.x1()) - segment.halfWidth();
+                Math.min(segment.x0(), segment.x1()) - supportRadius;
             double maxX =
-                Math.max(segment.x0(), segment.x1()) + segment.halfWidth();
+                Math.max(segment.x0(), segment.x1()) + supportRadius;
             double minZ =
-                Math.min(segment.z0(), segment.z1()) - segment.halfWidth();
+                Math.min(segment.z0(), segment.z1()) - supportRadius;
             double maxZ =
-                Math.max(segment.z0(), segment.z1()) + segment.halfWidth();
+                Math.max(segment.z0(), segment.z1()) + supportRadius;
             int minBX = this.featureBucketX(minX);
             int maxBX = this.featureBucketX(maxX);
             int minBZ = this.featureBucketZ(minZ);
@@ -856,16 +861,57 @@ public final class GeoWorldV1 {
         WaterKind kind = WaterKind.NONE;
 
         for (RiverSegment segment : this.riverCandidates(x, z)) {
-            PointSegment point = pointSegment(
-                x, z,
-                segment.x0(), segment.z0(),
-                segment.x1(), segment.z1()
-            );
-            if (point.distance() >= segment.halfWidth()) {
+            PointSegment point = pointRiverSegment(x, z, segment);
+            double bankRadius =
+                segment.halfWidth() +
+                riverBankBlendBlocks(segment.halfWidth());
+            if (point.distance() >= bankRadius) {
                 continue;
             }
             double bed = sampleRiverProfile(segment, point.t());
-            double weight = 1 - smoothstep(0, segment.halfWidth(), point.distance());
+
+            double widthSpan = Math.max(
+                1.0e-9,
+                waterbedConfig.maxRiverHalfWidthBlocks() -
+                    waterbedConfig.minRiverHalfWidthBlocks()
+            );
+            double widthT = clamp(
+                (segment.halfWidth() -
+                    waterbedConfig.minRiverHalfWidthBlocks()) /
+                    widthSpan,
+                0,
+                1
+            );
+            double centerDepth =
+                worldSampleConfig.riverCenterDepthNormalized() *
+                (1 + 2 * Math.pow(widthT, 1.15));
+
+            if (point.distance() >= segment.halfWidth()) {
+                double surface = bed + centerDepth;
+                double innerBank =
+                    Math.min(baseHeight, surface + 0.0022);
+                double bankWeight =
+                    1 -
+                    smoothstep(
+                        segment.halfWidth(),
+                        bankRadius,
+                        point.distance()
+                    );
+                double candidate =
+                    lerp(baseHeight, innerBank, bankWeight);
+                if (candidate < finalHeight) {
+                    finalHeight = candidate;
+                }
+                continue;
+            }
+
+            double weight =
+                1 -
+                smoothstep(
+                    0,
+                    segment.halfWidth(),
+                    point.distance()
+                );
             if (weight > riverWeight) {
                 riverWeight = weight;
             }
@@ -888,12 +934,25 @@ public final class GeoWorldV1 {
                 riverHalfWidth = segment.halfWidth();
                 receiverDefined = segment.receiverSurfaceDefined();
                 receiverSurface = segment.receiverSurface();
-                receiverWeight = smoothstep(0.28, 0.42, point.t());
+                receiverWeight =
+                    segment.receiverSurfaceDefined() ? 1.0 : 0.0;
                 riverDatumWeight = weight;
                 riverDatumT = point.t();
             }
+            double surface = bed + centerDepth;
+            double channelShoulder =
+                Math.min(baseHeight, surface + 0.0022);
+            double crossT =
+                smoothstep(
+                    0,
+                    segment.halfWidth(),
+                    point.distance()
+                );
             double candidate =
-                baseHeight - Math.max(0, baseHeight - bed) * weight;
+                Math.min(
+                    baseHeight,
+                    lerp(bed, channelShoulder, crossT)
+                );
             if (candidate < finalHeight) {
                 finalHeight = candidate;
             }
@@ -1348,6 +1407,138 @@ public final class GeoWorldV1 {
         );
     }
 
+    private static double riverBankBlendBlocks(double halfWidth) {
+        return clamp(10 + 0.65 * halfWidth, 12, 24);
+    }
+
+    private static double[] riverCenterAndNormalAt(
+        RiverSegment segment,
+        double t
+    ) {
+        t = clamp(t, 0, 1);
+        double dx = segment.x1() - segment.x0();
+        double dz = segment.z1() - segment.z0();
+        double length = Math.hypot(dx, dz);
+        if (length <= 1.0e-12) {
+            return new double[]{segment.x0(), segment.z0(), 1, 0};
+        }
+        double chordNX = -dz / length;
+        double chordNZ = dx / length;
+        double phase = Math.PI * t;
+        double s = Math.sin(phase);
+        double c = Math.cos(phase);
+        double x =
+            segment.x0() +
+            dx * t +
+            chordNX * segment.meanderOffset() * s;
+        double z =
+            segment.z0() +
+            dz * t +
+            chordNZ * segment.meanderOffset() * s;
+        double tx =
+            dx +
+            chordNX * segment.meanderOffset() * Math.PI * c;
+        double tz =
+            dz +
+            chordNZ * segment.meanderOffset() * Math.PI * c;
+        double tangentLength = Math.hypot(tx, tz);
+        if (tangentLength <= 1.0e-12) {
+            return new double[]{x, z, chordNX, chordNZ};
+        }
+        return new double[]{
+            x,
+            z,
+            -tz / tangentLength,
+            tx / tangentLength
+        };
+    }
+
+    private static PointSegment pointRiverSegment(
+        double px,
+        double pz,
+        RiverSegment segment
+    ) {
+        double dx = segment.x1() - segment.x0();
+        double dz = segment.z1() - segment.z0();
+        double len2 = dx * dx + dz * dz;
+        if (len2 <= 1.0e-18) {
+            return new PointSegment(
+                0,
+                Math.hypot(px - segment.x0(), pz - segment.z0())
+            );
+        }
+        double length = Math.sqrt(len2);
+        double nx = -dz / length;
+        double nz = dx / length;
+        double t = clamp(
+            (
+                (px - segment.x0()) * dx +
+                (pz - segment.z0()) * dz
+            ) / len2,
+            0,
+            1
+        );
+
+        for (
+            int iter = 0;
+            iter < 4 && Math.abs(segment.meanderOffset()) > 1.0e-9;
+            iter++
+        ) {
+            double phase = Math.PI * t;
+            double s = Math.sin(phase);
+            double c = Math.cos(phase);
+            double x =
+                segment.x0() +
+                dx * t +
+                nx * segment.meanderOffset() * s;
+            double z =
+                segment.z0() +
+                dz * t +
+                nz * segment.meanderOffset() * s;
+            double tx =
+                dx +
+                nx * segment.meanderOffset() * Math.PI * c;
+            double tz =
+                dz +
+                nz * segment.meanderOffset() * Math.PI * c;
+            double ax =
+                -nx *
+                segment.meanderOffset() *
+                Math.PI *
+                Math.PI *
+                s;
+            double az =
+                -nz *
+                segment.meanderOffset() *
+                Math.PI *
+                Math.PI *
+                s;
+            double rx = x - px;
+            double rz = z - pz;
+            double f = rx * tx + rz * tz;
+            double fp =
+                tx * tx +
+                tz * tz +
+                rx * ax +
+                rz * az;
+            if (Math.abs(fp) <= 1.0e-12) {
+                break;
+            }
+            double next = clamp(t - f / fp, 0, 1);
+            if (Math.abs(next - t) <= 1.0e-8) {
+                t = next;
+                break;
+            }
+            t = next;
+        }
+
+        double[] center = riverCenterAndNormalAt(segment, t);
+        return new PointSegment(
+            t,
+            Math.hypot(px - center[0], pz - center[1])
+        );
+    }
+
     private static PointSegment pointSegment(
         double px, double pz,
         double x0, double z0,
@@ -1560,6 +1751,9 @@ public final class GeoWorldV1 {
                 Json.doubleValue(r, "Bed0"),
                 Json.doubleValue(r, "Bed1"),
                 Json.doubleValue(r, "HalfWidth"),
+                r.get("MeanderOffset") == null
+                    ? 0.0
+                    : Json.doubleValue(r, "MeanderOffset"),
                 doubleArray(Json.required(r, "Profile"), "river.Profile"),
                 Json.bool(r, "ReceiverSurfaceDefined"),
                 Json.doubleValue(r, "ReceiverSurface")
@@ -1599,6 +1793,7 @@ public final class GeoWorldV1 {
                 river.to() < 0 || river.to() >= n ||
                 river.from() == river.to() ||
                 river.halfWidth() <= 0 ||
+                !finite(river.meanderOffset()) ||
                 river.profile().length == 0
             ) {
                 throw new IllegalArgumentException("invalid persisted river: " + i);

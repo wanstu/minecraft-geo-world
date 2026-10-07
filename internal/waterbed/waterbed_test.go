@@ -85,11 +85,58 @@ func TestRiverCorridorNeverRaisesBroadTerrain(t *testing.T) {
 	got := m.Sample((x0+x1)*0.5, z0)
 	want := 0.60 - m.Config.MinRiverBedDepthNormalized*
 		(1+1.5*riverWidthFraction(m.Config, m.Rivers[0].HalfWidth))
-	if math.Abs(got.FinalHeight-want) > 1e-12 || got.RiverCarve <= 0 {
-		t.Fatalf("river centerline was not embedded into broad terrain: got=%+v wantHeight=%.6f", got, want)
+	if got.FinalHeight > want+1e-12 ||
+		got.FinalHeight < want-navigationSurfaceStepNormalized-1e-12 ||
+		got.RiverCarve <= 0 {
+		t.Fatalf(
+			"river centerline outside allowed navigable carve: got=%+v baseTarget=%.6f step=%.6f",
+			got,
+			want,
+			navigationSurfaceStepNormalized,
+		)
 	}
 	if got.FinalHeight > 0.60+1e-12 {
 		t.Fatalf("river overlay raised broad terrain: %+v", got)
+	}
+}
+
+func TestNavigableRiverProfileSnapsDownWithoutRaising(t *testing.T) {
+	cfg, err := normalizeConfig(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := []float64{0.612, 0.610, 0.608, 0.607}
+	out := snapNavigableRiverProfile(
+		in,
+		cfg,
+		12,
+		navigationSurfaceStepNormalized,
+	)
+	if len(out) != len(in) {
+		t.Fatalf("snapped profile length=%d want=%d", len(out), len(in))
+	}
+	for i := range out {
+		if out[i] > in[i]+1e-12 {
+			t.Fatalf("navigation snap raised bed[%d]: %.12f -> %.12f", i, in[i], out[i])
+		}
+		if in[i]-out[i] > navigationSurfaceStepNormalized+1e-12 {
+			t.Fatalf(
+				"navigation snap carved too deeply at %d: %.12f -> %.12f step=%.6f",
+				i,
+				in[i],
+				out[i],
+				navigationSurfaceStepNormalized,
+			)
+		}
+		if i > 0 && out[i] > out[i-1]+1e-12 {
+			t.Fatalf("snapped river profile rose at %d: %.12f -> %.12f", i, out[i-1], out[i])
+		}
+	}
+	want := out[len(out)-1]
+	for i := range out {
+		if math.Abs(out[i]-want) > 1e-12 {
+			t.Fatalf("gentle navigable profile is not flat after snap: %v", out)
+		}
 	}
 }
 
@@ -116,16 +163,43 @@ func TestRiverBankBlendIsContinuous(t *testing.T) {
 	}
 	seg := m.Rivers[0]
 	x := (seg.X0 + seg.X1) * 0.5
-	z := seg.Z0 + seg.HalfWidth
 	eps := 1e-4
-	at := m.SampleNormalized(x, z)
-	insideSlope := (at - m.SampleNormalized(x, z-eps)) / eps
-	outsideSlope := (m.SampleNormalized(x, z+eps) - at) / eps
-	if math.Abs(at-0.70) > 1e-10 {
-		t.Fatalf("bank edge height=%.12f want broad terrain 0.70", at)
+
+	innerZ := seg.Z0 + seg.HalfWidth
+	inner := m.SampleNormalized(x, innerZ)
+	insideSlope :=
+		(inner - m.SampleNormalized(x, innerZ-eps)) / eps
+	outsideSlope :=
+		(m.SampleNormalized(x, innerZ+eps) - inner) / eps
+	if inner >= 0.70 || inner <= sampleRiverProfile(seg, 0.5) {
+		t.Fatalf(
+			"inner bank should sit between river bed and broad terrain: %.12f",
+			inner,
+		)
 	}
-	if math.Abs(insideSlope-outsideSlope) > 1e-5 {
-		t.Fatalf("bank slope kink: inside=%.12g outside=%.12g", insideSlope, outsideSlope)
+	if math.Abs(insideSlope-outsideSlope) > 2e-4 {
+		t.Fatalf(
+			"inner bank slope kink: inside=%.12g outside=%.12g",
+			insideSlope,
+			outsideSlope,
+		)
+	}
+
+	outerZ := innerZ + riverBankBlendBlocks(seg.HalfWidth)
+	outer := m.SampleNormalized(x, outerZ)
+	outerInsideSlope :=
+		(outer - m.SampleNormalized(x, outerZ-eps)) / eps
+	outerOutsideSlope :=
+		(m.SampleNormalized(x, outerZ+eps) - outer) / eps
+	if math.Abs(outer-0.70) > 1e-10 {
+		t.Fatalf("outer bank height=%.12f want broad terrain 0.70", outer)
+	}
+	if math.Abs(outerInsideSlope-outerOutsideSlope) > 2e-4 {
+		t.Fatalf(
+			"outer bank slope kink: inside=%.12g outside=%.12g",
+			outerInsideSlope,
+			outerOutsideSlope,
+		)
 	}
 }
 
@@ -371,8 +445,14 @@ func TestConfluencePropagatesActualUpstreamOutlet(t *testing.T) {
 	if downstreamSegment == nil {
 		t.Fatal("downstream segment not found")
 	}
-	if math.Abs(downstreamSegment.Bed0-0.55) > 1e-12 {
-		t.Fatalf("downstream bed start=%.12f want propagated 0.55", downstreamSegment.Bed0)
+	if downstreamSegment.Bed0 > 0.55+1e-12 ||
+		downstreamSegment.Bed0 < 0.55-navigationSurfaceStepNormalized-1e-12 {
+		t.Fatalf(
+			"downstream bed start=%.12f outside propagated/navigation range [%.12f, %.12f]",
+			downstreamSegment.Bed0,
+			0.55-navigationSurfaceStepNormalized,
+			0.55,
+		)
 	}
 
 	d := m.Audit(32, 1e-9)
@@ -423,7 +503,7 @@ func TestTerminalRiverSegmentInheritsOceanSurfaceAtItsEndpoint(t *testing.T) {
 	}
 }
 
-func TestDiagonalLakeFootprintOverridesCrossingRiverWithoutGlobalBackwater(t *testing.T) {
+func TestDiagonalLakeFootprintBackwatersCrossingRiver(t *testing.T) {
 	g := testGeometry()
 	// Keep detailed terrain close to the synthetic lake datum so the lake owns
 	// the crossing without requiring excavation of high dry terrain.
@@ -448,9 +528,9 @@ func TestDiagonalLakeFootprintOverridesCrossingRiverWithoutGlobalBackwater(t *te
 	rec.RiverBedTarget[4] = 0.52
 
 	// Node 1 is at (128,0). The diagonal segment 0 -> 4 passes through the
-	// rounded-square lake footprint near (64,64). The lake itself should own
-	// that overlap; merely crossing its footprint must not lift the entire
-	// 128-block river segment to the lake datum.
+	// rounded-square lake footprint near (64,64). Final rendered connectivity
+	// is authoritative: once river and lake actually touch, the lake datum must
+	// become a backwater floor so Minecraft never renders an upward water wall.
 	lake := 1
 	rec.LakeBedCeilingDefined[lake] = true
 	rec.LakeBedCeiling[lake] = 0.50
@@ -470,10 +550,14 @@ func TestDiagonalLakeFootprintOverridesCrossingRiverWithoutGlobalBackwater(t *te
 		t.Fatalf("river segments=%d want=1", len(m.Rivers))
 	}
 	seg := m.Rivers[0]
-	if seg.ReceiverSurfaceDefined {
+	if !seg.ReceiverSurfaceDefined {
+		t.Fatalf("spatial lake crossing did not create backwater: %+v", seg)
+	}
+	if math.Abs(seg.ReceiverSurface-m.Lakes[0].WaterSurface) > 1e-12 {
 		t.Fatalf(
-			"spatial lake crossing incorrectly backwatered whole river segment: %+v",
-			seg,
+			"crossing river receiver=%.12f lake=%.12f",
+			seg.ReceiverSurface,
+			m.Lakes[0].WaterSurface,
 		)
 	}
 	mid := m.Sample(64, 64)

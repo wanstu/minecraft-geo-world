@@ -68,6 +68,7 @@ public final class GeoWorldShorelineVerifier {
 
         int immediate = 0;
         int stable = 0;
+        int shallowFringes = 0;
         int shelves = 0;
         int materials = 0;
         int plantableEligible = 0;
@@ -218,6 +219,34 @@ public final class GeoWorldShorelineVerifier {
                             immediate++;
 
                             if (
+                                column.waterBoundary() >
+                                column.groundBoundary()
+                            ) {
+                                if (
+                                    column.waterBoundary() !=
+                                    column.shoreWaterBoundary() ||
+                                    column.waterBoundary() -
+                                    column.groundBoundary() != 1
+                                ) {
+                                    throw new AssertionError(
+                                        "shore fringe water is not a one-block " +
+                                        "source shelf at " +
+                                        (baseX + localX) + "," +
+                                        (baseZ + localZ) +
+                                        ": ground=" +
+                                        column.groundBoundary() +
+                                        " water=" +
+                                        column.waterBoundary() +
+                                        " source=" +
+                                        column.shoreWaterBoundary()
+                                    );
+                                }
+                                shallowFringes++;
+                                stable++;
+                                continue;
+                            }
+
+                            if (
                                 column.groundBoundary() <
                                 column.shoreWaterBoundary()
                             ) {
@@ -253,13 +282,14 @@ public final class GeoWorldShorelineVerifier {
 
         System.out.printf(
             "GeoWorld shoreline scan: seed=%d, immediate=%d, stable=%d, " +
-            "shelves=%d, materials=%d, caneReady=%d/%d, " +
+            "shallowFringes=%d, shelves=%d, materials=%d, caneReady=%d/%d, " +
             "maxLowering=%d, maxRaising=%d at %d,%d %s (%d->%d), " +
             "raiseBuckets=[1:%d,2-3:%d,4+:%d], materialChanges=%d/%d, " +
             "kinds=%s, maxByKind=%s%n",
             SEED,
             immediate,
             stable,
+            shallowFringes,
             shelves,
             materials,
             plantable,
@@ -333,6 +363,8 @@ public final class GeoWorldShorelineVerifier {
             }
         }
 
+        verifyWetlandPools(runtime);
+
         System.out.printf(
             "GeoWorld shoreline verification passed: seed=%d, immediate=%d, " +
             "stable=%d, shelves=%d, materials=%d, caneReady=%d/%d, " +
@@ -387,6 +419,142 @@ public final class GeoWorldShorelineVerifier {
             }
         }
         return null;
+    }
+
+    private static void verifyWetlandPools(
+        GeoWorldV1 runtime
+    ) {
+        int[] center = findWetlandCenter(runtime);
+        if (center == null) {
+            throw new AssertionError(
+                "could not find a dry Wetland region in seed " + SEED
+            );
+        }
+
+        int centerChunkX = Math.floorDiv(center[0], 16);
+        int centerChunkZ = Math.floorDiv(center[1], 16);
+        int eligible = 0;
+        int pools = 0;
+        for (int dz = -4; dz <= 4; dz++) {
+            for (int dx = -4; dx <= 4; dx++) {
+                int baseX = (centerChunkX + dx) * 16;
+                int baseZ = (centerChunkZ + dz) * 16;
+                GeoWorldShoreline.ChunkPlan plan =
+                    GeoWorldShoreline.planChunk(
+                        runtime,
+                        baseX,
+                        baseZ
+                    );
+                for (int localZ = 0; localZ < 16; localZ++) {
+                    for (int localX = 0; localX < 16; localX++) {
+                        GeoWorldShoreline.Column column =
+                            plan.column(localX, localZ);
+                        if (
+                            !isWetlandSemantics(column.sample()) ||
+                            !"None".equals(
+                                column.sample().waterKind()
+                            )
+                        ) {
+                            continue;
+                        }
+                        eligible++;
+                        if (!"WetlandPool".equals(
+                            column.shoreWaterKind()
+                        )) {
+                            continue;
+                        }
+                        pools++;
+                        if (
+                            column.waterBoundary() -
+                            column.groundBoundary() != 1
+                        ) {
+                            throw new AssertionError(
+                                "wetland pool is not one block deep at " +
+                                (baseX + localX) + "," +
+                                (baseZ + localZ)
+                            );
+                        }
+                        if (!"minecraft:mud".equals(
+                            column.surfaceOverride()
+                        )) {
+                            throw new AssertionError(
+                                "wetland pool bed is not mud at " +
+                                (baseX + localX) + "," +
+                                (baseZ + localZ)
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        if (eligible == 0 || pools == 0) {
+            throw new AssertionError(
+                "wetland planner produced no shallow pools: eligible=" +
+                eligible +
+                " pools=" +
+                pools
+            );
+        }
+        double ratio = (double)pools / eligible;
+        if (ratio < 0.03 || ratio > 0.55) {
+            throw new AssertionError(
+                "wetland pool coverage is implausible: " +
+                pools + "/" + eligible +
+                " ratio=" + ratio
+            );
+        }
+
+        System.out.printf(
+            "GeoWorld wetland pool verification passed: center=%d,%d " +
+            "pools=%d/%d ratio=%.3f%n",
+            center[0],
+            center[1],
+            pools,
+            eligible,
+            ratio
+        );
+    }
+
+    private static int[] findWetlandCenter(
+        GeoWorldV1 runtime
+    ) {
+        GeoWorldV1.Geometry geometry = runtime.manifest().geometry();
+        int macroStep = (int)Math.round(
+            geometry.spanXBlocks() /
+            Math.max(1.0, geometry.width() - 1.0)
+        );
+        int step = Math.max(16, macroStep / 4);
+        int minX = (int)Math.round(geometry.originX()) + macroStep;
+        int minZ = (int)Math.round(geometry.originZ()) + macroStep;
+        int maxX = (int)Math.round(
+            geometry.originX() + geometry.spanXBlocks()
+        ) - macroStep;
+        int maxZ = (int)Math.round(
+            geometry.originZ() + geometry.spanZBlocks()
+        ) - macroStep;
+
+        for (int z = minZ; z <= maxZ; z += step) {
+            for (int x = minX; x <= maxX; x += step) {
+                GeoWorldV1.RuntimeSample sample =
+                    runtime.sample(x, z);
+                if (
+                    isWetlandSemantics(sample) &&
+                    "None".equals(sample.waterKind())
+                ) {
+                    return new int[]{x, z};
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean isWetlandSemantics(
+        GeoWorldV1.RuntimeSample sample
+    ) {
+        return "Wetland".equals(sample.biomeFamily()) ||
+            "Wet Mud".equals(sample.surfaceProfile()) ||
+            "Peat".equals(sample.surfaceProfile());
     }
 
     private static void cleanupCache(Path root) {

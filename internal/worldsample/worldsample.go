@@ -104,12 +104,11 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		return out
 	}
 
-	// River water starts with a constant center depth, smoothly tapered to zero
-	// at the bank. If this channel eventually drains into a lake/ocean whose
-	// datum sits above that shallow surface, Waterbed exposes the receiving
-	// datum and Runtime applies a backwater floor. The floor is also tapered by
-	// RiverWeight, so it raises water depth inside the channel without flooding
-	// the surrounding broad terrain.
+	// River water starts with a constant center depth. If a downstream
+	// lake/ocean stands above the natural river surface, Waterbed propagates that
+	// receiving datum upstream only as far as needed and Runtime applies it as a
+	// flat backwater floor. The channel cross-section still owns where that water
+	// can exist, so the floor does not flood the surrounding broad terrain.
 	if ground.WaterKind == reconcile.WaterRiver && ground.RiverWeight > 0 {
 		// River size is already encoded by Waterbed half-width. Make the main
 		// stem physically deeper than headwater tributaries while preserving the
@@ -139,10 +138,10 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			if ground.RiverReceiverSurfaceDefined &&
 				ground.RiverReceiverSurface > surface &&
 				ground.RiverReceiverWeight > 0 {
-				// Receiver backwater is a local transition at the mouth, not
-				// a flat datum propagated across every upstream segment.
-				surface += (ground.RiverReceiverSurface - surface) *
-					ground.RiverReceiverWeight
+				// Receiver backwater is a floor, not a downstream ramp.
+				// Waterbed has already propagated the datum only through
+				// segments whose natural surface lies below the receiver.
+				surface = ground.RiverReceiverSurface
 			}
 			surface = math.Min(1, surface)
 			localDepth := surface - ground.FinalHeight

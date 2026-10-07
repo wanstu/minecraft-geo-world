@@ -1695,3 +1695,65 @@ t5 实测变化：
 - Golden fixtures 已重建；Java/Go GoldenVerifier 15/15，tolerance=1e-9。
 - verifyGeoWorldBiomePreset / verifyGeoWorldShoreline / verifyGeoWorldEngine / verifyGeoWorldSpawn 全通过。
 - 最新 NeoForge JAR 已自动部署到 HMCL 26.3。
+
+## 2026-10-07 · 可航行河网、河谷塑形、湿地浅水与湖泊排水闭环
+
+用户实机发现河面跟随地形频繁产生 Minecraft 整数 Y 台阶，划船顿挫且无法向上跨 1 格水；部分河段过直；沼泽几乎只有泥地；大型内陆湖看起来既无入流也无出流。同时复核 Minecraft 26.3 主世界群系覆盖。
+
+河流纵坡与游戏性：
+- Waterbed 对半宽 >=8 blocks、单宏段低坡（raw normalized drop <=0.006）的河段加入 navigable surface snapping。
+- 导航水位层级 navigationSurfaceStepNormalized=0.009，约对应 4~5 个 Minecraft 高度格；累计高差集中到更少的急流/跌水位置，而不是每几十格掉一级。
+- total drop >0.014 的陡河不做导航平整，保留山溪、急流和瀑布语义，不把所有河削成运河。
+- Receiver backwater 从“河口斜坡渐升”改为“接收水位 floor”：若湖/海水位高于自然河面，回水区保持接收水位，并只向上游传播到自然河面重新高于接收水位为止。
+- 最终渲染几何若河道实际穿过湖泊 footprint，即使粗 Hydrology FlowTo 未标记入湖，也视为真实水力连接并使用湖面 backwater floor，避免河->湖突然出现向上水墙。
+- 正式新增 cmd/geoworld-river-navigation-audit。Seed=123456 / 每 4 blocks 中心线采样 strict 结果：
+  - low-gradient small 8-12: 4.5868 changes/km
+  - low-gradient medium 12-16: 3.0073 changes/km
+  - low-gradient large >=16: 1.4030 changes/km
+  - downstream rises=0
+  - dry centerline samples=0
+  - steep/rapid reaches单独统计，不纳入可航行低坡阈值。
+
+河道平面形状与河谷：
+- RiverSegment 新增 MeanderOffset；低坡河段可生成轻微单弯曲流，约 20% 河段保持直线，避免所有河都机械蛇形。
+- 汇流前 meander 自动收敛到 35%；confluence profile harmonization 将 meander support 算入提前统一水位的距离，修复两条弯曲支流在汇流口前过早重叠导致约 4~5 格水位错位。
+- 河流采样改为真实曲线中心线 + Newton 最近点，不再以直线 chord 近似。
+- 河道横断面与外侧 dry bank 统一成“河床最低 -> 水边 shoulder -> 12~24 blocks 内平滑恢复原地形”的连续河谷缓坡。
+- GeoWorld Tester 的异常扫描和河流诊断图同步改为沿曲线中心线采样/绘制。
+
+湖泊水文闭环：
+- Reconcile 不再在河流进入湖后永久终止整条水路。
+- 每个湖至少保留一条 strongest direct feeder；即使该支流略低于全局可见阈值，也向上游追最多 3 个宏节点以形成可读的入流，而不是湖边一小截蓝线。
+- 对有 SpillOutlet 且 FlowTo 离开湖体的湖，从 SpillOutlet 强制继续 trace 到下游河网/海洋。
+- 新增 TestLakeKeepsVisibleFeederAndSpillOutflow。
+- Seed=123456 截图大湖（LakeID=2，约 1.884M blocks²）当前确认：
+  - 29 条宏观汇水边
+  - 5 条可见入流
+  - strongest feeder 9152,-832 -> 9024,-832，strength=0.743
+  - spill outlet 8000,-576 -> 7872,-576 已进入最终 RiverEdges，strength=0.743
+
+沼泽浅水：
+- GeoWorldShoreline 新增 wetland pool：Wetland / Wet Mud / Peat 语义中的低平 dry 区域可生成 1 格深浅水洼，池底 mud，保留泥地/草岛/浅水混合。
+- 使用低频 coherent noise，不做逐格随机孔洞；避开已有河湖海并限制局部坡差。
+- Seed=123456 verifier：center=1568,-3168，wetland pools=393/7059，ratio≈5.6%。
+
+岸线：
+- 直接邻水仍最多 solid raise 2 格；若仍恰差 1 格可改成一格 source-water fringe，而不是造 3 格人工堤。
+- 最新 Seed=123456 shoreline verifier：immediate=574，stable=574，shallowFringes=10，shelves=1046，materials=1069，caneReady=528/528，4+ raise=0。
+- 岸材质连续性仍保持：materialChanges=5/318。
+
+Minecraft 26.3 群系：
+- GeoWorldBiomePresetVerifier 现在直接读取 Minecraft 26.3 data/minecraft/tags/worldgen/biome/is_overworld.json 与 GeoWorld preset 比较。
+- Vanilla Overworld=56，GeoWorld preset=56，missing=0，extra=0。
+- 因此当前已注册全部 Minecraft 26.3 主世界群系；后续若有“看不到某群系”，应调查实际生成概率/可达条件，而非注册缺失。
+
+版本与验证：
+- Engine cache v9 -> v10，确保相同 Seed 新建世界不复用旧河网/水面缓存。
+- go test ./... -count=1 全绿。
+- geoworld-river-navigation-audit -strict PASS。
+- Java/Go GoldenVerifier 15/15，tolerance=1e-9。
+- verifyGeoWorldBiomePreset：56/56，missing=0，extra=0。
+- verifyGeoWorldShoreline + wetland pool PASS。
+- verifyGeoWorldEngine：v10 cached=false PASS。
+- verifyGeoWorldSpawn PASS。
+- NeoForge BUILD SUCCESSFUL；最新 GeoWorld-NeoForge-26.3-0.1.0-dev.jar 已自动部署到 HMCL 26.3。

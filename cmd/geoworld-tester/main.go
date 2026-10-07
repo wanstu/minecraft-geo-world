@@ -981,11 +981,11 @@ func buildAnomalyReport(active *activeWorld) anomalyReport {
 			if profileSteps := 2 * (len(seg.Profile) - 1); profileSteps > steps {
 				steps = profileSteps
 			}
-			prev := wb.SampleNormalized(seg.X0, seg.Z0)
+			prevX, prevZ := diagnosticRiverCenter(seg, 0)
+			prev := wb.SampleNormalized(prevX, prevZ)
 			for j := 1; j <= steps; j++ {
 				t := float64(j) / float64(steps)
-				x := seg.X0 + (seg.X1-seg.X0)*t
-				z := seg.Z0 + (seg.Z1-seg.Z0)*t
+				x, z := diagnosticRiverCenter(seg, t)
 				current := wb.SampleNormalized(x, z)
 				rise := current - prev
 				if rise > epsilon {
@@ -1195,10 +1195,41 @@ func renderDiagnosticLayer(img *image.RGBA, active *activeWorld, layer string) e
 			return errors.New("river diagnostics are unavailable for this world")
 		}
 		for _, segment := range wb.Rivers {
-			x0, y0 := diagnosticWorldToPixel(active.geometry, b, segment.X0, segment.Z0)
-			x1, y1 := diagnosticWorldToPixel(active.geometry, b, segment.X1, segment.Z1)
-			radius := diagnosticPhysicalRadius(active.geometry, b, segment.HalfWidth, 1, 3)
-			drawDiagnosticLine(img, x0, y0, x1, y1, radius, color.RGBA{70, 188, 235, 255})
+			radius := diagnosticPhysicalRadius(
+				active.geometry,
+				b,
+				segment.HalfWidth,
+				1,
+				3,
+			)
+			const curveSteps = 12
+			prevX, prevZ := diagnosticRiverCenter(segment, 0)
+			px0, py0 := diagnosticWorldToPixel(
+				active.geometry,
+				b,
+				prevX,
+				prevZ,
+			)
+			for j := 1; j <= curveSteps; j++ {
+				t := float64(j) / curveSteps
+				x, z := diagnosticRiverCenter(segment, t)
+				px1, py1 := diagnosticWorldToPixel(
+					active.geometry,
+					b,
+					x,
+					z,
+				)
+				drawDiagnosticLine(
+					img,
+					px0,
+					py0,
+					px1,
+					py1,
+					radius,
+					color.RGBA{70, 188, 235, 255},
+				)
+				px0, py0 = px1, py1
+			}
 		}
 	case "lakes":
 		if wb == nil {
@@ -1305,6 +1336,24 @@ func diagnosticCoastNode(surface *world.Surface, x, z int) bool {
 		return true
 	}
 	return false
+}
+
+func diagnosticRiverCenter(
+	segment waterbed.RiverSegment,
+	t float64,
+) (float64, float64) {
+	t = math.Max(0, math.Min(1, t))
+	dx := segment.X1 - segment.X0
+	dz := segment.Z1 - segment.Z0
+	length := math.Hypot(dx, dz)
+	if length <= 1e-12 || math.Abs(segment.MeanderOffset) <= 1e-12 {
+		return segment.X0 + dx*t, segment.Z0 + dz*t
+	}
+	nx := -dz / length
+	nz := dx / length
+	offset := segment.MeanderOffset * math.Sin(math.Pi*t)
+	return segment.X0 + dx*t + nx*offset,
+		segment.Z0 + dz*t + nz*offset
 }
 
 func diagnosticWorldToPixel(g world.GridGeometry, b image.Rectangle, x, z float64) (int, int) {

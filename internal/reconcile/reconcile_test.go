@@ -235,6 +235,78 @@ func TestRiverTopologyClosesWeakAndFlatDownstreamToOcean(t *testing.T) {
 	}
 }
 
+func TestLakeKeepsVisibleFeederAndSpillOutflow(t *testing.T) {
+	raw := []float64{0.66, 0.64, 0.60, 0.57, 0.46}
+	m := &Model{
+		Config: Config{
+			RiverStrengthThreshold:    0.30,
+			OriginalDownhillEpsilon:   1e-6,
+			FinalUpslopeEpsilon:       1e-5,
+			MinRiverBedDropNormalized: 1e-5,
+		},
+		RawTerrainElevation:   append([]float64(nil), raw...),
+		RiverBedTarget:        append([]float64(nil), raw...),
+		WaterKind:             []WaterKind{WaterNone, WaterNone, WaterLake, WaterNone, WaterOcean},
+		WaterSurfaceDefined:   []bool{false, false, true, false, true},
+		WaterSurfaceElevation: []float64{0, 0, 0.61, 0, 0.50},
+		RiverBedActive:        make([]bool, len(raw)),
+	}
+	h := &hydrology.Model{
+		Width:            5,
+		Height:           1,
+		LandMask:         []bool{true, true, true, true, false},
+		FlowTo:           []int{1, 2, 3, 4, -1},
+		LakeID:           []int{0, 0, 1, 0, 0},
+		RiverStrength:    []float64{0.05, 0.08, 0, 0, 0},
+		FlowAccumulation: []float64{20, 40, 80, 90, 100},
+		Lakes: []hydrology.Lake{{
+			ID:          1,
+			SpillOutlet: 2,
+		}},
+	}
+	macro := []float64{0.72, 0.68, 0.61, 0.56, 0.44}
+
+	if err := m.buildRiverConstraints(macro, h, raw); err != nil {
+		t.Fatal(err)
+	}
+
+	want := map[[2]int]bool{
+		{0, 1}: true,
+		{1, 2}: true,
+		{2, 3}: true,
+		{3, 4}: true,
+	}
+	if len(m.RiverEdges) != len(want) {
+		t.Fatalf(
+			"lake drainage edges=%d want=%d: %+v",
+			len(m.RiverEdges),
+			len(want),
+			m.RiverEdges,
+		)
+	}
+	for _, edge := range m.RiverEdges {
+		key := [2]int{edge.From, edge.To}
+		if !want[key] {
+			t.Fatalf("unexpected lake drainage edge %d->%d", edge.From, edge.To)
+		}
+		if edge.RiverStrength < m.Config.RiverStrengthThreshold {
+			t.Fatalf(
+				"forced lake drainage edge %d->%d strength=%.3f below visible threshold %.3f",
+				edge.From,
+				edge.To,
+				edge.RiverStrength,
+				m.Config.RiverStrengthThreshold,
+			)
+		}
+	}
+	if m.WaterKind[2] != WaterLake {
+		t.Fatalf("lake outlet node was reclassified: %v", m.WaterKind[2])
+	}
+	if m.WaterKind[4] != WaterOcean {
+		t.Fatalf("ocean receiver was reclassified: %v", m.WaterKind[4])
+	}
+}
+
 func TestLakeConstraintExposesWaterSurfaceAndBedCeiling(t *testing.T) {
 	m := &Model{
 		Config:                Config{LakeBedClearanceNormalized: 0.01},

@@ -368,16 +368,61 @@ func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Mod
 	edgeTo := make([]int, n)
 	active := make([]bool, n)
 	indegree := make([]int, n)
+	edgeStrengthFloor := make([]float64, n)
+	parents := make([][]int, n)
 	for i := range edgeTo {
 		edgeTo[i] = -1
+	}
+	for from, to := range h.FlowTo {
+		if to >= 0 && to < n {
+			parents[to] = append(parents[to], from)
+		}
+	}
+
+	traceRiver := func(seed int, allowLakeStart bool, strengthFloor float64) {
+		cur := seed
+		for steps := 0; steps < n; steps++ {
+			if cur < 0 || cur >= n || !h.LandMask[cur] {
+				break
+			}
+			if h.LakeID[cur] != 0 && !(allowLakeStart && steps == 0) {
+				break
+			}
+			next := h.FlowTo[cur]
+			if next < 0 || next >= n {
+				break
+			}
+			if active[cur] {
+				if strengthFloor > edgeStrengthFloor[cur] {
+					edgeStrengthFloor[cur] = strengthFloor
+				}
+				// This source has joined a downstream chain already traced by
+				// another source. The rest of the route is already guaranteed.
+				break
+			}
+
+			active[cur] = true
+			edgeTo[cur] = next
+			indegree[next]++
+			if strengthFloor > edgeStrengthFloor[cur] {
+				edgeStrengthFloor[cur] = strengthFloor
+			}
+			m.RiverBedActive[cur] = true
+			m.RiverBedActive[next] = true
+
+			// Keep the terminal edge into ocean/lake, then stop. A lake outlet
+			// is handled by a separate forced trace starting at SpillOutlet.
+			if !h.LandMask[next] || h.LakeID[next] != 0 {
+				break
+			}
+			cur = next
+		}
 	}
 
 	// RiverStrength decides where visible tributaries begin, but once a stream
 	// has begun its downstream FlowTo chain is topology, not an optional local
 	// classification. Trace every qualifying source all the way into a lake,
-	// ocean, or model outlet. This prevents a main stem from disappearing
-	// because one downstream macro cell is flat or falls just below a local
-	// strength threshold.
+	// ocean, or model outlet.
 	for seed := range h.FlowTo {
 		if !h.LandMask[seed] ||
 			h.LakeID[seed] != 0 ||
@@ -389,36 +434,84 @@ func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Mod
 			continue
 		}
 		m.QualifyingRiverEdges++
+		traceRiver(seed, false, 0)
+	}
 
-		cur := seed
-		for steps := 0; steps < n; steps++ {
-			if cur < 0 || cur >= n ||
-				!h.LandMask[cur] ||
-				h.LakeID[cur] != 0 {
-				break
-			}
-			next := h.FlowTo[cur]
-			if next < 0 || next >= n {
-				break
-			}
-			if active[cur] {
-				// This source has joined a downstream chain already traced by
-				// another source. The rest of the route is already guaranteed.
-				break
-			}
-
-			active[cur] = true
-			edgeTo[cur] = next
-			indegree[next]++
-			m.RiverBedActive[cur] = true
-			m.RiverBedActive[next] = true
-
-			// Keep the terminal land -> receiving-water edge, then stop.
-			if !h.LandMask[next] || h.LakeID[next] != 0 {
-				break
-			}
-			cur = next
+	// Large or small, a hydrologic lake should visibly belong to its drainage
+	// network. Guarantee at least one feeder by tracing the strongest direct
+	// inflow a few macro cells upstream even when that feeder falls just below
+	// the global visible-river threshold. Also continue every exorheic lake from
+	// its spill outlet so Runtime does not render a visually dead reservoir.
+	bestInflow := make(map[int]int)
+	bestInflowAccum := make(map[int]float64)
+	bestInflowStrength := make(map[int]float64)
+	for from, to := range h.FlowTo {
+		if to < 0 || to >= n || !h.LandMask[from] {
+			continue
 		}
+		lakeID := h.LakeID[to]
+		if lakeID <= 0 || h.LakeID[from] == lakeID {
+			continue
+		}
+		acc := h.FlowAccumulation[from]
+		if old, ok := bestInflowAccum[lakeID]; !ok || acc > old {
+			bestInflowAccum[lakeID] = acc
+			bestInflow[lakeID] = from
+		}
+		if h.RiverStrength[from] > bestInflowStrength[lakeID] {
+			bestInflowStrength[lakeID] = h.RiverStrength[from]
+		}
+	}
+	for _, lake := range h.Lakes {
+		if direct, ok := bestInflow[lake.ID]; ok {
+			seed := direct
+			// Expose enough upstream length to read as an actual tributary,
+			// rather than a one-cell blue stub touching a large lake.
+			for hops := 0; hops < 3; hops++ {
+				bestParent := -1
+				bestAccum := -1.0
+				for _, parent := range parents[seed] {
+					if parent < 0 || parent >= n ||
+						!h.LandMask[parent] ||
+						h.LakeID[parent] != 0 {
+						continue
+					}
+					if h.FlowAccumulation[parent] > bestAccum {
+						bestAccum = h.FlowAccumulation[parent]
+						bestParent = parent
+					}
+				}
+				if bestParent < 0 {
+					break
+				}
+				seed = bestParent
+			}
+			traceRiver(
+				seed,
+				false,
+				math.Max(
+					m.Config.RiverStrengthThreshold,
+					bestInflowStrength[lake.ID],
+				),
+			)
+		}
+
+		outlet := lake.SpillOutlet
+		if outlet < 0 || outlet >= n {
+			continue
+		}
+		to := h.FlowTo[outlet]
+		if to < 0 || to >= n || h.LakeID[to] == lake.ID {
+			continue
+		}
+		traceRiver(
+			outlet,
+			true,
+			math.Max(
+				m.Config.RiverStrengthThreshold,
+				bestInflowStrength[lake.ID],
+			),
+		)
 	}
 
 	for i, isActive := range active {
@@ -443,8 +536,11 @@ func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Mod
 		}
 
 		strength := math.Max(
-			h.RiverStrength[i],
-			m.Config.RiverStrengthThreshold,
+			math.Max(
+				h.RiverStrength[i],
+				m.Config.RiverStrengthThreshold,
+			),
+			edgeStrengthFloor[i],
 		)
 		m.RiverEdges = append(m.RiverEdges, RiverEdgeConstraint{
 			From: i, To: to,

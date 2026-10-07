@@ -215,7 +215,7 @@ func TestConfluenceWaterSurfaceDoesNotRiseWhenMainStemWidens(t *testing.T) {
 	}
 }
 
-func TestReceiverBackwaterOnlyRaisesRiverNearMouth(t *testing.T) {
+func TestReceiverBackwaterFormsFlatFloorWithoutDownstreamRise(t *testing.T) {
 	g := testGeometry()
 	base := testTerrain(t, g, 0.55)
 	rec := baseReconciliation(g, 0.55)
@@ -256,24 +256,28 @@ func TestReceiverBackwaterOnlyRaisesRiverNearMouth(t *testing.T) {
 
 	x0, z0 := g.NodePosition(0, 1)
 	x1, _ := g.NodePosition(1, 1)
-	upstream := m.Sample(x0+(x1-x0)*0.25, z0)
-	mouth := m.Sample(x0+(x1-x0)*0.95, z0)
-	if upstream.WaterKind != reconcile.WaterRiver ||
-		mouth.WaterKind != reconcile.WaterRiver {
-		t.Fatalf("expected river samples, upstream=%+v mouth=%+v", upstream, mouth)
-	}
-	if upstream.WaterSurfaceElevation >= 0.49 {
-		t.Fatalf(
-			"receiver datum leaked too far upstream: surface=%.6f",
-			upstream.WaterSurfaceElevation,
-		)
-	}
-	if mouth.WaterSurfaceElevation <= upstream.WaterSurfaceElevation+0.02 {
-		t.Fatalf(
-			"mouth did not transition toward receiver: upstream=%.6f mouth=%.6f",
-			upstream.WaterSurfaceElevation,
-			mouth.WaterSurfaceElevation,
-		)
+	prev := math.Inf(1)
+	for _, frac := range []float64{0.10, 0.25, 0.50, 0.75, 0.95} {
+		s := m.Sample(x0+(x1-x0)*frac, z0)
+		if s.WaterKind != reconcile.WaterRiver || !s.WaterSurfaceDefined {
+			t.Fatalf("expected river backwater at t=%.2f, got %+v", frac, s)
+		}
+		if math.Abs(s.WaterSurfaceElevation-0.50) > 1e-12 {
+			t.Fatalf(
+				"receiver backwater is not flat at t=%.2f: got=%.12f want=0.50",
+				frac,
+				s.WaterSurfaceElevation,
+			)
+		}
+		if s.WaterSurfaceElevation > prev+1e-12 {
+			t.Fatalf(
+				"receiver backwater rose downstream at t=%.2f: %.12f -> %.12f",
+				frac,
+				prev,
+				s.WaterSurfaceElevation,
+			)
+		}
+		prev = s.WaterSurfaceElevation
 	}
 }
 
