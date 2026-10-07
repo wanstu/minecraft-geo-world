@@ -351,9 +351,12 @@ final class GeoWorldShoreline {
 
     private static int shelfWidth(String waterKind, double noise) {
         return switch (waterKind) {
-            case "River" -> noise >= 0.76 ? 2 : 1;
-            case "Lake" -> noise >= 0.55 ? 2 : 1;
-            case "Ocean" -> noise >= 0.34 ? 2 : 1;
+            // Most low-gradient banks get a second dry shelf row toward land.
+            // Water itself is never expanded; this only fills the visual
+            // saw-tooth backward into the bank.
+            case "River" -> noise >= 0.18 ? 2 : 1;
+            case "Lake" -> noise >= 0.14 ? 2 : 1;
+            case "Ocean" -> noise >= 0.30 ? 2 : 1;
             default -> 1;
         };
     }
@@ -382,18 +385,21 @@ final class GeoWorldShoreline {
         int worldX,
         int worldZ
     ) {
+        // Shore materials should read as short natural reaches, not
+        // one-block salt-and-pepper noise. The broad field chooses the reach
+        // material; the smaller field only bends its boundary.
         double patch =
-            0.68 * smoothValueNoise(
+            0.82 * smoothValueNoise(
                 seed ^ 0x53484F52455F4D31L,
                 worldX,
                 worldZ,
-                18.0
+                46.0
             ) +
-            0.32 * smoothValueNoise(
+            0.18 * smoothValueNoise(
                 seed ^ 0x53484F52455F4D32L,
                 worldX,
                 worldZ,
-                7.0
+                21.0
             );
 
         String family = sample.biomeFamily();

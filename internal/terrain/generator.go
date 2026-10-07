@@ -248,8 +248,34 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	// ridge-only term made elevated crests, but from eye level they could still
 	// read as long rounded backs rather than individual peaks.
 	peakBlob := cellularPeak(m.Config.Seed+547, worldX, worldZ, 720)
-	localizedSummit := math.Pow(peakBlob, 2.6) *
-		smoothstep01(0.42, 0.82, crest) * 0.105
+	localizedSummit := math.Pow(peakBlob, 3.8) *
+		smoothstep01(0.44, 0.82, crest) * 0.115
+
+	// A second, much tighter summit field adds true peak cores. It is gated by
+	// the already-derived ridge crest, so it cannot create isolated spikes on
+	// plains or outside the mountain belt.
+	peakCore := cellularPeak(m.Config.Seed+571, worldX, worldZ, 420)
+	summitSpire := math.Pow(peakCore, 5.2) *
+		smoothstep01(0.58, 0.88, crest) * 0.095
+
+	// Natural mountain belts also contain occasional fault scarps / cliff
+	// faces. A sharp but continuous step across a low-frequency structural
+	// field creates those escarpments. A separate regional gate keeps them
+	// sparse; most mountain slopes remain walkable.
+	faultSignal :=
+		0.74*valueNoise(m.Config.Seed+631, worldX, worldZ, 980) +
+			0.26*valueNoise(m.Config.Seed+653, worldX, worldZ, 310)
+	faultRegion := 0.5 + 0.5*valueNoise(
+		m.Config.Seed+677,
+		worldX,
+		worldZ,
+		1700,
+	)
+	cliffGate :=
+		smoothstep01(0.58, 0.82, faultRegion) *
+			smoothstep01(0.48, 0.80, crest)
+	faultStep := smoothstep01(-0.010, 0.010, faultSignal)
+	cliffEscarpment := (faultStep - 0.5) * 0.085 * cliffGate
 
 	// Low parts of the same ridge field become saddles / dry head valleys.
 	// River-cut valleys are handled separately below by the real hydrologic
@@ -263,7 +289,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		plain*plainDetail +
 			hill*hillDetail +
 			foothill*foothillDetail +
-			mountain*(mountainDetail+mountainCrest+summit+localizedSummit+slopeWave-structuralSaddle) +
+			mountain*(mountainDetail+mountainCrest+summit+localizedSummit+summitSpire+cliffEscarpment+slopeWave-structuralSaddle) +
 			plateau*plateauDetail
 
 	// Broad depositional lowlands should be smoother than surrounding terrain.

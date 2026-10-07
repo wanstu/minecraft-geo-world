@@ -384,6 +384,110 @@ func TestMountainStructureCreatesSummitsAndSaddles(t *testing.T) {
 	}
 }
 
+
+func TestMountainStructureIncludesSparseCliffs(t *testing.T) {
+	in := uniformInput(20, 20, 0.70)
+	for i := range in.BaseElevation {
+		in.RollingPlainWeight[i] = 0
+		in.MountainWeight[i] = 1
+	}
+
+	m, err := Generate(in, Config{Seed: 20261007, CellSizeBlocks: 128})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const (
+		step           = 16.0
+		extent         = 6000.0
+		steepThreshold = 0.022
+		cliffThreshold = 0.040
+	)
+	total := 0
+	steep := 0
+	cliffs := 0
+	maxDelta := 0.0
+	for z := 0.0; z <= extent; z += step {
+		for x := 0.0; x <= extent; x += step {
+			a := m.SampleNormalized(x, z)
+			for _, p := range [][2]float64{
+				{x + step, z},
+				{x, z + step},
+			} {
+				d := math.Abs(m.SampleNormalized(p[0], p[1]) - a)
+				total++
+				if d > maxDelta {
+					maxDelta = d
+				}
+				if d >= steepThreshold {
+					steep++
+				}
+				if d >= cliffThreshold {
+					cliffs++
+				}
+			}
+		}
+	}
+
+	if maxDelta < 0.045 {
+		t.Fatalf(
+			"mountains still lack true steep faces: max 16-block delta=%.6f",
+			maxDelta,
+		)
+	}
+	if cliffs < 8 {
+		t.Fatalf(
+			"mountains contain too few cliff-scale faces: cliffs=%d steep=%d total=%d",
+			cliffs,
+			steep,
+			total,
+		)
+	}
+	if cliffs*500 >= total {
+		t.Fatalf(
+			"cliff faces are no longer sparse: cliffs=%d total=%d ratio=%.6f",
+			cliffs,
+			total,
+			float64(cliffs)/float64(total),
+		)
+	}
+}
+
+func TestPlainTerrainRemainsGentleAfterMountainCliffs(t *testing.T) {
+	in := uniformInput(20, 20, 0.62)
+	for i := range in.BaseElevation {
+		in.RollingPlainWeight[i] = 1
+		in.MountainWeight[i] = 0
+	}
+
+	m, err := Generate(in, Config{Seed: 20261007, CellSizeBlocks: 128})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	maxDelta := 0.0
+	for z := 0.0; z <= 2000; z += 16 {
+		for x := 0.0; x <= 2000; x += 16 {
+			a := m.SampleNormalized(x, z)
+			for _, p := range [][2]float64{
+				{x + 16, z},
+				{x, z + 16},
+			} {
+				d := math.Abs(m.SampleNormalized(p[0], p[1]) - a)
+				if d > maxDelta {
+					maxDelta = d
+				}
+			}
+		}
+	}
+	if maxDelta > 0.002 {
+		t.Fatalf(
+			"mountain cliff shaping leaked into plains: max 16-block delta=%.6f",
+			maxDelta,
+		)
+	}
+}
+
 func TestMountainValleyCarveGainsDepthFromRelief(t *testing.T) {
 	base := uniformInput(12, 12, 0.70)
 	valley := uniformInput(12, 12, 0.70)

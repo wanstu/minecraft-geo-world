@@ -1666,3 +1666,32 @@ t5 实测变化：
 - Java/Go GoldenVerifier 15/15。
 - verifyGeoWorldBiomePreset、verifyGeoWorldShoreline、verifyGeoWorldEngine、verifyGeoWorldSpawn 全绿。
 - NeoForge build SUCCESSFUL，最新 GeoWorld-NeoForge-26.3-0.1.0-dev.jar 已自动部署到 HMCL 26.3。
+
+## 2026-10-07 · 岸线后填充、连续材质与稀疏山崖
+
+用户对上一版短岸带实机验证后反馈：
+- 岸边整体已经明显改善，但一格宽的阶梯/锯齿应向陆地方向补齐，不能改水体范围；
+- 岸材质不能一格泥土一格沙子跳变，应形成连续的小段/小片；
+- 世界大部分平缓符合预期，但山峰也过于平缓、基本可以直接走上去，希望少量真正陡峭峰体和自然悬崖。
+
+岸线：
+- River/Lake 低坡 littoral shelf 的第二排更积极向陆地补齐；仅修改 dry-bank 高度/表层，不扩张河湖海 water footprint。
+- 岸材质 coherent noise 从原先约 18/7 blocks 的细碎尺度改为 46/21 blocks，主材质由更低频场决定，小尺度只弯曲边界。
+- Seed=123456 fresh verifier：immediate shore 615/615 稳定；littoral shelves 714 -> 1132；material transitions=1167；适合植物环境的直接邻水岸 caneReady=579/579。
+- 相邻直接水边材质仅 5/347 次发生切换（约 1.4%），避免“一格沙一格泥”的椒盐外观。
+
+山体：
+- 保留平原/丘陵现有低频平缓尺度，不修改 PlainAmplitude。
+- 现有 broad/fine ridge 继续决定山脉内部结构；localized summit 收窄，提高峰体集中度。
+- 新增更窄的 summitSpire，仅在 MountainWeight + ridge crest 内出现，不会在平原生成孤立尖刺。
+- 新增稀疏 structural fault escarpment：由低频 fault field 形成连续但窄的陡坎，并使用独立 regional gate 控制稀疏度；不是给所有山坡统一加噪声。
+- synthetic 6000x6000 mountain scan（16-block slope）：cliff-scale >=0.040 的坡面 51/282752，约 0.018%；最大 delta=0.053582。Plain 对照 cliff=0。
+- Seed=123456 当前新模型实测：X=16760 Z=-3532 为 Mountain/Alpine，16 格内 delta=0.067456，折算约 34.7 Minecraft blocks；高峰 X=-12388 Z=5164，约 Y=318，未形成大片 Y=320 ceiling。
+- 新增 TestMountainStructureIncludesSparseCliffs 与 TestPlainTerrainRemainsGentleAfterMountainCliffs，约束“确实有悬崖但必须稀疏、不能泄漏到平原”。
+- Engine cache key v8 -> v9，确保新世界不复用旧的平缓地形缓存。
+
+验证：
+- go test ./... -count=1 全绿。
+- Golden fixtures 已重建；Java/Go GoldenVerifier 15/15，tolerance=1e-9。
+- verifyGeoWorldBiomePreset / verifyGeoWorldShoreline / verifyGeoWorldEngine / verifyGeoWorldSpawn 全通过。
+- 最新 NeoForge JAR 已自动部署到 HMCL 26.3。

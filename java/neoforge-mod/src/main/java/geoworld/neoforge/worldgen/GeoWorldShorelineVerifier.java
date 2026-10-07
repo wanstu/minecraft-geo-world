@@ -82,6 +82,8 @@ public final class GeoWorldShorelineVerifier {
         int raised1 = 0;
         int raised2to3 = 0;
         int raised4plus = 0;
+        int materialEdges = 0;
+        int materialChanges = 0;
         Map<String, Integer> waterKinds = new LinkedHashMap<>();
         Map<String, Integer> maxRaiseByKind = new LinkedHashMap<>();
 
@@ -94,6 +96,57 @@ public final class GeoWorldShorelineVerifier {
                     int baseZ = (centerChunkZ + dz) * 16;
                     GeoWorldShoreline.ChunkPlan plan =
                         GeoWorldShoreline.planChunk(runtime, baseX, baseZ);
+
+                    for (int localZ = 0; localZ < 16; localZ++) {
+                        for (int localX = 0; localX < 16; localX++) {
+                            GeoWorldShoreline.Column a =
+                                plan.column(localX, localZ);
+                            if (
+                                "None".equals(a.sample().waterKind()) &&
+                                a.shoreDistance() == 1 &&
+                                a.surfaceOverride() != null
+                            ) {
+                                if (localX < 15) {
+                                    GeoWorldShoreline.Column b =
+                                        plan.column(localX + 1, localZ);
+                                    if (
+                                        "None".equals(b.sample().waterKind()) &&
+                                        b.shoreDistance() == 1 &&
+                                        b.surfaceOverride() != null &&
+                                        a.shoreWaterKind().equals(
+                                            b.shoreWaterKind()
+                                        )
+                                    ) {
+                                        materialEdges++;
+                                        if (!a.surfaceOverride().equals(
+                                            b.surfaceOverride()
+                                        )) {
+                                            materialChanges++;
+                                        }
+                                    }
+                                }
+                                if (localZ < 15) {
+                                    GeoWorldShoreline.Column b =
+                                        plan.column(localX, localZ + 1);
+                                    if (
+                                        "None".equals(b.sample().waterKind()) &&
+                                        b.shoreDistance() == 1 &&
+                                        b.surfaceOverride() != null &&
+                                        a.shoreWaterKind().equals(
+                                            b.shoreWaterKind()
+                                        )
+                                    ) {
+                                        materialEdges++;
+                                        if (!a.surfaceOverride().equals(
+                                            b.surfaceOverride()
+                                        )) {
+                                            materialChanges++;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
 
                     for (int localZ = 0; localZ < 16; localZ++) {
                         for (int localX = 0; localX < 16; localX++) {
@@ -202,7 +255,8 @@ public final class GeoWorldShorelineVerifier {
             "GeoWorld shoreline scan: seed=%d, immediate=%d, stable=%d, " +
             "shelves=%d, materials=%d, caneReady=%d/%d, " +
             "maxLowering=%d, maxRaising=%d at %d,%d %s (%d->%d), " +
-            "raiseBuckets=[1:%d,2-3:%d,4+:%d], kinds=%s, maxByKind=%s%n",
+            "raiseBuckets=[1:%d,2-3:%d,4+:%d], materialChanges=%d/%d, " +
+            "kinds=%s, maxByKind=%s%n",
             SEED,
             immediate,
             stable,
@@ -220,6 +274,8 @@ public final class GeoWorldShorelineVerifier {
             raised1,
             raised2to3,
             raised4plus,
+            materialChanges,
+            materialEdges,
             waterKinds,
             maxRaiseByKind
         );
@@ -250,6 +306,18 @@ public final class GeoWorldShorelineVerifier {
             if (!waterKinds.containsKey(requiredKind)) {
                 throw new AssertionError(
                     "shoreline verifier did not cover " + requiredKind
+                );
+            }
+        }
+
+        if (materialEdges > 0) {
+            double changeRatio =
+                (double)materialChanges / materialEdges;
+            if (changeRatio > 0.24) {
+                throw new AssertionError(
+                    "shore material changes are too fragmented: " +
+                    materialChanges + "/" + materialEdges +
+                    " ratio=" + changeRatio
                 );
             }
         }

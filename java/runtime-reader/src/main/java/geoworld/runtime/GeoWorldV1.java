@@ -1758,9 +1758,42 @@ public final class GeoWorldV1 {
                 720
             );
             double localizedSummit =
-                Math.pow(peakBlob, 2.6) *
-                smoothstep(0.42, 0.82, crest) *
-                0.105;
+                Math.pow(peakBlob, 3.8) *
+                smoothstep(0.44, 0.82, crest) *
+                0.115;
+
+            double peakCore = cellularPeak(
+                config.seed() + 571,
+                x,
+                z,
+                420
+            );
+            double summitSpire =
+                Math.pow(peakCore, 5.2) *
+                smoothstep(0.58, 0.88, crest) *
+                0.095;
+
+            double faultSignal =
+                0.74 * valueNoise(config.seed() + 631, x, z, 980) +
+                0.26 * valueNoise(config.seed() + 653, x, z, 310);
+            double faultRegion =
+                0.5 +
+                0.5 * valueNoise(
+                    config.seed() + 677,
+                    x,
+                    z,
+                    1700
+                );
+            double cliffGate =
+                smoothstep(0.58, 0.82, faultRegion) *
+                smoothstep(0.48, 0.80, crest);
+            double faultStep =
+                smoothstep(-0.010, 0.010, faultSignal);
+            double cliffEscarpment =
+                (faultStep - 0.5) *
+                0.085 *
+                cliffGate;
+
             double structuralSaddle =
                 Math.pow(clamp(1 - crest, 0, 1), 2.4) *
                 0.028;
@@ -1780,6 +1813,8 @@ public final class GeoWorldV1 {
                     mountainCrest +
                     summit +
                     localizedSummit +
+                    summitSpire +
+                    cliffEscarpment +
                     slopeWave -
                     structuralSaddle
                 ) +
