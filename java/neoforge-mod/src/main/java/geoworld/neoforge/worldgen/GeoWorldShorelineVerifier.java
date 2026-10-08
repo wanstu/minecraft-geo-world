@@ -18,7 +18,9 @@ public final class GeoWorldShorelineVerifier {
     private static final int[][] REGRESSION_CENTERS = {
         {5594, -1216},
         {9769, -474},
-        {7245, -4708}
+        {7245, -4708},
+        {2023, -2985},
+        {10883, -1293}
     };
     private static final Set<String> SUGAR_CANE_SUBSTRATES = Set.of(
         "minecraft:grass_block",
@@ -89,6 +91,8 @@ public final class GeoWorldShorelineVerifier {
         int raised4plus = 0;
         int materialEdges = 0;
         int materialChanges = 0;
+        int narrowBackshoreGrooves = 0;
+        int pointPlanMismatches = 0;
         Map<String, Integer> waterKinds = new LinkedHashMap<>();
         Map<String, Integer> maxRaiseByKind = new LinkedHashMap<>();
 
@@ -101,6 +105,53 @@ public final class GeoWorldShorelineVerifier {
                     int baseZ = (centerChunkZ + dz) * 16;
                     GeoWorldShoreline.ChunkPlan plan =
                         GeoWorldShoreline.planChunk(runtime, baseX, baseZ);
+
+                    for (int checkZ : new int[]{2, 8, 13}) {
+                        for (int checkX : new int[]{2, 8, 13}) {
+                            GeoWorldShoreline.Column chunkColumn =
+                                plan.column(checkX, checkZ);
+                            GeoWorldShoreline.Column pointColumn =
+                                GeoWorldShoreline.plan(
+                                    runtime,
+                                    baseX + checkX,
+                                    baseZ + checkZ
+                                );
+                            if (!samePlannedColumn(
+                                chunkColumn,
+                                pointColumn
+                            )) {
+                                pointPlanMismatches++;
+                            }
+                        }
+                    }
+
+                    for (int localZ = 1; localZ < 15; localZ++) {
+                        for (int localX = 1; localX < 15; localX++) {
+                            GeoWorldShoreline.Column centerColumn =
+                                plan.column(localX, localZ);
+                            if (
+                                "None".equals(
+                                    centerColumn.sample().waterKind()
+                                ) &&
+                                centerColumn.shoreDistance() >= 2 &&
+                                centerColumn.shoreDistance() <= 3
+                            ) {
+                                boolean grooveX = isBackshoreGroove(
+                                    centerColumn,
+                                    plan.column(localX - 1, localZ),
+                                    plan.column(localX + 1, localZ)
+                                );
+                                boolean grooveZ = isBackshoreGroove(
+                                    centerColumn,
+                                    plan.column(localX, localZ - 1),
+                                    plan.column(localX, localZ + 1)
+                                );
+                                if (grooveX || grooveZ) {
+                                    narrowBackshoreGrooves++;
+                                }
+                            }
+                        }
+                    }
 
                     for (int localZ = 0; localZ < 16; localZ++) {
                         for (int localX = 0; localX < 16; localX++) {
@@ -289,6 +340,7 @@ public final class GeoWorldShorelineVerifier {
             "shallowFringes=%d, shelves=%d, materials=%d, caneReady=%d/%d, " +
             "maxLowering=%d, maxRaising=%d at %d,%d %s (%d->%d), " +
             "raiseBuckets=[1:%d,2-3:%d,4+:%d], materialChanges=%d/%d, " +
+            "narrowBackshoreGrooves=%d, pointPlanMismatches=%d, " +
             "kinds=%s, maxByKind=%s%n",
             SEED,
             immediate,
@@ -310,6 +362,8 @@ public final class GeoWorldShorelineVerifier {
             raised4plus,
             materialChanges,
             materialEdges,
+            narrowBackshoreGrooves,
+            pointPlanMismatches,
             waterKinds,
             maxRaiseByKind
         );
@@ -327,6 +381,18 @@ public final class GeoWorldShorelineVerifier {
         if (materials == 0) {
             throw new AssertionError(
                 "shore planner produced no material transitions"
+            );
+        }
+        if (narrowBackshoreGrooves != 0) {
+            throw new AssertionError(
+                "shore planner left narrow backshore grooves: " +
+                narrowBackshoreGrooves
+            );
+        }
+        if (pointPlanMismatches != 0) {
+            throw new AssertionError(
+                "chunk and point shoreline plans disagree: " +
+                pointPlanMismatches
             );
         }
         if (maxRaising > 2) {
@@ -673,6 +739,54 @@ public final class GeoWorldShorelineVerifier {
             }
         }
         return null;
+    }
+
+    private static boolean samePlannedColumn(
+        GeoWorldShoreline.Column a,
+        GeoWorldShoreline.Column b
+    ) {
+        return a.originalGroundBoundary() == b.originalGroundBoundary() &&
+            a.groundBoundary() == b.groundBoundary() &&
+            a.waterBoundary() == b.waterBoundary() &&
+            a.shoreDistance() == b.shoreDistance() &&
+            java.util.Objects.equals(
+                a.shoreWaterKind(),
+                b.shoreWaterKind()
+            ) &&
+            a.shoreWaterBoundary() == b.shoreWaterBoundary() &&
+            a.littoralShelf() == b.littoralShelf() &&
+            java.util.Objects.equals(
+                a.surfaceOverride(),
+                b.surfaceOverride()
+            ) &&
+            java.util.Objects.equals(
+                a.underOverride(),
+                b.underOverride()
+            );
+    }
+
+    private static boolean isBackshoreGroove(
+        GeoWorldShoreline.Column center,
+        GeoWorldShoreline.Column a,
+        GeoWorldShoreline.Column b
+    ) {
+        if (
+            !"None".equals(a.sample().waterKind()) ||
+            !"None".equals(b.sample().waterKind()) ||
+            !center.shoreWaterKind().equals(a.shoreWaterKind()) ||
+            !center.shoreWaterKind().equals(b.shoreWaterKind())
+        ) {
+            return false;
+        }
+        int distance = center.shoreDistance();
+        boolean bracketsShore =
+            (a.shoreDistance() == distance - 1 &&
+             b.shoreDistance() == distance + 1) ||
+            (b.shoreDistance() == distance - 1 &&
+             a.shoreDistance() == distance + 1);
+        return bracketsShore &&
+            a.groundBoundary() > center.groundBoundary() &&
+            b.groundBoundary() > center.groundBoundary();
     }
 
     private static boolean isWetlandSemantics(

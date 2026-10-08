@@ -65,7 +65,8 @@ final class GeoWorldShoreline {
         int baseX,
         int baseZ
     ) {
-        final int radius = MAX_SHORE_DISTANCE;
+        final int fringe = 1;
+        final int radius = MAX_SHORE_DISTANCE + fringe;
         final int stride = 16 + radius * 2;
         GeoWorldV1.RuntimeSample[] samples =
             new GeoWorldV1.RuntimeSample[stride * stride];
@@ -78,30 +79,41 @@ final class GeoWorldShoreline {
             }
         }
 
-        ChunkPlan result = new ChunkPlan();
+        final int plannedStride = 16 + fringe * 2;
+        Column[] preliminary =
+            new Column[plannedStride * plannedStride];
         long seed = runtime.manifest().seed();
+        for (int localZ = -fringe; localZ < 16 + fringe; localZ++) {
+            for (int localX = -fringe; localX < 16 + fringe; localX++) {
+                preliminary[
+                    (localZ + fringe) * plannedStride +
+                    (localX + fringe)
+                ] = planCachedColumn(
+                    samples,
+                    stride,
+                    localX + radius,
+                    localZ + radius,
+                    seed,
+                    baseX + localX,
+                    baseZ + localZ
+                );
+            }
+        }
+
+        ChunkPlan result = new ChunkPlan();
         for (int localZ = 0; localZ < 16; localZ++) {
             for (int localX = 0; localX < 16; localX++) {
-                final int centerX = localX + radius;
-                final int centerZ = localZ + radius;
-                int worldX = baseX + localX;
-                int worldZ = baseZ + localZ;
-                GeoWorldV1.RuntimeSample center =
-                    samples[centerZ * stride + centerX];
-
-                Neighborhood neighborhood = (dx, dz) ->
-                    samples[
-                        (centerZ + dz) * stride +
-                        (centerX + dx)
-                    ];
-
-                result.columns[localZ * 16 + localX] = planColumn(
-                    center,
-                    neighborhood,
-                    seed,
-                    worldX,
-                    worldZ
-                );
+                int index =
+                    (localZ + fringe) * plannedStride +
+                    (localX + fringe);
+                result.columns[localZ * 16 + localX] =
+                    closeNarrowBackshoreGroove(
+                        preliminary[index],
+                        preliminary[index - 1],
+                        preliminary[index + 1],
+                        preliminary[index - plannedStride],
+                        preliminary[index + plannedStride]
+                    );
             }
         }
         return result;
@@ -112,11 +124,94 @@ final class GeoWorldShoreline {
         int worldX,
         int worldZ
     ) {
-        GeoWorldV1.RuntimeSample center = runtime.sample(worldX, worldZ);
+        final int radius = MAX_SHORE_DISTANCE + 1;
+        final int stride = radius * 2 + 1;
+        GeoWorldV1.RuntimeSample[] samples =
+            new GeoWorldV1.RuntimeSample[stride * stride];
+        for (int z = 0; z < stride; z++) {
+            for (int x = 0; x < stride; x++) {
+                samples[z * stride + x] = runtime.sample(
+                    worldX + x - radius,
+                    worldZ + z - radius
+                );
+            }
+        }
+
+        long seed = runtime.manifest().seed();
+        Column center = planCachedColumn(
+            samples,
+            stride,
+            radius,
+            radius,
+            seed,
+            worldX,
+            worldZ
+        );
+        Column west = planCachedColumn(
+            samples,
+            stride,
+            radius - 1,
+            radius,
+            seed,
+            worldX - 1,
+            worldZ
+        );
+        Column east = planCachedColumn(
+            samples,
+            stride,
+            radius + 1,
+            radius,
+            seed,
+            worldX + 1,
+            worldZ
+        );
+        Column north = planCachedColumn(
+            samples,
+            stride,
+            radius,
+            radius - 1,
+            seed,
+            worldX,
+            worldZ - 1
+        );
+        Column south = planCachedColumn(
+            samples,
+            stride,
+            radius,
+            radius + 1,
+            seed,
+            worldX,
+            worldZ + 1
+        );
+        return closeNarrowBackshoreGroove(
+            center,
+            west,
+            east,
+            north,
+            south
+        );
+    }
+
+    private static Column planCachedColumn(
+        GeoWorldV1.RuntimeSample[] samples,
+        int stride,
+        int centerX,
+        int centerZ,
+        long seed,
+        int worldX,
+        int worldZ
+    ) {
+        GeoWorldV1.RuntimeSample center =
+            samples[centerZ * stride + centerX];
+        Neighborhood neighborhood = (dx, dz) ->
+            samples[
+                (centerZ + dz) * stride +
+                (centerX + dx)
+            ];
         return planColumn(
             center,
-            (dx, dz) -> runtime.sample(worldX + dx, worldZ + dz),
-            runtime.manifest().seed(),
+            neighborhood,
+            seed,
             worldX,
             worldZ
         );
@@ -518,7 +613,11 @@ final class GeoWorldShoreline {
         if (water <= ground) {
             return null;
         }
-        return new WaterNeighbor(distance, water, sample.waterKind());
+        return new WaterNeighbor(
+            distance,
+            water,
+            sample.waterKind()
+        );
     }
 
     private static WaterNeighbor betterWater(
@@ -555,6 +654,92 @@ final class GeoWorldShoreline {
         return !"None".equals(sample.waterKind()) &&
             sample.waterSurfaceDefined() &&
             sample.waterSurfaceElevation() != null;
+    }
+
+    private static Column closeNarrowBackshoreGroove(
+        Column center,
+        Column west,
+        Column east,
+        Column north,
+        Column south
+    ) {
+        if (
+            !"None".equals(center.sample().waterKind()) ||
+            center.shoreDistance() < 2 ||
+            center.shoreDistance() > 3
+        ) {
+            return center;
+        }
+
+        int target = center.groundBoundary();
+        target = Math.max(
+            target,
+            bracketedPlannedGround(center, west, east)
+        );
+        target = Math.max(
+            target,
+            bracketedPlannedGround(center, north, south)
+        );
+        if (target <= center.groundBoundary()) {
+            return center;
+        }
+
+        // This is a final-voxel morphology repair, not a terrain rewrite.
+        // Close only a one-block-wide row that is lower than both the
+        // water-side and land-side planned rows. Never raise more than one
+        // block or above the low bank cap, so broad valleys and drainage
+        // swales remain untouched.
+        target = Math.min(target, center.groundBoundary() + 1);
+        target = Math.min(target, center.shoreWaterBoundary() + 1);
+        if (target <= center.groundBoundary()) {
+            return center;
+        }
+
+        return new Column(
+            center.sample(),
+            center.originalGroundBoundary(),
+            target,
+            target,
+            center.shoreDistance(),
+            center.shoreWaterKind(),
+            center.shoreWaterBoundary(),
+            center.littoralShelf(),
+            center.surfaceOverride(),
+            center.underOverride()
+        );
+    }
+
+    private static int bracketedPlannedGround(
+        Column center,
+        Column a,
+        Column b
+    ) {
+        if (
+            !"None".equals(a.sample().waterKind()) ||
+            !"None".equals(b.sample().waterKind()) ||
+            !center.shoreWaterKind().equals(a.shoreWaterKind()) ||
+            !center.shoreWaterKind().equals(b.shoreWaterKind())
+        ) {
+            return center.groundBoundary();
+        }
+
+        int distance = center.shoreDistance();
+        boolean bracketsShore =
+            (a.shoreDistance() == distance - 1 &&
+             b.shoreDistance() == distance + 1) ||
+            (b.shoreDistance() == distance - 1 &&
+             a.shoreDistance() == distance + 1);
+        if (
+            !bracketsShore ||
+            a.groundBoundary() <= center.groundBoundary() ||
+            b.groundBoundary() <= center.groundBoundary()
+        ) {
+            return center.groundBoundary();
+        }
+        return Math.min(
+            a.groundBoundary(),
+            b.groundBoundary()
+        );
     }
 
     private static int shelfWidth(String waterKind, double noise) {

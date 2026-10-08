@@ -1851,3 +1851,84 @@ Minecraft 26.3 群系：
   - verifyGeoWorldSpawn: PASS
   - BUILD SUCCESSFUL
 - 最新 GeoWorld-NeoForge-26.3-0.1.0-dev.jar 已自动部署到 HMCL 26.3。
+
+## 2026-10-08 · 岸后狭长沟槽闭合与截图河湖拓扑核验
+
+用户实机截图新增两个问题：
+- 河/湖岸后第 2～4 格仍会出现沿岸延伸的单格深条形沟槽。
+- 10720,-1312、9958,190 一带河道与 Lake 2 很近，需要按模型拓扑确认是否应当连接，不能仅凭视觉强连。
+
+### 河湖连接结论
+对 Seed=123456 逐层核对 Hydrology -> Reconcile -> Waterbed -> Runtime。
+
+Lake 2 的正式 SpillOutlet 为：
+- node 30622: 8000,-576
+- FlowTo node 30621: 7872,-576
+- 最终 Reconciliation.RiverEdges 中存在 30622 -> 30621
+
+截图附近两个看似“湖泊出口”的原始 FlowTo：
+- 10816,-1344 -> 10688,-1344 (28724 -> 28723)
+- 10048,192 -> 9920,192 (32558 -> 32557)
+
+两者都满足 raw Hydrology FlowTo，但：
+- recEdge=false
+- spillFrom=false
+
+因此它们不是最终河网连接，也不是 Lake 2 的正式出湖口。保持截图位置河湖局部不连接是符合最终模型的；不得因为视觉距离近而强制开渠。
+
+Lake 2 最终边界河网仍为：
+- 入湖：10944,-1216 -> 10816,-1216
+- 入湖：9152,-832 -> 9024,-832
+- 入湖：8128,-704 -> 8000,-704
+- 入湖：10560,192 -> 10432,192
+- 入湖：10048,576 -> 10176,448
+- 正式出湖：8000,-576 -> 7872,-576
+
+geoworld-river-navigation-audit -strict 保持：
+- lakeFeeders=6
+- disconnectedLakeFeeders=0
+- maxAdjacentWaterStepBlocks=1
+- adjacentWaterStepViolations=0
+
+### 岸后条形沟槽
+将截图坐标 2023,-2985 与 10883,-1293 加入 Shoreline 回归窗口后，确认问题不是视觉错觉。
+
+典型最终方块横断面：
+- shore distance 2: Y89
+- shore distance 3: Y88
+- shore distance 4: Y89
+
+即最终 Shoreline 规划形成连续的 89-88-89 单格深长槽。初次扫描共识别 narrowBackshoreGrooves=227。
+
+根因：
+- 原 Shoreline 每列独立规划。
+- 距离 2 的岸行会被 shelf/stability 规则抬高，但距离 3 行只看到 Runtime 原始高度，无法知道相邻列最终会变成更高的岸台。
+- 因此在单列阶段使用原始邻居无法可靠消除最终 Minecraft 方块中的狭长沟。
+
+修复：
+- Shoreline 改成两阶段规划。
+- 第一阶段先生成包含 1 格 fringe 的 preliminary Column 网格。
+- 第二阶段只针对最终 planned geometry 做窄沟闭合。
+- 仅当 dry shore distance=2/3，且同一水体岸线法向两侧分别是 distance-1 / distance+1，并且最终高度都比中心高时，中心抬 1 格。
+- 最大只抬 1 格，并受 shoreWaterBoundary + 1 限制。
+- 不修改 Runtime / Hydrology / Terrain，不填宽谷、排水洼地或普通自然坡面。
+- planChunk() 与单点 plan() 使用同一两阶段规则，避免 Heightmap / BaseColumn 与真实区块地形不一致。
+
+最新 Seed=123456 Shoreline verifier：
+- narrowBackshoreGrooves: 227 -> 0
+- pointPlanMismatches=0
+- immediate=1197 / stable=1197
+- maxLowering=1
+- maxRaising=2
+- wetland pools=254/6416 (~4.0%)
+- riverbank swampCells=0
+- Biome preset=56/56
+
+完整回归：
+- go test ./... -count=1: PASS
+- Java Golden: 15/15
+- geoworld-river-navigation-audit -strict: PASS
+- NeoForge Engine / Spawn / BiomePreset / Shoreline: PASS
+- BUILD SUCCESSFUL，最新 dev JAR 已部署到 HMCL 26.3。
+
+本轮只修改 Minecraft Shoreline 最终方块整形与验证，不改变 .geoworld 模型，因此 Engine cache 继续使用 v11。
