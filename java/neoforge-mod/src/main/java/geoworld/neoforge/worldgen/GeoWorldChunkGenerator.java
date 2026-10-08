@@ -67,7 +67,12 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         BiomeSource biomeSource,
         GeoWorldCreationConfig config
     ) {
-        super(biomeSource);
+        super(
+            biomeSource,
+            biome -> GeoWorldDecorationPolicy.filter(
+                biome.value().getGenerationSettings()
+            )
+        );
         if (config == null) {
             throw new NullPointerException("config");
         }

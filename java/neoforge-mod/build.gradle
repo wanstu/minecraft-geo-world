@@ -237,6 +237,13 @@ tasks.register('verifyGeoWorldBiomePreset', JavaExec) {
     mainClass = 'geoworld.neoforge.worldgen.GeoWorldBiomePresetVerifier'
 }
 
+tasks.register('verifyGeoWorldDecorationPolicy', JavaExec) {
+    group = 'verification'
+    description = 'Verifies GeoWorld suppresses vanilla spring_water without changing other biome features.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.worldgen.GeoWorldDecorationPolicyVerifier'
+}
+
 tasks.register('verifyGeoWorldShoreline', JavaExec) {
     group = 'verification'
     description = 'Verifies short stable littoral shelves, shoreline materials, and sugar-cane-ready banks.'
@@ -246,5 +253,6 @@ tasks.register('verifyGeoWorldShoreline', JavaExec) {
 
 tasks.named('check').configure {
     dependsOn tasks.named('verifyGeoWorldBiomePreset')
+    dependsOn tasks.named('verifyGeoWorldDecorationPolicy')
     dependsOn tasks.named('verifyGeoWorldShoreline')
 }

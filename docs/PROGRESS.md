@@ -2006,3 +2006,39 @@ geoworld-river-navigation-audit -strict 保持：
 - go test ./... -count=1 全绿。
 
 本轮只修改最终 Minecraft voxel shoreline，不改变 .geoworld 模型，因此 cache 仍为 v11。
+
+## 2026-10-09 · 禁止 GeoWorld 随机开放式 vanilla 水泉
+
+用户在高山/悬崖区域发现孤立单格水源。区块更新后该水源会开始流动，可能形成很长的水帘并产生大量 fluid tick。
+
+定位：
+- 截图附近约 10429,-1125 的 GeoWorld Runtime 为 Water=None / WaterSurfaceDefined=false。
+- 因此该水源不属于 River / Lake / Ocean / WetlandPool，而来自 vanilla biome decoration。
+- Minecraft 26.3 的 minecraft:spring_water 使用 SpringFeature：要求周围 5 个侧/下方位置恰好 4 个有效岩石、1 个空气；放置 source water 后立即 scheduleTick(..., 0)。
+- 这正好允许悬崖侧壁随机生成开放泉眼，并启动自由水流。
+
+策略：
+- GeoWorld 的开放地表水由 Runtime 水文模型负责；暂时禁止 vanilla 随机 spring_water。
+- 仅绑定 GeoWorldChunkGenerator，不修改普通 Minecraft 世界。
+- 通过 ChunkGenerator(biomeSource, generationSettingsGetter) 为 GeoWorld 单独提供过滤后的 BiomeGenerationSettings。
+- 只删除注册键 minecraft:spring_water。
+- 保留 spring_lava、树木、花草、矿物、结构和其他所有 biome decoration feature。
+- 保持 Decoration step 数量与其他 feature 的原有顺序不变。
+- 对过滤后的 BiomeGenerationSettings 使用 WeakHashMap 缓存，避免区块生成时反复重建。
+- BiomeFilter.biome() 的二次归属检查会调用 generator.getBiomeGenerationSettings(biome)，因此同样看到过滤结果。
+
+验证：
+- 新增 verifyGeoWorldDecorationPolicy，并接入 check。
+- synthetic feature-step 验证：suppressed=minecraft:spring_water。
+- preserved=minecraft:spring_lava,minecraft:flower_default。
+- steps=10，order=stable。
+- go test ./... -count=1: PASS。
+- Java Golden: 15/15。
+- geoworld-river-navigation-audit -strict: PASS。
+- totalDownstreamRises=0，adjacentWaterStepViolations=0，disconnectedLakeFeeders=0。
+- NeoForge BiomePreset / DecorationPolicy / Shoreline / Engine / Spawn: PASS。
+- BUILD SUCCESSFUL，最新 dev JAR 已部署到 HMCL 26.3。
+
+边界：
+- 这一步不新增 GeoWorld 自有泉眼。未来如需要山泉，应由地下水/降水/集水区模型明确生成，并接入溪流或受控贴壁瀑布。
+- 本轮不修改 .geoworld 模型与 Engine cache。
