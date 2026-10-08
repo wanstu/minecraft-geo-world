@@ -240,6 +240,14 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 	if processed != len(drafts) {
 		return nil, errors.New("waterbed: river graph contains a cycle")
 	}
+	softenNavigableJunctionDrops(m.Rivers, cfg)
+	connectFeedersToRenderedLake(
+		m,
+		hydro,
+		cfg,
+		lakeSurfaces,
+		incomingSegments,
+	)
 
 	// Lakes were constructed and spill-capped before the river DAG so
 	// lake outlets can begin exactly at the final rendered lake datum.
@@ -269,13 +277,127 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 			m.Rivers[i].ReceiverSurface = spatial
 		}
 	}
+	easeReceiverMouthDrops(
+		m.Rivers,
+		incomingSegments,
+		cfg,
+	)
+	harmonizeReceiverConfluences(
+		m.Rivers,
+		incomingSegments,
+	)
 	propagateReceiverBackwater(
 		m.Rivers,
 		incomingSegments,
 		cfg,
 	)
+	easeReceiverOutflowDrops(m.Rivers, cfg)
+	enforceSupportedRiverCascades(m.Rivers, cfg)
 
 	return m, nil
+}
+
+func enforceSupportedRiverCascades(
+	rivers []RiverSegment,
+	cfg Config,
+) {
+	if len(rivers) == 0 {
+		return
+	}
+	incoming := make(map[int][]int, len(rivers))
+	for id := range rivers {
+		incoming[rivers[id].To] = append(
+			incoming[rivers[id].To],
+			id,
+		)
+	}
+
+	queue := make([]int, len(rivers))
+	queued := make([]bool, len(rivers))
+	for id := range rivers {
+		queue[id] = id
+		queued[id] = true
+	}
+	for head := 0; head < len(queue); head++ {
+		id := queue[head]
+		queued[id] = false
+		seg := &rivers[id]
+		if len(seg.Profile) < 2 {
+			continue
+		}
+		changed := enforceSegmentCascadeSlope(seg)
+		if changed {
+			seg.Bed0 = seg.Profile[0]
+			seg.Bed1 = seg.Profile[len(seg.Profile)-1]
+		}
+
+		startSurface :=
+			seg.Profile[0] +
+				riverCenterDepth(cfg, seg.HalfWidth)
+		for _, upstreamID := range incoming[seg.From] {
+			if upstreamID < 0 || upstreamID >= len(rivers) {
+				continue
+			}
+			upstream := &rivers[upstreamID]
+			if len(upstream.Profile) == 0 {
+				continue
+			}
+			upstreamDepth :=
+				riverCenterDepth(cfg, upstream.HalfWidth)
+			targetBed := math.Max(
+				0,
+				startSurface-upstreamDepth,
+			)
+			last := len(upstream.Profile) - 1
+			if upstream.Profile[last] <= targetBed+1e-12 {
+				continue
+			}
+			upstream.Profile[last] = targetBed
+			upstream.Bed1 = targetBed
+			if !queued[upstreamID] {
+				queue = append(queue, upstreamID)
+				queued[upstreamID] = true
+			}
+		}
+	}
+}
+
+func enforceSegmentCascadeSlope(
+	seg *RiverSegment,
+) bool {
+	if seg == nil || len(seg.Profile) < 2 {
+		return false
+	}
+	chord := math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0)
+	if chord <= 1e-9 {
+		return false
+	}
+	sampleBlocks := chord / float64(len(seg.Profile)-1)
+	// Above normalized 0.5 the Minecraft vertical mapping is 514 blocks per
+	// normalized unit. Use that stricter scale everywhere and keep a margin
+	// below one vertical block per horizontal block. Therefore any final
+	// source-water step has solid riverbed/cliff support instead of a free
+	// vertical face.
+	maxDrop := 0.70 * sampleBlocks / 514.0
+	if maxDrop <= 0 {
+		return false
+	}
+
+	changed := false
+	for j := len(seg.Profile) - 1; j > 0; j-- {
+		maxUpstream := seg.Profile[j] + maxDrop
+		if seg.Profile[j-1] > maxUpstream+1e-12 {
+			seg.Profile[j-1] = maxUpstream
+			changed = true
+		}
+	}
+	for j := 1; j < len(seg.Profile); j++ {
+		if seg.Profile[j] > seg.Profile[j-1] {
+			seg.Profile[j] = seg.Profile[j-1]
+			changed = true
+		}
+	}
+	return changed
 }
 
 func buildLakeNodes(
@@ -435,6 +557,10 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			// the untouched broad surface instead of meeting water as a noisy
 			// staircase or vertical trench wall.
 			surface := bed + riverCenterDepth(m.Config, seg.HalfWidth)
+			if seg.ReceiverSurfaceDefined &&
+				seg.ReceiverSurface > surface {
+				surface = seg.ReceiverSurface
+			}
 			innerBank := math.Min(baseHeight, surface+0.0022)
 			bankWeight := 1 - smoothstep(
 				seg.HalfWidth,
@@ -484,6 +610,10 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			riverDatumT = t
 		}
 		surface := bed + riverCenterDepth(m.Config, seg.HalfWidth)
+		if seg.ReceiverSurfaceDefined &&
+			seg.ReceiverSurface > surface {
+			surface = seg.ReceiverSurface
+		}
 		channelShoulder := math.Min(baseHeight, surface+0.0022)
 		crossT := smoothstep(0, seg.HalfWidth, distance)
 		candidate := math.Min(
@@ -636,7 +766,7 @@ func harmonizeConfluenceProfiles(
 	sharedSurface float64,
 	cfg Config,
 ) float64 {
-	if len(ids) < 2 || !finite(sharedSurface) {
+	if len(ids) == 0 || !finite(sharedSurface) {
 		return math.Inf(1)
 	}
 
@@ -780,7 +910,13 @@ func terraceRiverProfile(
 	// level canal. Gentle lowland rivers are where Minecraft's integer Y grid
 	// turns a realistic continuous slope into annoying boat-stopping steps.
 	if totalDrop > 0.014 {
-		return append([]float64(nil), profile...)
+		// Even true mountain/canyon reaches must not become stacks of
+		// free-standing source-water blocks. Preserve their steep descent, but
+		// spread any sub-cell jump into a bed-backed cascade.
+		return spreadGentleProfileDrops(
+			append([]float64(nil), profile...),
+			stepBlocks,
+		)
 	}
 
 	reachSamples := maxInt(
@@ -809,7 +945,149 @@ func terraceRiverProfile(
 			out[j] = out[j-1]
 		}
 	}
+	return spreadGentleProfileDrops(out, stepBlocks)
+}
+
+func spreadGentleProfileDrops(
+	profile []float64,
+	stepBlocks float64,
+) []float64 {
+	if len(profile) < 3 || stepBlocks <= 0 {
+		return profile
+	}
+	out := append([]float64(nil), profile...)
+	for j := 1; j < len(out); j++ {
+		drop := out[j-1] - out[j]
+		if drop <= 0 {
+			continue
+		}
+		scale := 514.0
+		if out[j-1] <= 0.5 && out[j] <= 0.5 {
+			scale = 254.0
+		}
+		// Keep the continuous profile slope below one Minecraft vertical block
+		// per horizontal block. Integer voxelization then becomes a supported
+		// staircase rather than a multi-block water wall.
+		maxDropPerSample := 0.82 * stepBlocks / scale
+		if drop <= maxDropPerSample+1e-12 {
+			continue
+		}
+		samples := int(math.Ceil(drop / maxDropPerSample))
+		start := maxInt(0, j-samples)
+		if start >= j {
+			continue
+		}
+		startBed := out[start]
+		targetBed := out[j]
+		for k := start + 1; k < j; k++ {
+			f := float64(k-start) / float64(j-start)
+			cap := lerp(startBed, targetBed, f)
+			if out[k] > cap {
+				out[k] = cap
+			}
+		}
+	}
+	for j := 1; j < len(out); j++ {
+		if out[j] > out[j-1] {
+			out[j] = out[j-1]
+		}
+	}
 	return out
+}
+
+func softenNavigableJunctionDrops(
+	rivers []RiverSegment,
+	cfg Config,
+) {
+	if len(rivers) == 0 {
+		return
+	}
+	byFrom := make(map[int]int, len(rivers))
+	incoming := make(map[int][]int, len(rivers))
+	for id := range rivers {
+		seg := rivers[id]
+		byFrom[seg.From] = id
+		incoming[seg.To] = append(incoming[seg.To], id)
+	}
+
+	for node, incomingIDs := range incoming {
+		downID, ok := byFrom[node]
+		if !ok {
+			continue
+		}
+		down := rivers[downID]
+		if len(down.Profile) == 0 {
+			continue
+		}
+		downSurface :=
+			sampleRiverProfile(down, 0) +
+				riverCenterDepth(cfg, down.HalfWidth)
+
+		for _, upID := range incomingIDs {
+			up := &rivers[upID]
+			if len(up.Profile) < 2 {
+				continue
+			}
+			upDepth := riverCenterDepth(cfg, up.HalfWidth)
+			upSurface :=
+				sampleRiverProfile(*up, 1) + upDepth
+			drop := upSurface - downSurface
+			if drop <= 0 {
+				continue
+			}
+
+			// Spread every junction drop over the upstream bed. Low-gradient
+			// navigation terraces therefore become short one-block stair
+			// sequences, while mountain/canyon drops become a bed-backed
+			// cascade instead of a free-standing vertical source-water wall.
+			blocksPerNormalized := 514.0
+			if upSurface <= 0.5 && downSurface <= 0.5 {
+				blocksPerNormalized = 254.0
+			}
+			dropBlocks := drop * blocksPerNormalized
+			if dropBlocks <= 1.05 {
+				continue
+			}
+
+			length := math.Hypot(up.X1-up.X0, up.Z1-up.Z0)
+			if length <= 1e-9 {
+				continue
+			}
+			transitionBlocks := math.Min(
+				length,
+				math.Max(24, 8*dropBlocks),
+			)
+			startT := math.Max(
+				0,
+				1-transitionBlocks/length,
+			)
+			startBed := sampleRiverProfile(*up, startT)
+			targetBed := math.Max(0, downSurface-upDepth)
+			if targetBed >= startBed-1e-12 {
+				continue
+			}
+
+			for j := range up.Profile {
+				t := float64(j) / float64(len(up.Profile)-1)
+				if t < startT {
+					continue
+				}
+				f := clamp(
+					(t-startT)/math.Max(1e-12, 1-startT),
+					0,
+					1,
+				)
+				cap := lerp(startBed, targetBed, f)
+				if up.Profile[j] > cap {
+					up.Profile[j] = cap
+				}
+				if j > 0 && up.Profile[j] > up.Profile[j-1] {
+					up.Profile[j] = up.Profile[j-1]
+				}
+			}
+			up.Bed1 = up.Profile[len(up.Profile)-1]
+		}
+	}
 }
 
 func snapNavigableRiverProfile(
@@ -930,6 +1208,393 @@ func sampleRiverProfile(seg RiverSegment, t float64) float64 {
 	return lerp(seg.Profile[i0], seg.Profile[i1], f)
 }
 
+func connectFeedersToRenderedLake(
+	m *Model,
+	hydro *hydrology.Model,
+	cfg Config,
+	lakeSurfaces map[int]float64,
+	incomingSegments [][]int,
+) {
+	if m == nil || hydro == nil || len(m.Rivers) == 0 {
+		return
+	}
+
+	primaryCount := len(m.Rivers)
+	byFrom := make(map[int]int, primaryCount)
+	edgeByPair := make(map[[2]int]int, primaryCount)
+	outByFrom := make(map[int]int, primaryCount)
+	for id := 0; id < primaryCount; id++ {
+		seg := m.Rivers[id]
+		byFrom[seg.From] = id
+		edgeByPair[[2]int{seg.From, seg.To}] = id
+		outByFrom[seg.From] = id
+	}
+
+	// Seed each lake's connector graph with macro nodes whose final detailed
+	// footprint is actually wet. A coarse LakeID cell is not sufficient: high
+	// sub-cell terrain can keep that candidate dry.
+	connected := make(map[int]map[int]bool)
+	for _, node := range m.Lakes {
+		if m.Sample(node.X, node.Z).WaterKind != reconcile.WaterLake {
+			continue
+		}
+		if connected[node.LakeID] == nil {
+			connected[node.LakeID] = make(map[int]bool)
+		}
+		connected[node.LakeID][node.Index] = true
+	}
+
+	for feederID := 0; feederID < primaryCount; feederID++ {
+		feeder := m.Rivers[feederID]
+		if feeder.From < 0 || feeder.From >= len(hydro.LakeID) ||
+			feeder.To < 0 || feeder.To >= len(hydro.LakeID) {
+			continue
+		}
+		lakeID := hydro.LakeID[feeder.To]
+		if lakeID <= 0 || hydro.LakeID[feeder.From] == lakeID {
+			continue
+		}
+		if riverPathTouchesLake(
+			m,
+			hydro,
+			byFrom,
+			feederID,
+			lakeID,
+		) {
+			continue
+		}
+		surface, ok := lakeSurfaces[lakeID]
+		if !ok || !finite(surface) {
+			continue
+		}
+		targets := connected[lakeID]
+		if len(targets) == 0 {
+			continue
+		}
+		path, ok := renderedLakeConnectorPath(
+			m,
+			hydro,
+			feeder.To,
+			lakeID,
+			surface,
+			targets,
+		)
+		if !ok || len(path) < 2 {
+			continue
+		}
+		startBed := feeder.Profile[len(feeder.Profile)-1]
+		if !appendLakeConnectorPath(
+			m,
+			path,
+			feeder.HalfWidth,
+			startBed,
+			surface,
+			cfg,
+			incomingSegments,
+			edgeByPair,
+			outByFrom,
+		) {
+			continue
+		}
+		for _, node := range path {
+			targets[node] = true
+		}
+	}
+}
+
+func renderedLakeConnectorPath(
+	m *Model,
+	hydro *hydrology.Model,
+	start int,
+	lakeID int,
+	surface float64,
+	targets map[int]bool,
+) ([]int, bool) {
+	n := m.Geometry.Width * m.Geometry.Height
+	if start < 0 || start >= n ||
+		lakeID <= 0 ||
+		hydro.LakeID[start] != lakeID ||
+		len(targets) == 0 {
+		return nil, false
+	}
+	if targets[start] {
+		return []int{start}, true
+	}
+
+	dist := map[int]float64{start: 0}
+	previous := make(map[int]int)
+	open := map[int]bool{start: true}
+	closed := make(map[int]bool)
+	found := -1
+	directions := [][2]int{
+		{-1, -1}, {0, -1}, {1, -1},
+		{-1, 0}, {1, 0},
+		{-1, 1}, {0, 1}, {1, 1},
+	}
+
+	for len(open) > 0 {
+		current := -1
+		best := math.Inf(1)
+		for node := range open {
+			if d := dist[node]; d < best {
+				best = d
+				current = node
+			}
+		}
+		if current < 0 {
+			break
+		}
+		delete(open, current)
+		if targets[current] {
+			found = current
+			break
+		}
+		closed[current] = true
+
+		cx := current % m.Geometry.Width
+		cz := current / m.Geometry.Width
+		for _, direction := range directions {
+			nx := cx + direction[0]
+			nz := cz + direction[1]
+			if nx < 0 || nx >= m.Geometry.Width ||
+				nz < 0 || nz >= m.Geometry.Height {
+				continue
+			}
+			next := nz*m.Geometry.Width + nx
+			if closed[next] || hydro.LakeID[next] != lakeID {
+				continue
+			}
+			wx, wz := m.Geometry.NodePosition(nx, nz)
+			height := m.Base.SampleNormalized(wx, wz)
+			aboveWater := math.Max(0, height-surface)
+			step := 1.0
+			if direction[0] != 0 && direction[1] != 0 {
+				step = math.Sqrt2
+			}
+			// Prefer the lowest corridor through the coarse lake basin. The
+			// path may cross dry LakeID cells, but it should follow their
+			// natural lows instead of cutting a straight canal across a ridge.
+			cost := step * (1 + 120*aboveWater)
+			candidate := best + cost
+			old, seen := dist[next]
+			if !seen || candidate < old {
+				dist[next] = candidate
+				previous[next] = current
+				open[next] = true
+			}
+		}
+	}
+	if found < 0 {
+		return nil, false
+	}
+
+	path := []int{found}
+	for path[len(path)-1] != start {
+		prev, ok := previous[path[len(path)-1]]
+		if !ok {
+			return nil, false
+		}
+		path = append(path, prev)
+		if len(path) > n {
+			return nil, false
+		}
+	}
+	for left, right := 0, len(path)-1; left < right; left, right = left+1, right-1 {
+		path[left], path[right] = path[right], path[left]
+	}
+	return path, true
+}
+
+func appendLakeConnectorPath(
+	m *Model,
+	path []int,
+	halfWidth,
+	startBed,
+	receiverSurface float64,
+	cfg Config,
+	incomingSegments [][]int,
+	edgeByPair map[[2]int]int,
+	outByFrom map[int]int,
+) bool {
+	if len(path) < 2 || halfWidth <= 0 {
+		return false
+	}
+	depth := riverCenterDepth(cfg, halfWidth)
+	targetBed := math.Min(
+		startBed,
+		math.Max(0, receiverSurface-depth),
+	)
+	totalLength := 0.0
+	lengths := make([]float64, len(path)-1)
+	for i := 0; i+1 < len(path); i++ {
+		x0i, z0i := path[i]%m.Geometry.Width, path[i]/m.Geometry.Width
+		x1i, z1i := path[i+1]%m.Geometry.Width, path[i+1]/m.Geometry.Width
+		x0, z0 := m.Geometry.NodePosition(x0i, z0i)
+		x1, z1 := m.Geometry.NodePosition(x1i, z1i)
+		lengths[i] = math.Hypot(x1-x0, z1-z0)
+		totalLength += lengths[i]
+	}
+	if totalLength <= 1e-9 {
+		return false
+	}
+
+	currentBed := startBed
+	traversed := 0.0
+	widthT := riverWidthFraction(cfg, halfWidth)
+	for i := 0; i+1 < len(path); i++ {
+		from, to := path[i], path[i+1]
+		key := [2]int{from, to}
+		if existing, ok := edgeByPair[key]; ok {
+			seg := &m.Rivers[existing]
+			if !seg.ReceiverSurfaceDefined ||
+				receiverSurface > seg.ReceiverSurface {
+				seg.ReceiverSurfaceDefined = true
+				seg.ReceiverSurface = receiverSurface
+			}
+			if len(seg.Profile) > 0 {
+				currentBed = seg.Profile[len(seg.Profile)-1]
+			}
+			traversed += lengths[i]
+			continue
+		}
+		if existing, ok := outByFrom[from]; ok {
+			// Do not create a synthetic distributary. Another connector has
+			// already established this node's path to the same lake.
+			if existing >= 0 && existing < len(m.Rivers) {
+				return false
+			}
+		}
+
+		x0i, z0i := from%m.Geometry.Width, from/m.Geometry.Width
+		x1i, z1i := to%m.Geometry.Width, to/m.Geometry.Width
+		x0, z0 := m.Geometry.NodePosition(x0i, z0i)
+		x1, z1 := m.Geometry.NodePosition(x1i, z1i)
+		traversed += lengths[i]
+		fraction := clamp(traversed/totalLength, 0, 1)
+		desiredEnd := lerp(startBed, targetBed, fraction)
+		desiredEnd = math.Min(currentBed, desiredEnd)
+		originalDrop :=
+			m.Base.SampleNormalized(x0, z0) -
+				m.Base.SampleNormalized(x1, z1)
+		meander := riverMeanderOffset(
+			m.Base.Config.Seed,
+			from,
+			to,
+			lengths[i],
+			halfWidth,
+			originalDrop,
+		)
+		profile := buildRiverProfile(
+			m.Base,
+			x0,
+			z0,
+			x1,
+			z1,
+			currentBed,
+			desiredEnd,
+			halfWidth,
+			meander,
+			cfg.RiverProfileStepBlocks,
+			cfg.MinRiverBedDepthNormalized*(1+1.5*widthT),
+		)
+		profile = terraceRiverProfile(
+			profile,
+			cfg.RiverProfileStepBlocks,
+			riverNavigationReachBlocks(halfWidth),
+		)
+		profile = spreadGentleProfileDrops(
+			profile,
+			cfg.RiverProfileStepBlocks,
+		)
+		if len(profile) == 0 {
+			return false
+		}
+		if i == 0 && from >= 0 && from < len(incomingSegments) {
+			// buildRiverProfile may discover a lower detailed-terrain low at
+			// the connector's first sample than the coarse feeder endpoint had.
+			// Converge every incoming branch to that actual connector water
+			// surface before the geometries touch, otherwise Minecraft sees a
+			// multi-block vertical source-water wall at the join.
+			harmonizeConfluenceProfiles(
+				m.Rivers,
+				incomingSegments[from],
+				profile[0]+depth,
+				cfg,
+			)
+		}
+		segment := RiverSegment{
+			From:                   from,
+			To:                     to,
+			X0:                     x0,
+			Z0:                     z0,
+			X1:                     x1,
+			Z1:                     z1,
+			Bed0:                   profile[0],
+			Bed1:                   profile[len(profile)-1],
+			HalfWidth:              halfWidth,
+			MeanderOffset:          meander,
+			Profile:                profile,
+			ReceiverSurfaceDefined: true,
+			ReceiverSurface:        receiverSurface,
+		}
+		id := len(m.Rivers)
+		m.Rivers = append(m.Rivers, segment)
+		m.indexRiver(id, segment)
+		edgeByPair[key] = id
+		outByFrom[from] = id
+		if to >= 0 && to < len(incomingSegments) {
+			incomingSegments[to] = append(incomingSegments[to], id)
+		}
+		currentBed = profile[len(profile)-1]
+	}
+	return true
+}
+
+func riverPathTouchesLake(
+	m *Model,
+	hydro *hydrology.Model,
+	byFrom map[int]int,
+	startSegmentID int,
+	lakeID int,
+) bool {
+	id := startSegmentID
+	visited := make(map[int]bool)
+	for hops := 0; hops < 64; hops++ {
+		if id < 0 || id >= len(m.Rivers) || visited[id] {
+			return false
+		}
+		visited[id] = true
+		seg := m.Rivers[id]
+		length := math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0)
+		steps := maxInt(1, int(math.Ceil(length/4)))
+		for j := 0; j <= steps; j++ {
+			t := float64(j) / float64(steps)
+			x, z, _, _ := riverCenterAndNormalAt(
+				seg.X0,
+				seg.Z0,
+				seg.X1,
+				seg.Z1,
+				seg.MeanderOffset,
+				t,
+			)
+			if m.Sample(x, z).WaterKind == reconcile.WaterLake {
+				return true
+			}
+		}
+		node := seg.To
+		if node < 0 || node >= len(hydro.LakeID) ||
+			hydro.LakeID[node] != lakeID {
+			return false
+		}
+		next, ok := byFrom[node]
+		if !ok {
+			return false
+		}
+		id = next
+	}
+	return false
+}
+
 func spatialLakeReceiverSurface(
 	m *Model,
 	seg RiverSegment,
@@ -969,6 +1634,94 @@ func spatialLakeReceiverSurface(
 		}
 	}
 	return best, found
+}
+
+func easeReceiverMouthDrops(
+	rivers []RiverSegment,
+	incomingSegments [][]int,
+	cfg Config,
+) {
+	for id := range rivers {
+		seg := &rivers[id]
+		if !seg.ReceiverSurfaceDefined ||
+			!finite(seg.ReceiverSurface) ||
+			len(seg.Profile) < 2 {
+			continue
+		}
+		depth := riverCenterDepth(cfg, seg.HalfWidth)
+		receiver := seg.ReceiverSurface
+		naturalStart := seg.Profile[0] + depth
+		naturalEnd := seg.Profile[len(seg.Profile)-1] + depth
+		if naturalStart <= receiver+1e-12 &&
+			naturalEnd <= receiver+1e-12 {
+			continue
+		}
+
+		// The final Ocean/Lake classification may intersect this receiving
+		// macro reach before its endpoint. Give the whole receiving reach one
+		// water datum, then move the accumulated drop into the upstream reach
+		// as bed-backed steps. This prevents a river water wall at a shoreline
+		// whose exact sub-cell position is not known by the macro topology.
+		targetBed := math.Max(0, receiver-depth)
+		for j := range seg.Profile {
+			if seg.Profile[j] > targetBed {
+				seg.Profile[j] = targetBed
+			}
+		}
+		for j := 1; j < len(seg.Profile); j++ {
+			if seg.Profile[j] > seg.Profile[j-1] {
+				seg.Profile[j] = seg.Profile[j-1]
+			}
+		}
+		seg.Bed0 = seg.Profile[0]
+		seg.Bed1 = seg.Profile[len(seg.Profile)-1]
+
+		node := seg.From
+		if node >= 0 && node < len(incomingSegments) {
+			harmonizeConfluenceProfiles(
+				rivers,
+				incomingSegments[node],
+				receiver,
+				cfg,
+			)
+		}
+	}
+}
+
+func harmonizeReceiverConfluences(
+	rivers []RiverSegment,
+	incomingSegments [][]int,
+) {
+	for _, ids := range incomingSegments {
+		if len(ids) < 2 {
+			continue
+		}
+		shared := math.Inf(-1)
+		for _, id := range ids {
+			if id < 0 || id >= len(rivers) {
+				continue
+			}
+			seg := rivers[id]
+			if seg.ReceiverSurfaceDefined &&
+				seg.ReceiverSurface > shared {
+				shared = seg.ReceiverSurface
+			}
+		}
+		if !finite(shared) {
+			continue
+		}
+		for _, id := range ids {
+			if id < 0 || id >= len(rivers) {
+				continue
+			}
+			seg := &rivers[id]
+			if !seg.ReceiverSurfaceDefined ||
+				seg.ReceiverSurface < shared {
+				seg.ReceiverSurfaceDefined = true
+				seg.ReceiverSurface = shared
+			}
+		}
+	}
 }
 
 func propagateReceiverBackwater(
@@ -1026,6 +1779,83 @@ func propagateReceiverBackwater(
 				queued[upstreamID] = true
 			}
 		}
+	}
+}
+
+func easeReceiverOutflowDrops(
+	rivers []RiverSegment,
+	cfg Config,
+) {
+	if len(rivers) == 0 {
+		return
+	}
+	outgoing := make(map[int]int, len(rivers))
+	receiverAtNode := make(map[int]float64)
+	for id := range rivers {
+		seg := rivers[id]
+		outgoing[seg.From] = id
+		if !seg.ReceiverSurfaceDefined {
+			continue
+		}
+		if old, ok := receiverAtNode[seg.To]; !ok ||
+			seg.ReceiverSurface > old {
+			receiverAtNode[seg.To] = seg.ReceiverSurface
+		}
+	}
+
+	for node, receiver := range receiverAtNode {
+		outID, ok := outgoing[node]
+		if !ok {
+			continue
+		}
+		seg := &rivers[outID]
+		if len(seg.Profile) < 2 || !finite(receiver) {
+			continue
+		}
+		depth := riverCenterDepth(cfg, seg.HalfWidth)
+		naturalStart := seg.Profile[0] + depth
+		if receiver <= naturalStart+1e-12 {
+			continue
+		}
+
+		length := math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0)
+		if length <= 1e-9 {
+			continue
+		}
+		scale := 514.0
+		if receiver <= 0.5 && naturalStart <= 0.5 {
+			scale = 254.0
+		}
+		dropBlocks := (receiver - naturalStart) * scale
+		transitionBlocks := math.Min(
+			length,
+			math.Max(24, 8*dropBlocks),
+		)
+		endT := clamp(transitionBlocks/length, 0, 1)
+		if endT <= 0 {
+			continue
+		}
+		endBed := sampleRiverProfile(*seg, endT)
+		startBed := math.Max(0, receiver-depth)
+		if startBed <= seg.Profile[0]+1e-12 {
+			continue
+		}
+
+		for j := range seg.Profile {
+			t := float64(j) / float64(len(seg.Profile)-1)
+			if t > endT {
+				break
+			}
+			f := clamp(t/endT, 0, 1)
+			floor := lerp(startBed, endBed, f)
+			if seg.Profile[j] < floor {
+				seg.Profile[j] = floor
+			}
+			if j > 0 && seg.Profile[j] > seg.Profile[j-1] {
+				seg.Profile[j] = seg.Profile[j-1]
+			}
+		}
+		seg.Bed0 = seg.Profile[0]
 	}
 }
 

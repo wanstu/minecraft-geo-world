@@ -501,6 +501,64 @@ func TestTerminalRiverSegmentInheritsOceanSurfaceAtItsEndpoint(t *testing.T) {
 	if !seg.ReceiverSurfaceDefined || math.Abs(seg.ReceiverSurface-0.50) > 1e-12 {
 		t.Fatalf("terminal ocean surface not inherited: %+v", seg)
 	}
+	depth := riverCenterDepth(m.Config, seg.HalfWidth)
+	for i, bed := range seg.Profile {
+		if surface := bed + depth; surface > 0.50+1e-12 {
+			t.Fatalf(
+				"terminal receiving reach[%d] natural surface=%.12f above ocean 0.50",
+				i,
+				surface,
+			)
+		}
+	}
+}
+
+func TestFinalCascadeSlopeIsBackedByRiverBed(t *testing.T) {
+	cfg, err := normalizeConfig(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rivers := []RiverSegment{{
+		From:      0,
+		To:        1,
+		X0:        0,
+		Z0:        0,
+		X1:        128,
+		Z1:        0,
+		HalfWidth: 8,
+		Profile: []float64{
+			0.70,
+			0.69,
+			0.66,
+			0.61,
+			0.57,
+			0.52,
+			0.48,
+			0.44,
+			0.40,
+		},
+	}}
+	enforceSupportedRiverCascades(rivers, cfg)
+	seg := rivers[0]
+	sampleBlocks :=
+		math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0) /
+			float64(len(seg.Profile)-1)
+	maxDrop := 0.70 * sampleBlocks / 514.0
+	for i := 1; i < len(seg.Profile); i++ {
+		drop := seg.Profile[i-1] - seg.Profile[i]
+		if drop > maxDrop+1e-12 {
+			t.Fatalf(
+				"unsupported cascade step %d drop=%.12f max=%.12f profile=%v",
+				i,
+				drop,
+				maxDrop,
+				seg.Profile,
+			)
+		}
+		if drop < -1e-12 {
+			t.Fatalf("cascade rose downstream at %d: %v", i, seg.Profile)
+		}
+	}
 }
 
 func TestDiagonalLakeFootprintBackwatersCrossingRiver(t *testing.T) {

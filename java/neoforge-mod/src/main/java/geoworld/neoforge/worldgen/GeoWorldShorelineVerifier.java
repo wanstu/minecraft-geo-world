@@ -1,5 +1,6 @@
 package geoworld.neoforge.worldgen;
 
+import geoworld.minecraft.v26_3common.Minecraft26_3BiomeRealizer;
 import geoworld.minecraft.v26_3common.Minecraft26_3ProfileMapping;
 import geoworld.neoforge.creation.GeoWorldCreationConfig;
 import geoworld.neoforge.engine.GeoWorldEngineBridge;
@@ -31,9 +32,12 @@ public final class GeoWorldShorelineVerifier {
     private GeoWorldShorelineVerifier() {}
 
     public static void main(String[] args) throws Exception {
-        Path isolatedCache = Files.createTempDirectory(
-            "geoworld-shoreline-verifier-"
-        );
+        Path isolatedCache = Path.of(
+            "build",
+            "geoworld-shoreline-verifier-cache"
+        ).toAbsolutePath();
+        cleanupCache(isolatedCache);
+        Files.createDirectories(isolatedCache);
         System.setProperty(
             "geoworld.cache.dir",
             isolatedCache.toAbsolutePath().toString()
@@ -364,6 +368,7 @@ public final class GeoWorldShorelineVerifier {
         }
 
         verifyWetlandPools(runtime);
+        verifyRiverbankBiomes(runtime);
 
         System.out.printf(
             "GeoWorld shoreline verification passed: seed=%d, immediate=%d, " +
@@ -419,6 +424,127 @@ public final class GeoWorldShorelineVerifier {
             }
         }
         return null;
+    }
+
+    private static void verifyRiverbankBiomes(
+        GeoWorldV1 runtime
+    ) {
+        int regressionX = 4732;
+        int regressionZ = -1470;
+        String regressionBiome = Minecraft26_3BiomeRealizer.biomeId(
+            runtime,
+            regressionX,
+            regressionZ
+        );
+        if (isSwampBiome(regressionBiome)) {
+            throw new AssertionError(
+                "riverbank regression is still swamp at " +
+                regressionX + "," + regressionZ +
+                ": " + regressionBiome
+            );
+        }
+
+        int bankCells = 0;
+        int swampCells = 0;
+        int unsupportedSwamps = 0;
+        int[][] centers = {
+            {4732, -1470},
+            {1724, -3024},
+            {1855, -2889},
+            {1862, -2631}
+        };
+        for (int[] center : centers) {
+            for (int dz = -96; dz <= 96; dz += 4) {
+                for (int dx = -96; dx <= 96; dx += 4) {
+                    int x = center[0] + dx;
+                    int z = center[1] + dz;
+                    GeoWorldV1.RuntimeSample sample =
+                        runtime.sample(x, z);
+                    if (
+                        !"None".equals(sample.waterKind()) ||
+                        !nearRiver(runtime, x, z, 10)
+                    ) {
+                        continue;
+                    }
+                    bankCells++;
+                    String biome = Minecraft26_3BiomeRealizer.biomeId(
+                        runtime,
+                        x,
+                        z
+                    );
+                    if (!isSwampBiome(biome)) {
+                        continue;
+                    }
+                    swampCells++;
+                    boolean trueWetland =
+                        "Wetland".equals(sample.biomeFamily()) ||
+                        "Peat".equals(sample.surfaceProfile()) ||
+                        "Wetland".equals(sample.vegetationProfile());
+                    if (!trueWetland) {
+                        unsupportedSwamps++;
+                    }
+                }
+            }
+        }
+        if (unsupportedSwamps > 0) {
+            throw new AssertionError(
+                "riverbank biome scan found " + unsupportedSwamps +
+                " swamp cells without wetland ecology"
+            );
+        }
+        if (bankCells == 0) {
+            throw new AssertionError(
+                "riverbank biome scan found no dry riverbank cells"
+            );
+        }
+        System.out.printf(
+            "GeoWorld riverbank biome verification passed: " +
+            "bankCells=%d swampCells=%d unsupported=0 regression=%s%n",
+            bankCells,
+            swampCells,
+            regressionBiome
+        );
+    }
+
+    private static boolean nearRiver(
+        GeoWorldV1 runtime,
+        int x,
+        int z,
+        int radius
+    ) {
+        for (int distance = 2; distance <= radius; distance += 2) {
+            int diagonal = (int)Math.round(
+                distance * 0.7071067811865476
+            );
+            int[][] offsets = {
+                {distance, 0},
+                {-distance, 0},
+                {0, distance},
+                {0, -distance},
+                {diagonal, diagonal},
+                {diagonal, -diagonal},
+                {-diagonal, diagonal},
+                {-diagonal, -diagonal}
+            };
+            for (int[] offset : offsets) {
+                if (
+                    "River".equals(
+                        runtime.sample(
+                            x + offset[0],
+                            z + offset[1]
+                        ).waterKind()
+                    )
+                ) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isSwampBiome(String biome) {
+        return "minecraft:swamp".equals(biome) ||
+            "minecraft:mangrove_swamp".equals(biome);
     }
 
     private static void verifyWetlandPools(

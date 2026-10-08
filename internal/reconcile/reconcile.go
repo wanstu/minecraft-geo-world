@@ -379,13 +379,10 @@ func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Mod
 		}
 	}
 
-	traceRiver := func(seed int, allowLakeStart bool, strengthFloor float64) {
+	traceRiver := func(seed int, strengthFloor float64) {
 		cur := seed
 		for steps := 0; steps < n; steps++ {
 			if cur < 0 || cur >= n || !h.LandMask[cur] {
-				break
-			}
-			if h.LakeID[cur] != 0 && !(allowLakeStart && steps == 0) {
 				break
 			}
 			next := h.FlowTo[cur]
@@ -410,8 +407,11 @@ func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Mod
 			m.RiverBedActive[cur] = true
 			m.RiverBedActive[next] = true
 
-			// Keep the terminal edge into ocean/lake, then stop. A lake outlet
-			// is handled by a separate forced trace starting at SpillOutlet.
+			// The coarse LakeID boundary is only the handoff point. Stop the
+			// normal FlowTo trace as soon as it enters a lake candidate; Waterbed
+			// later knows the final detailed lake footprint and connects this
+			// inlet to the actual rendered shoreline. A spill-out trace starts
+			// inside the lake but has a non-lake next node, so it continues.
 			if !h.LandMask[next] || h.LakeID[next] != 0 {
 				break
 			}
@@ -434,7 +434,7 @@ func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Mod
 			continue
 		}
 		m.QualifyingRiverEdges++
-		traceRiver(seed, false, 0)
+		traceRiver(seed, 0)
 	}
 
 	// Large or small, a hydrologic lake should visibly belong to its drainage
@@ -488,7 +488,6 @@ func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Mod
 			}
 			traceRiver(
 				seed,
-				false,
 				math.Max(
 					m.Config.RiverStrengthThreshold,
 					bestInflowStrength[lake.ID],
@@ -506,7 +505,6 @@ func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Mod
 		}
 		traceRiver(
 			outlet,
-			true,
 			math.Max(
 				m.Config.RiverStrengthThreshold,
 				bestInflowStrength[lake.ID],

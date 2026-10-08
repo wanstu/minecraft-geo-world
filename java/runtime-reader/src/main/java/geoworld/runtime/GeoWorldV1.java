@@ -772,22 +772,14 @@ public final class GeoWorldV1 {
             );
         }
 
+        double riverSurface = 0;
+        double riverDepth = 0;
+        boolean riverValid = false;
         if (
-            ocean >= worldSampleConfig.oceanEligibilityThreshold() &&
-            ground.finalHeight() < manifest.seaLevelNormalized()
+            ground.waterKind() == WaterKind.RIVER &&
+            ground.riverWeight() > 0 &&
+            ground.riverBedDefined()
         ) {
-            return new WorldSample(
-                ground.finalHeight(),
-                WaterKind.OCEAN,
-                true,
-                manifest.seaLevelNormalized(),
-                manifest.seaLevelNormalized() - ground.finalHeight(),
-                ocean,
-                ground.riverWeight()
-            );
-        }
-
-        if (ground.waterKind() == WaterKind.RIVER && ground.riverWeight() > 0) {
             double widthSpan = Math.max(
                 1.0e-9,
                 waterbedConfig.maxRiverHalfWidthBlocks() -
@@ -803,36 +795,56 @@ public final class GeoWorldV1 {
             double centerDepth =
                 worldSampleConfig.riverCenterDepthNormalized() *
                 (1 + 2 * Math.pow(widthT, 1.15));
-            if (ground.riverBedDefined()) {
-                double surface =
-                    ground.riverBedElevation() + centerDepth;
-                if (
-                    ground.riverReceiverSurfaceDefined() &&
-                    ground.riverReceiverSurface() > surface &&
-                    ground.riverReceiverWeight() > 0
-                ) {
-                    surface +=
-                        (ground.riverReceiverSurface() - surface) *
-                        ground.riverReceiverWeight();
-                }
-                surface = Math.min(1.0, surface);
-                double localDepth =
-                    surface - ground.finalHeight();
-                if (
-                    localDepth >=
-                    worldSampleConfig.minRiverWaterDepthNormalized()
-                ) {
-                    return new WorldSample(
-                        ground.finalHeight(),
-                        WaterKind.RIVER,
-                        true,
-                        surface,
-                        localDepth,
-                        ocean,
-                        ground.riverWeight()
-                    );
-                }
+            riverSurface =
+                ground.riverBedElevation() + centerDepth;
+            if (
+                ground.riverReceiverSurfaceDefined() &&
+                ground.riverReceiverSurface() > riverSurface &&
+                ground.riverReceiverWeight() > 0
+            ) {
+                riverSurface =
+                    ground.riverReceiverSurface();
             }
+            riverSurface = Math.min(1.0, riverSurface);
+            riverDepth = riverSurface - ground.finalHeight();
+            riverValid =
+                riverDepth >=
+                worldSampleConfig.minRiverWaterDepthNormalized();
+        }
+
+        if (
+            ocean >= worldSampleConfig.oceanEligibilityThreshold() &&
+            ground.finalHeight() < manifest.seaLevelNormalized()
+        ) {
+            double oneBlock = normalizedBlockStepAbove(
+                manifest.seaLevelNormalized()
+            );
+            if (
+                !riverValid ||
+                riverSurface <= manifest.seaLevelNormalized() + oneBlock
+            ) {
+                return new WorldSample(
+                    ground.finalHeight(),
+                    WaterKind.OCEAN,
+                    true,
+                    manifest.seaLevelNormalized(),
+                    manifest.seaLevelNormalized() - ground.finalHeight(),
+                    ocean,
+                    ground.riverWeight()
+                );
+            }
+        }
+
+        if (riverValid) {
+            return new WorldSample(
+                ground.finalHeight(),
+                WaterKind.RIVER,
+                true,
+                riverSurface,
+                riverDepth,
+                ocean,
+                ground.riverWeight()
+            );
         }
 
         return new WorldSample(
@@ -844,6 +856,14 @@ public final class GeoWorldV1 {
             ocean,
             ground.riverWeight()
         );
+    }
+
+    private static double normalizedBlockStepAbove(
+        double height
+    ) {
+        return height < 0.5
+            ? 1.0 / 254.0
+            : 1.0 / 514.0;
     }
 
     private GroundSample sampleGround(double x, double z) {
@@ -888,6 +908,12 @@ public final class GeoWorldV1 {
 
             if (point.distance() >= segment.halfWidth()) {
                 double surface = bed + centerDepth;
+                if (
+                    segment.receiverSurfaceDefined() &&
+                    segment.receiverSurface() > surface
+                ) {
+                    surface = segment.receiverSurface();
+                }
                 double innerBank =
                     Math.min(baseHeight, surface + 0.0022);
                 double bankWeight =
@@ -940,6 +966,12 @@ public final class GeoWorldV1 {
                 riverDatumT = point.t();
             }
             double surface = bed + centerDepth;
+            if (
+                segment.receiverSurfaceDefined() &&
+                segment.receiverSurface() > surface
+            ) {
+                surface = segment.receiverSurface();
+            }
             double channelShoulder =
                 Math.min(baseHeight, surface + 0.0022);
             double crossT =

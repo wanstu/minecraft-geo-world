@@ -1757,3 +1757,97 @@ Minecraft 26.3 群系：
 - verifyGeoWorldEngine：v10 cached=false PASS。
 - verifyGeoWorldSpawn PASS。
 - NeoForge BUILD SUCCESSFUL；最新 GeoWorld-NeoForge-26.3-0.1.0-dev.jar 已自动部署到 HMCL 26.3。
+
+
+## 2026-10-08 · 河流阶梯支撑、河岸去沼泽化与真实湖岸入流闭合
+
+用户实机反馈：
+- 主河两岸几乎必然出现沼泽群系，生态表现不合理。
+- 沼泽浅水/河岸出现开放水源，形成大面积流动水并带来 fluid update 卡顿。
+- 平缓地形的河流台阶仍出现多格悬落，应该是河床同步下降的一格阶梯。
+- 即便是真正悬崖/峡谷，瀑布也应贴着实体崖壁，不允许自由悬空水帘。
+- 大湖部分支流虽然 Hydrology/Reconcile 有边，最终 Runtime 仍未真正碰到湖水。
+
+本轮修正：
+
+### 1. 河岸不再自动湿地化
+- Hydrology WetlandPotential 增加强河道 exclusion：高 RiverStrength 本身只表示河槽，不再直接把整条主河两岸提升成 wetland。
+- Minecraft26_3BiomeRealizer 取消 “Wet Mud + Floodplain => Wetland” 与 “高降水 Floodplain => Wetland” 的自动升级。
+- Wet Mud 仍作为冲积/湿润土壤存在，但不再等价于 Minecraft swamp biome。
+- Seed=123456 GeoWorldShorelineVerifier：
+  - riverbank cells=1568
+  - swampCells=0
+  - unsupported=0
+  - regression biome=minecraft:sunflower_plains
+
+### 2. 湿地浅水改成封闭小盆地
+- 浅水池不再逐格随机生成 source water。
+- 采用约 10x10 方块候选尺度，生成约 3x3 的一格深浅水盆地，并规划一格泥岸 rim。
+- 同一池使用统一 water boundary；池底为 mud。
+- 外圈若仅低一格可抬为泥岸封闭；更深逃逸口拒绝生成该池。
+- 浅水地貌允许出现在 Wetland / Wet Mud / Peat 语义，但不会因此把周围 climate biome 改成 swamp。
+- Seed=123456：wetland pools=254/6416，ratio≈4.0%。
+
+### 3. 河流纵向台阶不再多格自由悬落
+- Waterbed 最终增加 supported-cascade pass，对每条 RiverSegment 最终 Profile 再约束连续纵坡。
+- 河流内部、junction、receiver mouth/outflow 都统一处理，不只看单段 profile。
+- 普通/急流在 Minecraft 整数柱中相邻水面最多差 1 格；河床同步下降。
+- 正式 cmd/geoworld-river-navigation-audit 新增：
+  - maxAdjacentWaterStepBlocks
+  - adjacentWaterStepViolations
+  - lakeFeeders
+  - disconnectedLakeFeeders
+- Seed=123456 strict：
+  - maxAdjacentWaterStepBlocks=1
+  - adjacentWaterStepViolations=0
+  - downstream rises=0
+  - dry centerline samples=0
+  - low-gradient changes/km:
+    - small 8-12 = 1.7304
+    - medium 12-16 = 1.2809
+    - large >=16 = 0.2210
+- 对“瀑布必须贴崖壁”的语义收口：只有连续暴露 2 格以上的竖直水面才属于真正 waterfall；当前 Seed=123456 已不存在这种自由悬落。普通一格阶梯不强行塞支撑块，避免把河道做成障碍物。
+
+### 4. Receiver 回水同时塑岸
+- 之前 receiver/backwater 只抬最终水面，Waterbed 横断面仍按自然河面塑岸，导致低 RiverWeight 河边出现 Y105 地面面对 Y109 回水面的悬空水墙。
+- Go Waterbed 与 Java GeoWorldV1 同步改为：河槽/岸肩横断面按最终 receiver surface 计算。
+- 最新 Shoreline verifier：
+  - immediate=579 / stable=579
+  - shallowFringes=0
+  - shelves=1084
+  - materials=1140
+  - caneReady=543/543
+  - maxRaising=1
+  - 2-3 raise=0
+  - 4+ raise=0
+
+### 5. 大湖支流连接到“最终真实湖面”而不是 LakeID 抽象边界
+- 确认根因：Hydrology LakeID 是宏观候选盆地；详细 Terrain 会让大量候选 cell 最终保持干地。
+- 原先 feeder 到达 LakeID 就算“入湖”，会出现 9024,-832 已是 LakeID=2，但真实湖岸约在 10048 一带，中间超过 1 km 干地的情况。
+- Reconcile 仍以 LakeID 作为宏观 handoff；Waterbed 在最终湖 footprint 建成后执行 connectFeedersToRenderedLake：
+  - 从真正有 Runtime Lake 水的 macro node 建立目标集合。
+  - 对未碰真实湖水的 feeder，在同 LakeID basin 内使用带高程惩罚的最小代价路径寻找真实湿节点。
+  - connector 优先走低谷，不直切山脊。
+  - connector 生成正式 RiverSegment，并继承 lake receiver surface / cascade / confluence 约束。
+- 正式 navigation audit：
+  - lakeFeeders=6
+  - disconnectedLakeFeeders=0
+- 截图中的 LakeID=2 五条主要 feeder 复核全部 hit=true：
+  - 10944,-1216 -> 10816,-1216
+  - 9152,-832 -> 9024,-832（原断开）
+  - 8128,-704 -> 8000,-704（原断开）
+  - 10560,192 -> 10432,192
+  - 10048,576 -> 10176,448
+
+### 6. 验证环境与版本
+- Engine cache v10 -> v11，确保新世界不会复用旧河网/岸线缓存。
+- GeoWorldShorelineVerifier 不再把 embedded engine 解压到 Windows %TEMP% 执行；改用 module build/geoworld-shoreline-verifier-cache，避免 CreateProcess error=5。
+- Go Golden 已重建；go test ./... -count=1 全绿。
+- Java Golden 15/15，tolerance=1e-9。
+- NeoForge：
+  - verifyGeoWorldBiomePreset: 56/56
+  - verifyGeoWorldShoreline: PASS
+  - verifyGeoWorldEngine: PASS, v11 cached=false
+  - verifyGeoWorldSpawn: PASS
+  - BUILD SUCCESSFUL
+- 最新 GeoWorld-NeoForge-26.3-0.1.0-dev.jar 已自动部署到 HMCL 26.3。

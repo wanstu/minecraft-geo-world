@@ -488,7 +488,24 @@ func (m *Model) classifyWaterFeatures(seasonality []float64) {
 			1,
 		)
 		stability := 1 - 0.45*clamp(seasonality[i], 0, 1)
-		m.WetlandPotential[i] = clamp(waterSupply*flatness*stability, 0, 1)
+		// Flow accumulation alone describes the river channel, not a swamp.
+		// Suppress the wetland signal on strong channel cells; true floodplain
+		// and backswamp wetlands are recovered later from floodplain/alluvial
+		// geometry plus moisture instead of painting a swamp ribbon along every
+		// major river.
+		channelWeight := clamp(
+			(m.RiverStrength[i]-0.12)/(0.72-0.12),
+			0,
+			1,
+		)
+		channelWeight =
+			channelWeight * channelWeight * (3 - 2*channelWeight)
+		channelExclusion := 1 - 0.58*channelWeight
+		m.WetlandPotential[i] = clamp(
+			waterSupply*flatness*stability*channelExclusion,
+			0,
+			1,
+		)
 	}
 }
 

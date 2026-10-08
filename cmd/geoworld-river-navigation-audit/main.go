@@ -15,6 +15,7 @@ import (
 	"geoworld/internal/reconcile"
 	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
+	"geoworld/internal/worldsample"
 )
 
 type bucket struct {
@@ -29,13 +30,17 @@ type bucket struct {
 }
 
 type report struct {
-	Seed         int64    `json:"seed"`
-	SampleStep   float64  `json:"sampleStepBlocks"`
-	LowGradient  []bucket `json:"lowGradient"`
-	Rapids       []bucket `json:"rapids"`
-	TotalRises   int      `json:"totalDownstreamRises"`
-	TotalDry     int      `json:"totalDryCenterlineSamples"`
-	StrictPassed bool     `json:"strictPassed"`
+	Seed                    int64    `json:"seed"`
+	SampleStep              float64  `json:"sampleStepBlocks"`
+	LowGradient             []bucket `json:"lowGradient"`
+	Rapids                  []bucket `json:"rapids"`
+	TotalRises              int      `json:"totalDownstreamRises"`
+	TotalDry                int      `json:"totalDryCenterlineSamples"`
+	MaxAdjacentWaterStep    int      `json:"maxAdjacentWaterStepBlocks"`
+	AdjacentStepViolations  int      `json:"adjacentWaterStepViolations"`
+	LakeFeeders             int      `json:"lakeFeeders"`
+	DisconnectedLakeFeeders int      `json:"disconnectedLakeFeeders"`
+	StrictPassed            bool     `json:"strictPassed"`
 }
 
 func main() {
@@ -134,6 +139,9 @@ func main() {
 		}
 	}
 
+	maxAdjacentStep, adjacentStepViolations := auditAdjacentWaterSteps(m)
+	lakeFeeders, disconnectedLakeFeeders := auditLakeFeeders(m)
+
 	lowOrder := []bucket{*low["small"], *low["medium"], *low["large"]}
 	rapidOrder := []bucket{*rapid["small"], *rapid["medium"], *rapid["large"]}
 	for i := range lowOrder {
@@ -148,23 +156,182 @@ func main() {
 	}
 
 	pass := totalRises == 0 &&
+		adjacentStepViolations == 0 &&
+		disconnectedLakeFeeders == 0 &&
 		lowOrder[0].ChangesPerK <= 5.0 &&
 		lowOrder[1].ChangesPerK <= 3.5 &&
 		lowOrder[2].ChangesPerK <= 2.0
 	r := report{
-		Seed:         *seed,
-		SampleStep:   *step,
-		LowGradient:  lowOrder,
-		Rapids:       rapidOrder,
-		TotalRises:   totalRises,
-		TotalDry:     totalDry,
-		StrictPassed: pass,
+		Seed:                    *seed,
+		SampleStep:              *step,
+		LowGradient:             lowOrder,
+		Rapids:                  rapidOrder,
+		TotalRises:              totalRises,
+		TotalDry:                totalDry,
+		MaxAdjacentWaterStep:    maxAdjacentStep,
+		AdjacentStepViolations:  adjacentStepViolations,
+		LakeFeeders:             lakeFeeders,
+		DisconnectedLakeFeeders: disconnectedLakeFeeders,
+		StrictPassed:            pass,
 	}
 	data, _ := json.MarshalIndent(r, "", "  ")
 	fmt.Println(string(data))
 	if *strict && !pass {
 		os.Exit(1)
 	}
+}
+
+func auditAdjacentWaterSteps(m *generator.WorldModel) (int, int) {
+	// Minecraft only materializes integer X/Z columns. Build a dense set of
+	// integer centerline cells, then compare only face-adjacent block columns.
+	// Continuous half-block samples can cross two quantization thresholds at
+	// once and report a fake two-block "wall" that no MC column pair contains.
+	cells := make(map[[2]int]struct{})
+	for _, seg := range m.Waterbed.Rivers {
+		chord := math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0)
+		pathUpperBound := chord + math.Pi*math.Abs(seg.MeanderOffset)
+		steps := maxInt(1, int(math.Ceil(pathUpperBound/0.5)))
+		for j := 0; j <= steps; j++ {
+			t := float64(j) / float64(steps)
+			x, z := riverCenter(seg, t)
+			ix, iz := int(math.Round(x)), int(math.Round(z))
+			cells[[2]int{ix, iz}] = struct{}{}
+			// Include a one-block collar so diagonal rasterization and junction
+			// ownership are checked on the same face-adjacent columns MC uses.
+			cells[[2]int{ix + 1, iz}] = struct{}{}
+			cells[[2]int{ix - 1, iz}] = struct{}{}
+			cells[[2]int{ix, iz + 1}] = struct{}{}
+			cells[[2]int{ix, iz - 1}] = struct{}{}
+		}
+	}
+
+	maxStep := 0
+	violations := 0
+	for cell := range cells {
+		current := m.Runtime.Sample(float64(cell[0]), float64(cell[1]))
+		if !runtimeWater(current) {
+			continue
+		}
+		currentY := minecraftWaterY(current.WaterSurfaceElevation)
+		for _, direction := range [][2]int{{1, 0}, {0, 1}} {
+			nx := cell[0] + direction[0]
+			nz := cell[1] + direction[1]
+			neighbor := m.Runtime.Sample(float64(nx), float64(nz))
+			if !runtimeWater(neighbor) {
+				continue
+			}
+			neighborY := minecraftWaterY(neighbor.WaterSurfaceElevation)
+			d := currentY - neighborY
+			if d < 0 {
+				d = -d
+			}
+			if d > maxStep {
+				maxStep = d
+			}
+			if d > 1 {
+				violations++
+			}
+		}
+	}
+	return maxStep, violations
+}
+
+func runtimeWater(s worldsample.Sample) bool {
+	return s.WaterSurfaceDefined &&
+		(s.WaterKind == reconcile.WaterRiver ||
+			s.WaterKind == reconcile.WaterLake ||
+			s.WaterKind == reconcile.WaterOcean)
+}
+
+func auditLakeFeeders(m *generator.WorldModel) (int, int) {
+	if m == nil || m.Hydrology == nil ||
+		m.Reconciliation == nil || m.Waterbed == nil {
+		return 0, 0
+	}
+	pair := make(map[[2]int]int, len(m.Waterbed.Rivers))
+	outgoing := make(map[int][]int)
+	for id, seg := range m.Waterbed.Rivers {
+		pair[[2]int{seg.From, seg.To}] = id
+		outgoing[seg.From] = append(outgoing[seg.From], id)
+	}
+
+	feeders := 0
+	disconnected := 0
+	for _, edge := range m.Reconciliation.RiverEdges {
+		if edge.From < 0 || edge.From >= len(m.Hydrology.LakeID) ||
+			edge.To < 0 || edge.To >= len(m.Hydrology.LakeID) {
+			continue
+		}
+		lakeID := m.Hydrology.LakeID[edge.To]
+		if lakeID <= 0 || m.Hydrology.LakeID[edge.From] == lakeID {
+			continue
+		}
+		feeders++
+		start, ok := pair[[2]int{edge.From, edge.To}]
+		if !ok || !riverGraphTouchesLake(m, start, lakeID, outgoing) {
+			disconnected++
+		}
+	}
+	return feeders, disconnected
+}
+
+func riverGraphTouchesLake(
+	m *generator.WorldModel,
+	start int,
+	lakeID int,
+	outgoing map[int][]int,
+) bool {
+	queue := []int{start}
+	visited := make(map[int]bool)
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		if id < 0 || id >= len(m.Waterbed.Rivers) || visited[id] {
+			continue
+		}
+		visited[id] = true
+		seg := m.Waterbed.Rivers[id]
+		length := math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0)
+		steps := maxInt(1, int(math.Ceil(length/4)))
+		for j := 0; j <= steps; j++ {
+			t := float64(j) / float64(steps)
+			x, z := riverCenter(seg, t)
+			s := m.Runtime.Sample(x, z)
+			if s.WaterKind == reconcile.WaterLake &&
+				sampleBelongsToLake(m, x, z, lakeID) {
+				return true
+			}
+		}
+		for _, next := range outgoing[seg.To] {
+			if !visited[next] {
+				queue = append(queue, next)
+			}
+		}
+	}
+	return false
+}
+
+func sampleBelongsToLake(
+	m *generator.WorldModel,
+	x,
+	z float64,
+	lakeID int,
+) bool {
+	g := m.Waterbed.Geometry
+	spacingX := g.SpacingX()
+	spacingZ := g.SpacingZ()
+	if spacingX <= 0 || spacingZ <= 0 {
+		return false
+	}
+	gx := int(math.Round((x - g.OriginX) / spacingX))
+	gz := int(math.Round((z - g.OriginZ) / spacingZ))
+	if gx < 0 || gx >= g.Width || gz < 0 || gz >= g.Height {
+		return false
+	}
+	index := gz*g.Width + gx
+	return index >= 0 &&
+		index < len(m.Hydrology.LakeID) &&
+		m.Hydrology.LakeID[index] == lakeID
 }
 
 func widthBucket(halfWidth float64) string {

@@ -345,12 +345,10 @@ public final class Minecraft26_3BiomeRealizer {
                 tags.add(Minecraft26_3BiomeCatalog.Tag.PODZOLIC);
             case "Alluvial Silt" ->
                 tags.add(Minecraft26_3BiomeCatalog.Tag.ALLUVIAL);
-            case "Wet Mud" -> {
+            case "Wet Mud" ->
+                // Wet alluvium is common beside rivers, but it does not turn
+                // the surrounding climate biome into a swamp by itself.
                 tags.add(Minecraft26_3BiomeCatalog.Tag.WET);
-                if (tags.contains(Minecraft26_3BiomeCatalog.Tag.FLOODPLAIN)) {
-                    tags.add(Minecraft26_3BiomeCatalog.Tag.WETLAND);
-                }
-            }
             case "Peat" -> {
                 tags.add(Minecraft26_3BiomeCatalog.Tag.PEATY);
                 tags.add(Minecraft26_3BiomeCatalog.Tag.WET);
@@ -394,10 +392,10 @@ public final class Minecraft26_3BiomeRealizer {
             }
         }
 
-        if (tags.contains(Minecraft26_3BiomeCatalog.Tag.FLOODPLAIN) &&
-            precip >= 1250.0) {
-            tags.add(Minecraft26_3BiomeCatalog.Tag.WETLAND);
-        }
+        // Floodplains remain the surrounding climate biome unless the
+        // ecological model itself selected Wetland (or peat/wetland vegetation
+        // added the tag above). High rainfall alone must not make every major
+        // river corridor a Minecraft swamp.
         if (nearOcean(model, x, z, 96.0)) {
             tags.add(Minecraft26_3BiomeCatalog.Tag.COASTAL);
         }

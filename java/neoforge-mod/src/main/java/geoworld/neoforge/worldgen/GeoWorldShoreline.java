@@ -52,6 +52,12 @@ final class GeoWorldShoreline {
         String waterKind
     ) {}
 
+    private record WetlandPond(
+        int waterBoundary,
+        boolean inside,
+        boolean rim
+    ) {}
+
     private GeoWorldShoreline() {}
 
     static ChunkPlan planChunk(
@@ -161,50 +167,62 @@ final class GeoWorldShoreline {
             );
         }
 
-        WaterNeighbor shore = findNearestWater(neighborhood);
-        if (
-            isWetlandPool(
-                center,
-                neighborhood,
-                shore,
-                seed,
-                worldX,
-                worldZ,
-                originalGround
-            )
-        ) {
-            // Wetlands are not uniformly mud flats. Carve coherent one-block
-            // shallow pools into already-flat wetland ground; macro Hydrology
-            // remains responsible for true rivers/lakes.
+        WetlandPond wetlandPond = findWetlandPond(
+            neighborhood,
+            seed,
+            worldX,
+            worldZ
+        );
+        if (wetlandPond != null && wetlandPond.inside()) {
+            // A pond uses one shared water boundary across its 3x3 basin.
+            // The bed is exactly one block below that surface; the surrounding
+            // one-block rim is planned by the same deterministic pond spec.
             return new Column(
                 center,
                 originalGround,
-                originalGround - 1,
-                originalGround,
+                wetlandPond.waterBoundary() - 1,
+                wetlandPond.waterBoundary(),
                 Integer.MAX_VALUE,
                 "WetlandPool",
-                originalGround,
+                wetlandPond.waterBoundary(),
                 false,
                 "minecraft:mud",
                 "minecraft:dirt"
             );
         }
+
+        WaterNeighbor shore = findNearestWater(neighborhood);
         if (shore == null) {
+            int dryGround = originalGround;
+            boolean pondRimRaised =
+                wetlandPond != null &&
+                wetlandPond.rim() &&
+                dryGround < wetlandPond.waterBoundary();
+            if (pondRimRaised) {
+                dryGround = wetlandPond.waterBoundary();
+            }
             return new Column(
                 center,
                 originalGround,
-                originalGround,
-                ownWater,
+                dryGround,
+                dryGround,
                 Integer.MAX_VALUE,
                 "None",
-                originalGround,
+                dryGround,
                 false,
-                null,
-                null
+                pondRimRaised ? "minecraft:mud" : null,
+                pondRimRaised ? "minecraft:dirt" : null
             );
         }
 
         int adjustedGround = originalGround;
+        boolean wetlandRimRaised =
+            wetlandPond != null &&
+            wetlandPond.rim() &&
+            adjustedGround < wetlandPond.waterBoundary();
+        if (wetlandRimRaised) {
+            adjustedGround = wetlandPond.waterBoundary();
+        }
         boolean shallowFringe = false;
         int deltaToWater = originalGround - shore.waterBoundary();
 
@@ -264,8 +282,10 @@ final class GeoWorldShoreline {
             littoralShelf = adjustedGround == shore.waterBoundary();
         }
 
-        String surface = null;
-        String under = null;
+        String surface =
+            wetlandRimRaised ? "minecraft:mud" : null;
+        String under =
+            wetlandRimRaised ? "minecraft:dirt" : null;
         int materialWidth = materialBandWidth(shore.waterKind());
         int verticalOffset = adjustedGround - shore.waterBoundary();
         if (
@@ -282,7 +302,7 @@ final class GeoWorldShoreline {
                 worldX,
                 worldZ
             );
-            if (material != null) {
+            if (material != null && !wetlandRimRaised) {
                 surface = material;
                 under = underMaterial(material);
             }
@@ -304,61 +324,158 @@ final class GeoWorldShoreline {
         );
     }
 
-    private static boolean isWetlandPool(
-        GeoWorldV1.RuntimeSample center,
+    private static WetlandPond findWetlandPond(
         Neighborhood neighborhood,
-        WaterNeighbor shore,
+        long seed,
+        int worldX,
+        int worldZ
+    ) {
+        final int spacing = 10;
+        final int anchorOffset = spacing / 2;
+        int cellX = Math.floorDiv(worldX - anchorOffset, spacing);
+        int cellZ = Math.floorDiv(worldZ - anchorOffset, spacing);
+
+        for (int azCell = cellZ - 1; azCell <= cellZ + 1; azCell++) {
+            int anchorZ = azCell * spacing + anchorOffset;
+            int relZ = worldZ - anchorZ;
+            if (Math.abs(relZ) > 2) {
+                continue;
+            }
+            for (int axCell = cellX - 1; axCell <= cellX + 1; axCell++) {
+                int anchorX = axCell * spacing + anchorOffset;
+                int relX = worldX - anchorX;
+                if (Math.abs(relX) > 2) {
+                    continue;
+                }
+
+                Integer waterBoundary = wetlandPondBoundary(
+                    neighborhood,
+                    seed,
+                    worldX,
+                    worldZ,
+                    anchorX,
+                    anchorZ
+                );
+                if (waterBoundary == null) {
+                    continue;
+                }
+
+                int maxAbs = Math.max(
+                    Math.abs(relX),
+                    Math.abs(relZ)
+                );
+                if (maxAbs <= 1) {
+                    return new WetlandPond(
+                        waterBoundary,
+                        true,
+                        false
+                    );
+                }
+                if (maxAbs == 2) {
+                    return new WetlandPond(
+                        waterBoundary,
+                        false,
+                        true
+                    );
+                }
+            }
+        }
+        return null;
+    }
+
+    private static Integer wetlandPondBoundary(
+        Neighborhood neighborhood,
         long seed,
         int worldX,
         int worldZ,
-        int originalGround
+        int anchorX,
+        int anchorZ
     ) {
-        boolean wetland =
-            "Wetland".equals(center.biomeFamily()) ||
-            "Wet Mud".equals(center.surfaceProfile()) ||
-            "Peat".equals(center.surfaceProfile());
-        if (!wetland || isRocky(center)) {
-            return false;
-        }
-        if (shore != null && shore.distance() <= 2) {
-            return false;
-        }
-
-        // Pools belong on flat/very gently undulating marsh ground. Avoid
-        // punching water pockets into a two-block local slope.
-        int maxDelta = 0;
-        for (int[] offset : new int[][]{
-            {1, 0}, {-1, 0}, {0, 1}, {0, -1},
-            {2, 0}, {-2, 0}, {0, 2}, {0, -2}
-        }) {
-            int nearby = HEIGHTS.boundaryY(
-                neighborhood.sample(
-                    offset[0],
-                    offset[1]
-                ).groundHeight()
-            );
-            maxDelta = Math.max(
-                maxDelta,
-                Math.abs(nearby - originalGround)
-            );
-        }
-        if (maxDelta > 1) {
-            return false;
+        int anchorDX = anchorX - worldX;
+        int anchorDZ = anchorZ - worldZ;
+        GeoWorldV1.RuntimeSample anchor =
+            neighborhood.sample(anchorDX, anchorDZ);
+        if (
+            !isWetGround(anchor) ||
+            isRocky(anchor) ||
+            isWater(anchor)
+        ) {
+            return null;
         }
 
-        double broad = smoothValueNoise(
-            seed ^ 0x5745544C414E4450L,
-            worldX,
-            worldZ,
-            68.0
-        );
-        double detail = smoothValueNoise(
-            seed ^ 0x5348414C4C4F5750L,
-            worldX,
-            worldZ,
-            27.0
-        );
-        return broad > 0.57 && detail > 0.34;
+        // Terrain/wetness already make valid basins irregular. Use one
+        // uniform deterministic density gate instead of stacking smooth-noise
+        // thresholds that accidentally rejected almost every real basin.
+        if (
+            hashUnit(
+                seed ^ 0x5745544C414E4450L,
+                anchorX,
+                anchorZ
+            ) > 0.65
+        ) {
+            return null;
+        }
+
+        int wetInterior = 0;
+        int minGround = Integer.MAX_VALUE;
+        int maxGround = Integer.MIN_VALUE;
+        for (int dz = -1; dz <= 1; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                GeoWorldV1.RuntimeSample sample = neighborhood.sample(
+                    anchorDX + dx,
+                    anchorDZ + dz
+                );
+                if (isWater(sample) || isRocky(sample)) {
+                    return null;
+                }
+                if (isWetGround(sample)) {
+                    wetInterior++;
+                }
+                int ground = HEIGHTS.boundaryY(
+                    sample.groundHeight()
+                );
+                minGround = Math.min(minGround, ground);
+                maxGround = Math.max(maxGround, ground);
+            }
+        }
+        if (wetInterior < 5 || maxGround - minGround > 1) {
+            return null;
+        }
+
+        // Use the highest interior ground as the common water boundary. Lower
+        // interior cells need no excavation; higher cells are carved by one
+        // block. A one-block-low outer rim can be raised by the planner, but a
+        // deeper escape route rejects the pond.
+        int waterBoundary = maxGround;
+        for (int dz = -2; dz <= 2; dz++) {
+            for (int dx = -2; dx <= 2; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dz)) != 2) {
+                    continue;
+                }
+                GeoWorldV1.RuntimeSample sample = neighborhood.sample(
+                    anchorDX + dx,
+                    anchorDZ + dz
+                );
+                if (isWater(sample)) {
+                    return null;
+                }
+                int ground = HEIGHTS.boundaryY(
+                    sample.groundHeight()
+                );
+                if (ground < waterBoundary - 1) {
+                    return null;
+                }
+            }
+        }
+        return waterBoundary;
+    }
+
+    private static boolean isWetGround(
+        GeoWorldV1.RuntimeSample sample
+    ) {
+        return "Wetland".equals(sample.biomeFamily()) ||
+            "Wet Mud".equals(sample.surfaceProfile()) ||
+            "Peat".equals(sample.surfaceProfile());
     }
 
     private static WaterNeighbor findNearestWater(

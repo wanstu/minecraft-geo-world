@@ -92,16 +92,29 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		return out
 	}
 
+	riverSurface, riverDepth, riverValid :=
+		m.riverWaterSurface(ground)
+
 	// Ocean requires both continuous below-sea terrain and continuous macro
-	// ocean eligibility. This keeps enclosed below-sea land dry unless Hydrology
-	// explicitly turns it into a lake.
+	// ocean eligibility. Near a river mouth, however, do not let the ocean
+	// classification cut in while the supported river surface is still more
+	// than one Minecraft block above sea level. The river profile already
+	// limits longitudinal descent to <=1 block per horizontal block, so delaying
+	// handoff until this threshold removes multi-block source-water lips without
+	// extending the river arbitrarily far offshore.
 	if oceanEligibility >= m.Config.OceanEligibilityThreshold &&
 		ground.FinalHeight < m.SeaLevelNormalized {
-		out.WaterKind = reconcile.WaterOcean
-		out.WaterSurfaceDefined = true
-		out.WaterSurfaceElevation = m.SeaLevelNormalized
-		out.WaterDepth = m.SeaLevelNormalized - ground.FinalHeight
-		return out
+		oneBlock := normalizedBlockStepAbove(
+			m.SeaLevelNormalized,
+		)
+		if !riverValid ||
+			riverSurface <= m.SeaLevelNormalized+oneBlock {
+			out.WaterKind = reconcile.WaterOcean
+			out.WaterSurfaceDefined = true
+			out.WaterSurfaceElevation = m.SeaLevelNormalized
+			out.WaterDepth = m.SeaLevelNormalized - ground.FinalHeight
+			return out
+		}
 	}
 
 	// River water starts with a constant center depth. If a downstream
@@ -109,53 +122,57 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	// receiving datum upstream only as far as needed and Runtime applies it as a
 	// flat backwater floor. The channel cross-section still owns where that water
 	// can exist, so the floor does not flood the surrounding broad terrain.
-	if ground.WaterKind == reconcile.WaterRiver && ground.RiverWeight > 0 {
-		// River size is already encoded by Waterbed half-width. Make the main
-		// stem physically deeper than headwater tributaries while preserving the
-		// same smoothly tapered banks.
-		widthSpan := math.Max(
-			1e-9,
-			m.Ground.Config.MaxRiverHalfWidthBlocks-
-				m.Ground.Config.MinRiverHalfWidthBlocks,
-		)
-		widthT := math.Max(
-			0,
-			math.Min(
-				1,
-				(ground.RiverHalfWidth-m.Ground.Config.MinRiverHalfWidthBlocks)/
-					widthSpan,
-			),
-		)
-		centerDepth := m.Config.RiverCenterDepthNormalized *
-			(1 + 2*math.Pow(widthT, 1.15))
-		// A real river cross-section has an approximately level water surface;
-		// depth changes toward the bank because the bed rises, not because the
-		// water plane itself tilts sideways. Use the centerline bed to define one
-		// local datum and let the carved bank decide where that datum intersects
-		// terrain.
-		if ground.RiverBedDefined {
-			surface := ground.RiverBedElevation + centerDepth
-			if ground.RiverReceiverSurfaceDefined &&
-				ground.RiverReceiverSurface > surface &&
-				ground.RiverReceiverWeight > 0 {
-				// Receiver backwater is a floor, not a downstream ramp.
-				// Waterbed has already propagated the datum only through
-				// segments whose natural surface lies below the receiver.
-				surface = ground.RiverReceiverSurface
-			}
-			surface = math.Min(1, surface)
-			localDepth := surface - ground.FinalHeight
-			// Minecraft renders whole water blocks. Keep sub-block-thin fringe
-			// dry, but never slope the water plane toward the bank.
-			if localDepth >= m.Config.MinRiverWaterDepthNormalized {
-				out.WaterKind = reconcile.WaterRiver
-				out.WaterSurfaceDefined = true
-				out.WaterSurfaceElevation = surface
-				out.WaterDepth = localDepth
-			}
-		}
+	if riverValid {
+		out.WaterKind = reconcile.WaterRiver
+		out.WaterSurfaceDefined = true
+		out.WaterSurfaceElevation = riverSurface
+		out.WaterDepth = riverDepth
 	}
 	return out
+}
+
+func (m *Model) riverWaterSurface(
+	ground waterbed.Sample,
+) (float64, float64, bool) {
+	if ground.WaterKind != reconcile.WaterRiver ||
+		ground.RiverWeight <= 0 ||
+		!ground.RiverBedDefined {
+		return 0, 0, false
+	}
+	widthSpan := math.Max(
+		1e-9,
+		m.Ground.Config.MaxRiverHalfWidthBlocks-
+			m.Ground.Config.MinRiverHalfWidthBlocks,
+	)
+	widthT := math.Max(
+		0,
+		math.Min(
+			1,
+			(ground.RiverHalfWidth-m.Ground.Config.MinRiverHalfWidthBlocks)/
+				widthSpan,
+		),
+	)
+	centerDepth := m.Config.RiverCenterDepthNormalized *
+		(1 + 2*math.Pow(widthT, 1.15))
+	surface := ground.RiverBedElevation + centerDepth
+	if ground.RiverReceiverSurfaceDefined &&
+		ground.RiverReceiverSurface > surface &&
+		ground.RiverReceiverWeight > 0 {
+		surface = ground.RiverReceiverSurface
+	}
+	surface = math.Min(1, surface)
+	localDepth := surface - ground.FinalHeight
+	if localDepth < m.Config.MinRiverWaterDepthNormalized {
+		return 0, 0, false
+	}
+	return surface, localDepth, true
+}
+
+func normalizedBlockStepAbove(height float64) float64 {
+	if height < 0.5 {
+		return 1.0 / 254.0
+	}
+	return 1.0 / 514.0
 }
 
 func normalizeConfig(cfg Config) (Config, error) {
