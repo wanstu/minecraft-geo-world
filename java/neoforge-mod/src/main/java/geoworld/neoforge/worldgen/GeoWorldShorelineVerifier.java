@@ -20,7 +20,9 @@ public final class GeoWorldShorelineVerifier {
         {9769, -474},
         {7245, -4708},
         {2023, -2985},
-        {10883, -1293}
+        {2100, -3010},
+        {10883, -1293},
+        {10325, 2673}
     };
     private static final Set<String> SUGAR_CANE_SUBSTRATES = Set.of(
         "minecraft:grass_block",
@@ -92,6 +94,8 @@ public final class GeoWorldShorelineVerifier {
         int materialEdges = 0;
         int materialChanges = 0;
         int narrowBackshoreGrooves = 0;
+        int smallBackshorePits = 0;
+        int oceanBackshoreStepViolations = 0;
         int pointPlanMismatches = 0;
         Map<String, Integer> waterKinds = new LinkedHashMap<>();
         Map<String, Integer> maxRaiseByKind = new LinkedHashMap<>();
@@ -149,6 +153,36 @@ public final class GeoWorldShorelineVerifier {
                                 if (grooveX || grooveZ) {
                                     narrowBackshoreGrooves++;
                                 }
+                            }
+                            if (
+                                isSmallBackshorePit(
+                                    centerColumn,
+                                    plan.column(localX - 1, localZ),
+                                    plan.column(localX + 1, localZ),
+                                    plan.column(localX, localZ - 1),
+                                    plan.column(localX, localZ + 1)
+                                )
+                            ) {
+                                smallBackshorePits++;
+                            }
+                            if (
+                                "None".equals(
+                                    centerColumn.sample().waterKind()
+                                ) &&
+                                "Ocean".equals(
+                                    centerColumn.shoreWaterKind()
+                                ) &&
+                                centerColumn.shoreDistance() >= 1 &&
+                                centerColumn.shoreDistance() <= 3
+                            ) {
+                                oceanBackshoreStepViolations +=
+                                    oceanBackshoreViolations(
+                                        centerColumn,
+                                        plan.column(localX - 1, localZ),
+                                        plan.column(localX + 1, localZ),
+                                        plan.column(localX, localZ - 1),
+                                        plan.column(localX, localZ + 1)
+                                    );
                             }
                         }
                     }
@@ -340,7 +374,8 @@ public final class GeoWorldShorelineVerifier {
             "shallowFringes=%d, shelves=%d, materials=%d, caneReady=%d/%d, " +
             "maxLowering=%d, maxRaising=%d at %d,%d %s (%d->%d), " +
             "raiseBuckets=[1:%d,2-3:%d,4+:%d], materialChanges=%d/%d, " +
-            "narrowBackshoreGrooves=%d, pointPlanMismatches=%d, " +
+            "narrowBackshoreGrooves=%d, smallBackshorePits=%d, " +
+            "oceanBackshoreStepViolations=%d, pointPlanMismatches=%d, " +
             "kinds=%s, maxByKind=%s%n",
             SEED,
             immediate,
@@ -363,6 +398,8 @@ public final class GeoWorldShorelineVerifier {
             materialChanges,
             materialEdges,
             narrowBackshoreGrooves,
+            smallBackshorePits,
+            oceanBackshoreStepViolations,
             pointPlanMismatches,
             waterKinds,
             maxRaiseByKind
@@ -389,17 +426,34 @@ public final class GeoWorldShorelineVerifier {
                 narrowBackshoreGrooves
             );
         }
+        if (smallBackshorePits != 0) {
+            throw new AssertionError(
+                "shore planner left small backshore pits: " +
+                smallBackshorePits
+            );
+        }
+        if (oceanBackshoreStepViolations != 0) {
+            throw new AssertionError(
+                "ocean backshore did not smooth inward: " +
+                oceanBackshoreStepViolations
+            );
+        }
         if (pointPlanMismatches != 0) {
             throw new AssertionError(
                 "chunk and point shoreline plans disagree: " +
                 pointPlanMismatches
             );
         }
-        if (maxRaising > 2) {
+        if (
+            maxRaiseByKind.getOrDefault("River", 0) > 2 ||
+            maxRaiseByKind.getOrDefault("Lake", 0) > 2 ||
+            maxRaiseByKind.getOrDefault("Ocean", 0) > 3
+        ) {
             throw new AssertionError(
-                "shore stability would create an artificial levee: max raise=" +
+                "shore stability exceeded per-water-body raise cap: max raise=" +
                 maxRaising + " at " + maxRaiseX + "," + maxRaiseZ +
-                " kind=" + maxRaiseKind
+                " kind=" + maxRaiseKind +
+                " maxByKind=" + maxRaiseByKind
             );
         }
         for (String requiredKind : new String[]{"River", "Lake", "Ocean"}) {
@@ -763,6 +817,64 @@ public final class GeoWorldShorelineVerifier {
                 a.underOverride(),
                 b.underOverride()
             );
+    }
+
+    private static boolean isSmallBackshorePit(
+        GeoWorldShoreline.Column center,
+        GeoWorldShoreline.Column west,
+        GeoWorldShoreline.Column east,
+        GeoWorldShoreline.Column north,
+        GeoWorldShoreline.Column south
+    ) {
+        if (
+            !"None".equals(center.sample().waterKind()) ||
+            center.shoreDistance() < 2 ||
+            center.shoreDistance() > 4
+        ) {
+            return false;
+        }
+        int higherDry = 0;
+        for (GeoWorldShoreline.Column neighbor :
+            new GeoWorldShoreline.Column[]{west, east, north, south}) {
+            if (
+                "None".equals(neighbor.sample().waterKind()) &&
+                center.shoreWaterKind().equals(
+                    neighbor.shoreWaterKind()
+                ) &&
+                neighbor.groundBoundary() >
+                center.groundBoundary()
+            ) {
+                higherDry++;
+            }
+        }
+        return higherDry >= 3;
+    }
+
+    private static int oceanBackshoreViolations(
+        GeoWorldShoreline.Column center,
+        GeoWorldShoreline.Column west,
+        GeoWorldShoreline.Column east,
+        GeoWorldShoreline.Column north,
+        GeoWorldShoreline.Column south
+    ) {
+        int violations = 0;
+        for (GeoWorldShoreline.Column inland :
+            new GeoWorldShoreline.Column[]{west, east, north, south}) {
+            if (
+                !"None".equals(inland.sample().waterKind()) ||
+                !"Ocean".equals(inland.shoreWaterKind()) ||
+                inland.shoreDistance() != center.shoreDistance() + 1
+            ) {
+                continue;
+            }
+            if (
+                inland.groundBoundary() <
+                center.groundBoundary() - 1
+            ) {
+                violations++;
+            }
+        }
+        return violations;
     }
 
     private static boolean isBackshoreGroove(

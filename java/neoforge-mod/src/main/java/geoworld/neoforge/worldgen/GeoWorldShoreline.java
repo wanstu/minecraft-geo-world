@@ -65,7 +65,7 @@ final class GeoWorldShoreline {
         int baseX,
         int baseZ
     ) {
-        final int fringe = 1;
+        final int fringe = 3;
         final int radius = MAX_SHORE_DISTANCE + fringe;
         final int stride = 16 + radius * 2;
         GeoWorldV1.RuntimeSample[] samples =
@@ -100,20 +100,55 @@ final class GeoWorldShoreline {
             }
         }
 
+        Column[] grooveClosed = preliminary.clone();
+        for (int localZ = -2; localZ <= 17; localZ++) {
+            for (int localX = -2; localX <= 17; localX++) {
+                int index =
+                    (localZ + fringe) * plannedStride +
+                    (localX + fringe);
+                grooveClosed[index] = closeNarrowBackshoreGroove(
+                    preliminary[index],
+                    preliminary[index - 1],
+                    preliminary[index + 1],
+                    preliminary[index - plannedStride],
+                    preliminary[index + plannedStride]
+                );
+            }
+        }
+
+        Column[] pitClosed = grooveClosed.clone();
+        for (int localZ = -1; localZ <= 16; localZ++) {
+            for (int localX = -1; localX <= 16; localX++) {
+                int index =
+                    (localZ + fringe) * plannedStride +
+                    (localX + fringe);
+                pitClosed[index] = closeSmallBackshorePit(
+                    grooveClosed[index],
+                    grooveClosed[index - 1],
+                    grooveClosed[index + 1],
+                    grooveClosed[index - plannedStride],
+                    grooveClosed[index + plannedStride]
+                );
+            }
+        }
+
         ChunkPlan result = new ChunkPlan();
         for (int localZ = 0; localZ < 16; localZ++) {
             for (int localX = 0; localX < 16; localX++) {
                 int index =
                     (localZ + fringe) * plannedStride +
                     (localX + fringe);
+                Column once = pitClosed[index];
                 result.columns[localZ * 16 + localX] =
-                    closeNarrowBackshoreGroove(
-                        preliminary[index],
-                        preliminary[index - 1],
-                        preliminary[index + 1],
-                        preliminary[index - plannedStride],
-                        preliminary[index + plannedStride]
-                    );
+                    once != grooveClosed[index]
+                        ? once
+                        : closeSmallBackshorePit(
+                            once,
+                            pitClosed[index - 1],
+                            pitClosed[index + 1],
+                            pitClosed[index - plannedStride],
+                            pitClosed[index + plannedStride]
+                        );
             }
         }
         return result;
@@ -124,7 +159,8 @@ final class GeoWorldShoreline {
         int worldX,
         int worldZ
     ) {
-        final int radius = MAX_SHORE_DISTANCE + 1;
+        final int localRadius = 3;
+        final int radius = MAX_SHORE_DISTANCE + localRadius;
         final int stride = radius * 2 + 1;
         GeoWorldV1.RuntimeSample[] samples =
             new GeoWorldV1.RuntimeSample[stride * stride];
@@ -137,58 +173,69 @@ final class GeoWorldShoreline {
             }
         }
 
+        final int localStride = localRadius * 2 + 1;
+        Column[] preliminary =
+            new Column[localStride * localStride];
         long seed = runtime.manifest().seed();
-        Column center = planCachedColumn(
-            samples,
-            stride,
-            radius,
-            radius,
-            seed,
-            worldX,
-            worldZ
-        );
-        Column west = planCachedColumn(
-            samples,
-            stride,
-            radius - 1,
-            radius,
-            seed,
-            worldX - 1,
-            worldZ
-        );
-        Column east = planCachedColumn(
-            samples,
-            stride,
-            radius + 1,
-            radius,
-            seed,
-            worldX + 1,
-            worldZ
-        );
-        Column north = planCachedColumn(
-            samples,
-            stride,
-            radius,
-            radius - 1,
-            seed,
-            worldX,
-            worldZ - 1
-        );
-        Column south = planCachedColumn(
-            samples,
-            stride,
-            radius,
-            radius + 1,
-            seed,
-            worldX,
-            worldZ + 1
-        );
-        return closeNarrowBackshoreGroove(
-            center,
-            west,
-            east,
-            north,
-            south
+        for (int dz = -localRadius; dz <= localRadius; dz++) {
+            for (int dx = -localRadius; dx <= localRadius; dx++) {
+                preliminary[
+                    (dz + localRadius) * localStride +
+                    (dx + localRadius)
+                ] = planCachedColumn(
+                    samples,
+                    stride,
+                    radius + dx,
+                    radius + dz,
+                    seed,
+                    worldX + dx,
+                    worldZ + dz
+                );
+            }
+        }
+
+        Column[] grooveClosed = preliminary.clone();
+        for (int dz = -2; dz <= 2; dz++) {
+            for (int dx = -2; dx <= 2; dx++) {
+                int index =
+                    (dz + localRadius) * localStride +
+                    (dx + localRadius);
+                grooveClosed[index] = closeNarrowBackshoreGroove(
+                    preliminary[index],
+                    preliminary[index - 1],
+                    preliminary[index + 1],
+                    preliminary[index - localStride],
+                    preliminary[index + localStride]
+                );
+            }
+        }
+
+        Column[] pitClosed = grooveClosed.clone();
+        for (int dz = -1; dz <= 1; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                int index =
+                    (dz + localRadius) * localStride +
+                    (dx + localRadius);
+                pitClosed[index] = closeSmallBackshorePit(
+                    grooveClosed[index],
+                    grooveClosed[index - 1],
+                    grooveClosed[index + 1],
+                    grooveClosed[index - localStride],
+                    grooveClosed[index + localStride]
+                );
+            }
+        }
+
+        int center = localRadius * localStride + localRadius;
+        if (pitClosed[center] != grooveClosed[center]) {
+            return pitClosed[center];
+        }
+        return closeSmallBackshorePit(
+            pitClosed[center],
+            pitClosed[center - 1],
+            pitClosed[center + 1],
+            pitClosed[center - localStride],
+            pitClosed[center + localStride]
         );
     }
 
@@ -339,6 +386,17 @@ final class GeoWorldShoreline {
                 shore.waterBoundary() - adjustedGround;
             if (remainingGap == 1) {
                 shallowFringe = true;
+            }
+        }
+
+        if ("Ocean".equals(shore.waterKind())) {
+            int oceanMinimum = oceanBackshoreMinimum(
+                shore.distance(),
+                shore.waterBoundary()
+            );
+            if (adjustedGround < oceanMinimum) {
+                adjustedGround = oceanMinimum;
+                shallowFringe = false;
             }
         }
 
@@ -656,6 +714,18 @@ final class GeoWorldShoreline {
             sample.waterSurfaceElevation() != null;
     }
 
+    private static int oceanBackshoreMinimum(
+        int shoreDistance,
+        int waterBoundary
+    ) {
+        return switch (shoreDistance) {
+            case 1, 2 -> waterBoundary;
+            case 3 -> waterBoundary - 1;
+            case 4 -> waterBoundary - 2;
+            default -> Integer.MIN_VALUE;
+        };
+    }
+
     private static Column closeNarrowBackshoreGroove(
         Column center,
         Column west,
@@ -691,6 +761,67 @@ final class GeoWorldShoreline {
         // swales remain untouched.
         target = Math.min(target, center.groundBoundary() + 1);
         target = Math.min(target, center.shoreWaterBoundary() + 1);
+        if (target <= center.groundBoundary()) {
+            return center;
+        }
+
+        return new Column(
+            center.sample(),
+            center.originalGroundBoundary(),
+            target,
+            target,
+            center.shoreDistance(),
+            center.shoreWaterKind(),
+            center.shoreWaterBoundary(),
+            center.littoralShelf(),
+            center.surfaceOverride(),
+            center.underOverride()
+        );
+    }
+
+    private static Column closeSmallBackshorePit(
+        Column center,
+        Column west,
+        Column east,
+        Column north,
+        Column south
+    ) {
+        if (
+            !"None".equals(center.sample().waterKind()) ||
+            center.shoreDistance() < 2 ||
+            center.shoreDistance() > 4
+        ) {
+            return center;
+        }
+
+        Column[] neighbors = {west, east, north, south};
+        int higherDry = 0;
+        int cap = Integer.MAX_VALUE;
+        for (Column neighbor : neighbors) {
+            if (
+                !"None".equals(neighbor.sample().waterKind()) ||
+                !center.shoreWaterKind().equals(
+                    neighbor.shoreWaterKind()
+                )
+            ) {
+                continue;
+            }
+            if (
+                neighbor.groundBoundary() >
+                center.groundBoundary()
+            ) {
+                higherDry++;
+                cap = Math.min(cap, neighbor.groundBoundary());
+            }
+        }
+        if (higherDry < 3 || cap == Integer.MAX_VALUE) {
+            return center;
+        }
+
+        int target = Math.min(
+            center.groundBoundary() + 1,
+            Math.min(cap, center.shoreWaterBoundary() + 1)
+        );
         if (target <= center.groundBoundary()) {
             return center;
         }

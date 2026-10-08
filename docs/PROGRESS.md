@@ -1932,3 +1932,52 @@ geoworld-river-navigation-audit -strict 保持：
 - BUILD SUCCESSFUL，最新 dev JAR 已部署到 HMCL 26.3。
 
 本轮只修改 Minecraft Shoreline 最终方块整形与验证，不改变 .geoworld 模型，因此 Engine cache 继续使用 v11。
+
+## 2026-10-08 · 海岸围水短缓坡与岸后短坑收口
+
+用户实机截图新增：
+- 河岸/湖岸在长槽修复后仍残留少量局部单格短坑。
+- 海岸低地未完全围住海水，且陆地侧没有向内做短距离平滑，出现平地直接面对高海面的水墙。
+
+诊断（Seed=123456）：
+- 河岸截图中心：2100,-3010。
+- 海岸截图中心：10325,2673。
+- 海岸 Runtime 陆地约 Y60~62，Ocean water boundary=Y64，因此原规则“最多抬 2 格”不足以同时围水和向内平滑。
+
+修复：
+- River / Lake 保持原 raise cap <=2。
+- Ocean 使用独立 4 格 backshore profile：
+  - distance 1~2: 至少抬到 sea water boundary
+  - distance 3: 至少 waterBoundary-1
+  - distance 4: 至少 waterBoundary-2
+- Ocean 最大允许 raise=3；不是全局放宽。
+- 新增 oceanBackshoreStepViolations：向陆地每前进 1 格，高度不得突然下降超过 1 格。
+
+岸后短坑：
+- 在原有 narrowBackshoreGroove 二阶段修复后增加 smallBackshorePit。
+- 仅处理 shore distance 2~4、同一水体岸后、至少 3 个相邻干地最终高度更高的局部单格坑。
+- 同一格通过 small-pit 规则最多抬 1 次。
+- 由于长槽闭合会产生新的邻接关系，规划扩展为有限多阶段：base -> groove close -> pit close -> one cascade pit close。
+- Chunk plan 与 point plan 都使用相同 halo/stage，确保 Heightmap/BaseColumn 一致。
+
+最新 Shoreline verifier（包含 2100,-3010 与 10325,2673）：
+- immediate=1717 / stable=1717
+- narrowBackshoreGrooves=0
+- smallBackshorePits=0
+- oceanBackshoreStepViolations=0
+- pointPlanMismatches=0
+- maxRaising=3 (Ocean)
+- maxByKind={River=2, Lake=1, Ocean=3}
+- wetland pools=254/6416 (~4.0%)
+- riverbank swampCells=0
+
+完整回归：
+- go test ./... -count=1: PASS
+- Java Golden: 15/15
+- geoworld-river-navigation-audit -strict: PASS
+- maxAdjacentWaterStepBlocks=1, violations=0
+- lakeFeeders=6, disconnectedLakeFeeders=0
+- NeoForge Engine / Spawn / BiomePreset / Shoreline: PASS
+- BUILD SUCCESSFUL，最新 dev JAR 已部署到 HMCL 26.3。
+
+本轮只修改最终 Minecraft Shoreline 方块整形与验证，不改变 .geoworld 模型，因此 Engine cache 仍使用 v11。
