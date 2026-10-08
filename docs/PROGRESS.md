@@ -1981,3 +1981,28 @@ geoworld-river-navigation-audit -strict 保持：
 - BUILD SUCCESSFUL，最新 dev JAR 已部署到 HMCL 26.3。
 
 本轮只修改最终 Minecraft Shoreline 方块整形与验证，不改变 .geoworld 模型，因此 Engine cache 仍使用 v11。
+
+## 2026-10-08 · 河流横断面水面量化修复
+
+用户在 10824,2515 附近发现河缘出现高一格的孤立 source water，并伴随局部岸线视觉缺口。
+
+诊断：
+- Runtime 河流水面本身基本同高，问题发生在 Minecraft 方块化层。
+- 原 GeoWorldShoreline.waterBoundary 对 River 使用 boundaryYCeil 后，又强制 max(mapped, groundBoundary+1)。
+- 当浅河边缘地面量化到与模型水面同一 Y boundary 时，该规则会把边缘水面抬高 1 格，形成 河边64 | 河心63 | 河边64 的横断面。
+
+修复：
+- River waterBoundary 严格服从 Runtime waterSurfaceElevation，不再为保证水深抬高水面。
+- 若河床量化后顶到水面，则将该列河床下压 1 格，保证至少一格水层。
+- findNearestWater 对 River 不再因 water<=ground 而丢失邻接水体识别。
+
+回归：
+- 新增截图回归中心 10824,2515。
+- riverWaterBoundaryModelMismatches=0。
+- riverDryVoxelColumns=0。
+- riverBedQuantizationLowers=103：这些列由“抬水面”改为“下压河床 1 格”。
+- local riverbank material gaps=0。
+- Shoreline / Biome / Engine / Spawn 全部通过。
+- go test ./... -count=1 全绿。
+
+本轮只修改最终 Minecraft voxel shoreline，不改变 .geoworld 模型，因此 cache 仍为 v11。

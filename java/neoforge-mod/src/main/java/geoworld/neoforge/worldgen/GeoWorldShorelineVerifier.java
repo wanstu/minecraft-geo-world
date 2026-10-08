@@ -1,6 +1,7 @@
 package geoworld.neoforge.worldgen;
 
 import geoworld.minecraft.v26_3common.Minecraft26_3BiomeRealizer;
+import geoworld.minecraft.v26_3common.Minecraft26_3HeightMapping;
 import geoworld.minecraft.v26_3common.Minecraft26_3ProfileMapping;
 import geoworld.neoforge.creation.GeoWorldCreationConfig;
 import geoworld.neoforge.engine.GeoWorldEngineBridge;
@@ -22,7 +23,8 @@ public final class GeoWorldShorelineVerifier {
         {2023, -2985},
         {2100, -3010},
         {10883, -1293},
-        {10325, 2673}
+        {10325, 2673},
+        {10824, 2515}
     };
     private static final Set<String> SUGAR_CANE_SUBSTRATES = Set.of(
         "minecraft:grass_block",
@@ -96,6 +98,9 @@ public final class GeoWorldShorelineVerifier {
         int narrowBackshoreGrooves = 0;
         int smallBackshorePits = 0;
         int oceanBackshoreStepViolations = 0;
+        int riverWaterBoundaryModelMismatches = 0;
+        int riverDryVoxelColumns = 0;
+        int riverBedQuantizationLowers = 0;
         int pointPlanMismatches = 0;
         Map<String, Integer> waterKinds = new LinkedHashMap<>();
         Map<String, Integer> maxRaiseByKind = new LinkedHashMap<>();
@@ -183,6 +188,44 @@ public final class GeoWorldShorelineVerifier {
                                         plan.column(localX, localZ - 1),
                                         plan.column(localX, localZ + 1)
                                     );
+                            }
+                        }
+                    }
+
+                    Minecraft26_3HeightMapping heights =
+                        new Minecraft26_3HeightMapping();
+                    for (int localZ = 0; localZ < 16; localZ++) {
+                        for (int localX = 0; localX < 16; localX++) {
+                            GeoWorldShoreline.Column riverColumn =
+                                plan.column(localX, localZ);
+                            if (
+                                "River".equals(
+                                    riverColumn.sample().waterKind()
+                                )
+                            ) {
+                                int expectedWater =
+                                    heights.boundaryYCeil(
+                                        riverColumn.sample()
+                                            .waterSurfaceElevation()
+                                    );
+                                if (
+                                    riverColumn.waterBoundary() !=
+                                    expectedWater
+                                ) {
+                                    riverWaterBoundaryModelMismatches++;
+                                }
+                                if (
+                                    riverColumn.waterBoundary() <=
+                                    riverColumn.groundBoundary()
+                                ) {
+                                    riverDryVoxelColumns++;
+                                }
+                                if (
+                                    riverColumn.groundBoundary() <
+                                    riverColumn.originalGroundBoundary()
+                                ) {
+                                    riverBedQuantizationLowers++;
+                                }
                             }
                         }
                     }
@@ -369,14 +412,32 @@ public final class GeoWorldShorelineVerifier {
             }
         }
 
+        int localRiverMaterialGaps = 0;
+        for (int z = 2515 - 48; z <= 2515 + 48; z++) {
+            for (int x = 10824 - 48; x <= 10824 + 48; x++) {
+                GeoWorldShoreline.Column column =
+                    GeoWorldShoreline.plan(runtime, x, z);
+                if (
+                    "None".equals(column.sample().waterKind()) &&
+                    "River".equals(column.shoreWaterKind()) &&
+                    column.shoreDistance() == 1 &&
+                    column.surfaceOverride() == null
+                ) {
+                    localRiverMaterialGaps++;
+                }
+            }
+        }
+
         System.out.printf(
             "GeoWorld shoreline scan: seed=%d, immediate=%d, stable=%d, " +
             "shallowFringes=%d, shelves=%d, materials=%d, caneReady=%d/%d, " +
             "maxLowering=%d, maxRaising=%d at %d,%d %s (%d->%d), " +
             "raiseBuckets=[1:%d,2-3:%d,4+:%d], materialChanges=%d/%d, " +
             "narrowBackshoreGrooves=%d, smallBackshorePits=%d, " +
-            "oceanBackshoreStepViolations=%d, pointPlanMismatches=%d, " +
-            "kinds=%s, maxByKind=%s%n",
+            "oceanBackshoreStepViolations=%d, " +
+            "riverWaterBoundaryModelMismatches=%d, " +
+            "riverDryVoxelColumns=%d, riverBedQuantizationLowers=%d, " +
+            "pointPlanMismatches=%d, kinds=%s, maxByKind=%s%n",
             SEED,
             immediate,
             stable,
@@ -400,6 +461,9 @@ public final class GeoWorldShorelineVerifier {
             narrowBackshoreGrooves,
             smallBackshorePits,
             oceanBackshoreStepViolations,
+            riverWaterBoundaryModelMismatches,
+            riverDryVoxelColumns,
+            riverBedQuantizationLowers,
             pointPlanMismatches,
             waterKinds,
             maxRaiseByKind
@@ -436,6 +500,24 @@ public final class GeoWorldShorelineVerifier {
             throw new AssertionError(
                 "ocean backshore did not smooth inward: " +
                 oceanBackshoreStepViolations
+            );
+        }
+        if (localRiverMaterialGaps != 0) {
+            throw new AssertionError(
+                "riverbank regression window contains material gaps: " +
+                localRiverMaterialGaps
+            );
+        }
+        if (riverWaterBoundaryModelMismatches != 0) {
+            throw new AssertionError(
+                "river voxel water surface diverged from Runtime model: " +
+                riverWaterBoundaryModelMismatches
+            );
+        }
+        if (riverDryVoxelColumns != 0) {
+            throw new AssertionError(
+                "Runtime river columns lost their voxel water layer: " +
+                riverDryVoxelColumns
             );
         }
         if (pointPlanMismatches != 0) {

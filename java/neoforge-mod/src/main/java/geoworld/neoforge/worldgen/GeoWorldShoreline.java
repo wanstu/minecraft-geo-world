@@ -278,8 +278,14 @@ final class GeoWorldShoreline {
         int mapped = "River".equals(sample.waterKind())
             ? HEIGHTS.boundaryYCeil(sample.waterSurfaceElevation())
             : HEIGHTS.boundaryY(sample.waterSurfaceElevation());
+
+        // A river's free surface belongs to the hydrology model. Do not raise
+        // it merely because voxel quantization maps a shallow riverbed onto
+        // the same Y boundary. Doing that creates one-block-high source-water
+        // lips along the banks. River columns lower the bed by one block when
+        // needed instead, preserving a flat cross-section water plane.
         if ("River".equals(sample.waterKind())) {
-            mapped = Math.max(mapped, groundBoundary + 1);
+            return mapped;
         }
         return Math.max(groundBoundary, mapped);
     }
@@ -295,10 +301,17 @@ final class GeoWorldShoreline {
         int ownWater = waterBoundary(center, originalGround);
 
         if (isWater(center)) {
+            int waterGround = originalGround;
+            if (
+                "River".equals(center.waterKind()) &&
+                ownWater <= waterGround
+            ) {
+                waterGround = ownWater - 1;
+            }
             return new Column(
                 center,
                 originalGround,
-                originalGround,
+                waterGround,
                 ownWater,
                 0,
                 center.waterKind(),
@@ -668,7 +681,10 @@ final class GeoWorldShoreline {
         }
         int ground = HEIGHTS.boundaryY(sample.groundHeight());
         int water = waterBoundary(sample, ground);
-        if (water <= ground) {
+        if (
+            water <= ground &&
+            !"River".equals(sample.waterKind())
+        ) {
             return null;
         }
         return new WaterNeighbor(
