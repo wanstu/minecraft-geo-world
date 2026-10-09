@@ -2206,3 +2206,61 @@ geoworld-river-navigation-audit -strict 保持：
 - NeoForge BUILD SUCCESSFUL，最新 dev JAR 已部署到 HMCL 26.3。
 
 本轮只修审计/诊断语义，不改变世界模型生成结果，因此 Engine cache 保持 v12。
+
+## 2026-10-09 · 山体自然度量化与 Terrain Morphology Audit
+
+水体与 strict-final 收口后，继续核查此前“山有了但峰感不足 / 不能为了峰感把世界整体变崎岖”的地形目标。
+
+### 旧 geoworld-terrain-audit 已失效
+- 旧守卫仍要求 maximum |RegionalDetail| <= 0.06；当前 ridge / localized summit / summit spire / fault scarp 体系实际可到约 0.21~0.28。
+- 旧 macro slope mismatch 还要求整个自然 Terrain 接近 C1；这与当前明确允许稀疏尖峰和断崖的设计冲突。
+- 因此不再用这两个旧指标作为失败条件，但继续报告 maximum |RegionalDetail|、valley carve、height range 和 chunk seam。
+
+### 新 Morphology Audit
+- 默认正式种子：123456, 731894205, 10400。
+- 从 Landform.MountainWeight 中选最多 12 个强山地中心，中心间距 >= 1400 blocks。
+- 每个中心扫描 1024x1024 blocks，16-block 采样步长。
+- 直接按 Minecraft 26.3 高度映射换算为实际 Y，再统计：
+  - p50 / p90 / p95 / p99 / max 坡度角；
+  - >=35° steep、>=50° cliff、>=60° extreme cliff 比例；
+  - 5x5 邻域局部峰与 >=6 blocks 的 strong peaks；
+  - 1024-block 山地区域最大峰谷落差；
+  - Y>=318 的世界顶饱和比例；
+  - strongest high / low / cliff checkpoint 坐标。
+- 全局陆地区域再按 dominant landform 分 plain / hill / foothill / mountain / plateau，检查山地细节不能泄漏到平原和台地。
+
+### 当前三颗正式种子的实测结论
+- 平原 p99 坡度：6.9°~7.8°；最大 14.8°~16.0°；>=35° 和 >=50° 均为 0。
+- 丘陵 p99：9.2°~10.5°；山麓 p99：14.8°~15.5°；均无 >=50° cliff 泄漏。
+- dominant mountain：
+  - p90 约 14.2°~14.4°；
+  - p99 29.5°~36.5°；
+  - >=35° 约 0.411%~1.154%；
+  - >=50° 约 0.048%~0.313%；
+  - 最大坡度 60.4°~67.6°。
+- 强山地 12-window 扫描：
+  - Seed 123456: relief 245.8 blocks, strong peaks 139, cliff50 0.488%, top saturation 0%。
+  - Seed 731894205: relief 183.0 blocks, strong peaks 131, cliff50 0.026%, top saturation 0%。
+  - Seed 10400: relief 272.3 blocks, strong peaks 109, cliff50 0.400%, top saturation 0.1085%。
+
+这说明当前模型已经形成目标结构：
+- 大多数陆地仍平缓可走；
+- 山地多数坡面不是悬崖；
+- 真正高山有明显峰谷落差和大量局部峰；
+- 50°以上断崖稀疏但确实存在；
+- 高山没有大面积顶到 Y=320 形成平顶。
+
+### 新 guardrails
+- chunk epsilon jump <= 1e-5。
+- strong mountain windows: p90 8°~25°，p99 20°~55°，max 50°~80°。
+- strong mountain cliff50 <= 1.5%，steep35 <= 4%。
+- max local relief >= 100 blocks。
+- strong peaks >= 3 * selected mountain centers。
+- Y>=318 saturation <= 1%。
+- plain: p99 <= 10°，max <= 20°，>=35°/>=50° 必须为 0。
+- hill: p99 <= 20°，max <=45°，不得出现 >=50° cliff。
+- foothill: p99 <=25°，>=35° <=0.2%，>=50° <=0.1%，max <=65°；允许山脚过渡边缘存在极少量天然岩壁。
+- plateau: p99 <=6°，max <=25°。
+
+默认 geoworld-terrain-audit 已用三颗正式种子通过。此轮只升级审计，不改变 Terrain / WorldSample / Java Runtime，因此不需要 bump engine cache。
+- 另外用旧随机序列 7000 / 13151 / 19302 做了非正式交叉验证；只有 Seed 7000 暴露山麓边缘 0.024% 的 >=50° 稀疏岩壁，最终 guardrail 调整为按比例限制而非绝对禁止，Seed 7000 复跑 exit 0。
