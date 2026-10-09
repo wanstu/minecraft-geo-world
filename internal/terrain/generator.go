@@ -248,15 +248,15 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	// ridge-only term made elevated crests, but from eye level they could still
 	// read as long rounded backs rather than individual peaks.
 	peakBlob := cellularPeak(m.Config.Seed+547, worldX, worldZ, 720)
-	localizedSummit := math.Pow(peakBlob, 3.8) *
-		smoothstep01(0.44, 0.82, crest) * 0.115
+	localizedSummit := math.Pow(peakBlob, 4.2) *
+		smoothstep01(0.44, 0.82, crest) * 0.125
 
 	// A second, much tighter summit field adds true peak cores. It is gated by
 	// the already-derived ridge crest, so it cannot create isolated spikes on
 	// plains or outside the mountain belt.
 	peakCore := cellularPeak(m.Config.Seed+571, worldX, worldZ, 420)
-	summitSpire := math.Pow(peakCore, 5.2) *
-		smoothstep01(0.58, 0.88, crest) * 0.095
+	summitSpire := math.Pow(peakCore, 5.8) *
+		smoothstep01(0.56, 0.86, crest) * 0.110
 
 	// Natural mountain belts also contain occasional fault scarps / cliff
 	// faces. A sharp but continuous step across a low-frequency structural
@@ -272,10 +272,10 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		1700,
 	)
 	cliffGate :=
-		smoothstep01(0.58, 0.82, faultRegion) *
-			smoothstep01(0.48, 0.80, crest)
+		smoothstep01(0.56, 0.80, faultRegion) *
+			smoothstep01(0.46, 0.78, crest)
 	faultStep := smoothstep01(-0.010, 0.010, faultSignal)
-	cliffEscarpment := (faultStep - 0.5) * 0.085 * cliffGate
+	cliffEscarpment := (faultStep - 0.5) * 0.090 * cliffGate
 
 	// Low parts of the same ridge field become saddles / dry head valleys.
 	// River-cut valleys are handled separately below by the real hydrologic

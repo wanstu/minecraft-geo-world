@@ -2264,3 +2264,72 @@ geoworld-river-navigation-audit -strict 保持：
 
 默认 geoworld-terrain-audit 已用三颗正式种子通过。此轮只升级审计，不改变 Terrain / WorldSample / Java Runtime，因此不需要 bump engine cache。
 - 另外用旧随机序列 7000 / 13151 / 19302 做了非正式交叉验证；只有 Seed 7000 暴露山麓边缘 0.024% 的 >=50° 稀疏岩壁，最终 guardrail 调整为按比例限制而非绝对禁止，Seed 7000 复跑 exit 0。
+
+## 2026-10-09 · 山峰陡峭度与稀疏悬崖收口
+
+用户实机反馈：整体地形较平缓符合预期，但真正的山峰仍偏圆缓、很多可以直接走上去；希望高山有更明显峰面，并允许少量自然悬崖，同时不能把普通世界变成崎岖地形。
+
+### 诊断结论
+- 现有模型不是“完全没有悬崖”，而是不同 Seed 的山体陡峭度差异较大。
+- 640x400 形式化基线中，Seed 731894205 最平：p99 slope=28.4deg，cliff>=50deg=0.026%，明显弱于 123456 / 10400。
+- 游戏默认 320x200 居中世界复核后，三颗 Seed 都有真实陡峰，但仍保持大多数山坡可步行。
+
+### 模型调整
+只调整强 MountainWeight 区域内部形态，不抬高大范围山体基底，也不改平原/丘陵：
+- localized summit: pow 3.8 -> 4.2，amplitude 0.115 -> 0.125。
+- summit spire: pow 5.2 -> 5.8，crest gate 0.58..0.88 -> 0.56..0.86，amplitude 0.095 -> 0.110。
+- sparse fault cliff gate 稍放宽：faultRegion 0.58..0.82 -> 0.56..0.80；crest 0.48..0.80 -> 0.46..0.78。
+- cliff amplitude 0.085 -> 0.090。
+- 高山顶部 headroom compression 仍保持 0.42；曾试验 0.50，但收益很小，已撤回，避免额外压低高峰。
+
+Java Runtime Reader 同步上述参数，确保 Go / Java terrain sampling 完全一致。
+
+### Terrain Morphology Audit
+现有 geoworld-terrain-audit 已包含山体窗口、地形分类、峰谷/坡度/悬崖比例和 guardrail，本轮直接用它验收。
+
+Seed 123456（640x400）：
+- mountain window p50=4.0deg, p90=14.3deg, p99=44.7deg, max=67.6deg。
+- steep>=35deg=1.838%，cliff>=50deg=0.482%，cliff>=60deg=0.047%。
+- strong peaks=144，top>=318=0%。
+- dominant mountain category p99=37.2deg，cliff50=0.335%。
+
+Seed 731894205（640x400）：
+- mountain window p50=3.9deg, p90=13.5deg, p99=29.5deg, max=66.2deg。
+- steep>=35deg=0.424%，cliff>=50deg=0.046%，cliff>=60deg=0.010%。
+- strong peaks=136，top>=318=0%。
+- dominant mountain category p99=30.8deg，cliff50=0.075%。
+
+Seed 10400（640x400）：
+- mountain window p50=3.6deg, p90=15.8deg, p99=41.8deg, max=65.7deg。
+- steep>=35deg=1.761%，cliff>=50deg=0.416%，cliff>=60deg=0.058%。
+- strong peaks=112，top>=318=0.1538%。
+- dominant mountain category p99=35.5deg，cliff50=0.243%。
+
+分类结果保持空间隔离：
+- plains p99 slope 约 6.9..7.8deg，35deg+ 与 50deg+ 均为 0。
+- foothills p99 约 15.4..15.8deg，35deg+ 基本为 0。
+- plateaus p99 < 1deg。
+- cliff shaping 没有泄漏到普通地形。
+
+游戏默认 320x200 居中世界补充核验：
+- Seed 123456: p99=46.0deg, cliff50=0.673%。
+- Seed 731894205: p99=32.7deg, cliff50=0.089%。
+- Seed 10400: p99=46.1deg, cliff50=0.606%。
+
+### 缓存与跨语言基准
+- 世界模型发生变化，GeoWorldEngineBridge cache prefix v12 -> v13。
+- runtime-v1.geoworld / runtime-v1.json 已重新生成。
+- Java Runtime Reader terrain 常量同步。
+- Java Golden: 15/15 PASS，tolerance=1e-9。
+
+### 完整回归
+- geoworld-terrain-audit: PASS（三颗 Seed）。
+- geoworld-consistency-audit -strict-final: PASS（正式 Seed 731894205 / 10400）。
+- go test ./... -count=1: PASS。
+- geoworld-river-navigation-audit -strict: PASS。
+- totalDownstreamRises=0，dryCenterlineSamples=0。
+- maxAdjacentWaterStepBlocks=1，adjacentWaterStepViolations=0。
+- lakeFeeders=6，disconnectedLakeFeeders=0。
+- NeoForge BiomePreset / DecorationPolicy / Shoreline / WaterOwnership / Engine / Spawn: PASS。
+- WaterOwnership: unowned / unsafe exposed / free-fall / runtime lost / river peak / wetland leak 全 0。
+- NeoForge BUILD SUCCESSFUL，最新 dev JAR 已部署到 HMCL 26.3。
