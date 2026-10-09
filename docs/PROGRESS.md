@@ -2087,3 +2087,62 @@ geoworld-river-navigation-audit -strict 保持：
 - Engine v12: PASS, cached=false
 - Spawn: PASS
 - NeoForge BUILD SUCCESSFUL，最新 dev JAR 已部署到 HMCL 26.3。
+
+## 2026-10-09 · 最终 Minecraft 水体所有权审计
+
+目标：将近期反复出现的随机泉水、河岸高一格水源、湿地水洼泄口、悬空水帘等问题统一放到最终 voxel 层自动审计，而不是只依赖 Hydrology/Runtime 或实机肉眼检查。
+
+新增 verifyGeoWorldWaterOwnership：
+- 扫描已知回归坐标周围 9x9 chunks。
+- 再按约 2048 blocks 间隔覆盖整个模型范围。
+- 直接审计 GeoWorldShoreline.Column，即 Minecraft 最终落方块前的列计划。
+- Seed=123456 本轮共扫描 1183 chunks / 302848 columns。
+
+水体所有权只允许：
+- Runtime River
+- Runtime Lake
+- Runtime Ocean
+- GeoWorld WetlandPool
+
+正式指标：
+- UnownedSurfaceWaterSources = 0
+- UnsafeExposedWaterSources = 0
+- FreeFallWaterFaces = 0
+- RuntimeWaterLost = 0
+- RiverWaterBoundaryModelMismatches = 0
+- RiverLocalWaterPeaks = 0
+- WetlandPoolLeaks = 0
+
+审计初次运行真实抓到：
+- WetlandPoolLeaks=4，例如 5594,-1224 -> 5593,-1224，water Y110、外侧 dry ground Y109。
+- RiverLocalWaterPeaks=1。
+- RuntimeWaterLost=154。
+
+进一步核对后：
+- RuntimeWaterLost=154 主要来自 Lake/Ocean 语义边界：Runtime 仍带 WaterKind，但详细 terrain 在 voxel 化后已经顶到 water boundary，本质是最终干岸。
+- Java Shoreline isWater 统一为最终 voxel 水列语义：River 始终保留水文归属；Lake/Ocean 只有 waterBoundary > groundBoundary 才属于真实水列。
+- 这与此前 Go Waterbed 对宏观 Lake 候选和最终真实湖面的区分保持一致。
+- 统一语义后，湿地 rim 规划能正确识别附近最终干岸，4 个泄口归零；河流局部峰值也归零。
+
+最终 Seed=123456：
+- chunks=1183
+- columns=302848
+- waterColumns=88348
+- owners={WetlandPool=279, River=23068, Lake=11967, Ocean=53034}
+- unownedSurfaceWaterSources=0
+- unsafeExposedWaterSources=0
+- freeFallWaterFaces=0
+- runtimeWaterLost=0
+- riverWaterBoundaryModelMismatches=0
+- riverLocalWaterPeaks=0
+- wetlandPoolLeaks=0
+
+验证：
+- verifyGeoWorldWaterOwnership 接入 Gradle check。
+- NeoForge build/check: PASS。
+- go test ./... -count=1: PASS。
+- Java Golden: 15/15。
+- geoworld-river-navigation-audit -strict: PASS。
+- maxAdjacentWaterStepBlocks=1，adjacentWaterStepViolations=0。
+- lakeFeeders=6，disconnectedLakeFeeders=0。
+- 最新 dev JAR 已部署到 HMCL 26.3。
