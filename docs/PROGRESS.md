@@ -2146,3 +2146,63 @@ geoworld-river-navigation-audit -strict 保持：
 - maxAdjacentWaterStepBlocks=1，adjacentWaterStepViolations=0。
 - lakeFeeders=6，disconnectedLakeFeeders=0。
 - 最新 dev JAR 已部署到 HMCL 26.3。
+
+## 2026-10-09 · strict-final 审计语义收口
+
+在最终水体所有权审计完成后继续处理长期遗留的 geoworld-consistency-audit -strict-final 失败。
+
+### 1. Runtime 河流审计改为沿真实 meander 中心线
+- 旧 auditRuntimeWater 使用 X0->X1 / Z0->Z1 直线采样。
+- RiverSegment 已有 MeanderOffset，直线会大量离开真实河槽，正式种子因此出现 27万~29万 RuntimeRiverUndefinedSteps。
+- 改为与 river-navigation audit 一致的 sin(pi*t) meander centerline。
+- 两个正式种子 RuntimeRiverUndefinedSteps: -> 0。
+
+### 2. Waterbed upslope 只审计本段纵向 profile
+- 旧 Waterbed.Audit 使用 composite FinalHeight 判断逆坡。
+- 汇流区 composite bed 是重叠河槽的最小值；较深支流会形成合法局部冲刷坑，离开重叠区后地面回到下游本段河床，看起来会“升高”。
+- 最大旧案例中本段 own profile 实际仍在下降，且有 2~3 条河段重叠；最终 Runtime 水面同时保持不升、不断水。
+- 正式 invariant 改为：每条 RiverSegment 自身 Profile 不得下游升高；汇流 composite scour recovery 不算 profile upslope。
+- Runtime 继续独立保证 water surface non-rising / defined / non-dry。
+- Tester anomaly report 同步使用本段 profile 语义。
+- 正式种子 WaterbedRiverUpslopeSteps: 1325/1972 -> 0。
+
+### 3. CoastTerrain slope 检查恢复原始职责
+- 旧 CoastTerrainMacroSlopeMismatch 于 10da905 (apply continuous coast terrain correction) 引入，本意是防止 HeightCorrection 在宏格边界新增 slope kink。
+- 后续山地加入 ridge / sharp summit / summit spire / fault scarp 后，原始 Terrain 本身允许真实尖锐坡度变化。
+- 诊断证明最大点 Raw Terrain 与 CoastTerrain mismatch 完全相同，HeightCorrection kink=0：
+  - Seed 731894205 @ 27776,32896: raw=2.09941154443e-4, coast same。
+  - Seed 10400 @ 31872,14976: raw=2.67725739004e-4, coast same。
+- 因此拆分指标：
+  - RawTerrainMacroSlopeMismatch：仅报告自然地形自身尖锐度。
+  - CoastTerrainMacroSlopeMismatch：只测 Coast HeightCorrection 相对于 Raw Terrain 额外引入的 slope mismatch。
+- strict 阈值仍为 1e-4，没有放宽。
+
+最终 strict-final：
+- Seed 731894205:
+  - RawTerrainMacroSlopeMismatch=2.0994115444317174e-4
+  - CoastTerrainMacroSlopeMismatch=2.9773275003197597e-6
+  - WaterbedRiverUpslopeSteps=0
+  - RuntimeRiverUndefinedSteps=0
+  - RuntimeRiverDrySteps=0
+  - RuntimeRiverSurfaceUpslopeSteps=0
+- Seed 10400:
+  - RawTerrainMacroSlopeMismatch=2.6772573900446517e-4
+  - CoastTerrainMacroSlopeMismatch=4.701832812870066e-6
+  - WaterbedRiverUpslopeSteps=0
+  - RuntimeRiverUndefinedSteps=0
+  - RuntimeRiverDrySteps=0
+  - RuntimeRiverSurfaceUpslopeSteps=0
+  - RuntimeReceiverBackwaterSteps=1 (合法 receiver backwater)
+- geoworld-consistency-audit -strict-final: exit 0。
+
+完整回归：
+- go test ./... -count=1: PASS。
+- Java Golden: 15/15。
+- geoworld-river-navigation-audit -strict: PASS。
+- maxAdjacentWaterStepBlocks=1，adjacentWaterStepViolations=0。
+- lakeFeeders=6，disconnectedLakeFeeders=0。
+- NeoForge BiomePreset / DecorationPolicy / Shoreline / WaterOwnership / Engine / Spawn: PASS。
+- GeoWorld WaterOwnership: unowned/unsafe/freeFall/lost/riverPeak/wetlandLeak 全 0。
+- NeoForge BUILD SUCCESSFUL，最新 dev JAR 已部署到 HMCL 26.3。
+
+本轮只修审计/诊断语义，不改变世界模型生成结果，因此 Engine cache 保持 v12。

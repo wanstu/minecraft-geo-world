@@ -23,44 +23,44 @@ import (
 )
 
 type report struct {
-	Seed                                                                           int64
-	Width, Height                                                                  int
-	CellSizeBlocks                                                                 float64
-	SeaLevelNormalized                                                             float64
-	CrustOceanPercent, ActualMacroOceanPercent                                     float64
-	EmergedOceanicCrust, EnclosedBelowSea                                          int
-	MacroOceanAtOrAboveSea, MacroMaskDisagreements                                 int
-	FinalOceanLabelAboveSea, FinalLandLabelBelowSea, FinalSurfaceMaskChanges       int
-	NonLakeStrongRiverEdges, OriginallyDownhillEdges, FinalUpslopeEdges            int
-	MaxNormalizedRise                                                              float64
-	ConstraintSurfaceMismatches                                                    int
-	ConstraintCoastAdjustedNodes, ConstraintCoastRaisedNodes                       int
-	ConstraintCoastCarvedNodes, ConstraintLakeBedViolations                        int
-	ConstraintRiverUpslopeEdges, ConstraintRiverBedCarvedNodes                     int
-	AppliedCoastSurfaceMismatches, CoastTerrainUpslopeEdges                        int
-	AppliedCoastMaxNodeError, CoastTerrainMaxNormalizedRise                        float64
-	CoastTerrainChunkJump, CoastTerrainMacroSlopeMismatch                          float64
-	CoastInteriorOceanAboveSea, CoastInteriorLandBelowSea                          int
-	CoastInteriorMaxOceanExcess, CoastInteriorMaxLandDeficit                       float64
-	WaterbedRiverSampleSteps, WaterbedRiverUpslopeSteps, WaterbedLakeBedViolations int
-	WaterbedMaxRiverRise, WaterbedMaxLakeBedExcess, WaterbedChunkJump              float64
-	WaterbedMaxRiseSegment, WaterbedMaxRiseFrom, WaterbedMaxRiseTo                 int
-	WaterbedMaxRiseT, WaterbedMaxRiseOwnProfileRise                                float64
-	WaterbedMaxRisePreviousOverlaps, WaterbedMaxRiseCurrentOverlaps                int
-	RuntimeOceanNodeViolations, RuntimeEnclosedOceanLeaks                          int
-	RuntimeLakeNodeViolations, RuntimeRiverUndefinedSteps                          int
-	RuntimeRiverDrySteps, RuntimeRiverSurfaceUpslopeSteps                          int
-	RuntimeReceiverBackwaterSteps                                                  int
-	RuntimeMaxRiverSurfaceRise                                                     float64
-	RuntimeMaxRisePreviousKind, RuntimeMaxRiseCurrentKind                          int
-	RuntimeMaxRiseSegment                                                          int
-	RuntimeMaxRiseT, RuntimeMaxRisePreviousSurface, RuntimeMaxRiseCurrentSurface   float64
-	RuntimeMaxRiseReceiverDefined                                                  bool
-	RuntimeMaxRiseReceiverSurface, RuntimeMaxRiseRiverWeight                       float64
-	RuntimeProfileSamples, RuntimeProfileFallbacks                                 int
-	RuntimeProfileSemanticMismatches, RuntimeProfileUnknown                        int
-	RuntimeProfileMixedCoastSamples, RuntimeBoundarySamples                        int
-	RuntimeBoundaryNonOcean, RuntimeBoundaryProfileMismatches                      int
+	Seed                                                                                int64
+	Width, Height                                                                       int
+	CellSizeBlocks                                                                      float64
+	SeaLevelNormalized                                                                  float64
+	CrustOceanPercent, ActualMacroOceanPercent                                          float64
+	EmergedOceanicCrust, EnclosedBelowSea                                               int
+	MacroOceanAtOrAboveSea, MacroMaskDisagreements                                      int
+	FinalOceanLabelAboveSea, FinalLandLabelBelowSea, FinalSurfaceMaskChanges            int
+	NonLakeStrongRiverEdges, OriginallyDownhillEdges, FinalUpslopeEdges                 int
+	MaxNormalizedRise                                                                   float64
+	ConstraintSurfaceMismatches                                                         int
+	ConstraintCoastAdjustedNodes, ConstraintCoastRaisedNodes                            int
+	ConstraintCoastCarvedNodes, ConstraintLakeBedViolations                             int
+	ConstraintRiverUpslopeEdges, ConstraintRiverBedCarvedNodes                          int
+	AppliedCoastSurfaceMismatches, CoastTerrainUpslopeEdges                             int
+	AppliedCoastMaxNodeError, CoastTerrainMaxNormalizedRise                             float64
+	CoastTerrainChunkJump, RawTerrainMacroSlopeMismatch, CoastTerrainMacroSlopeMismatch float64
+	CoastInteriorOceanAboveSea, CoastInteriorLandBelowSea                               int
+	CoastInteriorMaxOceanExcess, CoastInteriorMaxLandDeficit                            float64
+	WaterbedRiverSampleSteps, WaterbedRiverUpslopeSteps, WaterbedLakeBedViolations      int
+	WaterbedMaxRiverRise, WaterbedMaxLakeBedExcess, WaterbedChunkJump                   float64
+	WaterbedMaxRiseSegment, WaterbedMaxRiseFrom, WaterbedMaxRiseTo                      int
+	WaterbedMaxRiseT, WaterbedMaxRiseOwnProfileRise                                     float64
+	WaterbedMaxRisePreviousOverlaps, WaterbedMaxRiseCurrentOverlaps                     int
+	RuntimeOceanNodeViolations, RuntimeEnclosedOceanLeaks                               int
+	RuntimeLakeNodeViolations, RuntimeRiverUndefinedSteps                               int
+	RuntimeRiverDrySteps, RuntimeRiverSurfaceUpslopeSteps                               int
+	RuntimeReceiverBackwaterSteps                                                       int
+	RuntimeMaxRiverSurfaceRise                                                          float64
+	RuntimeMaxRisePreviousKind, RuntimeMaxRiseCurrentKind                               int
+	RuntimeMaxRiseSegment                                                               int
+	RuntimeMaxRiseT, RuntimeMaxRisePreviousSurface, RuntimeMaxRiseCurrentSurface        float64
+	RuntimeMaxRiseReceiverDefined                                                       bool
+	RuntimeMaxRiseReceiverSurface, RuntimeMaxRiseRiverWeight                            float64
+	RuntimeProfileSamples, RuntimeProfileFallbacks                                      int
+	RuntimeProfileSemanticMismatches, RuntimeProfileUnknown                             int
+	RuntimeProfileMixedCoastSamples, RuntimeBoundarySamples                             int
+	RuntimeBoundaryNonOcean, RuntimeBoundaryProfileMismatches                           int
 }
 
 func checked[T any](value T, err error) T {
@@ -109,7 +109,12 @@ func inspect(seed int64, width, height int, cellSize float64) report {
 	}
 	if model.CoastTerrain != nil {
 		r.CoastTerrainChunkJump = auditChunkSeams(model.CoastTerrain, model.Geometry)
-		r.CoastTerrainMacroSlopeMismatch = auditMacroSlopes(model.CoastTerrain, model.Geometry)
+		r.RawTerrainMacroSlopeMismatch = auditMacroSlopes(model.Terrain, model.Geometry)
+		r.CoastTerrainMacroSlopeMismatch = auditAddedMacroSlopeMismatch(
+			model.Terrain,
+			model.CoastTerrain,
+			model.Geometry,
+		)
 		coast := auditCoastInteriors(model.CoastTerrain, w.Surface, model.Geometry, r.SeaLevelNormalized)
 		r.CoastInteriorOceanAboveSea = coast.oceanAboveSea
 		r.CoastInteriorLandBelowSea = coast.landBelowSea
@@ -339,8 +344,7 @@ func auditRuntimeWater(model *generator.WorldModel) runtimeWaterDiagnostics {
 		havePrev := false
 		for j := 0; j <= steps; j++ {
 			t := float64(j) / float64(steps)
-			x := seg.X0 + (seg.X1-seg.X0)*t
-			z := seg.Z0 + (seg.Z1-seg.Z0)*t
+			x, z := riverCenter(seg, t)
 			ground := model.Waterbed.Sample(x, z)
 			s := model.Runtime.Sample(x, z)
 
@@ -508,6 +512,18 @@ func auditRuntimeProfile(model *generator.WorldModel) runtimeProfileDiagnostics 
 	return d
 }
 
+func riverCenter(seg waterbed.RiverSegment, t float64) (float64, float64) {
+	t = math.Max(0, math.Min(1, t))
+	dx, dz := seg.X1-seg.X0, seg.Z1-seg.Z0
+	length := math.Hypot(dx, dz)
+	if length <= 1e-12 {
+		return seg.X0, seg.Z0
+	}
+	nx, nz := -dz/length, dx/length
+	offset := seg.MeanderOffset * math.Sin(math.Pi*t)
+	return seg.X0 + dx*t + nx*offset, seg.Z0 + dz*t + nz*offset
+}
+
 func auditMacroSlopes(m *terrain.Model, geometry world.GridGeometry) float64 {
 	maxMismatch := 0.0
 	cellSize := geometry.SpacingX()
@@ -524,6 +540,38 @@ func auditMacroSlopes(m *terrain.Model, geometry world.GridGeometry) float64 {
 		}
 	}
 	return maxMismatch
+}
+
+func auditAddedMacroSlopeMismatch(
+	base *terrain.Model,
+	adjusted *terrain.Model,
+	geometry world.GridGeometry,
+) float64 {
+	maxAddedMismatch := 0.0
+	cellSize := geometry.SpacingX()
+	h := 0.25
+	endX := geometry.OriginX + geometry.SpanXBlocks
+	endZ := geometry.OriginZ + geometry.SpanZBlocks
+
+	for x := geometry.OriginX + cellSize; x < endX; x += cellSize * 8 {
+		for z := geometry.OriginZ + cellSize; z < endZ-cellSize; z += cellSize * 4 {
+			baseAt := base.SampleNormalized(x, z)
+			baseLeft := (baseAt - base.SampleNormalized(x-h, z)) / h
+			baseRight := (base.SampleNormalized(x+h, z) - baseAt) / h
+
+			adjustedAt := adjusted.SampleNormalized(x, z)
+			adjustedLeft := (adjustedAt - adjusted.SampleNormalized(x-h, z)) / h
+			adjustedRight := (adjusted.SampleNormalized(x+h, z) - adjustedAt) / h
+
+			baseMismatch := baseLeft - baseRight
+			adjustedMismatch := adjustedLeft - adjustedRight
+			maxAddedMismatch = math.Max(
+				maxAddedMismatch,
+				math.Abs(adjustedMismatch-baseMismatch),
+			)
+		}
+	}
+	return maxAddedMismatch
 }
 
 type coastInteriorDiagnostics struct {

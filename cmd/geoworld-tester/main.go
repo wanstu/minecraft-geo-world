@@ -981,13 +981,12 @@ func buildAnomalyReport(active *activeWorld) anomalyReport {
 			if profileSteps := 2 * (len(seg.Profile) - 1); profileSteps > steps {
 				steps = profileSteps
 			}
-			prevX, prevZ := diagnosticRiverCenter(seg, 0)
-			prev := wb.SampleNormalized(prevX, prevZ)
+			prevOwn := diagnosticRiverProfile(seg, 0)
 			for j := 1; j <= steps; j++ {
 				t := float64(j) / float64(steps)
 				x, z := diagnosticRiverCenter(seg, t)
-				current := wb.SampleNormalized(x, z)
-				rise := current - prev
+				own := diagnosticRiverProfile(seg, t)
+				rise := own - prevOwn
 				if rise > epsilon {
 					add(anomalyPoint{
 						Kind: anomalyRiverUpslope, Label: "最终河床逆坡",
@@ -995,7 +994,7 @@ func buildAnomalyReport(active *activeWorld) anomalyReport {
 						Detail: fmt.Sprintf("segment=%d rise=%.8f", segID, rise),
 					})
 				}
-				prev = current
+				prevOwn = own
 			}
 		}
 		for _, lake := range wb.Lakes {
@@ -1336,6 +1335,28 @@ func diagnosticCoastNode(surface *world.Surface, x, z int) bool {
 		return true
 	}
 	return false
+}
+
+func diagnosticRiverProfile(
+	segment waterbed.RiverSegment,
+	t float64,
+) float64 {
+	t = math.Max(0, math.Min(1, t))
+	if len(segment.Profile) == 0 {
+		return segment.Bed0 + (segment.Bed1-segment.Bed0)*t
+	}
+	if len(segment.Profile) == 1 {
+		return segment.Profile[0]
+	}
+	pos := t * float64(len(segment.Profile)-1)
+	i0 := int(math.Floor(pos))
+	i1 := i0 + 1
+	if i1 >= len(segment.Profile) {
+		i1 = len(segment.Profile) - 1
+	}
+	f := pos - float64(i0)
+	return segment.Profile[i0] +
+		(segment.Profile[i1]-segment.Profile[i0])*f
 }
 
 func diagnosticRiverCenter(

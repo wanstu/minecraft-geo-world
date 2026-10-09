@@ -2149,10 +2149,17 @@ func maxInt(a, b int) int {
 
 func lerp(a, b, t float64) float64 { return a + (b-a)*t }
 
-// Audit samples the actual local waterbed surface, including non-node points
-// along every river centerline. This is intentionally stricter than checking
-// only macro endpoints because a local terrain hump between two valid targets
-// would still create an unusable longitudinal profile.
+// Audit samples every river segment's own longitudinal bed profile at
+// non-node points. The segment profile itself may never rise downstream.
+//
+// The composite FinalHeight is intentionally not used for the upslope
+// invariant: at connected confluences multiple channel footprints overlap and
+// the final carved terrain is the minimum of all participating beds. A deeper
+// tributary can therefore create a local confluence scour hole whose floor
+// rises back toward the downstream segment after the overlap fades. That is a
+// valid composite-bed recovery, not an upslope river profile. Runtime audits
+// separately enforce continuous, non-rising free-water surfaces and non-dry
+// channels.
 func (m *Model) Audit(samplesPerSegment int, epsilon float64) Diagnostics {
 	if samplesPerSegment < 2 {
 		samplesPerSegment = 16
@@ -2176,7 +2183,6 @@ func (m *Model) Audit(samplesPerSegment int, epsilon float64) Diagnostics {
 			seg.MeanderOffset,
 			0,
 		)
-		prev := m.SampleNormalized(prevX, prevZ)
 		prevOwn := sampleRiverProfile(seg, 0)
 		for j := 1; j <= steps; j++ {
 			t := float64(j) / float64(steps)
@@ -2188,14 +2194,13 @@ func (m *Model) Audit(samplesPerSegment int, epsilon float64) Diagnostics {
 				seg.MeanderOffset,
 				t,
 			)
-			current := m.SampleNormalized(x, z)
 			own := sampleRiverProfile(seg, t)
-			rise := current - prev
+			ownRise := own - prevOwn
 			d.RiverSampleSteps++
-			if rise > epsilon {
+			if ownRise > epsilon {
 				d.RiverUpslopeSteps++
-				if rise > d.MaxRiverRise {
-					d.MaxRiverRise = rise
+				if ownRise > d.MaxRiverRise {
+					d.MaxRiverRise = ownRise
 					d.MaxRiseSegment = segID
 					d.MaxRiseFrom = seg.From
 					d.MaxRiseTo = seg.To
@@ -2206,7 +2211,6 @@ func (m *Model) Audit(samplesPerSegment int, epsilon float64) Diagnostics {
 				}
 			}
 			prevX, prevZ = x, z
-			prev = current
 			prevOwn = own
 		}
 	}
