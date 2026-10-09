@@ -2042,3 +2042,48 @@ geoworld-river-navigation-audit -strict 保持：
 边界：
 - 这一步不新增 GeoWorld 自有泉眼。未来如需要山泉，应由地下水/降水/集水区模型明确生成，并接入溪流或受控贴壁瀑布。
 - 本轮不修改 .geoworld 模型与 Engine cache。
+
+## 2026-10-09 · 最终 Minecraft 水体所有权审计
+
+新增 verifyGeoWorldWaterOwnership，直接扫描最终 GeoWorldShoreline.Column，而不是只看 Hydrology/Runtime。
+
+扫描范围（Seed=123456）：
+- 12 个历史问题/关键水文坐标周围各 9x9 chunks。
+- 完整模型范围按约 2048 blocks 间隔补充稀疏扫描。
+- 共 1183 chunks / 302848 columns。
+
+正式指标：
+- unownedSurfaceWaterSources=0
+- unsafeExposedWaterSources=0
+- freeFallWaterFaces=0
+- runtimeWaterLost=0
+- riverWaterBoundaryModelMismatches=0
+- riverLocalWaterPeaks=0
+- wetlandPoolLeaks=0
+
+审计初次运行真实抓出：
+- WetlandPool 泄口 4 个；示例 5594,-1224 -> 5593,-1224，pool Y110、外侧 dry Y109。
+- RuntimeWaterLost=154；确认属于 Lake/Ocean 详细岸界零水深采样的语义误判。
+- RiverLocalWaterPeak=1；坐标 2118,-3004。
+
+修复：
+- Java Shoreline 的 Lake/Ocean isWater 只在 voxel water boundary 严格高于 ground 时认作实际水柱；River 仍允许通过下压河床保证浅水层。
+- WetlandPool 在最终 shoreline morphology 完成后增加 cardinal mud rim seal；附近 River shoreline 不再覆盖池边封口。
+- Waterbed 在 receiver/backwater/cascade 全部后处理完成后新增 final confluence harmonization，使多支流尾段不会被后续处理再次拉开水面。
+- 2118,-3004 实例的三条连接河段原先连续水面约 Y89.039 / Y88.854 / Y88.186，最终现在在重叠区统一为 Y88.186。
+- 新增 Go 回归 TestFinalConfluencePassKeepsOverlappingTributarySurfacesEqual。
+- Waterbed 模型发生变化，Engine cache v11 -> v12，并重建 Golden。
+
+验证：
+- go test ./... -count=1: PASS
+- Java Golden: 15/15
+- geoworld-river-navigation-audit -strict: PASS
+- maxAdjacentWaterStepBlocks=1, adjacentWaterStepViolations=0
+- lakeFeeders=6, disconnectedLakeFeeders=0
+- BiomePreset=56/56
+- DecorationPolicy: PASS
+- Shoreline: PASS
+- WaterOwnership: PASS (1183 chunks / 302848 columns, all safety counters zero)
+- Engine v12: PASS, cached=false
+- Spawn: PASS
+- NeoForge BUILD SUCCESSFUL，最新 dev JAR 已部署到 HMCL 26.3。

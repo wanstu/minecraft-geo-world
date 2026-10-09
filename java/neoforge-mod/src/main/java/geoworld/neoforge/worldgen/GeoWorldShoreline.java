@@ -139,7 +139,7 @@ final class GeoWorldShoreline {
                     (localZ + fringe) * plannedStride +
                     (localX + fringe);
                 Column once = pitClosed[index];
-                result.columns[localZ * 16 + localX] =
+                Column shaped =
                     once != grooveClosed[index]
                         ? once
                         : closeSmallBackshorePit(
@@ -149,6 +149,14 @@ final class GeoWorldShoreline {
                             pitClosed[index - plannedStride],
                             pitClosed[index + plannedStride]
                         );
+                result.columns[localZ * 16 + localX] =
+                    sealWetlandPoolRim(
+                        shaped,
+                        preliminary[index - 1],
+                        preliminary[index + 1],
+                        preliminary[index - plannedStride],
+                        preliminary[index + plannedStride]
+                    );
             }
         }
         return result;
@@ -227,15 +235,22 @@ final class GeoWorldShoreline {
         }
 
         int center = localRadius * localStride + localRadius;
-        if (pitClosed[center] != grooveClosed[center]) {
-            return pitClosed[center];
+        Column shaped = pitClosed[center];
+        if (shaped == grooveClosed[center]) {
+            shaped = closeSmallBackshorePit(
+                shaped,
+                pitClosed[center - 1],
+                pitClosed[center + 1],
+                pitClosed[center - localStride],
+                pitClosed[center + localStride]
+            );
         }
-        return closeSmallBackshorePit(
-            pitClosed[center],
-            pitClosed[center - 1],
-            pitClosed[center + 1],
-            pitClosed[center - localStride],
-            pitClosed[center + localStride]
+        return sealWetlandPoolRim(
+            shaped,
+            preliminary[center - 1],
+            preliminary[center + 1],
+            preliminary[center - localStride],
+            preliminary[center + localStride]
         );
     }
 
@@ -725,9 +740,73 @@ final class GeoWorldShoreline {
     }
 
     private static boolean isWater(GeoWorldV1.RuntimeSample sample) {
-        return !"None".equals(sample.waterKind()) &&
-            sample.waterSurfaceDefined() &&
-            sample.waterSurfaceElevation() != null;
+        if (
+            "None".equals(sample.waterKind()) ||
+            !sample.waterSurfaceDefined() ||
+            sample.waterSurfaceElevation() == null
+        ) {
+            return false;
+        }
+
+        // A Runtime Lake/Ocean label can extend onto the exact detailed shore
+        // where voxelized terrain already reaches the water boundary. That is
+        // a dry bank, not a water column. River is different: shallow river
+        // columns deliberately lower the voxel bed by one block rather than
+        // raising the hydrologic surface.
+        if ("River".equals(sample.waterKind())) {
+            return true;
+        }
+        int ground = HEIGHTS.boundaryY(sample.groundHeight());
+        int water = HEIGHTS.boundaryY(sample.waterSurfaceElevation());
+        return water > ground;
+    }
+
+    private static Column sealWetlandPoolRim(
+        Column center,
+        Column west,
+        Column east,
+        Column north,
+        Column south
+    ) {
+        if (
+            !"None".equals(center.sample().waterKind()) ||
+            center.waterBoundary() > center.groundBoundary()
+        ) {
+            return center;
+        }
+
+        int target = center.groundBoundary();
+        for (Column neighbor :
+            new Column[]{west, east, north, south}) {
+            if (
+                "WetlandPool".equals(neighbor.shoreWaterKind()) &&
+                neighbor.waterBoundary() > neighbor.groundBoundary()
+            ) {
+                target = Math.max(target, neighbor.waterBoundary());
+            }
+        }
+        if (target <= center.groundBoundary()) {
+            return center;
+        }
+
+        // Wetland pools are deliberately shallow source-water basins. Their
+        // final cardinal rim must be solid at the pool water boundary even
+        // when another shoreline rule (for example a nearby river) also owns
+        // this dry cell. Minecraft fluids escape only through cardinal faces,
+        // so a one-block mud rim is sufficient and does not reshape the wider
+        // floodplain.
+        return new Column(
+            center.sample(),
+            center.originalGroundBoundary(),
+            target,
+            target,
+            1,
+            "WetlandPool",
+            target,
+            false,
+            "minecraft:mud",
+            "minecraft:dirt"
+        );
     }
 
     private static int oceanBackshoreMinimum(

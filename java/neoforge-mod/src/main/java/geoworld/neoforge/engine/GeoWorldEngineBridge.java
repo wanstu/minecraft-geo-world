@@ -284,7 +284,7 @@ public final class GeoWorldEngineBridge {
     ) {
         String canonical = String.join(
             "|",
-            "v11",
+            "v12",
             Long.toString(seed),
             Integer.toString(config.width()),
             Integer.toString(config.height()),

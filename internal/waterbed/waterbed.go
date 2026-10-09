@@ -293,8 +293,57 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 	)
 	easeReceiverOutflowDrops(m.Rivers, cfg)
 	enforceSupportedRiverCascades(m.Rivers, cfg)
+	harmonizeFinalConfluences(
+		m.Rivers,
+		incomingSegments,
+		cfg,
+	)
 
 	return m, nil
+}
+
+func harmonizeFinalConfluences(
+	rivers []RiverSegment,
+	incomingSegments [][]int,
+	cfg Config,
+) {
+	for _, ids := range incomingSegments {
+		if len(ids) < 2 {
+			continue
+		}
+		sharedSurface := math.Inf(1)
+		valid := 0
+		for _, id := range ids {
+			if id < 0 || id >= len(rivers) {
+				continue
+			}
+			seg := rivers[id]
+			if len(seg.Profile) == 0 {
+				continue
+			}
+			surface :=
+				seg.Profile[len(seg.Profile)-1] +
+					riverCenterDepth(cfg, seg.HalfWidth)
+			if seg.ReceiverSurfaceDefined &&
+				seg.ReceiverSurface > surface {
+				surface = seg.ReceiverSurface
+			}
+			if !finite(surface) {
+				continue
+			}
+			sharedSurface = math.Min(sharedSurface, surface)
+			valid++
+		}
+		if valid < 2 || !finite(sharedSurface) {
+			continue
+		}
+		harmonizeConfluenceProfiles(
+			rivers,
+			ids,
+			sharedSurface,
+			cfg,
+		)
+	}
 }
 
 func enforceSupportedRiverCascades(

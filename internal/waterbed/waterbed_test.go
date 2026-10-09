@@ -461,6 +461,75 @@ func TestConfluencePropagatesActualUpstreamOutlet(t *testing.T) {
 	}
 }
 
+func TestFinalConfluencePassKeepsOverlappingTributarySurfacesEqual(t *testing.T) {
+	g := world.GridGeometry{
+		Width: 4, Height: 3,
+		SpanXBlocks: 384, SpanZBlocks: 256,
+	}
+	base := testTerrain(t, g, 0.70)
+	n := g.Width * g.Height
+	fromWest, fromNorth, junction, downstream := 4, 1, 5, 6
+
+	rec := &reconcile.Model{
+		Geometry:              g,
+		Config:                reconcile.Config{RiverStrengthThreshold: 0.30},
+		RiverBaseElevation:    filled(n, 0.70),
+		RiverBedTarget:        filled(n, 0.70),
+		LakeBedCeilingDefined: make([]bool, n),
+		LakeBedCeiling:        make([]float64, n),
+		WaterSurfaceDefined:   make([]bool, n),
+		WaterSurfaceElevation: make([]float64, n),
+		RiverEdges: []reconcile.RiverEdgeConstraint{
+			{From: fromWest, To: junction, RiverStrength: 0.55},
+			{From: fromNorth, To: junction, RiverStrength: 1.00},
+			{From: junction, To: downstream, RiverStrength: 1.00},
+		},
+	}
+	rec.RiverBedTarget[fromWest] = 0.58
+	rec.RiverBedTarget[fromNorth] = 0.54
+	rec.RiverBedTarget[junction] = 0.54
+	rec.RiverBedTarget[downstream] = 0.50
+
+	h := emptyHydrology(g)
+	m, err := Build(base, rec, h, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var incoming []*RiverSegment
+	for i := range m.Rivers {
+		if m.Rivers[i].To == junction {
+			incoming = append(incoming, &m.Rivers[i])
+		}
+	}
+	if len(incoming) != 2 {
+		t.Fatalf("incoming segments=%d want=2", len(incoming))
+	}
+
+	// By the final 5% of both tributaries their channel footprints overlap
+	// around the shared junction. Any later cascade/receiver adjustment must
+	// therefore leave them on one free-water datum; otherwise Minecraft ceil
+	// quantization can turn a sub-block seam into an isolated 1-block source
+	// peak.
+	const sampleT = 0.95
+	surfaces := make([]float64, 0, len(incoming))
+	for _, seg := range incoming {
+		bed := sampleRiverProfile(*seg, sampleT)
+		surface := bed + riverCenterDepth(m.Config, seg.HalfWidth)
+		if seg.ReceiverSurfaceDefined && seg.ReceiverSurface > surface {
+			surface = seg.ReceiverSurface
+		}
+		surfaces = append(surfaces, surface)
+	}
+	if math.Abs(surfaces[0]-surfaces[1]) > 1e-9 {
+		t.Fatalf(
+			"overlapping tributary surfaces diverged after final passes: %.12f vs %.12f",
+			surfaces[0],
+			surfaces[1],
+		)
+	}
+}
+
 func TestTerminalRiverSegmentInheritsOceanSurfaceAtItsEndpoint(t *testing.T) {
 	g := testGeometry()
 	base := testTerrain(t, g, 0.55)
