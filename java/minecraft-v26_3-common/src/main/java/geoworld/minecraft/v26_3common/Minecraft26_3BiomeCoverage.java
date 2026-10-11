@@ -29,7 +29,11 @@ public final class Minecraft26_3BiomeCoverage {
         String water, double temperature, double precipitation, double depth
     ) {}
 
+    private static final int HABITAT_BUCKET = 256;
     private final List<Habitat> habitats;
+    // Nearly every biome query is outside a reserved rare habitat. Use
+    // spatial buckets instead of scanning all 56 reserved areas per column.
+    private final Map<Long, List<Habitat>> habitatBuckets;
 
     private Minecraft26_3BiomeCoverage(GeoWorldV1 model) {
         var g = model.manifest().geometry();
@@ -104,6 +108,22 @@ public final class Minecraft26_3BiomeCoverage {
             selected.add(new Habitat(biome, best.x(), best.z(), y, 116.0));
         }
         this.habitats = List.copyOf(selected);
+        Map<Long, List<Habitat>> indexed = new HashMap<>();
+        for (Habitat habitat : this.habitats) {
+            int minX = bucket(habitat.x() - habitat.radius());
+            int maxX = bucket(habitat.x() + habitat.radius());
+            int minZ = bucket(habitat.z() - habitat.radius());
+            int maxZ = bucket(habitat.z() + habitat.radius());
+            for (int bx = minX; bx <= maxX; bx++) {
+                for (int bz = minZ; bz <= maxZ; bz++) {
+                    indexed.computeIfAbsent(bucketKey(bx, bz), unused -> new ArrayList<>())
+                        .add(habitat);
+                }
+            }
+        }
+        Map<Long, List<Habitat>> frozen = new HashMap<>();
+        indexed.forEach((key, value) -> frozen.put(key, List.copyOf(value)));
+        habitatBuckets = Map.copyOf(frozen);
     }
 
     private static Site siteAt(GeoWorldV1 model, double x, double z) {
@@ -132,10 +152,22 @@ public final class Minecraft26_3BiomeCoverage {
         return habitats;
     }
 
+    private static int bucket(double coordinate) {
+        return (int)Math.floor(coordinate / HABITAT_BUCKET);
+    }
+
+    private static long bucketKey(int bx, int bz) {
+        return ((long)bx << 32) | (bz & 0xffffffffL);
+    }
+
     public String override(GeoWorldV1 model, double x, double y, double z) {
+        List<Habitat> nearby = habitatBuckets.get(
+            bucketKey(bucket(x), bucket(z))
+        );
+        if (nearby == null) return null;
         Habitat chosen = null;
         double closest = Double.POSITIVE_INFINITY;
-        for (Habitat habitat : habitats) {
+        for (Habitat habitat : nearby) {
             double dx = x - habitat.x();
             double dz = z - habitat.z();
             double distance2 = dx * dx + dz * dz;

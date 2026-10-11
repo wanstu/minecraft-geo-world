@@ -164,12 +164,17 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         @Nullable WorldGenRegion carverBiomeRegion,
         Set<Holder<Biome>> possibleBiomes
     ) {
+        final boolean measure = GeoWorldChunkPerformance.enabled();
+        final long began = measure ? System.nanoTime() : 0L;
         GeoWorldV1 runtime = this.ensureModel(randomState.seed());
+        final long modelReady = measure ? System.nanoTime() : 0L;
         int baseX = chunk.getPos().getMinBlockX();
         int baseZ = chunk.getPos().getMinBlockZ();
 
         GeoWorldShoreline.ChunkPlan shoreline =
             GeoWorldShoreline.planChunk(runtime, baseX, baseZ);
+        final long shoreReady = measure ? System.nanoTime() : 0L;
+        long biomeNanos = 0L;
 
         BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
         Heightmap oceanFloor = chunk.getOrCreateHeightmapUnprimed(
@@ -189,9 +194,14 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
 
                 int groundBoundary = column.groundBoundary();
                 int waterBoundary = column.waterBoundary();
+                final long biomeStarted = measure ? System.nanoTime() : 0L;
                 String surfaceBiome = Minecraft26_3BiomeRealizer.biomeId(
                     runtime, worldX, groundBoundary - 1, worldZ
                 );
+                if (measure) biomeNanos += System.nanoTime() - biomeStarted;
+                boolean terracottaStrata =
+                    GeoWorldSurfaceMaterials.cover(surfaceBiome) ==
+                    GeoWorldSurfaceMaterials.Cover.BADLANDS;
 
                 int maxBoundary = Math.min(
                     Minecraft26_3HeightMapping.MAX_Y_EXCLUSIVE,
@@ -207,6 +217,7 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
                         column,
                         y,
                         surfaceBiome,
+                        terracottaStrata,
                         worldX,
                         worldZ
                     );
@@ -227,8 +238,20 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         // Overlay deterministic, ecology-biased 3D mineral veins after the
         // solid/water voxels exist. The planner clips world-space seams to
         // this chunk and never replaces the surface or water blocks.
+        final long voxelReady = measure ? System.nanoTime() : 0L;
         GeoWorldMineralVeins.populate(chunk, runtime, randomState.seed(), shoreline);
+        final long mineralsReady = measure ? System.nanoTime() : 0L;
         GeoWorldAmethystGeodes.populate(chunk, randomState.seed(), shoreline);
+        if (measure) {
+            GeoWorldChunkPerformance.record(
+                modelReady - began,
+                shoreReady - modelReady,
+                biomeNanos,
+                Math.max(0L, voxelReady - shoreReady - biomeNanos),
+                mineralsReady - voxelReady,
+                System.nanoTime() - mineralsReady
+            );
+        }
 
         return CompletableFuture.completedFuture(chunk);
     }
@@ -277,6 +300,9 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         String surfaceBiome = Minecraft26_3BiomeRealizer.biomeId(
             runtime, x, ground - 1, z
         );
+        boolean terracottaStrata =
+            GeoWorldSurfaceMaterials.cover(surfaceBiome) ==
+            GeoWorldSurfaceMaterials.Cover.BADLANDS;
 
         BlockState[] states = new BlockState[heightAccessor.getHeight()];
         int minY = heightAccessor.getMinY();
@@ -287,6 +313,7 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
                 column,
                 y,
                 surfaceBiome,
+                terracottaStrata,
                 x,
                 z
             );
@@ -432,6 +459,7 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         GeoWorldShoreline.Column column,
         int y,
         String surfaceBiome,
+        boolean terracottaStrata,
         int worldX,
         int worldZ
     ) {
@@ -456,6 +484,14 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
                     surfaceBiome, sample.surfaceProfile(),
                     column.surfaceOverride()
                 ));
+            }
+            // Most generated blocks are deep host stone; skip the full
+            // biome/material resolver except for surface, soil and the
+            // stratified badlands layer. This preserves exact output blocks.
+            if (depth > 3 && (!terracottaStrata || depth > 50)) {
+                return y < 0
+                    ? Blocks.DEEPSLATE.defaultBlockState()
+                    : Blocks.STONE.defaultBlockState();
             }
             String shallow = GeoWorldSurfaceMaterials.below(
                 surfaceBiome, sample.surfaceProfile(),

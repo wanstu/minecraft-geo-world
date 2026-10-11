@@ -2379,3 +2379,15 @@ Seed 10400（640x400）：
 - 默认 Seed 123456：该专项全绿（56/56，468列、936材料检查，naturalDesert=21，desertConflicts=0）；NeoForge build.cmd 全绿并部署到 HMCL 26.3；WaterOwnership 核查302848列，全部水源异常仍为0。
 - 额外两种子 Seed -563659577384754347（用户预览）与 -4852173505788415804 均通过 verifyGeoWorldSurfaceBiomes（各56/56、468列/936材料检查，生态沙漠内部冲突0）。在用户预览种子上 X382 Z-3089 为恶地+岩质陶瓦，X396 Z-3924 为疏林恶地+红沙，X-159 Z-6808 为沙漠+沙子/砂岩。
 - 完整实机视觉复核尚未做，已生成区块不会自动重置地表。文档见 docs/BIOME_SURFACE_CONSISTENCY.md。
+
+## 2026-10-11 · 区块生成性能第一轮 + 稀疏岩壁矿露头
+
+- 实机截图出现大范围区块等待/渲染滞后。新增 benchmarkGeoWorldChunkPlanning（默认 Seed123456，固定48区块，3轮预热），初测模型规划：shoreline=3.059ms、biomes=2.190ms、minerals=0.159ms/区块；独立 JVM 复测波动较大（4.364/3.622/0.295ms），无法声称客户端已加速。
+- 优化 Minecraft26_3BiomeCoverage：采用 256 方块空间桶选出附近稀有保底群系，避免查询时无条件扫描56个中心，保留半径和Y区间。
+- 优化 GeoWorldChunkGenerator：超过普通浅层3格的宿主岩石走快速路径（恶地50格以内按Y保留陶瓦层），不再每块石头重复匹配群系材质；buildTerrain/getBaseColumn 同步。
+- 优化 GeoWorldMineralVeins：完全离开目标区块的矿脉包围盒提前退出体素化循环，仍按原序消耗所有 PRNG 随机参数，不改变既有矿脉空间生成。
+- 允许少量煤/铁/铜/绿宝石在真正的 Mountain/Foothills 裸露石面上自然出露，按 8×8 固定微区稀疏门控。禁止在草、雪、泥、岸线、海水等表面出矿。
+- 新增可选真实客户端阶段耗时日志：JVM `-Dgeoworld.profileChunks=true`，每128区块汇报 model、shoreline、biomes、voxel、minerals、geodes 的平均耗时。不开启不计时。
+- 用户确认不希望大量天然洞穴，本轮不主动增加洞穴、洞口或原版 Carver 密度。未来地下河—地下水位—地层渗透/溶蚀—稀疏洞穴路线图见 docs/UNDERGROUND_WATER_AND_SPARSE_CAVES.md。
+- NeoForge build.cmd 通过（BiomeCoverage 56/56、矿石 8/16、Shoreline、SurfaceBiomes、WaterOwnership 等），已部署 HMCL 26.3。水体所有权 302848 列检查关键异常均 0；该结果不代表客户端区块延迟问题已经解决。
+- 具体性能基准和客户端验收文档见 docs/CHUNK_PERFORMANCE.md。

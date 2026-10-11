@@ -79,9 +79,22 @@ final class GeoWorldMineralVeins {
             // The vanilla ore features are suppressed for this generator only.
             int localX = placement.x() - minX;
             int localZ = placement.z() - minZ;
-            int safeBoundary = shoreline.column(localX, localZ).groundBoundary() - 4;
-            if (placement.y() < safeBoundary &&
-                (host.is(Blocks.STONE) || host.is(Blocks.DEEPSLATE))) {
+            GeoWorldShoreline.Column column = shoreline.column(localX, localZ);
+            int safeBoundary = column.groundBoundary() - 4;
+            int surfaceY = column.groundBoundary() - 1;
+            boolean solidHost = host.is(Blocks.STONE) || host.is(Blocks.DEEPSLATE);
+            // Rare natural ore exposures occur only where a planned vein
+            // intersects an actual STONE mountain face. Never expose ore on
+            // grass, snow, a shoreline, or underwater. Default remains buried.
+            boolean outcrop = placement.y() == surfaceY &&
+                host.is(Blocks.STONE) &&
+                column.surfaceOverride() == null &&
+                isOutcropLocation(
+                    placement.mineral(), column.sample().terrainVariant(),
+                    column.sample().waterKind(),
+                    placement.x(), placement.z(), seed
+                );
+            if (solidHost && (placement.y() < safeBoundary || outcrop)) {
                 chunk.setBlockState(position, placement.mineral().blockAt(placement.y()));
                 added[0]++;
             }
@@ -157,6 +170,26 @@ final class GeoWorldMineralVeins {
                 }
             }
         }
+    }
+
+    static boolean isOutcropLocation(
+        Mineral mineral, String terrain, String water,
+        int x, int z, long seed
+    ) {
+        if (!"None".equals(water) ||
+            !("Mountain".equals(terrain) || "Foothills".equals(terrain))) {
+            return false;
+        }
+        if (mineral != Mineral.COAL && mineral != Mineral.IRON &&
+            mineral != Mineral.COPPER && mineral != Mineral.EMERALD) {
+            return false;
+        }
+        long patch = cellSeed(
+            seed ^ 0x4F555443524F5053L,
+            Math.floorDiv(x, 8), 0, Math.floorDiv(z, 8)
+        );
+        // 1/16 rocky micro-regions: low density and coherent outcrop patches.
+        return (patch & 15L) == 0L;
     }
 
     static Mineral chooseMineral(String terrain, String biome, double y, double roll) {
@@ -249,6 +282,14 @@ final class GeoWorldMineralVeins {
         double dx = Math.cos(angle), dz = Math.sin(angle);
         double tilt = (random.nextDouble() - 0.5) * 0.32;
         double bend = (random.nextDouble() - 0.5) * 4;
+        // After consuming all the same PRNG draws, reject veins whose
+        // complete swept envelope cannot touch this chunk. Keeps both
+        // ore placement and subsequent attempts bit-for-bit unchanged.
+        double reach = length * 0.5 + Math.abs(bend) + radius + 1;
+        if (x + reach < minX || x - reach > maxX ||
+            z + reach < minZ || z - reach > maxZ) {
+            return;
+        }
         int steps = (int)Math.ceil(length / 1.5);
         for (int step = 0; step <= steps; step++) {
             double t = (double) step / steps;

@@ -250,6 +250,13 @@ tasks.register('verifyGeoWorldSurfaceBiomes', JavaExec) {
     }
 }
 
+tasks.register('benchmarkGeoWorldChunkPlanning', JavaExec) {
+    group = 'verification'
+    description = 'Benchmarks model-side shoreline, biome, and mineral planning without client rendering.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.worldgen.GeoWorldChunkPlanningBenchmark'
+}
+
 tasks.register('verifyGeoWorldMinerals', JavaExec) {
     group = 'verification'
     description = 'Verifies all 8 overworld ores in stone/deepslate, geological affinity and chunk continuity.'

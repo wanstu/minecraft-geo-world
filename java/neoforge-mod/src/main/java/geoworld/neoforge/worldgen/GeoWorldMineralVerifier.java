@@ -109,6 +109,39 @@ public final class GeoWorldMineralVerifier {
             );
         }
 
+        // Bare-rock exposures are intentionally rare, and must never leak
+        // onto oceans, forests or non-mineralized surface types.
+        int eligibleOutcrops = 0;
+        int outcropSamples = 0;
+        for (int x = -256; x <= 256; x += 8) {
+            for (int z = -256; z <= 256; z += 8) {
+                outcropSamples++;
+                boolean exposed = GeoWorldMineralVeins.isOutcropLocation(
+                    GeoWorldMineralVeins.Mineral.IRON, "Mountain",
+                    "None", x, z, seed
+                );
+                if (exposed) eligibleOutcrops++;
+                if (GeoWorldMineralVeins.isOutcropLocation(
+                    GeoWorldMineralVeins.Mineral.IRON, "Mountain",
+                    "Ocean", x, z, seed
+                ) || GeoWorldMineralVeins.isOutcropLocation(
+                    GeoWorldMineralVeins.Mineral.DIAMOND, "Mountain",
+                    "None", x, z, seed
+                ) || GeoWorldMineralVeins.isOutcropLocation(
+                    GeoWorldMineralVeins.Mineral.COPPER, "Plain",
+                    "None", x, z, seed
+                )) {
+                    throw new AssertionError("unsafe ore exposure class/region");
+                }
+            }
+        }
+        if (eligibleOutcrops == 0 || eligibleOutcrops > outcropSamples / 8) {
+            throw new AssertionError(
+                "rock outcrop coverage is not sparse: " +
+                eligibleOutcrops + "/" + outcropSamples
+            );
+        }
+
         boolean geodePresent = false;
         for (int tileX = firstCellX; tileX <= lastCellX && !geodePresent; tileX++) {
             for (int tileZ = firstCellZ; tileZ <= lastCellZ && !geodePresent; tileZ++) {
