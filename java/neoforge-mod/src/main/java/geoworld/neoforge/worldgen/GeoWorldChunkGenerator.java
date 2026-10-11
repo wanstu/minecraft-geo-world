@@ -195,8 +195,8 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
                 int groundBoundary = column.groundBoundary();
                 int waterBoundary = column.waterBoundary();
                 final long biomeStarted = measure ? System.nanoTime() : 0L;
-                String surfaceBiome = Minecraft26_3BiomeRealizer.biomeId(
-                    runtime, worldX, groundBoundary - 1, worldZ
+                String surfaceBiome = Minecraft26_3BiomeRealizer.biomeIdFromSample(
+                    runtime, worldX, groundBoundary - 1, worldZ, sample
                 );
                 if (measure) biomeNanos += System.nanoTime() - biomeStarted;
                 boolean terracottaStrata =
@@ -297,8 +297,8 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         );
         int ground = column.groundBoundary();
         int water = column.waterBoundary();
-        String surfaceBiome = Minecraft26_3BiomeRealizer.biomeId(
-            runtime, x, ground - 1, z
+        String surfaceBiome = Minecraft26_3BiomeRealizer.biomeIdFromSample(
+            runtime, x, ground - 1, z, column.sample()
         );
         boolean terracottaStrata =
             GeoWorldSurfaceMaterials.cover(surfaceBiome) ==

@@ -2400,4 +2400,14 @@ Seed 10400（640x400）：
 - 首次32区块汇报，之后仅在128区块节点检查且至少间隔30秒，避免刷屏。只在 GeoWorld 自定义生成器的区块统计 model、shoreline、biomes、voxel、minerals、geodes，其他生成器不计时。
 - 新增 verifyGeoWorldChunkPerformanceMode 并纳入 check，自动验证构建嵌入标记与默认开关一致。`-Pgeoworld.devBuild=true` 通过 automaticDevMode=true；`-Pgeoworld.devBuild=false` 通过 automaticDevMode=false。
 - Dev build.cmd 完整通过并部署至 HMCL v26.3；解包部署 JAR 确认 geoworld-build.properties=devBuild=true；其他生成内容验收仍通过。
-- 真实客户端完整耗时仍需用户下一次重新启动游戏并加载 GeoWorld 世界后读取日志，当前不能宣称已经找出性能瓶颈。
+- 随后重新进入 GeoWorld Seed -563659577384754347 存档 t25，最新日志实际记录 4736 区块：平均 biomes 18.960ms、voxel 7.539ms、shoreline 3.341ms、minerals 0.108ms、geodes 0.006ms；期间两次服务器 can't keep up（2029ms、17173ms）。群系解析成为当前最明确可优化项，不可据此认定全部 17s 卡顿均属 GeoWorld。
+
+## 2026-10-11 · 复用群系模型采样及真正的高山岩壁露头
+
+- Minecraft26_3BiomeRealizer 3D biome 计算去掉同坐标 RuntimeSample/ClimateSample 的重复读取；新增 biomeIdFromSample，ChunkGenerator.buildTerrain/getBaseColumn 直接复用 GeoWorldShoreline 已经算好的每列 RuntimeSample，保留原群系选择、洞穴候选与所有56群系生态区域。
+- 24,576个三维取样指纹对比：Seed 123456 维持 `9f3de994862521fb`，Seed -563659577384754347 维持 `71bfd1e1968b4db6`，前后完全一致；纳入正式 Gradle check 中的 fingerprintGeoWorldBiomeDecisions。
+- 模型侧48区块/3轮预热的群系阶段测得 0.103ms/区块。旧独立 JVM 基准约2.19ms，受工作负载/JIT和预热等影响不能据此认定客户端同比例提速，下一步必须读取新日志。
+- 稀疏矿脉出露从单点候选改为山区表面高度锚定曲线矿脉，约每12个合格64x64源格一个；仅原版石头高山/山麓真实外露的顶部或侧面能生成铁、绿宝石、煤、铜矿；高山铁/绿宝石扩展到Y319，不铺在水/雪/草/沙或岸线。
+- 新增 verifyGeoWorldSurfaceOutcrops：Seed -563659577384754347 高山 X1680..2700/Z-2950..-1650 测试计划点5495，Y>240点4926、近表岩石可选2757、顶部石面相交692，跨区块一致性PASS。测试参考坐标 2011,297,-2914（仅新世界/新生成区块）。
+- 完整 NeoForge build.cmd 通过：56/56 群系、8类原版矿石及16种变体、矿脉露头、表层材质、Shoreline 与 WaterOwnership（302848列，异常0），已部署HMCL 26.3。未改动引擎cache版本、原版方块/生物/实体注册或天然洞穴密度。
+- 详细见 docs/BIOME_PERFORMANCE_AND_ROCK_OUTCROPS.md。

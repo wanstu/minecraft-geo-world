@@ -276,11 +276,28 @@ tasks.register('verifyGeoWorldChunkPerformanceMode', JavaExec) {
     systemProperty 'geoworld.expectedBuildProfile', geoWorldDevBuild.get()
 }
 
+tasks.register('fingerprintGeoWorldBiomeDecisions', JavaExec) {
+    group = 'verification'
+    description = 'Creates deterministic 3D biome-decision fingerprints for regression comparisons.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.worldgen.GeoWorldBiomeDecisionFingerprint'
+    if (project.hasProperty('geoWorldFingerprintSeed')) {
+        args project.property('geoWorldFingerprintSeed').toString()
+    }
+}
+
 tasks.register('benchmarkGeoWorldChunkPlanning', JavaExec) {
     group = 'verification'
     description = 'Benchmarks model-side shoreline, biome, and mineral planning without client rendering.'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'geoworld.neoforge.worldgen.GeoWorldChunkPlanningBenchmark'
+}
+
+tasks.register('verifyGeoWorldSurfaceOutcrops', JavaExec) {
+    group = 'verification'
+    description = 'Checks rare high mountain ore outcrops in exposed vanilla stone and seam continuity.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.worldgen.GeoWorldSurfaceOutcropVerifier'
 }
 
 tasks.register('verifyGeoWorldMinerals', JavaExec) {
@@ -327,6 +344,8 @@ tasks.named('check').configure {
     dependsOn tasks.named('auditGeoWorldBiomeCoverage')
     dependsOn tasks.named('verifyGeoWorldSurfaceBiomes')
     dependsOn tasks.named('verifyGeoWorldMinerals')
+    dependsOn tasks.named('verifyGeoWorldSurfaceOutcrops')
+    dependsOn tasks.named('fingerprintGeoWorldBiomeDecisions')
     dependsOn tasks.named('verifyGeoWorldDecorationPolicy')
     dependsOn tasks.named('verifyGeoWorldWaterOwnership')
     dependsOn tasks.named('verifyGeoWorldShoreline')

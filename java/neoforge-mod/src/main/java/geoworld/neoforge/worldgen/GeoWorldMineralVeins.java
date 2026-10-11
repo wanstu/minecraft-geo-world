@@ -1,6 +1,7 @@
 package geoworld.neoforge.worldgen;
 
 import geoworld.runtime.GeoWorldV1;
+import geoworld.minecraft.v26_3common.Minecraft26_3HeightMapping;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -25,16 +26,22 @@ final class GeoWorldMineralVeins {
     private static final int SEARCH_MARGIN = 56;
     private static final int MIN_Y = -63;
     private static final int MAX_Y = 319;
+    private static final Minecraft26_3HeightMapping HEIGHTS =
+        new Minecraft26_3HeightMapping();
+    private static final long OUTCROP_SALT = 0x4F555443524F5053L;
+    private static final int[][] FACE_DIRECTIONS = {
+        {1, 0}, {-1, 0}, {0, 1}, {0, -1}
+    };
 
     enum Mineral {
         COAL(-63, 215, 7.5),
-        IRON(-60, 230, 9),
+        IRON(-60, 319, 9),
         COPPER(-20, 150, 6.0),
         GOLD(-63, 60, 3.2),
         LAPIS(-63, 80, 2.7),
         REDSTONE(-63, 24, 4.2),
         DIAMOND(-63, 24, 1.0),
-        EMERALD(-63, 240, 1.2);
+        EMERALD(-63, 319, 1.2);
 
         final int minY;
         final int maxY;
@@ -99,7 +106,113 @@ final class GeoWorldMineralVeins {
                 added[0]++;
             }
         });
+        // Independently plan rare lodes intersecting natural high rock.
+        // Subsurface mineral reserves remain intact; only real exposed
+        // stone on mountains can receive these surface-visible ores.
+        planSurfaceOutcrops(model, seed, minX, minX + 15, minZ, minZ + 15,
+            placement -> {
+                int localX = placement.x() - minX;
+                int localZ = placement.z() - minZ;
+                GeoWorldShoreline.Column column = shoreline.column(localX, localZ);
+                if (column.surfaceOverride() != null ||
+                    !"None".equals(column.sample().waterKind()) ||
+                    !isMountain(column.sample().terrainVariant())) {
+                    return;
+                }
+                int surface = column.groundBoundary() - 1;
+                if (placement.y() > surface || placement.y() < surface - 6) {
+                    return;
+                }
+                position.set(placement.x(), placement.y(), placement.z());
+                if (!chunk.getBlockState(position).is(Blocks.STONE)) {
+                    return;
+                }
+                if (!isExposedRockFace(
+                    model, shoreline, minX, minZ, localX, localZ,
+                    placement.y(), surface
+                )) {
+                    return;
+                }
+                chunk.setBlockState(
+                    position, placement.mineral().blockAt(placement.y())
+                );
+                added[0]++;
+            });
         return added[0];
+    }
+
+    private static boolean isMountain(String terrain) {
+        return "Mountain".equals(terrain) ||
+            "Foothills".equals(terrain);
+    }
+
+    private static boolean isExposedRockFace(
+        GeoWorldV1 model, GeoWorldShoreline.ChunkPlan shore,
+        int baseX, int baseZ, int localX, int localZ, int y, int surface
+    ) {
+        if (y == surface) return true;
+        for (int[] direction : FACE_DIRECTIONS) {
+            int nx = localX + direction[0];
+            int nz = localZ + direction[1];
+            GeoWorldShoreline.Column neighbor =
+                nx >= 0 && nx < 16 && nz >= 0 && nz < 16
+                    ? shore.column(nx, nz)
+                    : GeoWorldShoreline.plan(model, baseX + nx, baseZ + nz);
+            if (neighbor.groundBoundary() <= y &&
+                neighbor.waterBoundary() <= y) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Separate geography-anchored lodes; unlike underground random sources,
+     * they are intentionally centered within a few blocks of a mountain's
+     * true voxel surface, so erosion can expose coherent clusters.
+     */
+    static void planSurfaceOutcrops(
+        GeoWorldV1 model, long seed, int minX, int maxX,
+        int minZ, int maxZ, Consumer<Placement> consumer
+    ) {
+        for (int cellZ = Math.floorDiv(minZ - SEARCH_MARGIN, CELL_XZ);
+             cellZ <= Math.floorDiv(maxZ + SEARCH_MARGIN, CELL_XZ); cellZ++) {
+            for (int cellX = Math.floorDiv(minX - SEARCH_MARGIN, CELL_XZ);
+                 cellX <= Math.floorDiv(maxX + SEARCH_MARGIN, CELL_XZ); cellX++) {
+                double centerX = cellX * (double)CELL_XZ + CELL_XZ / 2.0;
+                double centerZ = cellZ * (double)CELL_XZ + CELL_XZ / 2.0;
+                var geology = model.sample(centerX, centerZ);
+                if (!geology.sourceLand() ||
+                    !"None".equals(geology.waterKind()) ||
+                    !isMountain(geology.terrainVariant())) {
+                    continue;
+                }
+                SplittableRandom random = new SplittableRandom(
+                    cellSeed(seed ^ OUTCROP_SALT, cellX, 0, cellZ)
+                );
+                if (random.nextInt(12) != 0) continue;
+                int surface = HEIGHTS.boundaryY(geology.groundHeight()) - 1;
+                if (surface < 85 || surface >= MAX_Y) continue;
+                Mineral mineral = surface > 215
+                    ? (random.nextBoolean() ? Mineral.IRON : Mineral.EMERALD)
+                    : surface > 150
+                        ? switch (random.nextInt(3)) {
+                            case 0 -> Mineral.COAL;
+                            case 1 -> Mineral.IRON;
+                            default -> Mineral.EMERALD;
+                        }
+                        : switch (random.nextInt(4)) {
+                            case 0 -> Mineral.COAL;
+                            case 1 -> Mineral.IRON;
+                            case 2 -> Mineral.COPPER;
+                            default -> Mineral.EMERALD;
+                        };
+                emitVein(
+                    mineral, centerX, surface - 1.0, centerZ,
+                    random, minX, maxX, minZ, maxZ, consumer
+                );
+            }
+        }
     }
 
     /** Pure placement geometry, used for both chunk generation and seam tests. */

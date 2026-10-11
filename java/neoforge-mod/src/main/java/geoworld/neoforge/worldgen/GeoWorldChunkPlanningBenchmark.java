@@ -53,8 +53,9 @@ public final class GeoWorldChunkPlanningBenchmark {
             for (int dz = 0; dz < 16; dz++) {
                 for (int dx = 0; dx < 16; dx++) {
                     var column = shore.column(dx, dz);
-                    String id = Minecraft26_3BiomeRealizer.biomeId(
-                        model, bx + dx, column.groundBoundary() - 1, bz + dz
+                    String id = Minecraft26_3BiomeRealizer.biomeIdFromSample(
+                        model, bx + dx, column.groundBoundary() - 1,
+                        bz + dz, column.sample()
                     );
                     sink += id.length();
                 }

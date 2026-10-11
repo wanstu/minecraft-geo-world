@@ -48,7 +48,11 @@ public final class Minecraft26_3BiomeRealizer {
         String ensured = Minecraft26_3BiomeCoverage.forModel(model).override(
             model, blockX, 319, blockZ
         );
-        return ensured != null ? ensured : surfaceBiomeId(model, blockX, blockZ);
+        return ensured != null ? ensured
+            : surfaceBiomeId(
+                model, blockX, blockZ, model.sample(blockX, blockZ),
+                model.sampleClimate(blockX, blockZ)
+            );
     }
 
     public static String biomeId(
@@ -63,30 +67,54 @@ public final class Minecraft26_3BiomeRealizer {
         if (ensured != null) {
             return ensured;
         }
-        GeoWorldV1.RuntimeSample sample = model.sample(blockX, blockZ);
+        return biomeWithoutOverride(
+            model, blockX, blockY, blockZ, model.sample(blockX, blockZ)
+        );
+    }
+
+    /**
+     * Same biome resolution, reusing an existing GeoWorld terrain sample.
+     * The chunk shoreline planner has already sampled each surface column,
+     * so sampling it again is wasted work.
+     */
+    public static String biomeIdFromSample(
+        GeoWorldV1 model,
+        double blockX,
+        double blockY,
+        double blockZ,
+        GeoWorldV1.RuntimeSample sample
+    ) {
+        String ensured = Minecraft26_3BiomeCoverage.forModel(model).override(
+            model, blockX, blockY, blockZ
+        );
+        return ensured != null ? ensured
+            : biomeWithoutOverride(model, blockX, blockY, blockZ, sample);
+    }
+
+    private static String biomeWithoutOverride(
+        GeoWorldV1 model,
+        double blockX,
+        double blockY,
+        double blockZ,
+        GeoWorldV1.RuntimeSample sample
+    ) {
+        GeoWorldV1.ClimateSample climate =
+            model.sampleClimate(blockX, blockZ);
         int surfaceY = HEIGHTS.boundaryY(sample.groundHeight()) - 1;
         String cave = caveBiomeId(
-            model,
-            sample,
-            model.sampleClimate(blockX, blockZ),
-            blockX,
-            blockY,
-            blockZ,
-            surfaceY
+            model, sample, climate, blockX, blockY, blockZ, surfaceY
         );
-        return cave != null
-            ? cave
-            : surfaceBiomeId(model, blockX, blockZ);
+        return cave != null ? cave
+            : surfaceBiomeId(model, blockX, blockZ, sample, climate);
     }
 
     private static String surfaceBiomeId(
         GeoWorldV1 model,
         double blockX,
-        double blockZ
+        double blockZ,
+        GeoWorldV1.RuntimeSample sample,
+        GeoWorldV1.ClimateSample climate
     ) {
-        GeoWorldV1.RuntimeSample sample = model.sample(blockX, blockZ);
-        GeoWorldV1.ClimateSample climate =
-            model.sampleClimate(blockX, blockZ);
         String family = sample.biomeFamily();
 
         if ("River".equals(sample.waterKind()) ||
