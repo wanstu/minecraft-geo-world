@@ -230,6 +230,26 @@ tasks.register('verifyGeoWorldSpawn', JavaExec) {
     mainClass = 'geoworld.neoforge.worldgen.GeoWorldSpawnVerifier'
 }
 
+tasks.register('auditGeoWorldBiomeCoverage', JavaExec) {
+    group = 'verification'
+    description = 'Reports which registered overworld biomes actually appear in a complete GeoWorld world.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.worldgen.GeoWorldBiomeCoverageVerifier'
+    if (project.hasProperty('geoWorldBiomeSeed')) {
+        args project.property('geoWorldBiomeSeed').toString()
+    }
+}
+
+tasks.register('verifyGeoWorldMinerals', JavaExec) {
+    group = 'verification'
+    description = 'Verifies all 8 overworld ores in stone/deepslate, geological affinity and chunk continuity.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.worldgen.GeoWorldMineralVerifier'
+    if (project.hasProperty('geoWorldMineralSeed')) {
+        args project.property('geoWorldMineralSeed').toString()
+    }
+}
+
 tasks.register('verifyGeoWorldBiomePreset', JavaExec) {
     group = 'verification'
     description = 'Verifies every GeoWorld-realized biome is registered by the world preset.'
@@ -260,6 +280,8 @@ tasks.register('verifyGeoWorldShoreline', JavaExec) {
 
 tasks.named('check').configure {
     dependsOn tasks.named('verifyGeoWorldBiomePreset')
+    dependsOn tasks.named('auditGeoWorldBiomeCoverage')
+    dependsOn tasks.named('verifyGeoWorldMinerals')
     dependsOn tasks.named('verifyGeoWorldDecorationPolicy')
     dependsOn tasks.named('verifyGeoWorldWaterOwnership')
     dependsOn tasks.named('verifyGeoWorldShoreline')

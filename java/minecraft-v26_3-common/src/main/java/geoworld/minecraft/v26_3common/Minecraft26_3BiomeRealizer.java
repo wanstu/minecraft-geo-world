@@ -45,7 +45,10 @@ public final class Minecraft26_3BiomeRealizer {
         double blockX,
         double blockZ
     ) {
-        return surfaceBiomeId(model, blockX, blockZ);
+        String ensured = Minecraft26_3BiomeCoverage.forModel(model).override(
+            model, blockX, 319, blockZ
+        );
+        return ensured != null ? ensured : surfaceBiomeId(model, blockX, blockZ);
     }
 
     public static String biomeId(
@@ -54,6 +57,12 @@ public final class Minecraft26_3BiomeRealizer {
         double blockY,
         double blockZ
     ) {
+        String ensured = Minecraft26_3BiomeCoverage.forModel(model).override(
+            model, blockX, blockY, blockZ
+        );
+        if (ensured != null) {
+            return ensured;
+        }
         GeoWorldV1.RuntimeSample sample = model.sample(blockX, blockZ);
         int surfaceY = HEIGHTS.boundaryY(sample.groundHeight()) - 1;
         String cave = caveBiomeId(

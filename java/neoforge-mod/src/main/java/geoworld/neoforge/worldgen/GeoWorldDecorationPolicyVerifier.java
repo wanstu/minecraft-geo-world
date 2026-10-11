@@ -19,114 +19,94 @@ public final class GeoWorldDecorationPolicyVerifier {
         ResourceKey<PlacedFeature> waterKey = key("spring_water");
         ResourceKey<PlacedFeature> lavaKey = key("spring_lava");
         ResourceKey<PlacedFeature> flowerKey = key("flower_default");
+        ResourceKey<PlacedFeature> gravelKey = key("ore_gravel");
+        ResourceKey<PlacedFeature> geodeKey = key("amethyst_geode");
+        ResourceKey<PlacedFeature> tuffKey = key("ore_tuff");
+        ResourceKey<PlacedFeature> ironKey = key("ore_iron_middle");
+        ResourceKey<PlacedFeature> copperKey = key("ore_copper_large");
 
+        List<String> oreFamilies = List.of(
+            "coal", "iron", "copper", "gold", "lapis",
+            "redstone", "diamond", "emerald"
+        );
         if (!GeoWorldDecorationPolicy.suppresses(waterKey)) {
-            throw new AssertionError(
-                "minecraft:spring_water must be suppressed in GeoWorld"
-            );
+            throw new AssertionError("minecraft:spring_water must be suppressed");
         }
-        if (
-            GeoWorldDecorationPolicy.suppresses(lavaKey) ||
-            GeoWorldDecorationPolicy.suppresses(flowerKey)
-        ) {
-            throw new AssertionError(
-                "GeoWorld decoration policy suppresses a non-water feature"
-            );
+        for (String ore : oreFamilies) {
+            if (!GeoWorldDecorationPolicy.suppresses(key("ore_" + ore)) ||
+                !GeoWorldDecorationPolicy.suppresses(key("ore_" + ore + "_upper"))) {
+                throw new AssertionError("unfiltered overworld ore family: " + ore);
+            }
+        }
+        var foreignIron = ResourceKey.create(
+            Registries.PLACED_FEATURE,
+            Identifier.fromNamespaceAndPath("examplemod", "ore_iron")
+        );
+        for (ResourceKey<PlacedFeature> keep : List.of(
+            lavaKey, flowerKey, gravelKey, geodeKey, tuffKey, foreignIron
+        )) {
+            if (GeoWorldDecorationPolicy.suppresses(keep)) {
+                throw new AssertionError("unexpectedly suppresses " + keep.identifier());
+            }
         }
 
         HolderOwner<PlacedFeature> owner = new HolderOwner<>() {};
-        Holder<PlacedFeature> water =
-            Holder.Reference.createStandAlone(owner, waterKey);
-        Holder<PlacedFeature> lava =
-            Holder.Reference.createStandAlone(owner, lavaKey);
-        Holder<PlacedFeature> flower =
-            Holder.Reference.createStandAlone(owner, flowerKey);
+        Holder<PlacedFeature> water = holder(owner, waterKey);
+        Holder<PlacedFeature> lava = holder(owner, lavaKey);
+        Holder<PlacedFeature> flower = holder(owner, flowerKey);
+        Holder<PlacedFeature> gravel = holder(owner, gravelKey);
+        Holder<PlacedFeature> geode = holder(owner, geodeKey);
+        Holder<PlacedFeature> iron = holder(owner, ironKey);
+        Holder<PlacedFeature> copper = holder(owner, copperKey);
 
         int springStep = GenerationStep.Decoration.FLUID_SPRINGS.ordinal();
-        int vegetationStep =
-            GenerationStep.Decoration.VEGETAL_DECORATION.ordinal();
-        int stepCount = Math.max(springStep, vegetationStep) + 1;
+        int oreStep = GenerationStep.Decoration.UNDERGROUND_ORES.ordinal();
+        int flowerStep = GenerationStep.Decoration.VEGETAL_DECORATION.ordinal();
+        int stepCount = Math.max(Math.max(springStep, oreStep), flowerStep) + 1;
 
-        List<HolderSet<PlacedFeature>> steps =
-            new ArrayList<>(stepCount);
+        List<HolderSet<PlacedFeature>> source = new ArrayList<>();
         for (int i = 0; i < stepCount; i++) {
-            steps.add(HolderSet.empty());
+            source.add(HolderSet.empty());
         }
-        steps.set(
-            springStep,
-            HolderSet.direct(List.of(water, lava))
-        );
-        steps.set(
-            vegetationStep,
-            HolderSet.direct(List.of(flower))
-        );
+        source.set(springStep, HolderSet.direct(List.of(water, lava)));
+        source.set(oreStep, HolderSet.direct(List.of(iron, gravel, copper, geode)));
+        source.set(flowerStep, HolderSet.direct(List.of(flower)));
 
         List<HolderSet<PlacedFeature>> filtered =
-            GeoWorldDecorationPolicy.filterFeatureSteps(steps);
-
-        if (filtered == steps) {
-            throw new AssertionError(
-                "feature list containing spring_water was not filtered"
-            );
+            GeoWorldDecorationPolicy.filterFeatureSteps(source);
+        if (filtered == source || filtered.size() != source.size()) {
+            throw new AssertionError("decoration filter failed to preserve steps");
         }
-        if (filtered.size() != steps.size()) {
-            throw new AssertionError(
-                "filter changed decoration step count: source=" +
-                steps.size() +
-                " filtered=" +
-                filtered.size()
-            );
+        if (!keys(filtered.get(springStep)).equals(List.of(lavaKey))) {
+            throw new AssertionError("spring_lava was removed or reordered");
         }
-        if (contains(filtered, waterKey)) {
-            throw new AssertionError(
-                "spring_water remains in filtered feature steps"
-            );
+        if (!keys(filtered.get(oreStep)).equals(List.of(gravelKey, geodeKey))) {
+            throw new AssertionError("non-ore underground features were removed or reordered");
         }
-        if (!contains(filtered, lavaKey) || !contains(filtered, flowerKey)) {
-            throw new AssertionError(
-                "filter removed an unrelated biome feature"
-            );
+        if (!keys(filtered.get(flowerStep)).equals(List.of(flowerKey))) {
+            throw new AssertionError("vegetation was changed");
         }
-        if (!contains(steps, waterKey)) {
-            throw new AssertionError(
-                "filter mutated source feature steps"
-            );
+        if (!keys(source.get(oreStep)).equals(
+            List.of(ironKey, gravelKey, copperKey, geodeKey)
+        )) {
+            throw new AssertionError("source decoration list was mutated");
         }
-
         List<HolderSet<PlacedFeature>> untouched =
-            List.of(HolderSet.direct(List.of(lava, flower)));
-        if (
-            GeoWorldDecorationPolicy.filterFeatureSteps(untouched) !=
-            untouched
-        ) {
-            throw new AssertionError(
-                "feature list without spring_water should be reused unchanged"
-            );
+            List.of(HolderSet.direct(List.of(lava, geode)));
+        if (GeoWorldDecorationPolicy.filterFeatureSteps(untouched) != untouched) {
+            throw new AssertionError("unfiltered features must reuse original steps");
         }
-
-        List<ResourceKey<PlacedFeature>> springOrder =
-            keys(filtered.get(springStep));
-        if (!springOrder.equals(List.of(lavaKey))) {
-            throw new AssertionError(
-                "fluid-springs feature order changed: " + springOrder
-            );
-        }
-        List<ResourceKey<PlacedFeature>> vegetationOrder =
-            keys(filtered.get(vegetationStep));
-        if (!vegetationOrder.equals(List.of(flowerKey))) {
-            throw new AssertionError(
-                "vegetation feature order changed: " + vegetationOrder
-            );
-        }
-
         System.out.printf(
-            "GeoWorld decoration policy verification passed: " +
-            "suppressed=minecraft:spring_water, preserved=%s,%s, " +
-            "steps=%d, order=stable%n",
-            lavaKey.identifier(),
-            flowerKey.identifier(),
-            filtered.size()
+            "GeoWorld decoration policy PASS: spring_water removed, " +
+            "8 vanilla ore families replaced, amethyst geodes/gravel/tuff/lava " +
+            "and foreign mod ores retained, steps=%d%n", stepCount
         );
+    }
+
+    private static Holder<PlacedFeature> holder(
+        HolderOwner<PlacedFeature> owner, ResourceKey<PlacedFeature> key
+    ) {
+        return Holder.Reference.createStandAlone(owner, key);
     }
 
     private static ResourceKey<PlacedFeature> key(String path) {
@@ -136,22 +116,7 @@ public final class GeoWorldDecorationPolicyVerifier {
         );
     }
 
-    private static boolean contains(
-        List<HolderSet<PlacedFeature>> steps,
-        ResourceKey<PlacedFeature> key
-    ) {
-        return steps.stream()
-            .flatMap(HolderSet::stream)
-            .anyMatch(holder -> holder.unwrapKey()
-                .map(key::equals)
-                .orElse(false));
-    }
-
-    private static List<ResourceKey<PlacedFeature>> keys(
-        HolderSet<PlacedFeature> set
-    ) {
-        return set.stream()
-            .map(holder -> holder.unwrapKey().orElseThrow())
-            .toList();
+    private static List<ResourceKey<PlacedFeature>> keys(HolderSet<PlacedFeature> set) {
+        return set.stream().map(h -> h.unwrapKey().orElseThrow()).toList();
     }
 }

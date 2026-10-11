@@ -27,6 +27,13 @@ import java.util.WeakHashMap;
 final class GeoWorldDecorationPolicy {
     private static final Identifier VANILLA_SPRING_WATER =
         Identifier.withDefaultNamespace("spring_water");
+    // GeoWorld replaces these overworld ore families with deterministic
+    // mineral veins. Keep vanilla decorative stone, gravel, dirt, flowers,
+    // trees, structures, and Nether-only ancient debris untouched.
+    private static final List<String> REPLACED_ORE_PREFIXES = List.of(
+        "ore_coal", "ore_iron", "ore_copper", "ore_gold",
+        "ore_lapis", "ore_redstone", "ore_diamond", "ore_emerald"
+    );
 
     private static final Map<
         BiomeGenerationSettings,
@@ -53,7 +60,19 @@ final class GeoWorldDecorationPolicy {
     }
 
     static boolean suppresses(ResourceKey<PlacedFeature> key) {
-        return key.identifier().equals(VANILLA_SPRING_WATER);
+        if (key.identifier().equals(VANILLA_SPRING_WATER)) {
+            return true;
+        }
+        if (!"minecraft".equals(key.identifier().getNamespace())) {
+            return false;
+        }
+        String path = key.identifier().getPath();
+        for (String prefix : REPLACED_ORE_PREFIXES) {
+            if (path.equals(prefix) || path.startsWith(prefix + "_")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static List<HolderSet<PlacedFeature>> filterFeatureSteps(

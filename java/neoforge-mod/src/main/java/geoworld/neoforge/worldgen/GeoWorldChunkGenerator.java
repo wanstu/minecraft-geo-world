@@ -218,6 +218,12 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
             }
         }
 
+        // Overlay deterministic, ecology-biased 3D mineral veins after the
+        // solid/water voxels exist. The planner clips world-space seams to
+        // this chunk and never replaces the surface or water blocks.
+        GeoWorldMineralVeins.populate(chunk, runtime, randomState.seed(), shoreline);
+        GeoWorldAmethystGeodes.populate(chunk, randomState.seed(), shoreline);
+
         return CompletableFuture.completedFuture(chunk);
     }
 
@@ -451,7 +457,9 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
                     )
                 );
             }
-            return Blocks.STONE.defaultBlockState();
+            return y < 0
+                ? Blocks.DEEPSLATE.defaultBlockState()
+                : Blocks.STONE.defaultBlockState();
         }
 
         if (y < waterBoundary) {

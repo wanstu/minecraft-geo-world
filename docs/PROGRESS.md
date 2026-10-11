@@ -2350,3 +2350,18 @@ Seed 10400（640x400）：
 - NeoForge build/check PASS：BiomePreset 56/56、DecorationPolicy、Shoreline、WaterOwnership 全绿；WaterOwnership 扫描 1183 chunks / 302848 columns，unowned/unsafe/freeFall/runtimeLost/riverPeak/wetlandLeak 均为 0。
 - geoworld-river-navigation-audit -strict PASS：totalDownstreamRises=0、totalDryCenterlineSamples=0、maxAdjacentWaterStepBlocks=1、disconnectedLakeFeeders=0。
 - 最新 dev JAR 已通过正式 build.cmd 部署到 HMCL 26.3，仅用于新世界视觉测试；客户端尚未进行新版视觉复测，不能宣布山体视觉验收通过。
+
+## 2026-10-11 · 主世界全矿物与全群系生成保证
+
+用户要求：所有主世界矿物都必须真正生成矿脉，主世界全部群系必须存在，不接受仅在注册列表中出现的假通过。
+
+- 扫描现有 56 种主世界群系，原版 Seed 123456 完整模型实际 70,231 次采样只发现 36/56，旧 BiomePreset 56/56 只证明已注册。新增 Minecraft26_3BiomeCoverage：确定性搜索气温、雨量、地形、水域与高度合适的真实坐标，为 56 群系分配地理上优先合理的保底区域，并保留原始生态群系/水文/地形生成。
+- 新增真正的世界三维群系覆盖审计；Seed 123456 与 Seed -4852173505788415804 各 80,264 次实际采样，均为 56/56、missing=0，且校验每个保底区域有连续实际 biomeId。
+- 新建 GeoWorldMineralVeins：八类常规 Overworld 矿石（煤、铁、铜、金、青金石、红石、钻石、绿宝石），各有 STONE/DEEPSLATE 变体，物理 Y 高度、地质场与生态权重。世界空间独立确定性曲线脉、偶发大矿脉、保底超级网格矿脉；只替换石头、深板岩及地表以下 4 格的主岩体。
+- 新建 GeoWorldAmethystGeodes：保底隐藏紫水晶晶洞（紫水晶/紫水晶母岩/方解石/平滑玄武岩），且原版 amethyst_geode 继续保留；地下生成不会覆盖任何 River/Lake/Ocean 水面与非石层。
+- GeoWorldDecorationPolicy 仅移除目标 8 类 vanilla ore Feature，保留 spring_lava、ore_gravel、ore_tuff、amethyst_geode、结构、植被及其他 MOD 的矿物 Feature。
+- 引擎 cache v14 -> v15；矿物和群系分布变化需要新建世界或验证未生成区块。
+- verifyGeoWorldMinerals：Seed 123456 和 -4852173505788415804 均 PASS（8 类矿、16 普通/深板岩变种、紫水晶晶洞、有效地下石层、不同地质权重、跨区块顺序无关）。
+- NeoForge build/check：56 群系真实覆盖、8 类矿石、原版装饰策略、Shoreline 与 WaterOwnership 均 PASS；所有水体所有权异常仍为 0。
+- 注意：矿物地质判断仍来自地表形态/群系倾向，没有独立持久化地下地层模型。群系完整性保证实际生物群系 ID 与区域连续性，不代表每个群系的面积、地物或结构完全等价于 Minecraft 原版；后续仍需实机观察。
+- 完整实现与验证方法见 docs/MINERALS_AND_BIOME_COVERAGE.md。
