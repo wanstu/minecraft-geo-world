@@ -331,6 +331,13 @@ tasks.register('verifyGeoWorldWaterOwnership', JavaExec) {
     mainClass = 'geoworld.neoforge.worldgen.GeoWorldWaterOwnershipVerifier'
 }
 
+tasks.register('probeGeoWorldReportedCoast', JavaExec) {
+    group = 'verification'
+    description = 'Prints actual water/shore voxel cross sections at the reported beach sites.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.worldgen.GeoWorldReportedCoastProbe'
+}
+
 tasks.register('verifyGeoWorldShoreline', JavaExec) {
     group = 'verification'
     description = 'Verifies short stable littoral shelves, shoreline materials, and sugar-cane-ready banks.'
@@ -349,4 +356,5 @@ tasks.named('check').configure {
     dependsOn tasks.named('verifyGeoWorldDecorationPolicy')
     dependsOn tasks.named('verifyGeoWorldWaterOwnership')
     dependsOn tasks.named('verifyGeoWorldShoreline')
+    dependsOn tasks.named('probeGeoWorldReportedCoast')
 }

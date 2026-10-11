@@ -326,6 +326,22 @@ final class GeoWorldShoreline {
             ) {
                 waterGround = ownWater - 1;
             }
+            if (("Ocean".equals(center.waterKind()) ||
+                 "Lake".equals(center.waterKind())) &&
+                ownWater - waterGround >= 2 &&
+                ownWater - waterGround <= 8) {
+                // The old planner only leveled dry sand. A four-block-deep
+                // ocean bed could therefore meet a raised sand rim as a
+                // vertical wall. Lift just the near-shore *wet* bed through
+                // a 1,2,3,4-block bathymetric profile without touching the
+                // model-owned water surface or adding water sources.
+                int dryDistance = nearestGentleDryBank(neighborhood);
+                if (dryDistance > 0) {
+                    waterGround = Math.max(
+                        waterGround, ownWater - dryDistance
+                    );
+                }
+            }
             return new Column(
                 center,
                 originalGround,
@@ -700,6 +716,25 @@ final class GeoWorldShoreline {
         return "Wetland".equals(sample.biomeFamily()) ||
             "Wet Mud".equals(sample.surfaceProfile()) ||
             "Peat".equals(sample.surfaceProfile());
+    }
+
+    private static int nearestGentleDryBank(Neighborhood neighborhood) {
+        for (int distance = 1; distance <= MAX_SHORE_DISTANCE; distance++) {
+            for (int dx = -distance; dx <= distance; dx++) {
+                int dz = distance - Math.abs(dx);
+                if (isGentleDryBank(neighborhood.sample(dx, dz)) ||
+                    (dz != 0 &&
+                     isGentleDryBank(neighborhood.sample(dx, -dz)))) {
+                    return distance;
+                }
+            }
+        }
+        return 0;
+    }
+
+    private static boolean isGentleDryBank(GeoWorldV1.RuntimeSample sample) {
+        if (isWater(sample) || isRocky(sample)) return false;
+        return !"Canyon".equals(sample.terrainVariant());
     }
 
     private static WaterNeighbor findNearestWater(
