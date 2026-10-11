@@ -36,6 +36,7 @@ public final class GeoWorldSurfaceOutcropVerifier {
         GeoWorldMineralVeins.Placement first = null;
         Set<Long> visibleCoords = new HashSet<>();
         Map<Long, GeoWorldShoreline.Column> columns = new HashMap<>();
+        Map<Long, Set<Integer>> oreColumnHeights = new HashMap<>();
         for (var placement : planned) {
             if (placement.y() < 241) continue;
             upperDeposits++;
@@ -49,7 +50,7 @@ public final class GeoWorldSurfaceOutcropVerifier {
                 !"None".equals(column.sample().waterKind())) continue;
             int surface = column.groundBoundary() - 1;
             if (placement.y() > surface ||
-                placement.y() < surface - 9) continue;
+                placement.y() < surface - 13) continue;
 
             String biome = Minecraft26_3BiomeRealizer.biomeIdFromSample(
                 model, placement.x(), surface,
@@ -61,6 +62,10 @@ public final class GeoWorldSurfaceOutcropVerifier {
             );
             if (!"minecraft:stone".equals(top)) continue;
             upperCandidateRock++;
+            oreColumnHeights.computeIfAbsent(
+                coordKey(placement.x(), placement.z()),
+                ignored -> new HashSet<>()
+            ).add(placement.y());
             if (placement.y() == surface) {
                 visibleTopRock++;
                 visibleCoords.add(coordKey(placement.x(), placement.z()));
@@ -77,6 +82,22 @@ public final class GeoWorldSurfaceOutcropVerifier {
         }
 
         int largestExposedPatch = largestPatch(visibleCoords);
+        int deepestExposedColumn = 0;
+        int thickLodeColumns = 0;
+        for (long key : visibleCoords) {
+            Set<Integer> ys = oreColumnHeights.get(key);
+            if (ys == null) continue;
+            int depth = ys.size();
+            deepestExposedColumn = Math.max(deepestExposedColumn, depth);
+            if (depth >= 4) thickLodeColumns++;
+        }
+        if (deepestExposedColumn < 5 || thickLodeColumns < 30) {
+            throw new AssertionError(
+                "mineral bodies do not extend beneath exposed rock: " +
+                "deepestColumn=" + deepestExposedColumn +
+                ", thickColumns=" + thickLodeColumns
+            );
+        }
         // Real exposed STONE tops: require larger coherent patches than
         // the old 414 tops / largest-64 baseline, but prevent ore carpeting.
         if (seed == -563659577384754347L &&
@@ -110,9 +131,11 @@ public final class GeoWorldSurfaceOutcropVerifier {
             "GeoWorld high mountain outcrops PASS seed=%d planned=%d " +
             "above240=%d candidateRock=%d visibleStoneTop=%d " +
             "distinctVisible=%d largestConnected=%d " +
+            "deepestColumn=%d thickLodeColumns=%d " +
             "example=(%d,%d,%d) chunkBoundary=PASS%n",
             seed, planned.size(), upperDeposits, upperCandidateRock,
             visibleTopRock, visibleCoords.size(), largestExposedPatch,
+            deepestExposedColumn, thickLodeColumns,
             first.x(), first.y(), first.z()
         );
     }

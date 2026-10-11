@@ -7,6 +7,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
+import java.util.BitSet;
 import java.util.SplittableRandom;
 import java.util.function.Consumer;
 
@@ -29,9 +30,6 @@ final class GeoWorldMineralVeins {
     private static final Minecraft26_3HeightMapping HEIGHTS =
         new Minecraft26_3HeightMapping();
     private static final long OUTCROP_SALT = 0x4F555443524F5053L;
-    private static final int[][] FACE_DIRECTIONS = {
-        {1, 0}, {-1, 0}, {0, 1}, {0, -1}
-    };
 
     enum Mineral {
         COAL(-63, 215, 7.5),
@@ -106,6 +104,11 @@ final class GeoWorldMineralVeins {
                 added[0]++;
             }
         });
+        // The swept ellipsoids overlap heavily. Deduplicate their voxel
+        // positions before even probing host blocks, and cache the expensive
+        // mountain/rock-surface validation once per x/z column.
+        BitSet seenOutcrop = new BitSet(384 * 256);
+        byte[] rockSurface = new byte[256];
         // Independently plan rare lodes intersecting natural high rock.
         // Subsurface mineral reserves remain intact; only real exposed
         // stone on mountains can receive these surface-visible ores.
@@ -113,26 +116,34 @@ final class GeoWorldMineralVeins {
             placement -> {
                 int localX = placement.x() - minX;
                 int localZ = placement.z() - minZ;
+                int voxel = ((placement.y() + 63) * 256) +
+                    localZ * 16 + localX;
+                if (seenOutcrop.get(voxel)) return;
+                seenOutcrop.set(voxel);
+
                 GeoWorldShoreline.Column column = shoreline.column(localX, localZ);
-                if (column.surfaceOverride() != null ||
-                    !"None".equals(column.sample().waterKind()) ||
-                    !isMountain(column.sample().terrainVariant())) {
-                    return;
-                }
                 int surface = column.groundBoundary() - 1;
-                if (placement.y() > surface || placement.y() < surface - 9) {
+                if (placement.y() > surface || placement.y() < surface - 13) {
                     return;
                 }
+                // Confirm the entire host column is a naturally exposed rock
+                // formation, not buried beneath snow, grass or an ocean.
+                int columnIndex = localZ * 16 + localX;
+                if (rockSurface[columnIndex] == 0) {
+                    if (column.surfaceOverride() != null ||
+                        !"None".equals(column.sample().waterKind()) ||
+                        !isMountain(column.sample().terrainVariant())) {
+                        rockSurface[columnIndex] = 1;
+                    } else {
+                        position.set(placement.x(), surface, placement.z());
+                        rockSurface[columnIndex] = (byte)(
+                            chunk.getBlockState(position).is(Blocks.STONE) ? 2 : 1
+                        );
+                    }
+                }
+                if (rockSurface[columnIndex] != 2) return;
                 position.set(placement.x(), placement.y(), placement.z());
-                if (!chunk.getBlockState(position).is(Blocks.STONE)) {
-                    return;
-                }
-                if (!isExposedRockFace(
-                    model, shoreline, minX, minZ, localX, localZ,
-                    placement.y(), surface
-                )) {
-                    return;
-                }
+                if (!chunk.getBlockState(position).is(Blocks.STONE)) return;
                 chunk.setBlockState(
                     position, placement.mineral().blockAt(placement.y())
                 );
@@ -144,26 +155,6 @@ final class GeoWorldMineralVeins {
     private static boolean isMountain(String terrain) {
         return "Mountain".equals(terrain) ||
             "Foothills".equals(terrain);
-    }
-
-    private static boolean isExposedRockFace(
-        GeoWorldV1 model, GeoWorldShoreline.ChunkPlan shore,
-        int baseX, int baseZ, int localX, int localZ, int y, int surface
-    ) {
-        if (y == surface) return true;
-        for (int[] direction : FACE_DIRECTIONS) {
-            int nx = localX + direction[0];
-            int nz = localZ + direction[1];
-            GeoWorldShoreline.Column neighbor =
-                nx >= 0 && nx < 16 && nz >= 0 && nz < 16
-                    ? shore.column(nx, nz)
-                    : GeoWorldShoreline.plan(model, baseX + nx, baseZ + nz);
-            if (neighbor.groundBoundary() <= y &&
-                neighbor.waterBoundary() <= y) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -213,7 +204,7 @@ final class GeoWorldMineralVeins {
                             default -> Mineral.EMERALD;
                         };
                 emitVein(
-                    mineral, centerX, surface - 2.0, centerZ,
+                    mineral, centerX, surface - 4.0, centerZ,
                     random, minX, maxX, minZ, maxZ, consumer, true
                 );
             }
@@ -438,21 +429,23 @@ final class GeoWorldMineralVeins {
             double cz = z + longitudinal * dz + lateral * dx;
             double cy = y + longitudinal * tilt;
             double r = radius * (0.82 + 0.18 * Math.sin(t * Math.PI));
+            double verticalRadius = rockyOutcrop ? r * 1.75 : r;
             int left = Math.max(minX, (int)Math.floor(cx - r));
             int right = Math.min(maxX, (int)Math.ceil(cx + r));
             int north = Math.max(minZ, (int)Math.floor(cz - r));
             int south = Math.min(maxZ, (int)Math.ceil(cz + r));
-            int low = Math.max(MIN_Y, (int)Math.floor(cy - r));
-            int high = Math.min(MAX_Y, (int)Math.ceil(cy + r));
+            int low = Math.max(MIN_Y, (int)Math.floor(cy - verticalRadius));
+            int high = Math.min(MAX_Y, (int)Math.ceil(cy + verticalRadius));
             if (left > right || north > south || low > high) {
                 continue;
             }
             for (int bx = left; bx <= right; bx++) {
                 for (int bz = north; bz <= south; bz++) {
                     for (int by = low; by <= high; by++) {
-                        double rr = (bx - cx) * (bx - cx) +
-                            (bz - cz) * (bz - cz) + (by - cy) * (by - cy);
-                        if (rr <= r * r) {
+                        double horizontal2 = (bx - cx) * (bx - cx) +
+                            (bz - cz) * (bz - cz);
+                        double vertical = (by - cy) / verticalRadius;
+                        if (horizontal2 / (r * r) + vertical * vertical <= 1.0) {
                             consumer.accept(new Placement(bx, by, bz, mineral));
                         }
                     }

@@ -133,7 +133,11 @@ public final class Minecraft26_3BiomeRealizer {
             return coastBiomeId(sample);
         }
 
-        if (isMushroomCandidate(model, sample, blockX, blockZ)) {
+        // Both mushroom coasts and region tags require the same 96-block
+        // ocean-neighbor test. Reuse it rather than sampling eight model
+        // positions twice for every temperate-forest or grassland column.
+        boolean nearOcean96 = nearOcean(model, blockX, blockZ, 96.0);
+        if (isMushroomCandidate(model, sample, blockX, blockZ, nearOcean96)) {
             return "minecraft:mushroom_fields";
         }
 
@@ -155,7 +159,8 @@ public final class Minecraft26_3BiomeRealizer {
             sample,
             climate,
             blockX,
-            blockZ
+            blockZ,
+            nearOcean96
         );
         return erodedBoundaryBiome(
             model,
@@ -229,7 +234,8 @@ public final class Minecraft26_3BiomeRealizer {
         GeoWorldV1.RuntimeSample sample,
         GeoWorldV1.ClimateSample climate,
         double x,
-        double z
+        double z,
+        boolean nearOcean96
     ) {
         double temp = climate.available()
             ? climate.annualMeanTempC()
@@ -247,8 +253,7 @@ public final class Minecraft26_3BiomeRealizer {
             temp,
             precip,
             monsoon,
-            x,
-            z
+            nearOcean96
         );
         String fallback = Minecraft26_3ProfileMapping.biomeId(
             sample.biomeFamily()
@@ -273,8 +278,7 @@ public final class Minecraft26_3BiomeRealizer {
         double temp,
         double precip,
         double monsoon,
-        double x,
-        double z
+        boolean nearOcean96
     ) {
         EnumSet<Minecraft26_3BiomeCatalog.Tag> tags =
             EnumSet.noneOf(Minecraft26_3BiomeCatalog.Tag.class);
@@ -433,7 +437,7 @@ public final class Minecraft26_3BiomeRealizer {
         // ecological model itself selected Wetland (or peat/wetland vegetation
         // added the tag above). High rainfall alone must not make every major
         // river corridor a Minecraft swamp.
-        if (nearOcean(model, x, z, 96.0)) {
+        if (nearOcean96) {
             tags.add(Minecraft26_3BiomeCatalog.Tag.COASTAL);
         }
         return tags;
@@ -513,13 +517,14 @@ public final class Minecraft26_3BiomeRealizer {
         GeoWorldV1 model,
         GeoWorldV1.RuntimeSample sample,
         double x,
-        double z
+        double z,
+        boolean nearOcean96
     ) {
         if (!sample.sourceLand() ||
             (!"Temperate Grassland".equals(sample.biomeFamily()) &&
              !"Temperate Forest".equals(sample.biomeFamily())) ||
             "Mountain".equals(sample.terrainVariant()) ||
-            !nearOcean(model, x, z, 96.0)) {
+            !nearOcean96) {
             return false;
         }
         double broad = smoothValueNoise(
