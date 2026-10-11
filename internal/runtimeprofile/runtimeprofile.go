@@ -285,10 +285,18 @@ func (m *Model) applyElevationZoning(worldX, worldZ float64, s *Sample) {
 	if effectiveHeight >= snowLine {
 		s.BiomeFamily = mcprofile.BiomeAlpine
 		s.VegetationProfile = mcprofile.VegetationAlpineSparse
-		if effectiveHeight >= snowLine+0.055 {
-			s.SurfaceProfile = mcprofile.SurfaceAlpineSnow
-		} else {
+		// Exposed rock follows terrain steepness rather than a continuous
+		// altitude stripe. Snow stays on walkable shoulders, including the
+		// lower alpine transition, while steep faces can be bare even high up.
+		baseHeight := m.Runtime.Ground.Base.SampleNormalized(worldX, worldZ)
+		dx := (m.Runtime.Ground.Base.SampleNormalized(worldX+16, worldZ) - baseHeight) * 514 / 16
+		dz := (m.Runtime.Ground.Base.SampleNormalized(worldX, worldZ+16) - baseHeight) * 514 / 16
+		slope := math.Hypot(dx, dz)
+		rockPatch := 0.5 + 0.5*valueNoise(seed+33131, worldX, worldZ, cellSize*1.1)
+		if exposedAlpineRock(slope, rockPatch) {
 			s.SurfaceProfile = mcprofile.SurfaceAlpineRock
+		} else {
+			s.SurfaceProfile = mcprofile.SurfaceAlpineSnow
 		}
 		return
 	}
@@ -330,6 +338,13 @@ func (m *Model) applyElevationZoning(worldX, worldZ float64, s *Sample) {
 		s.SurfaceProfile = mcprofile.SurfaceGrassLoam
 		s.VegetationProfile = mcprofile.VegetationGrassland
 	}
+}
+
+// A flat snowfield must remain snow regardless of altitude or patch noise.
+// Rock outcrops are reserved for exposed high-gradient alpine faces.
+func exposedAlpineRock(slope, rockPatch float64) bool {
+	exposure := smoothstep(clamp((slope-0.32)/(0.85-0.32), 0, 1))
+	return exposure > 0.52+0.18*(rockPatch-0.5)
 }
 
 func terrainElevationContext(v mcprofile.TerrainVariant) float64 {

@@ -247,7 +247,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	// Add sparse, localized summit nodes along the ridge network. The previous
 	// ridge-only term made elevated crests, but from eye level they could still
 	// read as long rounded backs rather than individual peaks.
-	peakBlob := cellularPeak(m.Config.Seed+547, worldX, worldZ, 720)
+	peakBlob := cellularRidgePeak(m.Config.Seed+547, worldX, worldZ, 720)
 	localizedSummit := math.Pow(peakBlob, 4.2) *
 		smoothstep01(0.44, 0.82, crest) * 0.125
 
@@ -281,6 +281,10 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	// River-cut valleys are handled separately below by the real hydrologic
 	// ValleyWeight/CanyonWeight fields.
 	structuralSaddle := math.Pow(clamp(1-crest, 0, 1), 2.4) * 0.028
+	// Carve shallow head gullies between subsidiary ridges rather than
+	// lifting the whole mountainside into another smooth mound.
+	ridgeIncision := smoothstep01(0.37, 0.68, 1-ridgeFine) *
+		smoothstep01(0.50, 0.74, ridgeBroad) * 0.050
 	slopeWave := fbm(m.Config.Seed+509, worldX, worldZ, 270, 3) * 0.014
 
 	plateauDetail := fbm(m.Config.Seed+503, worldX, worldZ, 2600, 2) * m.Config.PlateauAmplitude
@@ -289,7 +293,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		plain*plainDetail +
 			hill*hillDetail +
 			foothill*foothillDetail +
-			mountain*(mountainDetail+mountainCrest+summit+localizedSummit+summitSpire+cliffEscarpment+slopeWave-structuralSaddle) +
+			mountain*(mountainDetail+mountainCrest+summit+localizedSummit+summitSpire+cliffEscarpment+slopeWave-structuralSaddle-ridgeIncision) +
 			plateau*plateauDetail
 
 	// Broad depositional lowlands should be smoother than surrounding terrain.
@@ -419,6 +423,38 @@ func fbm(seed int64, x, z, wavelength float64, octaves int) float64 {
 		return 0
 	}
 	return sum / sumAmplitude
+}
+
+// cellularRidgePeak stretches local summits along a reproducible structural
+// axis. Steeper cross-ridge flanks and longer ridges replace circular mounds.
+// Neighbor-cell candidates overlap, keeping this a continuous world function.
+func cellularRidgePeak(seed int64, x, z, cellSize float64) float64 {
+	if cellSize <= 0 {
+		return 0
+	}
+	gx := int64(math.Floor(x / cellSize))
+	gz := int64(math.Floor(z / cellSize))
+	best := 0.0
+	for dz := int64(-1); dz <= 1; dz++ {
+		for dx := int64(-1); dx <= 1; dx++ {
+			cx, cz := gx+dx, gz+dz
+			ux := 0.5 + 0.5*hashValue(seed+17, cx, cz)
+			uz := 0.5 + 0.5*hashValue(seed+53, cx, cz)
+			px := (float64(cx) + 0.16 + 0.68*ux) * cellSize
+			pz := (float64(cz) + 0.16 + 0.68*uz) * cellSize
+			heading := math.Pi * hashValue(seed+97, cx, cz)
+			c, s := math.Cos(heading), math.Sin(heading)
+			ox, oz := x-px, z-pz
+			along := ox*c + oz*s
+			across := -ox*s + oz*c
+			d := math.Hypot(along/(cellSize*0.68), across/(cellSize*0.29))
+			ridge := 1 - smoothstep01(0.08, 1, d)
+			if ridge > best {
+				best = ridge
+			}
+		}
+	}
+	return clamp(best, 0, 1)
 }
 
 func cellularPeak(seed int64, x, z, cellSize float64) float64 {

@@ -92,6 +92,7 @@ func main() {
 	width := flag.Int("width", 640, "macro grid width")
 	height := flag.Int("height", 400, "macro grid height")
 	cellSize := flag.Float64("cell-size", 128, "Minecraft blocks per macro cell")
+	centered := flag.Bool("centered", false, "center the model at the Minecraft origin, as the MOD does")
 	flag.Parse()
 
 	seeds, err := parseSeeds(*seedsText, *count)
@@ -110,6 +111,10 @@ func main() {
 			Height:      *height,
 			SpanXBlocks: float64(*width-1) * *cellSize,
 			SpanZBlocks: float64(*height-1) * *cellSize,
+		}
+		if *centered {
+			geometry.OriginX = -geometry.SpanXBlocks / 2
+			geometry.OriginZ = -geometry.SpanZBlocks / 2
 		}
 		model, err := generator.GenerateWorld(context.Background(), generator.Config{
 			Seed:          seed,

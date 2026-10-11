@@ -280,7 +280,7 @@
       "x": 0,
       "z": 0,
       "expected": {
-        "groundHeight": 0.5938307701498979,
+        "groundHeight": 0.5904639650997014,
         "waterKind": "None",
         "waterSurfaceDefined": false,
         "waterDepth": 0,
@@ -417,11 +417,11 @@
       "x": 384,
       "z": 128,
       "expected": {
-        "groundHeight": 0.5099150214186025,
+        "groundHeight": 0.5091634724563231,
         "waterKind": "Lake",
         "waterSurfaceDefined": true,
-        "waterSurfaceElevation": 0.5184020535565889,
-        "waterDepth": 0.008487032137986406,
+        "waterSurfaceElevation": 0.517351344306139,
+        "waterDepth": 0.008187871849815953,
         "oceanEligibility": 0,
         "riverWeight": 1,
         "sourceNode": 843,

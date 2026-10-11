@@ -92,6 +92,17 @@ func TestElevationZoningThresholdsFollowClimateAndTerrain(t *testing.T) {
 	}
 }
 
+func TestExposedAlpineRockTracksSlopeRatherThanAltitudeBand(t *testing.T) {
+	for _, patch := range []float64{0, 0.5, 1} {
+		if exposedAlpineRock(0, patch) || exposedAlpineRock(0.25, patch) {
+			t.Fatalf("flat or gently sloped snowfields must not become bare rock, patch=%v", patch)
+		}
+		if !exposedAlpineRock(1.1, patch) {
+			t.Fatalf("steep alpine face must show rock, patch=%v", patch)
+		}
+	}
+}
+
 func TestRuntimeSideMatchesProfile(t *testing.T) {
 	ocean := Sample{
 		SourceLand:        false,

@@ -384,6 +384,25 @@ func TestMountainStructureCreatesSummitsAndSaddles(t *testing.T) {
 	}
 }
 
+func TestCellularRidgePeakHasDirectionalFlanks(t *testing.T) {
+	const seed int64 = 20261011
+	const cellSize = 720.0
+	cx, cz := int64(0), int64(0)
+	ux := 0.5 + 0.5*hashValue(seed+17, cx, cz)
+	uz := 0.5 + 0.5*hashValue(seed+53, cx, cz)
+	px := (float64(cx) + 0.16 + 0.68*ux) * cellSize
+	pz := (float64(cz) + 0.16 + 0.68*uz) * cellSize
+	heading := math.Pi * hashValue(seed+97, cx, cz)
+	c, s := math.Cos(heading), math.Sin(heading)
+	along := cellularRidgePeak(seed, px+0.20*cellSize*c, pz+0.20*cellSize*s, cellSize)
+	across := cellularRidgePeak(seed, px-0.20*cellSize*s, pz+0.20*cellSize*c, cellSize)
+	if along <= across {
+		t.Fatalf("elongated summit lost directional ridge: along=%.5f across=%.5f", along, across)
+	}
+	if top := cellularRidgePeak(seed, px, pz, cellSize); top < 0.99 {
+		t.Fatalf("expected summit core at crest center, got %.5f", top)
+	}
+}
 
 func TestMountainStructureIncludesSparseCliffs(t *testing.T) {
 	in := uniformInput(20, 20, 0.70)

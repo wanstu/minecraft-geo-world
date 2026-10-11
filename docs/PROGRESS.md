@@ -2333,3 +2333,20 @@ Seed 10400（640x400）：
 - NeoForge BiomePreset / DecorationPolicy / Shoreline / WaterOwnership / Engine / Spawn: PASS。
 - WaterOwnership: unowned / unsafe exposed / free-fall / runtime lost / river peak / wetland leak 全 0。
 - NeoForge BUILD SUCCESSFUL，最新 dev JAR 已部署到 HMCL 26.3。
+
+## 2026-10-11 · Seed 123456 高山视觉反馈与定向峰脊/裸岩改造
+
+截图复核（约 X=1411,Z=8024 山脚和 X=1699,Z=8087 峰顶）：虽然有高差，但整体像圆滑大坡，峰顶过宽；雪线附近形成成片灰色裸岩横带。此次针对山体形态而非整体抬高。
+
+- Terrain：将较大尺度的圆形 cellularPeak 改为 cellularRidgePeak，确定性方向、长短轴让峰脊延展且横向更陡；保留小尺度 summitSpire，并在次级山脊之间加入少量 ridgeIncision；只在原 MountainWeight 区域发生作用。
+- RuntimeProfile：取消原先雪线以上 0.055 高度区间统一铺石的规则；改为局部地形坡度和缓变噪声共同决定裸岩，缓坡雪覆盖、陡坡暴露岩石。Go / Java Runtime 同步。
+- EngineBridge 模型缓存前缀 v13 -> v14；实机必须新建世界或验证未生成区块。
+- Terrain Audit 增加 -centered 可选项，以复现 MOD 使用的居中模型布局；640x400 正式基线及 guardrail 保持不变。
+- 新增定向峰脊沿/横衰减与坡度裸岩规则测试。
+- go test ./... -count=1 PASS；Java Golden 15/15 PASS。
+- 正式 640x400 三 Seed Terrain Morphology PASS：Seed123456 山区 cliff50=0.493%、Mountain cliff50=0.335%，平原 steep35=0；731894205 与 10400 通过。
+- strict-final（731894205 / 10400）PASS，最终 Runtime 水文/群系一致性无新增失败。
+- 320x200 -centered Seed123456 作为实景补充审计，按原 guardrail **未通过**：Foothill p99=29.5°、steep35=0.573%（限制25°/0.2%），需进一步调查与改善，不放宽阈值。
+- NeoForge build/check PASS：BiomePreset 56/56、DecorationPolicy、Shoreline、WaterOwnership 全绿；WaterOwnership 扫描 1183 chunks / 302848 columns，unowned/unsafe/freeFall/runtimeLost/riverPeak/wetlandLeak 均为 0。
+- geoworld-river-navigation-audit -strict PASS：totalDownstreamRises=0、totalDryCenterlineSamples=0、maxAdjacentWaterStepBlocks=1、disconnectedLakeFeeders=0。
+- 最新 dev JAR 已通过正式 build.cmd 部署到 HMCL 26.3，仅用于新世界视觉测试；客户端尚未进行新版视觉复测，不能宣布山体视觉验收通过。

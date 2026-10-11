@@ -1104,11 +1104,28 @@ public final class GeoWorldV1 {
                 VEGETATION_NAMES,
                 "Alpine Sparse"
             );
+            // Mirror Go's slope-driven bare rock rule. A snow-line
+            // elevation band must not turn into a horizontal stone stripe.
+            double baseHeight = terrain.sampleNormalized(worldX, worldZ);
+            double dx = (
+                terrain.sampleNormalized(worldX + 16, worldZ) - baseHeight
+            ) * 514 / 16;
+            double dz = (
+                terrain.sampleNormalized(worldX, worldZ + 16) - baseHeight
+            ) * 514 / 16;
+            double slope = Math.hypot(dx, dz);
+            double exposure = smoothstep(0.32, 0.85, slope);
+            double rockPatch = 0.5 + 0.5 * valueNoise(
+                seed + 33131L,
+                worldX,
+                worldZ,
+                cellSize * 1.1
+            );
             int alpineSurface = enumCode(
                 SURFACE_NAMES,
-                effectiveHeight >= snowLine + 0.055
-                    ? "Alpine Snow"
-                    : "Alpine Rock"
+                exposure > 0.52 + 0.18 * (rockPatch - 0.5)
+                    ? "Alpine Rock"
+                    : "Alpine Snow"
             );
             return new ProfileCodes(
                 alpine,
@@ -1978,7 +1995,7 @@ public final class GeoWorldV1 {
                 Math.pow(ridgeIntersection, 2.35) *
                 0.075 *
                 summitMod;
-            double peakBlob = cellularPeak(
+            double peakBlob = cellularRidgePeak(
                 config.seed() + 547,
                 x,
                 z,
@@ -2024,6 +2041,11 @@ public final class GeoWorldV1 {
             double structuralSaddle =
                 Math.pow(clamp(1 - crest, 0, 1), 2.4) *
                 0.028;
+            // Cut head gullies between subsidiary ridges, without broad uplift.
+            double ridgeIncision =
+                smoothstep(0.37, 0.68, 1 - ridgeFine) *
+                smoothstep(0.50, 0.74, ridgeBroad) *
+                0.050;
             double slopeWave =
                 fbm(config.seed() + 509, x, z, 270, 3) *
                 0.014;
@@ -2043,7 +2065,8 @@ public final class GeoWorldV1 {
                     summitSpire +
                     cliffEscarpment +
                     slopeWave -
-                    structuralSaddle
+                    structuralSaddle -
+                    ridgeIncision
                 ) +
                 plateau * plateauDetail;
 
@@ -2230,6 +2253,48 @@ public final class GeoWorldV1 {
             currentWavelength *= 0.5;
         }
         return sumAmplitude <= 0 ? 0 : sum / sumAmplitude;
+    }
+
+    // The structural-axis summit field is continuous across noise cells and
+    // gives each mountain ridge a long crest and a steep transverse flank.
+    private static double cellularRidgePeak(
+        long seed,
+        double x,
+        double z,
+        double cellSize
+    ) {
+        if (cellSize <= 0) {
+            return 0;
+        }
+        long gx = (long)Math.floor(x / cellSize);
+        long gz = (long)Math.floor(z / cellSize);
+        double best = 0;
+        for (long dz = -1; dz <= 1; dz++) {
+            for (long dx = -1; dx <= 1; dx++) {
+                long cx = gx + dx;
+                long cz = gz + dz;
+                double ux = 0.5 + 0.5 * hashValue(seed + 17, cx, cz);
+                double uz = 0.5 + 0.5 * hashValue(seed + 53, cx, cz);
+                double px = (cx + 0.16 + 0.68 * ux) * cellSize;
+                double pz = (cz + 0.16 + 0.68 * uz) * cellSize;
+                double heading = Math.PI * hashValue(seed + 97, cx, cz);
+                double c = Math.cos(heading);
+                double s = Math.sin(heading);
+                double ox = x - px;
+                double oz = z - pz;
+                double along = ox * c + oz * s;
+                double across = -ox * s + oz * c;
+                double d = Math.hypot(
+                    along / (cellSize * 0.68),
+                    across / (cellSize * 0.29)
+                );
+                double ridge = 1 - smoothstep(0.08, 1, d);
+                if (ridge > best) {
+                    best = ridge;
+                }
+            }
+        }
+        return clamp(best, 0, 1);
     }
 
     private static double cellularPeak(
