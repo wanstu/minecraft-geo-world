@@ -8,6 +8,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.ArrayDeque;
 
 /** Confirms rare high-rock lodes actually intersect exposed vanilla stone. */
 public final class GeoWorldSurfaceOutcropVerifier {
@@ -31,17 +34,22 @@ public final class GeoWorldSurfaceOutcropVerifier {
         int visibleTopRock = 0;
         int upperCandidateRock = 0;
         GeoWorldMineralVeins.Placement first = null;
+        Set<Long> visibleCoords = new HashSet<>();
+        Map<Long, GeoWorldShoreline.Column> columns = new HashMap<>();
         for (var placement : planned) {
             if (placement.y() < 241) continue;
             upperDeposits++;
-            var column = GeoWorldShoreline.plan(
-                model, placement.x(), placement.z()
+            var column = columns.computeIfAbsent(
+                coordKey(placement.x(), placement.z()),
+                unused -> GeoWorldShoreline.plan(
+                    model, placement.x(), placement.z()
+                )
             );
             if (column.surfaceOverride() != null ||
                 !"None".equals(column.sample().waterKind())) continue;
             int surface = column.groundBoundary() - 1;
             if (placement.y() > surface ||
-                placement.y() < surface - 6) continue;
+                placement.y() < surface - 9) continue;
 
             String biome = Minecraft26_3BiomeRealizer.biomeIdFromSample(
                 model, placement.x(), surface,
@@ -55,6 +63,7 @@ public final class GeoWorldSurfaceOutcropVerifier {
             upperCandidateRock++;
             if (placement.y() == surface) {
                 visibleTopRock++;
+                visibleCoords.add(coordKey(placement.x(), placement.z()));
                 if (first == null) first = placement;
             }
         }
@@ -67,6 +76,17 @@ public final class GeoWorldSurfaceOutcropVerifier {
             );
         }
 
+        int largestExposedPatch = largestPatch(visibleCoords);
+        // Real exposed STONE tops: require larger coherent patches than
+        // the old 414 tops / largest-64 baseline, but prevent ore carpeting.
+        if (seed == -563659577384754347L &&
+            (visibleCoords.size() < 700 || largestExposedPatch < 100 ||
+                visibleCoords.size() > 2500)) {
+            throw new AssertionError(
+                "rocky ore outcrop size/density regression: unique=" +
+                visibleCoords.size() + " largest=" + largestExposedPatch
+            );
+        }
         int baseX = Math.floorDiv(first.x(), 16) * 16;
         int baseZ = Math.floorDiv(first.z(), 16) * 16;
         Map<GeoWorldMineralVeins.Placement, Integer> whole = new HashMap<>();
@@ -89,9 +109,43 @@ public final class GeoWorldSurfaceOutcropVerifier {
         System.out.printf(
             "GeoWorld high mountain outcrops PASS seed=%d planned=%d " +
             "above240=%d candidateRock=%d visibleStoneTop=%d " +
+            "distinctVisible=%d largestConnected=%d " +
             "example=(%d,%d,%d) chunkBoundary=PASS%n",
             seed, planned.size(), upperDeposits, upperCandidateRock,
-            visibleTopRock, first.x(), first.y(), first.z()
+            visibleTopRock, visibleCoords.size(), largestExposedPatch,
+            first.x(), first.y(), first.z()
         );
+    }
+
+    private static long coordKey(int x, int z) {
+        return ((long)x << 32) | (z & 0xffffffffL);
+    }
+
+    private static int largestPatch(Set<Long> visible) {
+        Set<Long> remaining = new HashSet<>(visible);
+        int largest = 0;
+        ArrayDeque<Long> queue = new ArrayDeque<>();
+        while (!remaining.isEmpty()) {
+            Long start = remaining.iterator().next();
+            remaining.remove(start);
+            queue.add(start);
+            int size = 0;
+            while (!queue.isEmpty()) {
+                long point = queue.removeFirst();
+                size++;
+                int x = (int)(point >> 32);
+                int z = (int)point;
+                for (int[] direction : new int[][] {
+                    {1,0}, {-1,0}, {0,1}, {0,-1}
+                }) {
+                    long neighbor = coordKey(
+                        x + direction[0], z + direction[1]
+                    );
+                    if (remaining.remove(neighbor)) queue.addLast(neighbor);
+                }
+            }
+            largest = Math.max(largest, size);
+        }
+        return largest;
     }
 }

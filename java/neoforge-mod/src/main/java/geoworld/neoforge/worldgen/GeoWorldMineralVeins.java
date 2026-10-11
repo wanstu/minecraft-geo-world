@@ -120,7 +120,7 @@ final class GeoWorldMineralVeins {
                     return;
                 }
                 int surface = column.groundBoundary() - 1;
-                if (placement.y() > surface || placement.y() < surface - 6) {
+                if (placement.y() > surface || placement.y() < surface - 9) {
                     return;
                 }
                 position.set(placement.x(), placement.y(), placement.z());
@@ -179,18 +179,23 @@ final class GeoWorldMineralVeins {
              cellZ <= Math.floorDiv(maxZ + SEARCH_MARGIN, CELL_XZ); cellZ++) {
             for (int cellX = Math.floorDiv(minX - SEARCH_MARGIN, CELL_XZ);
                  cellX <= Math.floorDiv(maxX + SEARCH_MARGIN, CELL_XZ); cellX++) {
-                double centerX = cellX * (double)CELL_XZ + CELL_XZ / 2.0;
-                double centerZ = cellZ * (double)CELL_XZ + CELL_XZ / 2.0;
+                SplittableRandom random = new SplittableRandom(
+                    cellSeed(seed ^ OUTCROP_SALT, cellX, 0, cellZ)
+                );
+                // Lodes are less rare than the old 1/12 sources, but still
+                // clustered in individual 64x64 geological cells.
+                if (random.nextInt(8) != 0) continue;
+                // Do not pin every lode exactly to the center of its cell.
+                double centerX = cellX * (double)CELL_XZ + CELL_XZ / 2.0
+                    + (random.nextDouble() - 0.5) * 24.0;
+                double centerZ = cellZ * (double)CELL_XZ + CELL_XZ / 2.0
+                    + (random.nextDouble() - 0.5) * 24.0;
                 var geology = model.sample(centerX, centerZ);
                 if (!geology.sourceLand() ||
                     !"None".equals(geology.waterKind()) ||
                     !isMountain(geology.terrainVariant())) {
                     continue;
                 }
-                SplittableRandom random = new SplittableRandom(
-                    cellSeed(seed ^ OUTCROP_SALT, cellX, 0, cellZ)
-                );
-                if (random.nextInt(12) != 0) continue;
                 int surface = HEIGHTS.boundaryY(geology.groundHeight()) - 1;
                 if (surface < 85 || surface >= MAX_Y) continue;
                 Mineral mineral = surface > 215
@@ -208,8 +213,8 @@ final class GeoWorldMineralVeins {
                             default -> Mineral.EMERALD;
                         };
                 emitVein(
-                    mineral, centerX, surface - 1.0, centerZ,
-                    random, minX, maxX, minZ, maxZ, consumer
+                    mineral, centerX, surface - 2.0, centerZ,
+                    random, minX, maxX, minZ, maxZ, consumer, true
                 );
             }
         }
@@ -388,9 +393,27 @@ final class GeoWorldMineralVeins {
         int minX, int maxX, int minZ, int maxZ,
         Consumer<Placement> consumer
     ) {
+        emitVein(mineral, x, y, z, random, minX, maxX, minZ, maxZ,
+            consumer, false);
+    }
+
+    private static void emitVein(
+        Mineral mineral, double x, double y, double z,
+        SplittableRandom random,
+        int minX, int maxX, int minZ, int maxZ,
+        Consumer<Placement> consumer, boolean rockyOutcrop
+    ) {
         boolean large = random.nextDouble() < 0.025;
-        double length = large ? 32 + random.nextDouble() * 16 : 13 + random.nextDouble() * 18;
-        double radius = large ? 2.4 + random.nextDouble() * 0.8 : 1.2 + random.nextDouble() * 0.9;
+        double length = rockyOutcrop
+            ? (large ? 50 + random.nextDouble() * 10
+                : 30 + random.nextDouble() * 22)
+            : (large ? 32 + random.nextDouble() * 16
+                : 13 + random.nextDouble() * 18);
+        double radius = rockyOutcrop
+            ? (large ? 3.6 + random.nextDouble() * 0.8
+                : 2.5 + random.nextDouble() * 1.1)
+            : (large ? 2.4 + random.nextDouble() * 0.8
+                : 1.2 + random.nextDouble() * 0.9);
         double angle = random.nextDouble() * Math.PI * 2;
         double dx = Math.cos(angle), dz = Math.sin(angle);
         double tilt = (random.nextDouble() - 0.5) * 0.32;
@@ -403,7 +426,10 @@ final class GeoWorldMineralVeins {
             z + reach < minZ || z - reach > maxZ) {
             return;
         }
-        int steps = (int)Math.ceil(length / 1.5);
+        // Rocky lodes have >=2.5-block radius, so sampling their centers
+        // every 2.5 blocks stays continuous and avoids re-emitting many
+        // identical voxels. Preserve original underground vein geometry.
+        int steps = (int)Math.ceil(length / (rockyOutcrop ? 2.5 : 1.5));
         for (int step = 0; step <= steps; step++) {
             double t = (double) step / steps;
             double longitudinal = (t - 0.5) * length;
