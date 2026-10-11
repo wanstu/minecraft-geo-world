@@ -3,7 +3,7 @@ package geoworld.neoforge.worldgen;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import geoworld.minecraft.v26_3common.Minecraft26_3HeightMapping;
-import geoworld.minecraft.v26_3common.Minecraft26_3ProfileMapping;
+import geoworld.minecraft.v26_3common.Minecraft26_3BiomeRealizer;
 import geoworld.neoforge.creation.GeoWorldCreationConfig;
 import geoworld.neoforge.engine.GeoWorldEngineBridge;
 import geoworld.runtime.GeoWorldV1;
@@ -189,6 +189,9 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
 
                 int groundBoundary = column.groundBoundary();
                 int waterBoundary = column.waterBoundary();
+                String surfaceBiome = Minecraft26_3BiomeRealizer.biomeId(
+                    runtime, worldX, groundBoundary - 1, worldZ
+                );
 
                 int maxBoundary = Math.min(
                     Minecraft26_3HeightMapping.MAX_Y_EXCLUSIVE,
@@ -202,7 +205,10 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
                 ) {
                     BlockState state = blockAt(
                         column,
-                        y
+                        y,
+                        surfaceBiome,
+                        worldX,
+                        worldZ
                     );
                     if (state.isAir()) {
                         continue;
@@ -262,13 +268,15 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         LevelHeightAccessor heightAccessor,
         RandomState randomState
     ) {
+        GeoWorldV1 runtime = this.ensureModel(randomState.seed());
         GeoWorldShoreline.Column column = GeoWorldShoreline.plan(
-            this.ensureModel(randomState.seed()),
-            x,
-            z
+            runtime, x, z
         );
         int ground = column.groundBoundary();
         int water = column.waterBoundary();
+        String surfaceBiome = Minecraft26_3BiomeRealizer.biomeId(
+            runtime, x, ground - 1, z
+        );
 
         BlockState[] states = new BlockState[heightAccessor.getHeight()];
         int minY = heightAccessor.getMinY();
@@ -277,7 +285,10 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
             int y = minY + index;
             states[index] = blockAt(
                 column,
-                y
+                y,
+                surfaceBiome,
+                x,
+                z
             );
         }
 
@@ -419,7 +430,10 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
 
     private static BlockState blockAt(
         GeoWorldShoreline.Column column,
-        int y
+        int y,
+        String surfaceBiome,
+        int worldX,
+        int worldZ
     ) {
         GeoWorldV1.RuntimeSample sample = column.sample();
         int groundBoundary = column.groundBoundary();
@@ -438,24 +452,17 @@ public final class GeoWorldChunkGenerator extends ChunkGenerator {
         if (y < groundBoundary) {
             int depth = groundBoundary - 1 - y;
             if (depth == 0) {
-                String override = column.surfaceOverride();
-                return blockState(
-                    override != null
-                        ? override
-                        : Minecraft26_3ProfileMapping.surfaceBlock(
-                            sample.surfaceProfile()
-                        )
-                );
+                return blockState(GeoWorldSurfaceMaterials.top(
+                    surfaceBiome, sample.surfaceProfile(),
+                    column.surfaceOverride()
+                ));
             }
-            if (depth <= 2 && column.underOverride() != null) {
-                return blockState(column.underOverride());
-            }
-            if (depth <= 3) {
-                return blockState(
-                    Minecraft26_3ProfileMapping.underBlock(
-                        sample.surfaceProfile()
-                    )
-                );
+            String shallow = GeoWorldSurfaceMaterials.below(
+                surfaceBiome, sample.surfaceProfile(),
+                column.underOverride(), worldX, y, worldZ, depth
+            );
+            if (shallow != null) {
+                return blockState(shallow);
             }
             return y < 0
                 ? Blocks.DEEPSLATE.defaultBlockState()

@@ -41,16 +41,25 @@ public final class Minecraft26_3BiomeCoverage {
              x <= g.originX() + g.spanXBlocks() - step / 2; x += step) {
             for (double z = g.originZ() + step / 2;
                  z <= g.originZ() + g.spanZBlocks() - step / 2; z += step) {
+                candidates.add(siteAt(model, x, z));
+            }
+        }
+
+        // A 320-block ecological grid can skip narrow river channels
+        // entirely. Refine candidate discovery near hydrographic receivers
+        // without needing a dense grid for every biome family.
+        final double riverStep = Math.max(96.0, g.cellSize());
+        for (double x = g.originX() + riverStep / 2;
+             x <= g.originX() + g.spanXBlocks() - riverStep / 2;
+             x += riverStep) {
+            for (double z = g.originZ() + riverStep / 2;
+                 z <= g.originZ() + g.spanZBlocks() - riverStep / 2;
+                 z += riverStep) {
                 var sample = model.sample(x, z);
-                var climate = model.sampleClimate(x, z);
-                int surface = HEIGHTS.boundaryY(sample.groundHeight()) - 1;
-                candidates.add(new Site(
-                    x, z, surface, sample.terrainVariant(),
-                    sample.biomeFamily(), sample.waterKind(),
-                    climate.available() ? climate.annualMeanTempC() : 12.0,
-                    climate.available() ? climate.annualPrecipMM() : 800.0,
-                    sample.waterDepth()
-                ));
+                if ("River".equals(sample.waterKind()) ||
+                    "Lake".equals(sample.waterKind())) {
+                    candidates.add(siteAt(model, x, z));
+                }
             }
         }
 
@@ -70,8 +79,13 @@ public final class Minecraft26_3BiomeCoverage {
                 double spacing = selected.stream()
                     .mapToDouble(a -> Math.hypot(site.x() - a.x(), site.z() - a.z()))
                     .min().orElse(Double.POSITIVE_INFINITY);
-                if (spacing < 480.0) {
-                    score -= 60.0;
+                // Each guaranteed habitat must own its entire 116-block
+                // interior. Penalizing collisions was insufficient on some
+                // seeds: river and frozen_river could share a source cell.
+                // Reserve nonoverlapping sites instead of masking collisions
+                // through habitat iteration order.
+                if (spacing < 256.0) {
+                    continue;
                 } else if (spacing < 850.0) {
                     score -= (850.0 - spacing) / 150.0;
                 }
@@ -92,6 +106,19 @@ public final class Minecraft26_3BiomeCoverage {
         this.habitats = List.copyOf(selected);
     }
 
+    private static Site siteAt(GeoWorldV1 model, double x, double z) {
+        var sample = model.sample(x, z);
+        var climate = model.sampleClimate(x, z);
+        return new Site(
+            x, z, HEIGHTS.boundaryY(sample.groundHeight()) - 1,
+            sample.terrainVariant(), sample.biomeFamily(),
+            sample.waterKind(),
+            climate.available() ? climate.annualMeanTempC() : 12.0,
+            climate.available() ? climate.annualPrecipMM() : 800.0,
+            sample.waterDepth()
+        );
+    }
+
     private static final Minecraft26_3HeightMapping HEIGHTS =
         new Minecraft26_3HeightMapping();
 
@@ -106,26 +133,28 @@ public final class Minecraft26_3BiomeCoverage {
     }
 
     public String override(GeoWorldV1 model, double x, double y, double z) {
+        Habitat chosen = null;
+        double closest = Double.POSITIVE_INFINITY;
         for (Habitat habitat : habitats) {
             double dx = x - habitat.x();
             double dz = z - habitat.z();
-            if (dx * dx + dz * dz > habitat.radius() * habitat.radius()) {
+            double distance2 = dx * dx + dz * dz;
+            if (distance2 > habitat.radius() * habitat.radius() ||
+                distance2 >= closest) {
                 continue;
             }
             String biome = habitat.biome();
             if (isCave(biome)) {
-                if (Math.abs(y - habitat.y()) <= 24.0) {
-                    return biome;
-                }
+                if (Math.abs(y - habitat.y()) > 24.0) continue;
             } else {
                 // Surface patches do not suppress underground cave biomes.
                 int ground = HEIGHTS.boundaryY(model.sample(x, z).groundHeight()) - 1;
-                if (y >= ground - 16.0) {
-                    return biome;
-                }
+                if (y < ground - 16.0) continue;
             }
+            chosen = habitat;
+            closest = distance2;
         }
-        return null;
+        return chosen == null ? null : chosen.biome();
     }
 
     private static int representativeY(String biome, int surface) {

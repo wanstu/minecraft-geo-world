@@ -2365,3 +2365,17 @@ Seed 10400（640x400）：
 - NeoForge build/check：56 群系真实覆盖、8 类矿石、原版装饰策略、Shoreline 与 WaterOwnership 均 PASS；所有水体所有权异常仍为 0。
 - 注意：矿物地质判断仍来自地表形态/群系倾向，没有独立持久化地下地层模型。群系完整性保证实际生物群系 ID 与区域连续性，不代表每个群系的面积、地物或结构完全等价于 Minecraft 原版；后续仍需实机观察。
 - 完整实现与验证方法见 docs/MINERALS_AND_BIOME_COVERAGE.md。
+
+## 2026-10-11 · 所有主世界群系的最终地表/浅层材质统一审计
+
+用户截图发现：世界预览已显示「温带荒漠，冲积土/灌丛土」，游戏是沙漠或恶地，但地面成片泥土或草块。根因是最终群系由 BiomeRealizer 决定，实际地表 voxel 却只按 GeoWorld 中间 SurfaceProfile 生成。
+
+- 新增 GeoWorldSurfaceMaterials：所有 56 种主世界群系明确映射（52 种地表/水域、4 种地下），GeoWorldChunkGenerator 以最终 biomeId 决定表面和浅层，buildTerrain 与 getBaseColumn 规则一致。
+- 沙漠：表面沙、浅层砂岩；恶地：平缓处红沙，侵蚀区/岩质露头陶瓦，地下50格以内维持 Y 连续的分层陶瓦。其余森林、雨林、针叶林、雪地、冰刺、蘑菇岛、苍白之园、红树林、沼泽、海滩、海床、风袭丘陵、高山等都有明确策略。
+- 保留水文岸线和湿地池塘的 surfaceOverride、underOverride 最高优先级，避免材质替换破坏已通过的岸线/河流水源。
+- 发现旧 56/56 群系保底不同中心碰撞问题：在 Seed -563659577384754347 上 minecraft:river 被 frozen_river 覆盖。修复为非重叠中心（间隔至少256方块）、距离最近优先选取，并为窄河流补充更细的候选采样。
+- 修复 Minecraft26_3BiomeCatalog 中沙漠地貌可错误选为 windswept_gravelly_hills/windswept_hills 的问题。仍保留真实 GeoWorld 生态交界 56 格范围内的自然过渡。
+- 新增 verifyGeoWorldSurfaceBiomes，纳入 Gradle check：严格验证全部56群系、52个地表群系保底中心周围共468列、936项表层/浅层材质检查、水文优先情况，以及荒漠内部生态群系一致性。
+- 默认 Seed 123456：该专项全绿（56/56，468列、936材料检查，naturalDesert=21，desertConflicts=0）；NeoForge build.cmd 全绿并部署到 HMCL 26.3；WaterOwnership 核查302848列，全部水源异常仍为0。
+- 额外两种子 Seed -563659577384754347（用户预览）与 -4852173505788415804 均通过 verifyGeoWorldSurfaceBiomes（各56/56、468列/936材料检查，生态沙漠内部冲突0）。在用户预览种子上 X382 Z-3089 为恶地+岩质陶瓦，X396 Z-3924 为疏林恶地+红沙，X-159 Z-6808 为沙漠+沙子/砂岩。
+- 完整实机视觉复核尚未做，已生成区块不会自动重置地表。文档见 docs/BIOME_SURFACE_CONSISTENCY.md。

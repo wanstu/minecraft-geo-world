@@ -240,6 +240,16 @@ tasks.register('auditGeoWorldBiomeCoverage', JavaExec) {
     }
 }
 
+tasks.register('verifyGeoWorldSurfaceBiomes', JavaExec) {
+    group = 'verification'
+    description = 'Audits final biome against surface/subsoil for all 56 Overworld biomes, including rare habitats.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.worldgen.GeoWorldSurfaceBiomeVerifier'
+    if (project.hasProperty('geoWorldSurfaceSeed')) {
+        args project.property('geoWorldSurfaceSeed').toString()
+    }
+}
+
 tasks.register('verifyGeoWorldMinerals', JavaExec) {
     group = 'verification'
     description = 'Verifies all 8 overworld ores in stone/deepslate, geological affinity and chunk continuity.'
@@ -281,6 +291,7 @@ tasks.register('verifyGeoWorldShoreline', JavaExec) {
 tasks.named('check').configure {
     dependsOn tasks.named('verifyGeoWorldBiomePreset')
     dependsOn tasks.named('auditGeoWorldBiomeCoverage')
+    dependsOn tasks.named('verifyGeoWorldSurfaceBiomes')
     dependsOn tasks.named('verifyGeoWorldMinerals')
     dependsOn tasks.named('verifyGeoWorldDecorationPolicy')
     dependsOn tasks.named('verifyGeoWorldWaterOwnership')

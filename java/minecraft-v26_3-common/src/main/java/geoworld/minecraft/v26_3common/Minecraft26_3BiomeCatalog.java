@@ -298,6 +298,15 @@ public final class Minecraft26_3BiomeCatalog {
 
     private static double score(Region region, Candidate candidate) {
         Set<Tag> tags = region.tags();
+        // A dry, rocky desert hillside belongs to the badlands/desert
+        // families, not windswept temperate grassland. The old generic
+        // windswept-gravelly-hills candidate had no biome-family constraint
+        // and regularly displaced true desert biomes in hot arid terrain.
+        if (tags.contains(Tag.DESERT) &&
+            (candidate.id().equals("minecraft:windswept_hills") ||
+             candidate.id().equals("minecraft:windswept_gravelly_hills"))) {
+            return Double.NEGATIVE_INFINITY;
+        }
         if (!tags.containsAll(candidate.requiredAll())) {
             return Double.NEGATIVE_INFINITY;
         }
