@@ -5,6 +5,9 @@ import geoworld.runtime.GeoWorldV1;
 
 final class GeoWorldShoreline {
     static final int MAX_SHORE_DISTANCE = 4;
+    // Only Lake/Ocean dry shores can need a longer inland transition.
+    // Do not widen the river shelf or move a modeled water surface.
+    static final int MAX_GENTLE_BANK_DISTANCE = 10;
 
     private static final Minecraft26_3HeightMapping HEIGHTS =
         new Minecraft26_3HeightMapping();
@@ -66,7 +69,7 @@ final class GeoWorldShoreline {
         int baseZ
     ) {
         final int fringe = 3;
-        final int radius = MAX_SHORE_DISTANCE + fringe;
+        final int radius = MAX_GENTLE_BANK_DISTANCE + fringe;
         final int stride = 16 + radius * 2;
         GeoWorldV1.RuntimeSample[] samples =
             new GeoWorldV1.RuntimeSample[stride * stride];
@@ -168,7 +171,7 @@ final class GeoWorldShoreline {
         int worldZ
     ) {
         final int localRadius = 3;
-        final int radius = MAX_SHORE_DISTANCE + localRadius;
+        final int radius = MAX_GENTLE_BANK_DISTANCE + localRadius;
         final int stride = radius * 2 + 1;
         GeoWorldV1.RuntimeSample[] samples =
             new GeoWorldV1.RuntimeSample[stride * stride];
@@ -362,6 +365,11 @@ final class GeoWorldShoreline {
         }
 
         WaterNeighbor shore = findNearestWater(neighborhood);
+        if (shore != null && shore.distance() > MAX_SHORE_DISTANCE &&
+            !"Ocean".equals(shore.waterKind()) &&
+            !"Lake".equals(shore.waterKind())) {
+            shore = null;
+        }
         if (shore == null) {
             int dryGround = originalGround;
             boolean pondRimRaised =
@@ -428,14 +436,49 @@ final class GeoWorldShoreline {
             }
         }
 
+        boolean rocky = isRocky(center);
+        // Preserve genuinely high mountain/canyon sea-cliffs. Low and
+        // medium rocky banks still need a short walkable transition.
+        boolean naturalCliff =
+            "Canyon".equals(center.terrainVariant()) ||
+            ("Mountain".equals(center.terrainVariant()) &&
+                deltaToWater > 24);
+        boolean taperedBank = false;
+        // The four-cell littoral shelf preserves water/shore ownership, but
+        // nonrocky lake and sea edges can still rise into an abrupt vertical
+        // wall just inland. Blend the *dry* terrain over a wider corridor
+        // only where its raw height actually needs it. Leave rocky natural
+        // cliffs, rivers, and large escarpments unchanged.
+        if (("Ocean".equals(shore.waterKind()) ||
+             "Lake".equals(shore.waterKind())) &&
+            !naturalCliff &&
+            deltaToWater >= 4 && deltaToWater <= 32 &&
+            shore.distance() <= MAX_GENTLE_BANK_DISTANCE) {
+            int cap = gentleBankCap(
+                originalGround, shore.waterBoundary(), shore.distance()
+            );
+            cap = Math.max(
+                cap,
+                "Ocean".equals(shore.waterKind())
+                    ? oceanBackshoreMinimum(
+                        shore.distance(), shore.waterBoundary())
+                    : shore.waterBoundary()
+            );
+            if (cap < adjustedGround) {
+                adjustedGround = cap;
+                shallowFringe = false;
+                taperedBank = true;
+            }
+        }
         double shapeNoise = smoothValueNoise(
             seed ^ 0x53484F52455F5348L,
             worldX,
             worldZ,
             28.0
         );
-        boolean rocky = isRocky(center);
-        boolean steep = deltaToWater >= 2;
+        boolean steep = (taperedBank
+            ? adjustedGround - shore.waterBoundary()
+            : deltaToWater) >= 2;
         boolean hardBank =
             steep ||
             (deltaToWater >= 1 &&
@@ -662,7 +705,7 @@ final class GeoWorldShoreline {
     private static WaterNeighbor findNearestWater(
         Neighborhood neighborhood
     ) {
-        for (int distance = 1; distance <= MAX_SHORE_DISTANCE; distance++) {
+        for (int distance = 1; distance <= MAX_GENTLE_BANK_DISTANCE; distance++) {
             WaterNeighbor best = null;
             for (int dx = -distance; dx <= distance; dx++) {
                 int dzAbs = distance - Math.abs(dx);
@@ -807,6 +850,17 @@ final class GeoWorldShoreline {
             "minecraft:mud",
             "minecraft:dirt"
         );
+    }
+
+    // Ease-in/ease-out instead of an abrupt four-block sea wall.
+    // Leaves the inland height untouched at the end of the blending band.
+    static int gentleBankCap(int originalGround, int waterBoundary, int distance) {
+        if (distance >= MAX_GENTLE_BANK_DISTANCE) return originalGround;
+        double t = Math.max(0.0,
+            distance / (double)MAX_GENTLE_BANK_DISTANCE);
+        double ease = t * t * (3.0 - 2.0 * t);
+        return waterBoundary + Math.max(1,
+            (int)Math.round((originalGround - waterBoundary) * ease));
     }
 
     private static int oceanBackshoreMinimum(

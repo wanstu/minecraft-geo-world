@@ -50,6 +50,7 @@ public final class GeoWorldShorelineVerifier {
         );
         System.setProperty("geoworld.engine.embeddedOnly", "true");
 
+        verifyGentleBankProfile();
         GeoWorldEngineBridge.GeneratedModel generated =
             GeoWorldEngineBridge.generate(
                 SEED,
@@ -84,6 +85,8 @@ public final class GeoWorldShorelineVerifier {
         int plantableEligible = 0;
         int plantable = 0;
         int maxLowering = 0;
+        int gentleBankColumns = 0;
+        int inlandGentleBankColumns = 0;
         int maxRaising = 0;
         int maxRaiseX = 0;
         int maxRaiseZ = 0;
@@ -285,6 +288,16 @@ public final class GeoWorldShorelineVerifier {
                         for (int localX = 0; localX < 16; localX++) {
                             GeoWorldShoreline.Column column =
                                 plan.column(localX, localZ);
+                            if ("None".equals(column.sample().waterKind()) &&
+                                ("Lake".equals(column.shoreWaterKind()) ||
+                                 "Ocean".equals(column.shoreWaterKind())) &&
+                                column.shoreDistance() <=
+                                    GeoWorldShoreline.MAX_GENTLE_BANK_DISTANCE &&
+                                column.groundBoundary() <
+                                    column.originalGroundBoundary()) {
+                                gentleBankColumns++;
+                                if (!column.hasShore()) inlandGentleBankColumns++;
+                            }
                             if (
                                 !"None".equals(column.sample().waterKind()) ||
                                 !column.hasShore()
@@ -315,9 +328,12 @@ public final class GeoWorldShorelineVerifier {
                                 raised4plus++;
                             }
 
-                            if (lowering > 1) {
+                            if (lowering > (
+                                    ("Lake".equals(column.shoreWaterKind()) ||
+                                     "Ocean".equals(column.shoreWaterKind()))
+                                        ? 31 : 1)) {
                                 throw new AssertionError(
-                                    "shore aesthetic lowering exceeded one block at " +
+                                    "shore taper lowered terrain beyond safety bound at " +
                                     (baseX + localX) + "," +
                                     (baseZ + localZ) +
                                     ": original=" +
@@ -431,7 +447,8 @@ public final class GeoWorldShorelineVerifier {
         System.out.printf(
             "GeoWorld shoreline scan: seed=%d, immediate=%d, stable=%d, " +
             "shallowFringes=%d, shelves=%d, materials=%d, caneReady=%d/%d, " +
-            "maxLowering=%d, maxRaising=%d at %d,%d %s (%d->%d), " +
+            "maxLowering=%d, gentleBanks=%d, inlandGentleBanks=%d, " +
+            "maxRaising=%d at %d,%d %s (%d->%d), " +
             "raiseBuckets=[1:%d,2-3:%d,4+:%d], materialChanges=%d/%d, " +
             "narrowBackshoreGrooves=%d, smallBackshorePits=%d, " +
             "oceanBackshoreStepViolations=%d, " +
@@ -447,6 +464,8 @@ public final class GeoWorldShorelineVerifier {
             plantable,
             plantableEligible,
             maxLowering,
+            gentleBankColumns,
+            inlandGentleBankColumns,
             maxRaising,
             maxRaiseX,
             maxRaiseZ,
@@ -588,6 +607,35 @@ public final class GeoWorldShorelineVerifier {
             waterKinds
         );
         cleanupCache(isolatedCache);
+    }
+
+    private static void verifyGentleBankProfile() {
+        for (int relief : new int[]{8, 16, 24, 32}) {
+            int water = 63;
+            int previous = water;
+            for (int distance = 1;
+                 distance <= GeoWorldShoreline.MAX_GENTLE_BANK_DISTANCE;
+                 distance++) {
+                int capped = GeoWorldShoreline.gentleBankCap(
+                    water + relief, water, distance
+                );
+                if (capped < previous || capped > water + relief ||
+                    capped - previous > 6) {
+                    throw new AssertionError(
+                        "lake/ocean gentle shore profile is discontinuous: " +
+                        "relief=" + relief + " d=" + distance +
+                        " prev=" + previous + " cap=" + capped
+                    );
+                }
+                previous = capped;
+            }
+            if (previous != water + relief) {
+                throw new AssertionError(
+                    "shore transition does not rejoin natural ground"
+                );
+            }
+        }
+        System.out.println("GeoWorld moderate lake/ocean bank taper PASS");
     }
 
     private static int[] findBoundaryCenter(
