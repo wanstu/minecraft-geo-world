@@ -444,7 +444,8 @@ final class GeoWorldShoreline {
         if ("Ocean".equals(shore.waterKind())) {
             int oceanMinimum = oceanBackshoreMinimum(
                 shore.distance(),
-                shore.waterBoundary()
+                shore.waterBoundary(),
+                originalGround
             );
             if (adjustedGround < oceanMinimum) {
                 adjustedGround = oceanMinimum;
@@ -477,7 +478,8 @@ final class GeoWorldShoreline {
                 cap,
                 "Ocean".equals(shore.waterKind())
                     ? oceanBackshoreMinimum(
-                        shore.distance(), shore.waterBoundary())
+                        shore.distance(), shore.waterBoundary(),
+                        originalGround)
                     : shore.waterBoundary()
             );
             if (cap < adjustedGround) {
@@ -898,16 +900,42 @@ final class GeoWorldShoreline {
             (int)Math.round((originalGround - waterBoundary) * ease));
     }
 
-    private static int oceanBackshoreMinimum(
+    static int oceanBackshoreMinimum(
         int shoreDistance,
-        int waterBoundary
+        int waterBoundary,
+        int originalGround
     ) {
-        return switch (shoreDistance) {
+        int legacyMinimum = switch (shoreDistance) {
             case 1, 2 -> waterBoundary;
             case 3 -> waterBoundary - 1;
             case 4 -> waterBoundary - 2;
             default -> Integer.MIN_VALUE;
         };
+        int depression = waterBoundary - originalGround;
+        // The shoreline can be lower than the ocean surface in the terrain
+        // model, yet still be dry land. The near-shore rim must stop water,
+        // but a 3-block-high berm squeezed into 4 horizontal blocks looks
+        // like a continuous artificial wall from the landward side.
+        // Spread *only modest* below-sea-level coastal depressions across
+        // the already sampled 10-block bank. Keep larger natural relief and
+        // rocky cliff policy unchanged; no water ownership is modified.
+        if (depression < 1 || depression > 4 ||
+            shoreDistance > MAX_GENTLE_BANK_DISTANCE ||
+            shoreDistance <= 0) {
+            return legacyMinimum;
+        }
+        double progress = Math.max(0.0,
+            (shoreDistance - 2.0) /
+            (MAX_GENTLE_BANK_DISTANCE - 2.0));
+        double eased = progress * progress * (3.0 - 2.0 * progress);
+        int rampFloor = waterBoundary -
+            (int)Math.round(depression * eased);
+        if (shoreDistance > 2) {
+            // Cap inland soil uplift at the original three blocks even
+            // when the adjacent raw ground is four blocks below sea level.
+            rampFloor = Math.min(rampFloor, originalGround + 3);
+        }
+        return Math.max(legacyMinimum, rampFloor);
     }
 
     private static Column closeNarrowBackshoreGroove(

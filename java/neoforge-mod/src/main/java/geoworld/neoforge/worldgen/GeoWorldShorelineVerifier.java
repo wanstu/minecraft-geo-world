@@ -51,6 +51,7 @@ public final class GeoWorldShorelineVerifier {
         System.setProperty("geoworld.engine.embeddedOnly", "true");
 
         verifyGentleBankProfile();
+        verifyLowlandOceanBackshore();
         GeoWorldEngineBridge.GeneratedModel generated =
             GeoWorldEngineBridge.generate(
                 SEED,
@@ -607,6 +608,45 @@ public final class GeoWorldShorelineVerifier {
             waterKinds
         );
         cleanupCache(isolatedCache);
+    }
+
+    private static void verifyLowlandOceanBackshore() {
+        // Reported real shoreline: dry original Y60, sea surface Y63.
+        // The inland side must ramp back down, not form a 3-block-high
+        // narrow berm. No increase in water height or dry-side flooding.
+        int sea = 63;
+        for (int depression = 1; depression <= 4; depression++) {
+            int original = sea - depression;
+            int previous = sea;
+            for (int distance = 1; distance <=
+                    GeoWorldShoreline.MAX_GENTLE_BANK_DISTANCE + 1;
+                    distance++) {
+                int minimum = GeoWorldShoreline.oceanBackshoreMinimum(
+                    distance, sea, original
+                );
+                int ground = Math.max(original, minimum);
+                if (ground > previous || previous - ground > 1 ||
+                    ground < original) {
+                    throw new AssertionError(
+                        "coastal lowland shoreline berm failed: depth=" +
+                        depression + " d=" + distance +
+                        " previous=" + previous + " now=" + ground
+                    );
+                }
+                if (distance == 1 && ground < sea) {
+                    throw new AssertionError(
+                        "ocean rim lower than the water boundary"
+                    );
+                }
+                previous = ground;
+            }
+            if (previous != original) {
+                throw new AssertionError(
+                    "backshore taper failed to meet the original lowland"
+                );
+            }
+        }
+        System.out.println("GeoWorld coastal lowland berm taper PASS");
     }
 
     private static void verifyGentleBankProfile() {
