@@ -220,8 +220,26 @@ tasks.register('buildGeoWorldEngine', Exec) {
 }
 
 sourceSets.main.resources.srcDir geoWorldEngineResources
+// A dev build automatically enables bounded GeoWorld chunk profiling.
+// Explicit Gradle release builds remain quiet unless the JVM flag opts in.
+def geoWorldDevBuild = providers.gradleProperty('geoworld.devBuild').orElse('false')
+def geoWorldBuildProfileDir = layout.buildDirectory.dir('generated/geoworldBuildProfile')
+tasks.register('generateGeoWorldBuildProfile') {
+    group = 'build'
+    inputs.property 'devBuild', geoWorldDevBuild
+    outputs.file geoWorldBuildProfileDir.map { it.file('geoworld-build.properties') }
+    doLast {
+        def outputDir = geoWorldBuildProfileDir.get().asFile
+        outputDir.mkdirs()
+        new File(outputDir, 'geoworld-build.properties').text =
+            "devBuild=${geoWorldDevBuild.get()}\n"
+    }
+}
+sourceSets.main.resources.srcDir geoWorldBuildProfileDir
+
 tasks.named('processResources').configure {
     dependsOn tasks.named('buildGeoWorldEngine')
+    dependsOn tasks.named('generateGeoWorldBuildProfile')
 }
 tasks.register('verifyGeoWorldSpawn', JavaExec) {
     group = 'verification'
@@ -248,6 +266,14 @@ tasks.register('verifyGeoWorldSurfaceBiomes', JavaExec) {
     if (project.hasProperty('geoWorldSurfaceSeed')) {
         args project.property('geoWorldSurfaceSeed').toString()
     }
+}
+
+tasks.register('verifyGeoWorldChunkPerformanceMode', JavaExec) {
+    group = 'verification'
+    description = 'Verifies dev/release embedded profiling mode matches build flags.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.worldgen.GeoWorldChunkPerformanceVerifier'
+    systemProperty 'geoworld.expectedBuildProfile', geoWorldDevBuild.get()
 }
 
 tasks.register('benchmarkGeoWorldChunkPlanning', JavaExec) {
@@ -296,6 +322,7 @@ tasks.register('verifyGeoWorldShoreline', JavaExec) {
 }
 
 tasks.named('check').configure {
+    dependsOn tasks.named('verifyGeoWorldChunkPerformanceMode')
     dependsOn tasks.named('verifyGeoWorldBiomePreset')
     dependsOn tasks.named('auditGeoWorldBiomeCoverage')
     dependsOn tasks.named('verifyGeoWorldSurfaceBiomes')

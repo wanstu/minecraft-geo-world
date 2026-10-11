@@ -21,7 +21,7 @@ set "PATH=%JAVA_HOME%\bin;%PATH%"
 
 :run_gradle
 echo JAVA_HOME=%JAVA_HOME%
-call gradlew.bat build --no-daemon %*
+call gradlew.bat build --no-daemon -Pgeoworld.devBuild=true %*
 if errorlevel 1 goto build_failed
 
 set "GEOWORLD_BUILT_JAR="

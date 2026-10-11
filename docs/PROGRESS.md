@@ -2391,3 +2391,13 @@ Seed 10400（640x400）：
 - 用户确认不希望大量天然洞穴，本轮不主动增加洞穴、洞口或原版 Carver 密度。未来地下河—地下水位—地层渗透/溶蚀—稀疏洞穴路线图见 docs/UNDERGROUND_WATER_AND_SPARSE_CAVES.md。
 - NeoForge build.cmd 通过（BiomeCoverage 56/56、矿石 8/16、Shoreline、SurfaceBiomes、WaterOwnership 等），已部署 HMCL 26.3。水体所有权 302848 列检查关键异常均 0；该结果不代表客户端区块延迟问题已经解决。
 - 具体性能基准和客户端验收文档见 docs/CHUNK_PERFORMANCE.md。
+
+## 2026-10-11 · 开发版区块性能诊断自动化
+
+- 2026-10-11 HMCL v26.3 日志调查：压缩日志 5 份加最新日志均无 GeoWorld generated 记录；旧性能统计未开启。内置服务器累计发现 19 次 can't keep up 警告，最大一次 13732 ms（274 ticks），但无法仅凭该警告定位是何阶段。
+- 改造 GeoWorldChunkPerformance：开发版的嵌入构建标记自动开启（无需用户修改 JVM 参数），正式构建默认关闭；系统属性 -Dgeoworld.profileChunks=true / false 可显式覆盖。
+- 正式构建通过 build.gradle 的 generateGeoWorldBuildProfile 资源生成，build.cmd 固定 -Pgeoworld.devBuild=true。性能日志采用 Mod SLF4J 日志通道写入 Minecraft latest.log。
+- 首次32区块汇报，之后仅在128区块节点检查且至少间隔30秒，避免刷屏。只在 GeoWorld 自定义生成器的区块统计 model、shoreline、biomes、voxel、minerals、geodes，其他生成器不计时。
+- 新增 verifyGeoWorldChunkPerformanceMode 并纳入 check，自动验证构建嵌入标记与默认开关一致。`-Pgeoworld.devBuild=true` 通过 automaticDevMode=true；`-Pgeoworld.devBuild=false` 通过 automaticDevMode=false。
+- Dev build.cmd 完整通过并部署至 HMCL v26.3；解包部署 JAR 确认 geoworld-build.properties=devBuild=true；其他生成内容验收仍通过。
+- 真实客户端完整耗时仍需用户下一次重新启动游戏并加载 GeoWorld 世界后读取日志，当前不能宣称已经找出性能瓶颈。
