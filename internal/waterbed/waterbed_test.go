@@ -10,6 +10,25 @@ import (
 	"geoworld/internal/world"
 )
 
+func TestOceanMouthFlaresOnlyOnFinalReach(t *testing.T) {
+	upstream := RiverSegment{HalfWidth: 6}
+	mouth := RiverSegment{HalfWidth: 6, OceanMouth: true}
+	if got := riverMouthHalfWidth(upstream, 1); got != 6 {
+		t.Fatalf("ordinary upstream river widened: %v", got)
+	}
+	if got := riverMouthHalfWidth(mouth, 0.10); got != 6 {
+		t.Fatalf("ocean mouth must retain ordinary upstream width: %v", got)
+	}
+	mid := riverMouthHalfWidth(mouth, 0.5)
+	end := riverMouthHalfWidth(mouth, 0.9)
+	if mid <= 6 || end <= mid || end > mouthMaxHalfWidth(mouth) {
+		t.Fatalf("river mouth did not expand smoothly: mid=%v end=%v", mid, end)
+	}
+	if end != 15 {
+		t.Fatalf("expected ocean mouth +9 blocks half width, got=%v", end)
+	}
+}
+
 func TestRiverCorridorHitsBedTargetAndStaysLocal(t *testing.T) {
 	g := testGeometry()
 	base := testTerrain(t, g, 0.70)

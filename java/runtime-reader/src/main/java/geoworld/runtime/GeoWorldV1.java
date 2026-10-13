@@ -224,7 +224,8 @@ public final class GeoWorldV1 {
         double meanderOffset,
         double[] profile,
         boolean receiverSurfaceDefined,
-        double receiverSurface
+        double receiverSurface,
+        boolean oceanMouth
     ) {}
 
     private record LakeNode(
@@ -345,7 +346,7 @@ public final class GeoWorldV1 {
         Map<Long, List<RiverSegment>> buckets = new HashMap<>();
         for (RiverSegment segment : segments) {
             double supportRadius =
-                segment.halfWidth() +
+                mouthMaxHalfWidth(segment) +
                 Math.abs(segment.meanderOffset()) +
                 riverBankBlendBlocks(segment.halfWidth());
             double minX =
@@ -882,8 +883,9 @@ public final class GeoWorldV1 {
 
         for (RiverSegment segment : this.riverCandidates(x, z)) {
             PointSegment point = pointRiverSegment(x, z, segment);
+            double mouthHalfWidth = riverMouthHalfWidth(segment, point.t());
             double bankRadius =
-                segment.halfWidth() +
+                mouthHalfWidth +
                 riverBankBlendBlocks(segment.halfWidth());
             if (point.distance() >= bankRadius) {
                 continue;
@@ -906,7 +908,7 @@ public final class GeoWorldV1 {
                 worldSampleConfig.riverCenterDepthNormalized() *
                 (1 + 2 * Math.pow(widthT, 1.15));
 
-            if (point.distance() >= segment.halfWidth()) {
+            if (point.distance() >= mouthHalfWidth) {
                 double surface = bed + centerDepth;
                 if (
                     segment.receiverSurfaceDefined() &&
@@ -919,7 +921,7 @@ public final class GeoWorldV1 {
                 double bankWeight =
                     1 -
                     smoothstep(
-                        segment.halfWidth(),
+                        mouthHalfWidth,
                         bankRadius,
                         point.distance()
                     );
@@ -935,7 +937,7 @@ public final class GeoWorldV1 {
                 1 -
                 smoothstep(
                     0,
-                    segment.halfWidth(),
+                    mouthHalfWidth,
                     point.distance()
                 );
             if (weight > riverWeight) {
@@ -957,7 +959,7 @@ public final class GeoWorldV1 {
             ) {
                 riverBedDefined = true;
                 riverBedElevation = bed;
-                riverHalfWidth = segment.halfWidth();
+                riverHalfWidth = mouthHalfWidth;
                 receiverDefined = segment.receiverSurfaceDefined();
                 receiverSurface = segment.receiverSurface();
                 receiverWeight =
@@ -977,7 +979,7 @@ public final class GeoWorldV1 {
             double crossT =
                 smoothstep(
                     0,
-                    segment.halfWidth(),
+                    mouthHalfWidth,
                     point.distance()
                 );
             double candidate =
@@ -1456,6 +1458,20 @@ public final class GeoWorldV1 {
         );
     }
 
+    private static double mouthMaxHalfWidth(RiverSegment segment) {
+        if (!segment.oceanMouth()) return segment.halfWidth();
+        return segment.halfWidth() +
+            Math.min(12.0, Math.max(9.0, segment.halfWidth()));
+    }
+
+    private static double riverMouthHalfWidth(RiverSegment segment, double t) {
+        if (!segment.oceanMouth()) return segment.halfWidth();
+        double progress = clamp((t - 0.12) / 0.62, 0, 1);
+        return segment.halfWidth() +
+            (mouthMaxHalfWidth(segment) - segment.halfWidth()) *
+            smoothstep(0, 1, progress);
+    }
+
     private static double riverBankBlendBlocks(double halfWidth) {
         return clamp(10 + 0.65 * halfWidth, 12, 24);
     }
@@ -1805,7 +1821,8 @@ public final class GeoWorldV1 {
                     : Json.doubleValue(r, "MeanderOffset"),
                 doubleArray(Json.required(r, "Profile"), "river.Profile"),
                 Json.bool(r, "ReceiverSurfaceDefined"),
-                Json.doubleValue(r, "ReceiverSurface")
+                Json.doubleValue(r, "ReceiverSurface"),
+                r.containsKey("OceanMouth") && Json.bool(r, "OceanMouth")
             ));
         }
         return out;

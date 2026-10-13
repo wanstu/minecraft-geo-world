@@ -222,6 +222,7 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 			HalfWidth:     draft.halfWidth,
 			MeanderOffset: draft.meanderOffset,
 			Profile:       profile,
+			OceanMouth:    draft.edge.To >= 0 && draft.edge.To < len(rec.WaterKind) && rec.WaterKind[draft.edge.To] == reconcile.WaterOcean,
 		}
 		id := len(m.Rivers)
 		m.Rivers = append(m.Rivers, segment)
@@ -594,13 +595,14 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	for _, id := range m.riverBuckets[bucket] {
 		seg := m.Rivers[id]
 		t, distance := pointRiverSegment(worldX, worldZ, seg)
-		bankRadius := seg.HalfWidth + riverBankBlendBlocks(seg.HalfWidth)
+		halfWidth := riverMouthHalfWidth(seg, t)
+		bankRadius := halfWidth + riverBankBlendBlocks(seg.HalfWidth)
 		if distance >= bankRadius {
 			continue
 		}
 		bed := sampleRiverProfile(seg, t)
 
-		if distance >= seg.HalfWidth {
+		if distance >= halfWidth {
 			// Shape a short dry river valley around the navigable channel.
 			// The river is the local low point; terrain rises smoothly back to
 			// the untouched broad surface instead of meeting water as a noisy
@@ -612,7 +614,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			}
 			innerBank := math.Min(baseHeight, surface+0.0022)
 			bankWeight := 1 - smoothstep(
-				seg.HalfWidth,
+				halfWidth,
 				bankRadius,
 				distance,
 			)
@@ -627,7 +629,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			continue
 		}
 
-		weight := 1 - smoothstep(0, seg.HalfWidth, distance)
+		weight := 1 - smoothstep(0, halfWidth, distance)
 		if weight > sample.RiverWeight {
 			sample.RiverWeight = weight
 		}
@@ -644,7 +646,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 						bed < sample.RiverBedElevation))) {
 			sample.RiverBedDefined = true
 			sample.RiverBedElevation = bed
-			sample.RiverHalfWidth = seg.HalfWidth
+			sample.RiverHalfWidth = halfWidth
 			sample.RiverReceiverSurfaceDefined = seg.ReceiverSurfaceDefined
 			sample.RiverReceiverSurface = seg.ReceiverSurface
 			if seg.ReceiverSurfaceDefined {
@@ -664,7 +666,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			surface = seg.ReceiverSurface
 		}
 		channelShoulder := math.Min(baseHeight, surface+0.0022)
-		crossT := smoothstep(0, seg.HalfWidth, distance)
+		crossT := smoothstep(0, halfWidth, distance)
 		candidate := math.Min(
 			baseHeight,
 			lerp(bed, channelShoulder, crossT),
@@ -730,7 +732,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 func (m *Model) indexRiver(id int, seg RiverSegment) {
 	spacing := m.Geometry.SpacingX()
 	supportRadius :=
-		seg.HalfWidth +
+		mouthMaxHalfWidth(seg) +
 			math.Abs(seg.MeanderOffset) +
 			riverBankBlendBlocks(seg.HalfWidth)
 	expansion := int(math.Ceil(supportRadius/spacing)) + 1
@@ -1983,6 +1985,25 @@ func riverWidthFraction(cfg Config, halfWidth float64) float64 {
 func riverCenterDepth(cfg Config, halfWidth float64) float64 {
 	widthT := riverWidthFraction(cfg, halfWidth)
 	return cfg.RiverCenterDepthNormalized * (1 + 2*math.Pow(widthT, 1.15))
+}
+
+func mouthMaxHalfWidth(seg RiverSegment) float64 {
+	if !seg.OceanMouth {
+		return seg.HalfWidth
+	}
+	return seg.HalfWidth + math.Min(12, math.Max(9, seg.HalfWidth))
+}
+
+// Flare the final ocean-bound reach before it enters the coastline.
+// The macro receiver node can sit far offshore, so the widening begins
+// well before the endpoint and does not depend on a voxelized shore pixel.
+func riverMouthHalfWidth(seg RiverSegment, t float64) float64 {
+	if !seg.OceanMouth {
+		return seg.HalfWidth
+	}
+	progress := clamp((t-0.12)/0.62, 0, 1)
+	return seg.HalfWidth +
+		(mouthMaxHalfWidth(seg)-seg.HalfWidth)*smoothstep(0, 1, progress)
 }
 
 func riverBankBlendBlocks(halfWidth float64) float64 {

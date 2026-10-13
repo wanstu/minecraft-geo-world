@@ -54,6 +54,9 @@ type RiverSegment struct {
 	// therefore gets a flat backwater reach instead of an upstream-facing ramp.
 	ReceiverSurfaceDefined bool
 	ReceiverSurface        float64
+
+	// The final reach into the ocean grows wider near its outlet.
+	OceanMouth bool
 }
 
 type LakeNode struct {
