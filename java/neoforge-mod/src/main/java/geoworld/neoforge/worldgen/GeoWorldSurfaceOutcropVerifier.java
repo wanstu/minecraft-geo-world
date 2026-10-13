@@ -50,7 +50,7 @@ public final class GeoWorldSurfaceOutcropVerifier {
                 !"None".equals(column.sample().waterKind())) continue;
             int surface = column.groundBoundary() - 1;
             if (placement.y() > surface ||
-                placement.y() < surface - 13) continue;
+                placement.y() < surface - 23) continue;
 
             String biome = Minecraft26_3BiomeRealizer.biomeIdFromSample(
                 model, placement.x(), surface,
@@ -98,11 +98,13 @@ public final class GeoWorldSurfaceOutcropVerifier {
                 ", thickColumns=" + thickLodeColumns
             );
         }
-        // Real exposed STONE tops: require larger coherent patches than
-        // the old 414 tops / largest-64 baseline, but prevent ore carpeting.
+        // The former long ribbons covered more cliff columns but only a
+        // thin layer. New granite-like blobs expose smaller, thicker
+        // connected patches. Bound both visible coverage and connectivity
+        // so the rock face is mineralized without being entirely ore.
         if (seed == -563659577384754347L &&
-            (visibleCoords.size() < 700 || largestExposedPatch < 100 ||
-                visibleCoords.size() > 2500)) {
+            (visibleCoords.size() < 280 || largestExposedPatch < 70 ||
+                visibleCoords.size() > 1100)) {
             throw new AssertionError(
                 "rocky ore outcrop size/density regression: unique=" +
                 visibleCoords.size() + " largest=" + largestExposedPatch

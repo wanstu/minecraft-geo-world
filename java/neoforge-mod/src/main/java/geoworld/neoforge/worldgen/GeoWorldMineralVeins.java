@@ -32,23 +32,33 @@ final class GeoWorldMineralVeins {
     private static final long OUTCROP_SALT = 0x4F555443524F5053L;
 
     enum Mineral {
-        COAL(-63, 215, 7.5),
-        IRON(-60, 319, 9),
-        COPPER(-20, 150, 6.0),
-        GOLD(-63, 60, 3.2),
-        LAPIS(-63, 80, 2.7),
-        REDSTONE(-63, 24, 4.2),
-        DIAMOND(-63, 24, 1.0),
-        EMERALD(-63, 319, 1.2);
+        // Rarity primarily controls how frequently a vein starts, NOT
+        // whether it is a 2-block speck. Even diamond/emerald deposits form
+        // tangible three-dimensional lodes when discovered.
+        // Vanilla granite/andesite-style lobes: short, thick and irregular,
+        // rather than long thin strings of ore.
+        COAL(-63, 215, 7.5, 17, 3.3),
+        IRON(-60, 319, 9, 16, 3.2),
+        COPPER(-20, 150, 6.0, 16, 3.3),
+        GOLD(-63, 60, 3.2, 13, 2.6),
+        LAPIS(-63, 80, 2.7, 13, 2.6),
+        REDSTONE(-63, 24, 4.2, 14, 2.7),
+        DIAMOND(-63, 24, 1.0, 11, 2.1),
+        EMERALD(-63, 319, 1.2, 11, 2.1);
 
         final int minY;
         final int maxY;
         final double weight;
+        final double seamLength;
+        final double seamRadius;
 
-        Mineral(int minY, int maxY, double weight) {
+        Mineral(int minY, int maxY, double weight,
+                double seamLength, double seamRadius) {
             this.minY = minY;
             this.maxY = maxY;
             this.weight = weight;
+            this.seamLength = seamLength;
+            this.seamRadius = seamRadius;
         }
 
         // Resolve Minecraft blocks only in the actual generation runtime.
@@ -77,13 +87,21 @@ final class GeoWorldMineralVeins {
         int minZ = chunk.getPos().getMinBlockZ();
         BlockPos.MutableBlockPos position = new BlockPos.MutableBlockPos();
         final int[] added = {0};
+        // Long, thick seams contain overlapping ellipsoid sweeps. Skip each
+        // voxel after the first mineral candidate, before expensive chunk
+        // state and surface checks. First-seen ordering is unchanged.
+        BitSet seenUnderground = new BitSet(384 * 256);
         plan(model, seed, minX, minX + 15, minZ, minZ + 15, placement -> {
+            int localX = placement.x() - minX;
+            int localZ = placement.z() - minZ;
+            int voxel = ((placement.y() + 63) * 256) +
+                localZ * 16 + localX;
+            if (seenUnderground.get(voxel)) return;
+            seenUnderground.set(voxel);
             position.set(placement.x(), placement.y(), placement.z());
             BlockState host = chunk.getBlockState(position);
             // Leave bedrock, ocean/river water, soil, snow, and decorations intact.
             // The vanilla ore features are suppressed for this generator only.
-            int localX = placement.x() - minX;
-            int localZ = placement.z() - minZ;
             GeoWorldShoreline.Column column = shoreline.column(localX, localZ);
             int safeBoundary = column.groundBoundary() - 4;
             int surfaceY = column.groundBoundary() - 1;
@@ -123,7 +141,7 @@ final class GeoWorldMineralVeins {
 
                 GeoWorldShoreline.Column column = shoreline.column(localX, localZ);
                 int surface = column.groundBoundary() - 1;
-                if (placement.y() > surface || placement.y() < surface - 13) {
+                if (placement.y() > surface || placement.y() < surface - 23) {
                     return;
                 }
                 // Confirm the entire host column is a naturally exposed rock
@@ -173,9 +191,9 @@ final class GeoWorldMineralVeins {
                 SplittableRandom random = new SplittableRandom(
                     cellSeed(seed ^ OUTCROP_SALT, cellX, 0, cellZ)
                 );
-                // Lodes are less rare than the old 1/12 sources, but still
-                // clustered in individual 64x64 geological cells.
-                if (random.nextInt(8) != 0) continue;
+                // Mountain outcrops are discrete deposits, never random surface
+                // confetti. Larger connected veins remain rare by source rate.
+                if (random.nextInt(6) != 0) continue;
                 // Do not pin every lode exactly to the center of its cell.
                 double centerX = cellX * (double)CELL_XZ + CELL_XZ / 2.0
                     + (random.nextDouble() - 0.5) * 24.0;
@@ -204,7 +222,7 @@ final class GeoWorldMineralVeins {
                             default -> Mineral.EMERALD;
                         };
                 emitVein(
-                    mineral, centerX, surface - 4.0, centerZ,
+                    mineral, centerX, surface - 2.5, centerZ,
                     random, minX, maxX, minZ, maxZ, consumer, true
                 );
             }
@@ -394,42 +412,44 @@ final class GeoWorldMineralVeins {
         int minX, int maxX, int minZ, int maxZ,
         Consumer<Placement> consumer, boolean rockyOutcrop
     ) {
-        boolean large = random.nextDouble() < 0.025;
-        double length = rockyOutcrop
-            ? (large ? 50 + random.nextDouble() * 10
-                : 30 + random.nextDouble() * 22)
-            : (large ? 32 + random.nextDouble() * 16
-                : 13 + random.nextDouble() * 18);
-        double radius = rockyOutcrop
-            ? (large ? 3.6 + random.nextDouble() * 0.8
-                : 2.5 + random.nextDouble() * 1.1)
-            : (large ? 2.4 + random.nextDouble() * 0.8
-                : 1.2 + random.nextDouble() * 0.9);
+        boolean large = random.nextDouble() < 0.035;
+        // Similar in geometry to Minecraft's granite/andesite blobs:
+        // a short bent set of overlapping ellipsoids with uneven lobes.
+        // The geology/rarity selection happens BEFORE this; rare minerals
+        // remain rarer sources but are never 1-2-block specks.
+        double length = mineral.seamLength *
+            (0.90 + random.nextDouble() * 0.22) *
+            (large ? 1.22 : 1.0);
+        double radius = mineral.seamRadius *
+            (0.94 + random.nextDouble() * 0.15) *
+            (large ? 1.17 : 1.0) *
+            (rockyOutcrop ? 1.12 : 1.0);
         double angle = random.nextDouble() * Math.PI * 2;
         double dx = Math.cos(angle), dz = Math.sin(angle);
-        double tilt = (random.nextDouble() - 0.5) * 0.32;
-        double bend = (random.nextDouble() - 0.5) * 4;
-        // After consuming all the same PRNG draws, reject veins whose
-        // complete swept envelope cannot touch this chunk. Keeps both
-        // ore placement and subsequent attempts bit-for-bit unchanged.
-        double reach = length * 0.5 + Math.abs(bend) + radius + 1;
+        double tilt = (random.nextDouble() - 0.5) * 0.27;
+        double bend = (random.nextDouble() - 0.5) * radius * 1.15;
+        // Bound all lobe centers before sampling this chunk. The geometry
+        // remains deterministic independently of which chunk is generated.
+        double reach = length * 0.5 + Math.abs(bend) +
+            radius * 1.3 + 2;
         if (x + reach < minX || x - reach > maxX ||
             z + reach < minZ || z - reach > maxZ) {
             return;
         }
-        // Rocky lodes have >=2.5-block radius, so sampling their centers
-        // every 2.5 blocks stays continuous and avoids re-emitting many
-        // identical voxels. Preserve original underground vein geometry.
-        int steps = (int)Math.ceil(length / (rockyOutcrop ? 2.5 : 1.5));
+        int steps = Math.max(4, (int)Math.ceil(length / 3.7));
         for (int step = 0; step <= steps; step++) {
             double t = (double) step / steps;
-            double longitudinal = (t - 0.5) * length;
+            double longitudinal = (t - 0.5) * length * 0.68;
             double lateral = Math.sin(t * Math.PI) * bend;
             double cx = x + longitudinal * dx - lateral * dz;
             double cz = z + longitudinal * dz + lateral * dx;
             double cy = y + longitudinal * tilt;
-            double r = radius * (0.82 + 0.18 * Math.sin(t * Math.PI));
-            double verticalRadius = rockyOutcrop ? r * 1.75 : r;
+            // Bulges of varied radius make a compact, connected but
+            // irregular lode instead of a uniform ore cylinder.
+            double lobe = 0.76 + 0.19 * Math.sin(t * Math.PI) +
+                0.14 * (random.nextDouble() - 0.5);
+            double r = radius * lobe;
+            double verticalRadius = rockyOutcrop ? r * 1.70 : r * 1.10;
             int left = Math.max(minX, (int)Math.floor(cx - r));
             int right = Math.min(maxX, (int)Math.ceil(cx + r));
             int north = Math.max(minZ, (int)Math.floor(cz - r));
@@ -452,6 +472,18 @@ final class GeoWorldMineralVeins {
                 }
             }
         }
+    }
+
+    // Deterministic, full-geometry fixture for auditing the lower bound of
+    // each mineral body without bootstrapping a Minecraft server.
+    static void planReferenceBody(
+        Mineral mineral, boolean exposed, long seed,
+        Consumer<Placement> consumer
+    ) {
+        emitVein(
+            mineral, 0, 100, 0, new SplittableRandom(seed),
+            -70, 70, -70, 70, consumer, exposed
+        );
     }
 
     private static long cellSeed(long seed, int x, int y, int z) {

@@ -300,6 +300,13 @@ tasks.register('verifyGeoWorldSurfaceOutcrops', JavaExec) {
     mainClass = 'geoworld.neoforge.worldgen.GeoWorldSurfaceOutcropVerifier'
 }
 
+tasks.register('verifyGeoWorldMineralBodies', JavaExec) {
+    group = 'verification'
+    description = 'Enforces minimum 3D seam volume, thickness, and connectedness for all overworld ores.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.worldgen.GeoWorldMineralBodyVerifier'
+}
+
 tasks.register('verifyGeoWorldMinerals', JavaExec) {
     group = 'verification'
     description = 'Verifies all 8 overworld ores in stone/deepslate, geological affinity and chunk continuity.'
@@ -350,6 +357,7 @@ tasks.named('check').configure {
     dependsOn tasks.named('verifyGeoWorldBiomePreset')
     dependsOn tasks.named('auditGeoWorldBiomeCoverage')
     dependsOn tasks.named('verifyGeoWorldSurfaceBiomes')
+    dependsOn tasks.named('verifyGeoWorldMineralBodies')
     dependsOn tasks.named('verifyGeoWorldMinerals')
     dependsOn tasks.named('verifyGeoWorldSurfaceOutcrops')
     dependsOn tasks.named('fingerprintGeoWorldBiomeDecisions')
