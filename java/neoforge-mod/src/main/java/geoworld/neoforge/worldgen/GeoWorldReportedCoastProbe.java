@@ -27,11 +27,13 @@ public final class GeoWorldReportedCoastProbe {
                         cells.put(key(cx*16+x,cz*16+z),plan.column(x,z));
                 }
             }
-            int[] distanceCount=new int[11],heightDrop=new int[11];
+            int[] distanceCount=new int[GeoWorldShoreline.MAX_GENTLE_BANK_DISTANCE+1],
+                heightDrop=new int[GeoWorldShoreline.MAX_GENTLE_BANK_DISTANCE+1];
             int water=0, land=0, tapered=0, cappedSlope=0, maxGround=0;
             Map<String,Integer> kinds=new TreeMap<>(),terrain=new TreeMap<>();
             int eligible=0;
             int inlandLowlandRamp=0;
+            int extendedLowlandRamp=0;
             int shallowDryLowland=0;
             for(int z=z0-40;z<=z0+40;z++)
               for(int x=x0-40;x<=x0+40;x++) {
@@ -40,7 +42,8 @@ public final class GeoWorldReportedCoastProbe {
                 if(c.waterBoundary()>c.groundBoundary()){water++;kinds.merge(c.shoreWaterKind(),1,Integer::sum);}
                 else land++;
                 int d=c.shoreDistance();
-                if(d>=1&&d<=10&&("Ocean".equals(c.shoreWaterKind())||"Lake".equals(c.shoreWaterKind()))){
+                if(d>=1&&d<=GeoWorldShoreline.MAX_GENTLE_BANK_DISTANCE&&
+                   ("Ocean".equals(c.shoreWaterKind())||"Lake".equals(c.shoreWaterKind()))){
                     if ("None".equals(c.sample().waterKind()) &&
                         "Ocean".equals(c.shoreWaterKind()) &&
                         c.originalGroundBoundary()<c.shoreWaterBoundary() &&
@@ -49,6 +52,9 @@ public final class GeoWorldReportedCoastProbe {
                         if (d>=5 && d<=9 &&
                             c.groundBoundary()>c.originalGroundBoundary())
                             inlandLowlandRamp++;
+                        if (d>=11 && d<=13 &&
+                            c.groundBoundary()>c.originalGroundBoundary())
+                            extendedLowlandRamp++;
                     }
                     distanceCount[d]++;
                     int drop=c.originalGroundBoundary()-c.groundBoundary();
@@ -71,12 +77,14 @@ public final class GeoWorldReportedCoastProbe {
                     }
                 }
               }
-            System.out.printf("COAST site=(%d,%d) land=%d water=%d waterKinds=%s terrains=%s candidates=%d altered=%d maxDrop=%d steepDryEdges=%d lowlandCandidates=%d rampedInland=%d%n",
-                x0,z0,land,water,kinds,terrain,eligible,tapered,maxGround,cappedSlope,shallowDryLowland,inlandLowlandRamp);
-            if (site == sites[0] && (inlandLowlandRamp < 80 || cappedSlope != 0)) {
+            System.out.printf("COAST site=(%d,%d) land=%d water=%d waterKinds=%s terrains=%s candidates=%d altered=%d maxDrop=%d steepDryEdges=%d lowlandCandidates=%d rampedInland=%d extendedRamped=%d%n",
+                x0,z0,land,water,kinds,terrain,eligible,tapered,maxGround,cappedSlope,shallowDryLowland,inlandLowlandRamp,extendedLowlandRamp);
+            if (site == sites[0] &&
+                (inlandLowlandRamp < 80 || extendedLowlandRamp < 10 ||
+                    cappedSlope != 0)) {
                 throw new AssertionError("landward coastal dune/berm still too steep: ramped="+inlandLowlandRamp+" drySteps="+cappedSlope);
             }
-            for(int d=1;d<=10;d++)if(distanceCount[d]>0)
+            for(int d=1;d<=GeoWorldShoreline.MAX_GENTLE_BANK_DISTANCE;d++)if(distanceCount[d]>0)
                 System.out.printf("  d=%d columns=%d avgLowered=%.2f%n",d,distanceCount[d],(double)heightDrop[d]/distanceCount[d]);
             if (Boolean.getBoolean("geoworld.coastProbeVerbose")) {
               for(int z : new int[]{z0-8,z0,z0+8}) {

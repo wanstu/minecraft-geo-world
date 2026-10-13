@@ -7,7 +7,7 @@ final class GeoWorldShoreline {
     static final int MAX_SHORE_DISTANCE = 4;
     // Only Lake/Ocean dry shores can need a longer inland transition.
     // Do not widen the river shelf or move a modeled water surface.
-    static final int MAX_GENTLE_BANK_DISTANCE = 10;
+    static final int MAX_GENTLE_BANK_DISTANCE = 14;
 
     private static final Minecraft26_3HeightMapping HEIGHTS =
         new Minecraft26_3HeightMapping();
@@ -75,10 +75,23 @@ final class GeoWorldShoreline {
             new GeoWorldV1.RuntimeSample[stride * stride];
 
         for (int z = 0; z < stride; z++) {
-            int worldZ = baseZ + z - radius;
+            int localZ = z - radius;
+            int worldZ = baseZ + localZ;
+            int beyondZ = Math.max(0, Math.max(
+                -fringe - localZ, localZ - (15 + fringe)
+            ));
             for (int x = 0; x < stride; x++) {
-                int worldX = baseX + x - radius;
-                samples[z * stride + x] = runtime.sample(worldX, worldZ);
+                int localX = x - radius;
+                int beyondX = Math.max(0, Math.max(
+                    -fringe - localX, localX - (15 + fringe)
+                ));
+                // All water searches use a Manhattan radius. The square
+                // corners can never be read by any planned column, so skip
+                // their costly runtime samples without approximating terrain.
+                if (beyondX + beyondZ > MAX_GENTLE_BANK_DISTANCE) continue;
+                samples[z * stride + x] = runtime.sample(
+                    baseX + localX, worldZ
+                );
             }
         }
 
@@ -176,10 +189,14 @@ final class GeoWorldShoreline {
         GeoWorldV1.RuntimeSample[] samples =
             new GeoWorldV1.RuntimeSample[stride * stride];
         for (int z = 0; z < stride; z++) {
+            int dz = z - radius;
+            int beyondZ = Math.max(0, Math.abs(dz) - localRadius);
             for (int x = 0; x < stride; x++) {
+                int dx = x - radius;
+                int beyondX = Math.max(0, Math.abs(dx) - localRadius);
+                if (beyondX + beyondZ > MAX_GENTLE_BANK_DISTANCE) continue;
                 samples[z * stride + x] = runtime.sample(
-                    worldX + x - radius,
-                    worldZ + z - radius
+                    worldX + dx, worldZ + dz
                 );
             }
         }
@@ -924,12 +941,20 @@ final class GeoWorldShoreline {
             shoreDistance <= 0) {
             return legacyMinimum;
         }
-        double progress = Math.max(0.0,
-            (shoreDistance - 2.0) /
-            (MAX_GENTLE_BANK_DISTANCE - 2.0));
-        double eased = progress * progress * (3.0 - 2.0 * progress);
+        // Low relief requires only a short transition; deeper lowland
+        // beaches get more room without widening rivers or moving water.
+        // At most 14 blocks: avoids sampling a larger ring for every chunk.
+        // In the reported three-block depression the full 14-block taper applies.
+        int taperDistance = Math.min(
+            MAX_GENTLE_BANK_DISTANCE, 8 + depression * 2
+        );
+        double progress = Math.min(1.0, Math.max(0.0,
+            (shoreDistance - 2.0) / (taperDistance - 2.0)));
+        // Minecraft stores integer block heights: smootherstep clusters
+        // the three visible contours in the middle of a beach. Distribute
+        // those steps across the full taper instead of wasting its ends.
         int rampFloor = waterBoundary -
-            (int)Math.round(depression * eased);
+            (int)Math.round(depression * progress);
         if (shoreDistance > 2) {
             // Cap inland soil uplift at the original three blocks even
             // when the adjacent raw ground is four blocks below sea level.
