@@ -244,6 +244,9 @@ func TestReceiverBackwaterFormsFlatFloorWithoutDownstreamRise(t *testing.T) {
 	if !wb.Rivers[0].ReceiverSurfaceDefined {
 		t.Fatal("terminal segment did not receive direct ocean datum")
 	}
+	if !wb.Rivers[0].OceanMouth {
+		t.Fatal("terminal ocean segment must have an expanded mouth footprint")
+	}
 
 	m, err := Build(
 		testSurface(g, true),
@@ -258,7 +261,15 @@ func TestReceiverBackwaterFormsFlatFloorWithoutDownstreamRise(t *testing.T) {
 	x1, _ := g.NodePosition(1, 1)
 	prev := math.Inf(1)
 	for _, frac := range []float64{0.10, 0.25, 0.50, 0.75, 0.95} {
-		s := m.Sample(x0+(x1-x0)*frac, z0)
+		worldX := x0 + (x1-x0)*frac
+		ground := wb.Sample(worldX, z0)
+		// The outlet gets wider, but its nominal hydrological width (and
+		// therefore its center depth) must NOT grow with the flare.
+		if ground.RiverHalfWidth != wb.Rivers[0].HalfWidth {
+			t.Fatalf("ocean mouth width changed water-depth basis at t=%.2f: got=%v nominal=%v",
+				frac, ground.RiverHalfWidth, wb.Rivers[0].HalfWidth)
+		}
+		s := m.Sample(worldX, z0)
 		if s.WaterKind != reconcile.WaterRiver || !s.WaterSurfaceDefined {
 			t.Fatalf("expected river backwater at t=%.2f, got %+v", frac, s)
 		}

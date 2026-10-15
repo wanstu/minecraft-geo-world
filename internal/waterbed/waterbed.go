@@ -646,7 +646,8 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 						bed < sample.RiverBedElevation))) {
 			sample.RiverBedDefined = true
 			sample.RiverBedElevation = bed
-			sample.RiverHalfWidth = halfWidth
+			// Mouth flare changes the footprint, not the river's depth datum.
+			sample.RiverHalfWidth = seg.HalfWidth
 			sample.RiverReceiverSurfaceDefined = seg.ReceiverSurfaceDefined
 			sample.RiverReceiverSurface = seg.ReceiverSurface
 			if seg.ReceiverSurfaceDefined {

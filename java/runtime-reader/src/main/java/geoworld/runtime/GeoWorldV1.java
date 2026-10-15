@@ -959,7 +959,8 @@ public final class GeoWorldV1 {
             ) {
                 riverBedDefined = true;
                 riverBedElevation = bed;
-                riverHalfWidth = mouthHalfWidth;
+                // Flaring the river footprint must not inflate centerDepth.
+                riverHalfWidth = segment.halfWidth();
                 receiverDefined = segment.receiverSurfaceDefined();
                 receiverSurface = segment.receiverSurface();
                 receiverWeight =
