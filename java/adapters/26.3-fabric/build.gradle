@@ -1,0 +1,96 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version '1.18-SNAPSHOT'
+    id 'java'
+}
+
+group = 'geoworld.fabric'
+version = project.mod_version
+
+repositories {
+    maven { url 'https://maven.fabricmc.net/' }
+    mavenCentral()
+}
+
+dependencies {
+    minecraft 'com.mojang:minecraft:' + project.minecraft_version
+    implementation 'net.fabricmc:fabric-loader:' + project.loader_version
+    implementation 'net.fabricmc.fabric-api:fabric-api:' + project.fabric_api_version
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+base.archivesName = 'geoworld'
+
+tasks.named('processResources', ProcessResources) {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') {
+        expand(version: project.version)
+    }
+}
+
+// Minecraft 26.3 implementation shared by NeoForge and Fabric.
+sourceSets.main.java.srcDir '../../runtime-reader/src/main/java'
+sourceSets.main.java.srcDir '../../minecraft-common/src/main/java'
+sourceSets.main.java.srcDir '../../minecraft-v26-common/src/main/java'
+sourceSets.main.java.srcDir '../../minecraft-v26_3-common/src/main/java'
+
+sourceSets.main.resources.srcDir '../../minecraft-v26-common/src/main/resources'
+
+// Shared Minecraft 26.3 assets/data are loader-neutral.
+sourceSets.main.resources.srcDir '../../minecraft-v26_3-common/src/main/resources'
+
+def geoWorldEngineResources = layout.buildDirectory.dir('generated/geoworldEngineResources')
+def geoWorldEnginePlatforms = [
+    'windows-x64'  : ['windows', 'amd64', 'geoworld-engine.exe'],
+    'windows-arm64': ['windows', 'arm64', 'geoworld-engine.exe'],
+    'linux-x64'    : ['linux', 'amd64', 'geoworld-engine'],
+    'linux-arm64'  : ['linux', 'arm64', 'geoworld-engine'],
+    'macos-x64'    : ['darwin', 'amd64', 'geoworld-engine'],
+    'macos-arm64'  : ['darwin', 'arm64', 'geoworld-engine']
+]
+def geoWorldEngineBuilds = geoWorldEnginePlatforms.collect { target, spec ->
+    tasks.register('buildGeoWorldEngine_' + target.replace('-', '_'), Exec) {
+        group = 'build'
+        description = "Cross-compiles GeoWorld engine for ${target}."
+        workingDir file('../../..')
+        inputs.files(fileTree('../../..') {
+            include 'go.mod'
+            include 'go.sum'
+            include 'cmd/geoworld-engine/**/*.go'
+            include 'internal/**/*.go'
+        })
+        def output = geoWorldEngineResources.map {
+            it.file("native/${target}/${spec[2]}")
+        }
+        outputs.file output
+        environment 'GOOS', spec[0]
+        environment 'GOARCH', spec[1]
+        environment 'CGO_ENABLED', '0'
+        doFirst {
+            output.get().asFile.parentFile.mkdirs()
+            commandLine 'go', 'build', '-trimpath', '-ldflags=-s -w',
+                '-o', output.get().asFile.absolutePath,
+                './cmd/geoworld-engine'
+        }
+    }
+}
+sourceSets.main.resources.srcDir geoWorldEngineResources
+tasks.named('processResources').configure {
+    dependsOn geoWorldEngineBuilds
+}
+
+tasks.register('verifyGeoWorldAdapter') {
+    group = 'verification'
+    dependsOn tasks.named('classes')
+    doLast {
+        def adapter = layout.buildDirectory.file(
+            'classes/java/main/geoworld/fabric/GeoWorldFabricPlatform.class'
+        ).get().asFile
+        if (!adapter.isFile()) {
+            throw new GradleException(
+                'Fabric platform adapter did not compile: ' + adapter
+            )
+        }
+    }
+}
+tasks.named('check') { dependsOn tasks.named('verifyGeoWorldAdapter') }

@@ -9,12 +9,54 @@
                  │                         │
           GeoWorld Generator        GeoWorld Runtime
                  │                         │
-        可视化 / 预生成 / 导出       Minecraft Common
+        可视化 / 预生成 / 导出       minecraft-common
                                            │
-                            ┌──────────────┼──────────────┐
-                            │              │              │
-                         NeoForge        Fabric         Forge
+                       ┌───────────────────┴───────────────────┐
+                       │                                       │
+              minecraft-v26-common                    minecraft-v1_21_1-common
+                       │                                       │
+                ┌──────┴──────┐                               ...
+                │             │
+       minecraft-v26_2-common minecraft-v26_3-common
+                │             │
+           ┌────┴────┐   ┌────┴────┐
+           │         │   │         │
+        NeoForge   Fabric NeoForge Fabric
 ```
+
+`minecraft-common` 当前只允许依赖 Java / GeoWorld Runtime，不允许直接依赖
+`net.minecraft.*` 或某个 `minecraft-vXX-common`。其中可复用接口包括：
+
+- `MinecraftVersionProfile`
+- `MinecraftPlatformAdapter<S, ChunkCodec, BiomeCodec>`
+- `ServerLifecycleAdapter<S>`
+- `WorldgenRegistrationAdapter<ChunkCodec, BiomeCodec>`
+- `HeightMapping`
+- `SurfaceProfileMapping`
+- `BiomeFamilyMapping`
+- `BiomeCatalog` / `TaggedBiomeSelector`
+- `GeoWorldShorelinePlanner` / `ShorelineRules`
+- `GeoWorldMineralPlanner` / `GeoWorldMineralRules`
+
+
+`minecraft-v26-common` 只承载经 26.2 / 26.3 双边真实编译验证过的 26.x 共同能力，包括：
+
+- `MinecraftV26Profile` / `MinecraftV26HeightMapping`
+- 26.x 群系候选表、Realizer 与 Coverage
+- `GeoWorldV26TerrainPopulator`
+- `GeoWorldV26BiomeSourceBase`
+- `GeoWorldV26GeneratorRuntime`
+- `GeoWorldV26WorldService`
+
+`minecraft-v26_2-common` / `minecraft-v26_3-common` 只保留 Mojang API 真正发生变化的薄适配层，例如 26.2 的 `fillFromNoise/buildSurface/applyCarvers` 与 26.3 的 `buildTerrain`，以及 BiomeSource 方法签名和版本新增群系能力。
+
+平台能力采用可组合接口，而不是要求所有模组实现同一套大接口。
+GeoWorld 当前组合“服务器生命周期 + 世界生成注册”；其它功能模组以后
+只使用自己需要的能力即可。
+
+具体 Minecraft 版本负责把这些抽象绑定到该版本的 Server、Codec、
+世界高度、Registry 与 Block/Biome API；NeoForge/Fabric/Forge 再只负责
+Loader 注册和事件桥接。
 
 ## 2. 核心领域模块
 

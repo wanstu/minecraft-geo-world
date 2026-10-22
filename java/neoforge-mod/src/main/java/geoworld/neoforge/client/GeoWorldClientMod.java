@@ -1,8 +1,10 @@
 package geoworld.neoforge.client;
 
 import geoworld.neoforge.GeoWorldMod;
-import geoworld.neoforge.GeoWorldWorldService;
-import geoworld.neoforge.worldgen.GeoWorldWorldPresets;
+import geoworld.minecraft.v26_3common.client.GeoWorldPresetScreen;
+import geoworld.minecraft.v26_3common.client.GeoWorldPreviewScreen;
+import geoworld.minecraft.v26_3common.runtime.GeoWorldWorldService;
+import geoworld.minecraft.v26common.worldgen.GeoWorldV26WorldPresets;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.PauseScreen;
@@ -26,12 +28,12 @@ public final class GeoWorldClientMod {
     @SubscribeEvent
     static void registerPresetEditors(RegisterPresetEditorsEvent event) {
         event.register(
-            GeoWorldWorldPresets.GEOWORLD,
+            GeoWorldV26WorldPresets.GEOWORLD,
             (parent, settings) -> new GeoWorldPresetScreen(parent, settings)
         );
         GeoWorldMod.LOGGER.info(
             "Registered GeoWorld preset editor for {}",
-            GeoWorldWorldPresets.GEOWORLD.identifier()
+            GeoWorldV26WorldPresets.GEOWORLD.identifier()
         );
     }
 

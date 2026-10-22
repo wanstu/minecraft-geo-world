@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "package": "geoworld.fabric.mixin",
+  "mixins": [
+    "MinecraftServerLifecycleMixin"
+  ],
+  "client": [
+    "WorldCreationUiStateMixin",
+    "PauseScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

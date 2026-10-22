@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "geoworld",
+  "version": "${version}",
+  "name": "GeoWorld",
+  "description": "GeoWorld terrain generator",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "geoworld.fabric.GeoWorldFabricMod"
+    ]
+  },
+  "mixins": [
+    "geoworld.fabric.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "26.2",
+    "java": ">=25"
+  }
+}

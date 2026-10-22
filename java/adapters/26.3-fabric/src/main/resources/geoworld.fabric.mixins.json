@@ -1,0 +1,10 @@
+{
+  "required": true,
+  "package": "geoworld.fabric.mixin",
+  "client": [
+    "WorldCreationUiStateMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
