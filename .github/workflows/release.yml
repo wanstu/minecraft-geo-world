@@ -1,0 +1,343 @@
+name: GeoWorld release
+
+# Every published artifact is built by GitHub Actions from the tagged commit.
+# Local build outputs are never uploaded into a GitHub Release.
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  RELEASE_TARGET_COUNT: '9'
+
+jobs:
+  core-tests:
+    name: Core unit tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test all GeoWorld Go packages
+        run: go test ./...
+
+  implemented-adapters:
+    name: Verify ${{ matrix.minecraft }} / ${{ matrix.loader }}
+    needs: core-tests
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { minecraft: '26.3', loader: neoforge, java: '25', module: 'java/neoforge-mod' }
+          - { minecraft: '26.3', loader: fabric, java: '25', module: 'java/adapters/26.3-fabric' }
+          - { minecraft: '26.2', loader: neoforge, java: '25', module: 'java/adapters/26.2-neoforge' }
+          - { minecraft: '26.2', loader: fabric, java: '25', module: 'java/adapters/26.2-fabric' }
+          - { minecraft: '26.1.2', loader: neoforge, java: '25', module: 'java/adapters/26.1.2-neoforge' }
+          - { minecraft: '26.1.2', loader: fabric, java: '25', module: 'java/adapters/26.1.2-fabric' }
+          - { minecraft: '1.21.1', loader: neoforge, java: '21', module: 'java/adapters/1.21.1-neoforge' }
+          - { minecraft: '1.21.1', loader: fabric, java: '21', module: 'java/adapters/1.21.1-fabric' }
+          - { minecraft: '1.20.1', loader: fabric, java: '17', module: 'java/adapters/1.20.1-fabric' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+
+      - name: Validate adapter target
+        shell: pwsh
+        env:
+          TARGET_MC: ${{ matrix.minecraft }}
+          TARGET_MODULE: ${{ matrix.module }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $properties = Join-Path $env:TARGET_MODULE 'gradle.properties'
+          if (-not (Test-Path $properties)) {
+            throw "Missing adapter properties: $properties"
+          }
+          $expectedMc = "^minecraft_version=$([regex]::Escape($env:TARGET_MC))$"
+          if (-not (Get-Content $properties | Where-Object { $_ -match $expectedMc })) {
+            throw "Adapter reports a different Minecraft version: $properties"
+          }
+
+      - name: Build and verify adapter
+        shell: pwsh
+        env:
+          MODULE: ${{ matrix.module }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $gradlew = Join-Path $env:MODULE 'gradlew.bat'
+          if (-not (Test-Path $gradlew)) {
+            throw "Missing Gradle wrapper: $gradlew"
+          }
+          & $gradlew -p $env:MODULE clean check build --no-daemon
+          if ($LASTEXITCODE -ne 0) {
+            throw "Adapter build failed with $LASTEXITCODE"
+          }
+
+      - name: Verify loader metadata and native engines
+        shell: pwsh
+        env:
+          MODULE: ${{ matrix.module }}
+          MOD_LOADER: ${{ matrix.loader }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $jars = @(Get-ChildItem (Join-Path $env:MODULE 'build/libs') -Filter '*.jar' |
+            Where-Object { $_.Name -notmatch '(sources|javadoc|dev|shadow)' })
+          if ($jars.Count -ne 1) {
+            throw "Expected exactly one adapter jar, got $($jars.Count)"
+          }
+
+          Add-Type -AssemblyName System.IO.Compression
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($jars[0].FullName)
+          try {
+            $entries = @($zip.Entries | ForEach-Object FullName)
+            $metadata = switch ($env:MOD_LOADER) {
+              'fabric'   { 'fabric.mod.json' }
+              'neoforge' { 'META-INF/neoforge.mods.toml' }
+              default    { throw "Unknown loader $env:MOD_LOADER" }
+            }
+            if ($metadata -notin $entries) {
+              throw "Missing loader metadata $metadata"
+            }
+
+            $native = @(
+              'native/windows-x64/geoworld-engine.exe',
+              'native/windows-arm64/geoworld-engine.exe',
+              'native/linux-x64/geoworld-engine',
+              'native/linux-arm64/geoworld-engine',
+              'native/macos-x64/geoworld-engine',
+              'native/macos-arm64/geoworld-engine'
+            )
+            foreach ($path in $native) {
+              if ($path -notin $entries) {
+                throw "Missing native GeoWorld engine: $path"
+              }
+            }
+          } finally {
+            $zip.Dispose()
+          }
+
+  release-build:
+    name: Release ${{ matrix.minecraft }} / ${{ matrix.loader }}
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: core-tests
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { minecraft: '26.3', loader: neoforge, java: '25', module: 'java/neoforge-mod' }
+          - { minecraft: '26.3', loader: fabric, java: '25', module: 'java/adapters/26.3-fabric' }
+          - { minecraft: '26.2', loader: neoforge, java: '25', module: 'java/adapters/26.2-neoforge' }
+          - { minecraft: '26.2', loader: fabric, java: '25', module: 'java/adapters/26.2-fabric' }
+          - { minecraft: '26.1.2', loader: neoforge, java: '25', module: 'java/adapters/26.1.2-neoforge' }
+          - { minecraft: '26.1.2', loader: fabric, java: '25', module: 'java/adapters/26.1.2-fabric' }
+          - { minecraft: '1.21.1', loader: neoforge, java: '21', module: 'java/adapters/1.21.1-neoforge' }
+          - { minecraft: '1.21.1', loader: fabric, java: '21', module: 'java/adapters/1.21.1-fabric' }
+          - { minecraft: '1.20.1', loader: fabric, java: '17', module: 'java/adapters/1.20.1-fabric' }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+
+      - name: Verify tag and adapter
+        id: target
+        shell: pwsh
+        env:
+          TARGET_MC: ${{ matrix.minecraft }}
+          TARGET_LOADER: ${{ matrix.loader }}
+          TARGET_MODULE: ${{ matrix.module }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REF_NAME -notmatch '^v([0-9]+\.[0-9]+\.[0-9]+(?:-rc\.[0-9]+)?)$') {
+            throw "Release tags must be vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-rc.N"
+          }
+          $version = $Matches[1]
+
+          $module = Join-Path $env:GITHUB_WORKSPACE $env:TARGET_MODULE
+          if (-not (Test-Path (Join-Path $module 'build.gradle'))) {
+            throw "No real $env:TARGET_LOADER adapter for Minecraft $env:TARGET_MC exists at $env:TARGET_MODULE."
+          }
+
+          $properties = Join-Path $module 'gradle.properties'
+          $expectedMc = "^minecraft_version=$([regex]::Escape($env:TARGET_MC))$"
+          if (-not (Get-Content $properties | Where-Object { $_ -match $expectedMc })) {
+            throw "Adapter reports a different Minecraft version: $properties"
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "filename=GeoWorld-$version-mc$env:TARGET_MC-$env:TARGET_LOADER.jar" >> $env:GITHUB_OUTPUT
+
+      - name: Verify tag points to current master
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git fetch origin master --no-tags
+          $tagCommit = git rev-parse HEAD
+          $masterCommit = git rev-parse FETCH_HEAD
+          if ($tagCommit -ne $masterCommit) {
+            throw "Release tag must point to current master."
+          }
+
+      - name: Build release artifact in CI
+        shell: pwsh
+        env:
+          MODULE: ${{ matrix.module }}
+          MOD_VERSION: ${{ steps.target.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $gradlew = Join-Path $env:MODULE 'gradlew.bat'
+          & $gradlew -p $env:MODULE clean check build --no-daemon "-Pmod_version=$env:MOD_VERSION"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Gradle build/check failed with $LASTEXITCODE"
+          }
+
+      - name: Stage and verify release artifact
+        shell: pwsh
+        env:
+          MODULE: ${{ matrix.module }}
+          FILE: ${{ steps.target.outputs.filename }}
+          MOD_LOADER: ${{ matrix.loader }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $jars = @(Get-ChildItem (Join-Path $env:MODULE 'build/libs') -Filter '*.jar' |
+            Where-Object { $_.Name -notmatch '(sources|javadoc|dev|shadow)' })
+          if ($jars.Count -ne 1) {
+            throw "Expected exactly one release jar, got $($jars.Count): $($jars.Name)"
+          }
+
+          Add-Type -AssemblyName System.IO.Compression
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($jars[0].FullName)
+          try {
+            $entries = @($zip.Entries | ForEach-Object FullName)
+            $required = switch ($env:MOD_LOADER) {
+              'fabric'   { 'fabric.mod.json' }
+              'neoforge' { 'META-INF/neoforge.mods.toml' }
+              default    { throw "Unknown loader $env:MOD_LOADER" }
+            }
+            if ($required -notin $entries) {
+              throw "Built jar lacks $required"
+            }
+
+            foreach ($path in @(
+              'native/windows-x64/geoworld-engine.exe',
+              'native/windows-arm64/geoworld-engine.exe',
+              'native/linux-x64/geoworld-engine',
+              'native/linux-arm64/geoworld-engine',
+              'native/macos-x64/geoworld-engine',
+              'native/macos-arm64/geoworld-engine'
+            )) {
+              if ($path -notin $entries) {
+                throw "Missing bundled GeoWorld engine: $path"
+              }
+            }
+          } finally {
+            $zip.Dispose()
+          }
+
+          New-Item -ItemType Directory -Force release-stage | Out-Null
+          Copy-Item -LiteralPath $jars[0].FullName -Destination (Join-Path release-stage $env:FILE)
+          Get-FileHash (Join-Path release-stage $env:FILE) -Algorithm SHA256 | Format-List
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: geoworld-${{ matrix.minecraft }}-${{ matrix.loader }}
+          path: release-stage/*.jar
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    name: Publish nine-file GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [core-tests, release-build]
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: geoworld-*
+          merge-multiple: true
+          path: release-stage
+
+      - name: Validate complete release set
+        id: release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = $env:GITHUB_REF_NAME.Substring(1)
+          $expected = @(
+            "GeoWorld-$version-mc26.3-neoforge.jar",
+            "GeoWorld-$version-mc26.3-fabric.jar",
+            "GeoWorld-$version-mc26.2-neoforge.jar",
+            "GeoWorld-$version-mc26.2-fabric.jar",
+            "GeoWorld-$version-mc26.1.2-neoforge.jar",
+            "GeoWorld-$version-mc26.1.2-fabric.jar",
+            "GeoWorld-$version-mc1.21.1-neoforge.jar",
+            "GeoWorld-$version-mc1.21.1-fabric.jar",
+            "GeoWorld-$version-mc1.20.1-fabric.jar"
+          ) | Sort-Object
+
+          $actual = @(Get-ChildItem release-stage -Filter '*.jar' | ForEach-Object Name | Sort-Object)
+          if ($actual.Count -ne [int]$env:RELEASE_TARGET_COUNT -or (Compare-Object $actual $expected)) {
+            Write-Host "Expected:"
+            $expected | ForEach-Object { Write-Host "  $_" }
+            Write-Host "Actual:"
+            $actual | ForEach-Object { Write-Host "  $_" }
+            throw "Exactly nine verified Minecraft/loader artifacts are required."
+          }
+
+          $hashes = foreach ($item in $expected) {
+            $hash = (Get-FileHash (Join-Path release-stage $item) -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $item"
+          }
+          Set-Content -Path release-stage/SHA256SUMS.txt -Value $hashes -Encoding utf8
+
+          $prerelease = $env:GITHUB_REF_NAME -match '-rc\.[0-9]+$'
+          "prerelease=$($prerelease.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+      - name: Create GitHub Release from CI artifacts
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IS_PRERELEASE: ${{ steps.release.outputs.prerelease }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $args = @(
+            'release', 'create', $env:GITHUB_REF_NAME,
+            'release-stage/*.jar',
+            'release-stage/SHA256SUMS.txt',
+            '--verify-tag',
+            '--title', "GeoWorld $env:GITHUB_REF_NAME",
+            '--notes', 'Nine CI-built GeoWorld artifacts for Minecraft 26.3, 26.2, 26.1.2, 1.21.1, and 1.20.1. Choose only the jar matching your Minecraft version and loader. Forge 1.20.1 is intentionally not supported. Each jar bundles GeoWorld engines for Windows, Linux, and macOS on x64 and arm64.'
+          )
+          if ($env:IS_PRERELEASE -eq 'true') {
+            $args += '--prerelease'
+          }
+          & gh @args
+          if ($LASTEXITCODE -ne 0) {
+            throw "GitHub Release creation failed with $LASTEXITCODE"
+          }
