@@ -1,6 +1,7 @@
 output/
 **/build/
 **/.gradle/
+**/geoworld-cache/
 *.log
 .DS_Store
 Thumbs.db
