@@ -38,6 +38,29 @@ public final class GeoWorldV26BiomeCoverageVerifier {
                 }
             }
         }
+        // Rivers are narrow hydrographic features. The coarse ecological
+        // grid above can legitimately step over a frozen river even when the
+        // final Runtime contains one. Sample actual River/Lake receivers at
+        // the model cell scale as well, matching the resolution used by the
+        // coverage planner for hydrographic candidates.
+        final double riverStep = Math.max(96.0, g.cellSize());
+        for (double x = g.originX() + riverStep / 2;
+             x <= g.originX() + g.spanXBlocks() - riverStep / 2;
+             x += riverStep) {
+            for (double z = g.originZ() + riverStep / 2;
+                 z <= g.originZ() + g.spanZBlocks() - riverStep / 2;
+                 z += riverStep) {
+                var sample = model.sample(x, z);
+                if (!"River".equals(sample.waterKind()) &&
+                    !"Lake".equals(sample.waterKind())) {
+                    continue;
+                }
+                String id = realizer.biomeId(model, x, 319, z);
+                observed.computeIfAbsent(id, _key -> new int[]{0})[0]++;
+                samples++;
+            }
+        }
+
         Set<String> expected = realizer.requiredBiomeIds();
         Set<String> missing = new LinkedHashSet<>(expected);
         missing.removeAll(observed.keySet());
