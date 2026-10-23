@@ -11,8 +11,8 @@ public final class GeoWorldBiomeDecisionFingerprint {
         GeoWorldV26BiomeDecisionFingerprint.run(
             Minecraft26_3Profile.INSTANCE,
             java.util.Map.of(
-                123456L, 0x9f3de994862521fbL,
-                -563659577384754347L, 0x71bfd1e1968b4db6L
+                123456L, 0x3fafba4138499f13L,
+                -563659577384754347L, 0x646d5e470cfeb13bL
             ),
             args
         );

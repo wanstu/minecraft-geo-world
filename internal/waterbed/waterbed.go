@@ -1354,6 +1354,19 @@ func connectFeedersToRenderedLake(
 	}
 }
 
+func lowestOpenNode(open map[int]bool, dist map[int]float64) (int, float64) {
+	current := -1
+	best := math.Inf(1)
+	for node := range open {
+		d := dist[node]
+		if d < best || (d == best && (current < 0 || node < current)) {
+			best = d
+			current = node
+		}
+	}
+	return current, best
+}
+
 func renderedLakeConnectorPath(
 	m *Model,
 	hydro *hydrology.Model,
@@ -1385,14 +1398,7 @@ func renderedLakeConnectorPath(
 	}
 
 	for len(open) > 0 {
-		current := -1
-		best := math.Inf(1)
-		for node := range open {
-			if d := dist[node]; d < best {
-				best = d
-				current = node
-			}
-		}
+		current, best := lowestOpenNode(open, dist)
 		if current < 0 {
 			break
 		}

@@ -29,6 +29,17 @@ func TestOceanMouthFlaresOnlyOnFinalReach(t *testing.T) {
 	}
 }
 
+func TestLowestOpenNodeBreaksEqualCostTiesByNodeID(t *testing.T) {
+	open := map[int]bool{8: true, 3: true, 5: true}
+	dist := map[int]float64{8: 2, 3: 2, 5: 2}
+	for i := 0; i < 100; i++ {
+		node, cost := lowestOpenNode(open, dist)
+		if node != 3 || cost != 2 {
+			t.Fatalf("equal-cost open set chose node=%d cost=%v want node=3 cost=2", node, cost)
+		}
+	}
+}
+
 func TestRiverCorridorHitsBedTargetAndStaysLocal(t *testing.T) {
 	g := testGeometry()
 	base := testTerrain(t, g, 0.70)

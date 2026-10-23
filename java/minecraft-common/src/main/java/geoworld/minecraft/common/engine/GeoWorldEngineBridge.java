@@ -196,6 +196,12 @@ public final class GeoWorldEngineBridge {
             throw new IOException("Configured GeoWorld engine not found: " + path);
         }
 
+        Path embedded = extractEmbeddedEngine();
+        if (embedded != null) {
+            resolvedEngine = embedded;
+            return embedded;
+        }
+
         String executable = isWindows() ? "geoworld-engine.exe" : "geoworld-engine";
         Path current = embeddedOnly ? null : Path.of(System.getProperty("user.dir"))
             .toAbsolutePath()
@@ -211,12 +217,6 @@ public final class GeoWorldEngineBridge {
                 return candidate;
             }
             current = current.getParent();
-        }
-
-        Path embedded = extractEmbeddedEngine();
-        if (embedded != null) {
-            resolvedEngine = embedded;
-            return embedded;
         }
 
         throw new IOException(
@@ -299,7 +299,7 @@ public final class GeoWorldEngineBridge {
     ) {
         String canonical = String.join(
             "|",
-            "v16",
+            "v17",
             Long.toString(seed),
             Integer.toString(config.width()),
             Integer.toString(config.height()),
