@@ -26,6 +26,8 @@ public final class GeoWorldV26ShorelineVerifier {
         {10883, -1293},
         {10325, 2673},
         {10824, 2515},
+        // User-reported island coast/high-rim regression.
+        {-4096, -11072},
         // User-reported long 1x1 riverbank zipper regression.
         {1590, -3096},
         // User-reported high-water riverbank containment regression.
@@ -625,6 +627,7 @@ public final class GeoWorldV26ShorelineVerifier {
 
         verifyWetlandPools(runtime);
         verifyRiverbankBiomes(runtime);
+        verifyReportedIslandCoast(runtime);
         verifyReportedRiverbankRaster(runtime);
         verifyReportedRepairMaterialBlend(runtime);
 
@@ -644,6 +647,125 @@ public final class GeoWorldV26ShorelineVerifier {
             waterKinds
         );
         cleanupCache(isolatedCache);
+    }
+
+    private static void verifyReportedIslandCoast(
+        GeoWorldV1 runtime
+    ) {
+        final int centerX = -4096;
+        final int centerZ = -11072;
+        final int radius = 1536;
+        final int sampleStep = 16;
+        final int coastProbe = 16;
+        final int interiorProbe = 64;
+
+        ArrayList<Integer> coastHeights = new ArrayList<>();
+        ArrayList<Integer> interiorHeights = new ArrayList<>();
+
+        for (int z = centerZ - radius; z <= centerZ + radius; z += sampleStep) {
+            for (int x = centerX - radius; x <= centerX + radius; x += sampleStep) {
+                GeoWorldV1.RuntimeSample sample = runtime.sample(x, z);
+                if (
+                    !sample.sourceLand() ||
+                    !"None".equals(sample.waterKind())
+                ) {
+                    continue;
+                }
+
+                int groundY = HEIGHTS.boundaryY(sample.groundHeight());
+                if (hasWaterNeighbor(runtime, x, z, coastProbe, "Ocean")) {
+                    coastHeights.add(groundY);
+                } else if (
+                    !hasWaterNeighbor(runtime, x, z, interiorProbe, null)
+                ) {
+                    interiorHeights.add(groundY);
+                }
+            }
+        }
+
+        if (coastHeights.size() < 100 || interiorHeights.size() < 1000) {
+            throw new AssertionError(
+                "reported island coast regression window lost coverage: coast=" +
+                coastHeights.size() + " interior=" + interiorHeights.size()
+            );
+        }
+
+        coastHeights.sort(Integer::compareTo);
+        interiorHeights.sort(Integer::compareTo);
+
+        int coastP10 = percentileSorted(coastHeights, 0.10);
+        int coastP50 = percentileSorted(coastHeights, 0.50);
+        int coastP90 = percentileSorted(coastHeights, 0.90);
+        int interiorP50 = percentileSorted(interiorHeights, 0.50);
+        int maxNormalCoastP90 = HEIGHTS.seaLevel() + 9;
+
+        if (coastP90 > maxNormalCoastP90) {
+            throw new AssertionError(
+                "reported island coast regressed to a high rim: coastP90=" +
+                coastP90 + " allowed=" + maxNormalCoastP90
+            );
+        }
+        if (interiorP50 - coastP50 < 12) {
+            throw new AssertionError(
+                "reported island coast no longer rises naturally inland: " +
+                "coastP50=" + coastP50 +
+                " interiorP50=" + interiorP50
+            );
+        }
+
+        System.out.printf(
+            "GeoWorld reported island coast PASS: center=%d,%d, " +
+            "coast=%d p10/p50/p90=%d/%d/%d, interior=%d p50=%d%n",
+            centerX,
+            centerZ,
+            coastHeights.size(),
+            coastP10,
+            coastP50,
+            coastP90,
+            interiorHeights.size(),
+            interiorP50
+        );
+    }
+
+    private static boolean hasWaterNeighbor(
+        GeoWorldV1 runtime,
+        int x,
+        int z,
+        int distance,
+        String requiredKind
+    ) {
+        int[][] directions = {
+            {-1, 0}, {1, 0}, {0, -1}, {0, 1},
+            {-1, -1}, {-1, 1}, {1, -1}, {1, 1}
+        };
+        for (int[] direction : directions) {
+            GeoWorldV1.RuntimeSample neighbor = runtime.sample(
+                x + direction[0] * distance,
+                z + direction[1] * distance
+            );
+            if (
+                !"None".equals(neighbor.waterKind()) &&
+                (
+                    requiredKind == null ||
+                    requiredKind.equals(neighbor.waterKind())
+                )
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static int percentileSorted(
+        ArrayList<Integer> values,
+        double percentile
+    ) {
+        int index = (int)Math.round(
+            percentile * (values.size() - 1)
+        );
+        return values.get(
+            Math.max(0, Math.min(values.size() - 1, index))
+        );
     }
 
     private static void verifyReportedRiverbankRaster(
