@@ -7,6 +7,11 @@ package geoworld.minecraft.common.worldgen;
 public final class ShorelineRules {
     public static final int MAX_SHORE_DISTANCE = 4;
     public static final int MAX_GENTLE_BANK_DISTANCE = 14;
+    // v1.1.10 adaptive banks do not end at this distance. The value is only
+    // a safety/search bound large enough for the supported low/medium relief;
+    // each bank stops as soon as its constructed slope is within one block
+    // of the untouched terrain.
+    public static final int MAX_ADAPTIVE_BANK_DISTANCE = 32;
 
     private ShorelineRules() {}
 
@@ -25,6 +30,43 @@ public final class ShorelineRules {
             1,
             (int) Math.round((originalGround - waterBoundary) * ease)
         );
+    }
+
+    public static int adaptiveGentleBankRise(int distance) {
+        // Two vertical blocks per five horizontal blocks. Integer rounding
+        // produces a natural 0/1 staircase: typically one rise every 2-3
+        // inland columns instead of a forced one-block rise on every column.
+        if (distance <= 0) return 0;
+        return Math.max(1, (2 * distance + 4) / 5);
+    }
+
+    public static int adaptiveGentleBankDrop(int distance) {
+        // Keep the immediate dry rim level with the water, then descend with
+        // the same 2-in-5 cadence when reconnecting to lower natural ground.
+        if (distance <= 1) return 0;
+        return (2 * (distance - 1) + 4) / 5;
+    }
+
+    public static int adaptiveGentleBankMaxRelief() {
+        return adaptiveGentleBankRise(MAX_ADAPTIVE_BANK_DISTANCE);
+    }
+
+    public static int adaptiveGentleBankCap(
+        int originalGround,
+        int waterBoundary,
+        int distance
+    ) {
+        int cap = waterBoundary + adaptiveGentleBankRise(distance);
+        return Math.min(originalGround, cap);
+    }
+
+    public static int adaptiveGentleBankFloor(
+        int originalGround,
+        int waterBoundary,
+        int distance
+    ) {
+        int floor = waterBoundary - adaptiveGentleBankDrop(distance);
+        return Math.max(originalGround, floor);
     }
 
     public static int oceanBackshoreMinimum(

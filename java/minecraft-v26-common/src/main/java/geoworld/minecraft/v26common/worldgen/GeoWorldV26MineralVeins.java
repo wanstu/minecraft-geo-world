@@ -82,7 +82,8 @@ public final class GeoWorldV26MineralVeins {
         String rules = model.manifest().generationRulesVersion();
         return "geoworld-rules-v1.1.7".equals(rules) ||
             "geoworld-rules-v1.1.8".equals(rules) ||
-            "geoworld-rules-v1.1.9".equals(rules);
+            "geoworld-rules-v1.1.9".equals(rules) ||
+            "geoworld-rules-v1.1.10".equals(rules);
     }
 
     public static int populate(

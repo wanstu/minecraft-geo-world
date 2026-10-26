@@ -1103,7 +1103,8 @@ public final class GeoWorldV1 {
         if (
             !"geoworld-rules-v1.1.7".equals(generationRulesVersion) &&
             !"geoworld-rules-v1.1.8".equals(generationRulesVersion) &&
-            !"geoworld-rules-v1.1.9".equals(generationRulesVersion)
+            !"geoworld-rules-v1.1.9".equals(generationRulesVersion) &&
+            !"geoworld-rules-v1.1.10".equals(generationRulesVersion)
         ) {
             return legacy;
         }

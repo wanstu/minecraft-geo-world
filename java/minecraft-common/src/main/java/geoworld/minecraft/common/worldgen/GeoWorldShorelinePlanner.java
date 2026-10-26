@@ -2,14 +2,45 @@ package geoworld.minecraft.common.worldgen;
 
 import geoworld.runtime.GeoWorldV1;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 public class GeoWorldShorelinePlanner {
     public static final int MAX_SHORE_DISTANCE = ShorelineRules.MAX_SHORE_DISTANCE;
-    // Only Lake/Ocean dry shores can need a longer inland transition.
-    // Do not widen the river shelf or move a modeled water surface.
+    // Legacy rules use the historical fixed 14-block corridor. v1.1.10
+    // switches to convergence-based banks; its larger value is a safety
+    // search bound, never a visual endpoint.
     public static final int MAX_GENTLE_BANK_DISTANCE =
         ShorelineRules.MAX_GENTLE_BANK_DISTANCE;
+    public static final int MAX_ADAPTIVE_BANK_DISTANCE =
+        ShorelineRules.MAX_ADAPTIVE_BANK_DISTANCE;
 
     private final HeightMapping heights;
+    private record AdaptiveSearchKey(GeoWorldV1 runtime, int chunkX, int chunkZ) {}
+    private record ChunkPlanKey(GeoWorldV1 runtime, int baseX, int baseZ) {}
+    private final Map<AdaptiveSearchKey, Integer> adaptiveSearchDistanceCache =
+        Collections.synchronizedMap(
+            new LinkedHashMap<>(256, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(
+                    Map.Entry<AdaptiveSearchKey, Integer> eldest
+                ) {
+                    return size() > 2048;
+                }
+            }
+        );
+    private final Map<ChunkPlanKey, ChunkPlan> chunkPlanCache =
+        Collections.synchronizedMap(
+            new LinkedHashMap<>(128, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(
+                    Map.Entry<ChunkPlanKey, ChunkPlan> eldest
+                ) {
+                    return size() > 512;
+                }
+            }
+        );
 
     public record Column(
         GeoWorldV1.RuntimeSample sample,
@@ -48,6 +79,42 @@ public class GeoWorldShorelinePlanner {
         GeoWorldV1.RuntimeSample sample(int dx, int dz);
     }
 
+    private static final class SampleCache {
+        private final GeoWorldV1 runtime;
+        private final int originX;
+        private final int originZ;
+        private final int stride;
+        private final GeoWorldV1.RuntimeSample[] samples;
+
+        private SampleCache(
+            GeoWorldV1 runtime,
+            int originX,
+            int originZ,
+            int stride
+        ) {
+            this.runtime = runtime;
+            this.originX = originX;
+            this.originZ = originZ;
+            this.stride = stride;
+            this.samples = new GeoWorldV1.RuntimeSample[stride * stride];
+        }
+
+        private GeoWorldV1.RuntimeSample sample(int x, int z) {
+            if (x < 0 || x >= stride || z < 0 || z >= stride) {
+                throw new IllegalArgumentException(
+                    "shoreline sample outside cache: " + x + "," + z
+                );
+            }
+            int index = z * stride + x;
+            GeoWorldV1.RuntimeSample sample = samples[index];
+            if (sample == null) {
+                sample = runtime.sample(originX + x, originZ + z);
+                samples[index] = sample;
+            }
+            return sample;
+        }
+    }
+
     private record WaterNeighbor(
         int distance,
         int waterBoundary,
@@ -60,7 +127,8 @@ public class GeoWorldShorelinePlanner {
             "geoworld-rules-v1.1.6".equals(rules) ||
             "geoworld-rules-v1.1.7".equals(rules) ||
             "geoworld-rules-v1.1.8".equals(rules) ||
-            "geoworld-rules-v1.1.9".equals(rules);
+            "geoworld-rules-v1.1.9".equals(rules) ||
+            "geoworld-rules-v1.1.10".equals(rules);
     }
 
     private static boolean sealHighRiverBanks(GeoWorldV1 runtime) {
@@ -68,7 +136,51 @@ public class GeoWorldShorelinePlanner {
         return "geoworld-rules-v1.1.6".equals(rules) ||
             "geoworld-rules-v1.1.7".equals(rules) ||
             "geoworld-rules-v1.1.8".equals(rules) ||
-            "geoworld-rules-v1.1.9".equals(rules);
+            "geoworld-rules-v1.1.9".equals(rules) ||
+            "geoworld-rules-v1.1.10".equals(rules);
+    }
+
+    private static boolean adaptiveGentleBanks(GeoWorldV1 runtime) {
+        return "geoworld-rules-v1.1.10".equals(
+            runtime.manifest().generationRulesVersion()
+        );
+    }
+
+    private int adaptiveSearchDistanceForChunk(
+        GeoWorldV1 runtime,
+        int baseX,
+        int baseZ
+    ) {
+        if (!adaptiveGentleBanks(runtime)) {
+            return MAX_GENTLE_BANK_DISTANCE;
+        }
+        int chunkX = Math.floorDiv(baseX, 16);
+        int chunkZ = Math.floorDiv(baseZ, 16);
+        AdaptiveSearchKey key = new AdaptiveSearchKey(runtime, chunkX, chunkZ);
+        Integer cached = adaptiveSearchDistanceCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        GeoWorldV1.NaturalFeatureSample features =
+            runtime.sampleNaturalFeatures(
+                chunkX * 16 + 7.5,
+                chunkZ * 16 + 7.5
+            );
+        double nearest = Double.POSITIVE_INFINITY;
+        if (features.distanceToRiver() != null) {
+            nearest = Math.min(nearest, features.distanceToRiver());
+        }
+        if (features.distanceToLake() != null) {
+            nearest = Math.min(nearest, features.distanceToLake());
+        }
+        if (features.distanceToOcean() != null) {
+            nearest = Math.min(nearest, features.distanceToOcean());
+        }
+        int computed = nearest <= MAX_ADAPTIVE_BANK_DISTANCE + 16.0
+            ? MAX_ADAPTIVE_BANK_DISTANCE
+            : MAX_GENTLE_BANK_DISTANCE;
+        adaptiveSearchDistanceCache.put(key, computed);
+        return computed;
     }
 
     private record WetlandPond(
@@ -86,32 +198,36 @@ public class GeoWorldShorelinePlanner {
         int baseX,
         int baseZ
     ) {
-        final int fringe = 3;
-        final int radius = MAX_GENTLE_BANK_DISTANCE + fringe;
-        final int stride = 16 + radius * 2;
-        GeoWorldV1.RuntimeSample[] samples =
-            new GeoWorldV1.RuntimeSample[stride * stride];
-
-        for (int z = 0; z < stride; z++) {
-            int localZ = z - radius;
-            int worldZ = baseZ + localZ;
-            int beyondZ = Math.max(0, Math.max(
-                -fringe - localZ, localZ - (15 + fringe)
-            ));
-            for (int x = 0; x < stride; x++) {
-                int localX = x - radius;
-                int beyondX = Math.max(0, Math.max(
-                    -fringe - localX, localX - (15 + fringe)
-                ));
-                // All water searches use a Manhattan radius. The square
-                // corners can never be read by any planned column, so skip
-                // their costly runtime samples without approximating terrain.
-                if (beyondX + beyondZ > MAX_GENTLE_BANK_DISTANCE) continue;
-                samples[z * stride + x] = runtime.sample(
-                    baseX + localX, worldZ
-                );
-            }
+        ChunkPlanKey key = new ChunkPlanKey(runtime, baseX, baseZ);
+        ChunkPlan cached = chunkPlanCache.get(key);
+        if (cached != null) {
+            return cached;
         }
+        ChunkPlan computed = computeChunkModel(runtime, baseX, baseZ);
+        chunkPlanCache.put(key, computed);
+        return computed;
+    }
+
+    private ChunkPlan computeChunkModel(
+        GeoWorldV1 runtime,
+        int baseX,
+        int baseZ
+    ) {
+        final int fringe = 3;
+        final boolean adaptiveBank = adaptiveGentleBanks(runtime);
+        final int bankSearchDistance = adaptiveSearchDistanceForChunk(
+            runtime,
+            baseX,
+            baseZ
+        );
+        final int radius = bankSearchDistance + fringe;
+        final int stride = 16 + radius * 2;
+        SampleCache samples = new SampleCache(
+            runtime,
+            baseX - radius,
+            baseZ - radius,
+            stride
+        );
 
         final int plannedStride = 16 + fringe * 2;
         Column[] preliminary =
@@ -133,7 +249,9 @@ public class GeoWorldShorelinePlanner {
                     baseX + localX,
                     baseZ + localZ,
                     modernRiverBank,
-                    sealedHighRiverBank
+                    sealedHighRiverBank,
+                    adaptiveBank,
+                    bankSearchDistance
                 );
             }
         }
@@ -167,13 +285,116 @@ public class GeoWorldShorelinePlanner {
                     grooveClosed[index + 1],
                     grooveClosed[index - plannedStride],
                     grooveClosed[index + plannedStride],
-                    sealedHighRiverBank
+                    sealedHighRiverBank,
+                    adaptiveBank
                 );
             }
         }
 
-        Column[] materialPass1 = pitClosed.clone();
-        Column[] materialPass2 = pitClosed.clone();
+        Column[] bankClosed = pitClosed;
+        if (adaptiveBank) {
+            for (int pass = 0; pass < MAX_ADAPTIVE_BANK_DISTANCE; pass++) {
+                Column[] next = bankClosed.clone();
+                boolean changed = false;
+                for (int localZ = -2; localZ <= 17; localZ++) {
+                    for (int localX = -2; localX <= 17; localX++) {
+                        int index =
+                            (localZ + fringe) * plannedStride +
+                            (localX + fringe);
+                        Column relaxed = relaxAdaptiveBankStep(
+                            bankClosed[index],
+                            bankClosed[index - 1],
+                            bankClosed[index + 1],
+                            bankClosed[index - plannedStride],
+                            bankClosed[index + plannedStride]
+                        );
+                        next[index] = relaxed;
+                        if (relaxed != bankClosed[index]) {
+                            changed = true;
+                        }
+                    }
+                }
+                bankClosed = next;
+                if (!changed) break;
+            }
+
+            // Relaxation can expose a narrow one-cell groove or pit at the
+            // edge of the raised bank. Iterate the small morphology repairs
+            // to a fixed point (bounded by the four-block river raise cap).
+            for (int cleanupPass = 0; cleanupPass < 4; cleanupPass++) {
+                boolean cleanupChanged = false;
+                Column[] grooves = bankClosed.clone();
+                for (int localZ = -2; localZ <= 17; localZ++) {
+                    for (int localX = -2; localX <= 17; localX++) {
+                        int index =
+                            (localZ + fringe) * plannedStride +
+                            (localX + fringe);
+                        Column closed = closeNarrowBackshoreGroove(
+                            bankClosed[index],
+                            bankClosed[index - 1],
+                            bankClosed[index + 1],
+                            bankClosed[index - plannedStride],
+                            bankClosed[index + plannedStride],
+                            sealedHighRiverBank
+                        );
+                        grooves[index] = closed;
+                        if (closed != bankClosed[index]) cleanupChanged = true;
+                    }
+                }
+
+                Column[] pits = grooves.clone();
+                for (int localZ = -1; localZ <= 16; localZ++) {
+                    for (int localX = -1; localX <= 16; localX++) {
+                        int index =
+                            (localZ + fringe) * plannedStride +
+                            (localX + fringe);
+                        Column closed = closeSmallBackshorePit(
+                            grooves[index],
+                            grooves[index - 1],
+                            grooves[index + 1],
+                            grooves[index - plannedStride],
+                            grooves[index + plannedStride],
+                            sealedHighRiverBank,
+                            true
+                        );
+                        pits[index] = closed;
+                        if (closed != grooves[index]) cleanupChanged = true;
+                    }
+                }
+                bankClosed = pits;
+                if (!cleanupChanged) break;
+            }
+
+            // Morphology cleanup can lift one cell by one block. Re-run the
+            // 2D bank relaxation afterwards so cleanup itself cannot recreate
+            // a two-block terminal wall. This pass only moves generated bank
+            // cells within their original/max-raise envelope.
+            for (int pass = 0; pass < MAX_ADAPTIVE_BANK_DISTANCE; pass++) {
+                Column[] next = bankClosed.clone();
+                boolean changed = false;
+                for (int localZ = -2; localZ <= 17; localZ++) {
+                    for (int localX = -2; localX <= 17; localX++) {
+                        int index =
+                            (localZ + fringe) * plannedStride +
+                            (localX + fringe);
+                        Column relaxed = relaxAdaptiveBankStep(
+                            bankClosed[index],
+                            bankClosed[index - 1],
+                            bankClosed[index + 1],
+                            bankClosed[index - plannedStride],
+                            bankClosed[index + plannedStride]
+                        );
+                        next[index] = relaxed;
+                        if (relaxed != bankClosed[index]) changed = true;
+                    }
+                }
+                bankClosed = next;
+                if (!changed) break;
+            }
+        }
+
+        Column[] materialPass1 = bankClosed.clone();
+        Column[] materialPass2 = bankClosed.clone();
         if (sealedHighRiverBank) {
             for (int localZ = -1; localZ <= 16; localZ++) {
                 for (int localX = -1; localX <= 16; localX++) {
@@ -181,11 +402,11 @@ public class GeoWorldShorelinePlanner {
                         (localZ + fringe) * plannedStride +
                         (localX + fringe);
                     materialPass1[index] = fillRiverMaterialGap(
-                        pitClosed[index],
-                        pitClosed[index - 1],
-                        pitClosed[index + 1],
-                        pitClosed[index - plannedStride],
-                        pitClosed[index + plannedStride]
+                        bankClosed[index],
+                        bankClosed[index - 1],
+                        bankClosed[index + 1],
+                        bankClosed[index - plannedStride],
+                        bankClosed[index + plannedStride]
                     );
                 }
             }
@@ -212,10 +433,11 @@ public class GeoWorldShorelinePlanner {
                 int index =
                     (localZ + fringe) * plannedStride +
                     (localX + fringe);
-                Column geometryOnce = pitClosed[index];
+                Column geometryOnce = bankClosed[index];
                 Column once = materialPass2[index];
-                Column shaped =
-                    geometryOnce != grooveClosed[index]
+                Column shaped = adaptiveBank
+                    ? once
+                    : geometryOnce != grooveClosed[index]
                         ? once
                         : closeSmallBackshorePit(
                             once,
@@ -223,7 +445,8 @@ public class GeoWorldShorelinePlanner {
                             materialPass2[index + 1],
                             materialPass2[index - plannedStride],
                             materialPass2[index + plannedStride],
-                            sealedHighRiverBank
+                            sealedHighRiverBank,
+                            false
                         );
                 result.columns[localZ * 16 + localX] =
                     sealWetlandPoolRim(
@@ -243,23 +466,31 @@ public class GeoWorldShorelinePlanner {
         int worldX,
         int worldZ
     ) {
+        if (!adaptiveGentleBanks(runtime)) {
+            return planModelLegacy(runtime, worldX, worldZ);
+        }
+        int baseX = Math.floorDiv(worldX, 16) * 16;
+        int baseZ = Math.floorDiv(worldZ, 16) * 16;
+        return planChunkModel(runtime, baseX, baseZ).column(
+            worldX - baseX,
+            worldZ - baseZ
+        );
+    }
+
+    private Column planModelLegacy(
+        GeoWorldV1 runtime,
+        int worldX,
+        int worldZ
+    ) {
         final int localRadius = 3;
         final int radius = MAX_GENTLE_BANK_DISTANCE + localRadius;
         final int stride = radius * 2 + 1;
-        GeoWorldV1.RuntimeSample[] samples =
-            new GeoWorldV1.RuntimeSample[stride * stride];
-        for (int z = 0; z < stride; z++) {
-            int dz = z - radius;
-            int beyondZ = Math.max(0, Math.abs(dz) - localRadius);
-            for (int x = 0; x < stride; x++) {
-                int dx = x - radius;
-                int beyondX = Math.max(0, Math.abs(dx) - localRadius);
-                if (beyondX + beyondZ > MAX_GENTLE_BANK_DISTANCE) continue;
-                samples[z * stride + x] = runtime.sample(
-                    worldX + dx, worldZ + dz
-                );
-            }
-        }
+        SampleCache samples = new SampleCache(
+            runtime,
+            worldX - radius,
+            worldZ - radius,
+            stride
+        );
 
         final int localStride = localRadius * 2 + 1;
         Column[] preliminary =
@@ -281,7 +512,9 @@ public class GeoWorldShorelinePlanner {
                     worldX + dx,
                     worldZ + dz,
                     modernRiverBank,
-                    sealedHighRiverBank
+                    sealedHighRiverBank,
+                    false,
+                    MAX_GENTLE_BANK_DISTANCE
                 );
             }
         }
@@ -315,7 +548,8 @@ public class GeoWorldShorelinePlanner {
                     grooveClosed[index + 1],
                     grooveClosed[index - localStride],
                     grooveClosed[index + localStride],
-                    sealedHighRiverBank
+                    sealedHighRiverBank,
+                    false
                 );
             }
         }
@@ -357,7 +591,8 @@ public class GeoWorldShorelinePlanner {
                 materialPass2[center + 1],
                 materialPass2[center - localStride],
                 materialPass2[center + localStride],
-                sealedHighRiverBank
+                sealedHighRiverBank,
+                false
             );
         }
         return sealWetlandPoolRim(
@@ -370,7 +605,7 @@ public class GeoWorldShorelinePlanner {
     }
 
     private Column planCachedColumn(
-        GeoWorldV1.RuntimeSample[] samples,
+        SampleCache samples,
         int stride,
         int centerX,
         int centerZ,
@@ -378,15 +613,14 @@ public class GeoWorldShorelinePlanner {
         int worldX,
         int worldZ,
         boolean modernRiverBank,
-        boolean sealedHighRiverBank
+        boolean sealedHighRiverBank,
+        boolean adaptiveBank,
+        int bankSearchDistance
     ) {
         GeoWorldV1.RuntimeSample center =
-            samples[centerZ * stride + centerX];
+            samples.sample(centerX, centerZ);
         Neighborhood neighborhood = (dx, dz) ->
-            samples[
-                (centerZ + dz) * stride +
-                (centerX + dx)
-            ];
+            samples.sample(centerX + dx, centerZ + dz);
         return planColumn(
             center,
             neighborhood,
@@ -394,7 +628,9 @@ public class GeoWorldShorelinePlanner {
             worldX,
             worldZ,
             modernRiverBank,
-            sealedHighRiverBank
+            sealedHighRiverBank,
+            adaptiveBank,
+            bankSearchDistance
         );
     }
 
@@ -431,7 +667,9 @@ public class GeoWorldShorelinePlanner {
         int worldX,
         int worldZ,
         boolean modernRiverBank,
-        boolean sealedHighRiverBank
+        boolean sealedHighRiverBank,
+        boolean adaptiveBank,
+        int bankSearchDistance
     ) {
         int originalGround = this.heights.boundaryY(center.groundHeight());
         int ownWater = waterBoundaryModel(center, originalGround);
@@ -498,8 +736,12 @@ public class GeoWorldShorelinePlanner {
             );
         }
 
-        WaterNeighbor shore = findNearestWater(neighborhood);
-        if (shore != null && shore.distance() > MAX_SHORE_DISTANCE &&
+        WaterNeighbor shore = findNearestWater(
+            neighborhood,
+            bankSearchDistance
+        );
+        if (!adaptiveBank && shore != null &&
+            shore.distance() > MAX_SHORE_DISTANCE &&
             !"Ocean".equals(shore.waterKind()) &&
             !"Lake".equals(shore.waterKind())) {
             shore = null;
@@ -574,10 +816,35 @@ public class GeoWorldShorelinePlanner {
             }
         }
 
-        // Back the sealed edge with a short 1-block-per-row inland ramp so a
-        // high river does not become a one-column artificial levee. This only
-        // raises already-low dry terrain and never changes the modeled water.
+        // v1.1.10 no longer gives an upward-built bank a fixed inland end.
+        // The bank changes by 0 or 1 block per column, usually only once per
+        // 2-3 inland columns. It stops as soon as it reconnects to the natural
+        // terrain. Older locked worlds retain the historical river backing.
         if (
+            adaptiveBank &&
+            shore.distance() >= 2 &&
+            originalGround < shore.waterBoundary() &&
+            shore.waterBoundary() - originalGround <=
+                adaptiveGentleBankMaxRelief()
+        ) {
+            int backingTarget = adaptiveGentleBankFloor(
+                originalGround,
+                shore.waterBoundary(),
+                shore.distance()
+            );
+            int maxRaise = adaptiveMaxRaise(shore.waterKind());
+            backingTarget = Math.min(
+                backingTarget,
+                originalGround + maxRaise
+            );
+            if (
+                backingTarget > originalGround &&
+                adjustedGround < backingTarget
+            ) {
+                adjustedGround = backingTarget;
+                shallowFringe = false;
+            }
+        } else if (
             sealedHighRiverBank &&
             "River".equals(shore.waterKind()) &&
             shore.distance() >= 2 &&
@@ -615,16 +882,42 @@ public class GeoWorldShorelinePlanner {
             ("Mountain".equals(center.terrainVariant()) &&
                 deltaToWater > 24);
         boolean taperedBank = false;
-        // The four-cell littoral shelf preserves water/shore ownership, but
-        // nonrocky lake and sea edges can still rise into an abrupt vertical
-        // wall just inland. Blend the *dry* terrain over a wider corridor
-        // only where its raw height actually needs it. Leave rocky natural
-        // cliffs, rivers, and large escarpments unchanged.
-        if (("Ocean".equals(shore.waterKind()) ||
+        // v1.1.10 uses a convergence envelope instead of a fixed 14-block
+        // blend. The dry bank rises on a 0/1 staircase (about 2 vertical
+        // blocks per 5 horizontal blocks), not a forced 45-degree ramp.
+        // If that gentle envelope cannot reach the natural terrain inside the
+        // adaptive corridor, leave the natural escarpment alone rather than
+        // manufacture a hard terminal wall.
+        if (
+            adaptiveBank &&
+            ("Ocean".equals(shore.waterKind()) ||
+             "Lake".equals(shore.waterKind())) &&
+            !naturalCliff &&
+            deltaToWater >= 2 &&
+            deltaToWater <= adaptiveGentleBankMaxRelief() &&
+            shore.distance() <= MAX_ADAPTIVE_BANK_DISTANCE
+        ) {
+            int cap = adaptiveGentleBankCap(
+                originalGround,
+                shore.waterBoundary(),
+                shore.distance()
+            );
+            if (
+                cap < originalGround &&
+                cap < adjustedGround
+            ) {
+                adjustedGround = cap;
+                shallowFringe = false;
+                taperedBank = true;
+            }
+        } else if (
+            !adaptiveBank &&
+            ("Ocean".equals(shore.waterKind()) ||
              "Lake".equals(shore.waterKind())) &&
             !naturalCliff &&
             deltaToWater >= 4 && deltaToWater <= 32 &&
-            shore.distance() <= MAX_GENTLE_BANK_DISTANCE) {
+            shore.distance() <= MAX_GENTLE_BANK_DISTANCE
+        ) {
             int cap = gentleBankCap(
                 originalGround, shore.waterBoundary(), shore.distance()
             );
@@ -899,9 +1192,10 @@ public class GeoWorldShorelinePlanner {
     }
 
     private WaterNeighbor findNearestWater(
-        Neighborhood neighborhood
+        Neighborhood neighborhood,
+        int maxDistance
     ) {
-        for (int distance = 1; distance <= MAX_GENTLE_BANK_DISTANCE; distance++) {
+        for (int distance = 1; distance <= maxDistance; distance++) {
             WaterNeighbor best = null;
             for (int dx = -distance; dx <= distance; dx++) {
                 int dzAbs = distance - Math.abs(dx);
@@ -1062,6 +1356,34 @@ public class GeoWorldShorelinePlanner {
         );
     }
 
+    public static int adaptiveGentleBankCap(
+        int originalGround,
+        int waterBoundary,
+        int distance
+    ) {
+        return ShorelineRules.adaptiveGentleBankCap(
+            originalGround,
+            waterBoundary,
+            distance
+        );
+    }
+
+    public static int adaptiveGentleBankFloor(
+        int originalGround,
+        int waterBoundary,
+        int distance
+    ) {
+        return ShorelineRules.adaptiveGentleBankFloor(
+            originalGround,
+            waterBoundary,
+            distance
+        );
+    }
+
+    public static int adaptiveGentleBankMaxRelief() {
+        return ShorelineRules.adaptiveGentleBankMaxRelief();
+    }
+
     public static int oceanBackshoreMinimum(
         int shoreDistance,
         int waterBoundary,
@@ -1137,13 +1459,88 @@ public class GeoWorldShorelinePlanner {
         );
     }
 
+    private static int adaptiveMaxRaise(String waterKind) {
+        return switch (waterKind) {
+            case "River" -> 4;
+            case "Ocean" -> 3;
+            case "Lake" -> 2;
+            default -> 0;
+        };
+    }
+
+    private Column relaxAdaptiveBankStep(
+        Column center,
+        Column west,
+        Column east,
+        Column north,
+        Column south
+    ) {
+        if (
+            !"None".equals(center.sample().waterKind()) ||
+            center.shoreDistance() < 2 ||
+            center.groundBoundary() == center.originalGroundBoundary()
+        ) {
+            return center;
+        }
+
+        int original = center.originalGroundBoundary();
+        int current = center.groundBoundary();
+        int target = current;
+        boolean raised = current > original;
+        boolean lowered = current < original;
+        for (Column neighbor : new Column[]{west, east, north, south}) {
+            if (!"None".equals(neighbor.sample().waterKind())) continue;
+            boolean compatible =
+                center.shoreWaterKind().equals(neighbor.shoreWaterKind()) ||
+                neighbor.shoreDistance() == Integer.MAX_VALUE;
+            if (!compatible) continue;
+
+            if (raised) {
+                // Raised banks converge toward lower/natural neighbors only.
+                // Never pull a generated bank back upward to chase another
+                // generated row: the untouched terrain is the closure anchor.
+                if (target > neighbor.groundBoundary() + 1) {
+                    target = Math.max(
+                        original,
+                        Math.min(target, neighbor.groundBoundary() + 1)
+                    );
+                }
+            } else if (
+                lowered && target < neighbor.groundBoundary() - 1
+            ) {
+                target = Math.min(
+                    original,
+                    Math.max(target, neighbor.groundBoundary() - 1)
+                );
+            }
+        }
+        if (target == current) return center;
+
+        int waterBoundary = center.waterBoundary() == current
+            ? target
+            : center.waterBoundary();
+        return new Column(
+            center.sample(),
+            original,
+            target,
+            waterBoundary,
+            center.shoreDistance(),
+            center.shoreWaterKind(),
+            center.shoreWaterBoundary(),
+            center.littoralShelf(),
+            center.surfaceOverride(),
+            center.underOverride()
+        );
+    }
+
     private Column closeSmallBackshorePit(
         Column center,
         Column west,
         Column east,
         Column north,
         Column south,
-        boolean blendRepairMaterial
+        boolean blendRepairMaterial,
+        boolean adaptiveBank
     ) {
         if (
             !"None".equals(center.sample().waterKind()) ||
@@ -1156,6 +1553,7 @@ public class GeoWorldShorelinePlanner {
         Column[] neighbors = {west, east, north, south};
         int higherDry = 0;
         int cap = Integer.MAX_VALUE;
+        boolean adaptiveEscape = false;
         for (Column neighbor : neighbors) {
             if (
                 !"None".equals(neighbor.sample().waterKind()) ||
@@ -1166,6 +1564,15 @@ public class GeoWorldShorelinePlanner {
                 continue;
             }
             if (
+                adaptiveBank &&
+                neighbor.groundBoundary() <= center.groundBoundary()
+            ) {
+                // A convergence ramp has a real downhill/equal continuation.
+                // It is not an isolated pit merely because the other three
+                // cardinal neighbors are higher.
+                adaptiveEscape = true;
+            }
+            if (
                 neighbor.groundBoundary() >
                 center.groundBoundary()
             ) {
@@ -1173,13 +1580,19 @@ public class GeoWorldShorelinePlanner {
                 cap = Math.min(cap, neighbor.groundBoundary());
             }
         }
-        if (higherDry < 3 || cap == Integer.MAX_VALUE) {
+        if (
+            adaptiveEscape ||
+            higherDry < 3 ||
+            cap == Integer.MAX_VALUE
+        ) {
             return center;
         }
 
+        int waterCap = center.shoreWaterBoundary() +
+            (adaptiveBank ? Math.max(1, center.shoreDistance() - 2) : 1);
         int target = Math.min(
             center.groundBoundary() + 1,
-            Math.min(cap, center.shoreWaterBoundary() + 1)
+            Math.min(cap, waterCap)
         );
         if (target <= center.groundBoundary()) {
             return center;

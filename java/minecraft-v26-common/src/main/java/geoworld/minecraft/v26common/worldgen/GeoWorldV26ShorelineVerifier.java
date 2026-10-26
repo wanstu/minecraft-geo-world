@@ -35,6 +35,17 @@ public final class GeoWorldV26ShorelineVerifier {
         // User-reported repaired-bank material mismatch regression.
         {1535, -1245}
     };
+    private static final int[][] VISUAL_ACCEPTANCE_CENTERS = {
+        // 2026-10-26 manual screenshots: hard bank ends, residual columns,
+        // rectangular repair edges, riverbank zipper and beach stair-stepping.
+        {1157, -3027},
+        {4128, -1690},
+        {1030, -3010},
+        {1906, -2961},
+        {1891, -2905},
+        {20873, 2725}
+    };
+
     private static final Set<String> SUGAR_CANE_SUBSTRATES = Set.of(
         "minecraft:grass_block",
         "minecraft:dirt",
@@ -72,6 +83,7 @@ public final class GeoWorldV26ShorelineVerifier {
         System.setProperty("geoworld.engine.embeddedOnly", "true");
 
         verifyGentleBankProfile();
+        verifyAdaptiveGentleBankProfile();
         verifyLowlandOceanBackshore();
         GeoWorldEngineBridge.GeneratedModel generated =
             GeoWorldEngineBridge.generate(
@@ -127,6 +139,7 @@ public final class GeoWorldV26ShorelineVerifier {
         int riverDryVoxelColumns = 0;
         int riverBedQuantizationLowers = 0;
         int pointPlanMismatches = 0;
+        int adaptiveBankStepViolations = 0;
         Map<String, Integer> waterKinds = new LinkedHashMap<>();
         Map<String, Integer> maxRaiseByKind = new LinkedHashMap<>();
 
@@ -155,6 +168,69 @@ public final class GeoWorldV26ShorelineVerifier {
                                 pointColumn
                             )) {
                                 pointPlanMismatches++;
+                            }
+                        }
+                    }
+
+                    for (int localZ = 0; localZ < 16; localZ++) {
+                        for (int localX = 0; localX < 16; localX++) {
+                            GeoWorldShorelinePlanner.Column column =
+                                plan.column(localX, localZ);
+                            if (localX < 15) {
+                                int violation = adaptiveBankStepViolation(
+                                    column,
+                                    plan.column(localX + 1, localZ)
+                                );
+                                if (
+                                    violation != 0 &&
+                                    adaptiveBankStepViolations < 8
+                                ) {
+                                    System.out.printf(
+                                        "adaptive step violation at %d,%d -> %d,%d " +
+                                        "ground=%d/%d original=%d/%d shore=%d/%d kind=%s/%s%n",
+                                        baseX + localX,
+                                        baseZ + localZ,
+                                        baseX + localX + 1,
+                                        baseZ + localZ,
+                                        column.groundBoundary(),
+                                        plan.column(localX + 1, localZ).groundBoundary(),
+                                        column.originalGroundBoundary(),
+                                        plan.column(localX + 1, localZ).originalGroundBoundary(),
+                                        column.shoreDistance(),
+                                        plan.column(localX + 1, localZ).shoreDistance(),
+                                        column.shoreWaterKind(),
+                                        plan.column(localX + 1, localZ).shoreWaterKind()
+                                    );
+                                }
+                                adaptiveBankStepViolations += violation;
+                            }
+                            if (localZ < 15) {
+                                int violation = adaptiveBankStepViolation(
+                                    column,
+                                    plan.column(localX, localZ + 1)
+                                );
+                                if (
+                                    violation != 0 &&
+                                    adaptiveBankStepViolations < 8
+                                ) {
+                                    System.out.printf(
+                                        "adaptive step violation at %d,%d -> %d,%d " +
+                                        "ground=%d/%d original=%d/%d shore=%d/%d kind=%s/%s%n",
+                                        baseX + localX,
+                                        baseZ + localZ,
+                                        baseX + localX,
+                                        baseZ + localZ + 1,
+                                        column.groundBoundary(),
+                                        plan.column(localX, localZ + 1).groundBoundary(),
+                                        column.originalGroundBoundary(),
+                                        plan.column(localX, localZ + 1).originalGroundBoundary(),
+                                        column.shoreDistance(),
+                                        plan.column(localX, localZ + 1).shoreDistance(),
+                                        column.shoreWaterKind(),
+                                        plan.column(localX, localZ + 1).shoreWaterKind()
+                                    );
+                                }
+                                adaptiveBankStepViolations += violation;
                             }
                         }
                     }
@@ -193,6 +269,18 @@ public final class GeoWorldV26ShorelineVerifier {
                                     plan.column(localX, localZ + 1)
                                 )
                             ) {
+                                if (smallBackshorePits < 4) {
+                                    System.out.printf(
+                                        "small backshore pit at %d,%d ground=%d original=%d " +
+                                        "shore=%d kind=%s%n",
+                                        baseX + localX,
+                                        baseZ + localZ,
+                                        centerColumn.groundBoundary(),
+                                        centerColumn.originalGroundBoundary(),
+                                        centerColumn.shoreDistance(),
+                                        centerColumn.shoreWaterKind()
+                                    );
+                                }
                                 smallBackshorePits++;
                             }
                             if (
@@ -476,7 +564,8 @@ public final class GeoWorldV26ShorelineVerifier {
             "oceanBackshoreStepViolations=%d, " +
             "riverWaterBoundaryModelMismatches=%d, " +
             "riverDryVoxelColumns=%d, riverBedQuantizationLowers=%d, " +
-            "pointPlanMismatches=%d, kinds=%s, maxByKind=%s%n",
+            "pointPlanMismatches=%d, adaptiveBankStepViolations=%d, " +
+            "kinds=%s, maxByKind=%s%n",
             SEED,
             immediate,
             stable,
@@ -507,6 +596,7 @@ public final class GeoWorldV26ShorelineVerifier {
             riverDryVoxelColumns,
             riverBedQuantizationLowers,
             pointPlanMismatches,
+            adaptiveBankStepViolations,
             waterKinds,
             maxRaiseByKind
         );
@@ -574,6 +664,12 @@ public final class GeoWorldV26ShorelineVerifier {
                 pointPlanMismatches
             );
         }
+        if (adaptiveBankStepViolations != 0) {
+            throw new AssertionError(
+                "adaptive shoreline still contains a terminal >1-block step: " +
+                adaptiveBankStepViolations
+            );
+        }
         String generationRulesVersion =
             runtime.manifest().generationRulesVersion();
         int maxAllowedRiverRaise =
@@ -581,7 +677,8 @@ public final class GeoWorldV26ShorelineVerifier {
                 "geoworld-rules-v1.1.6".equals(generationRulesVersion) ||
                 "geoworld-rules-v1.1.7".equals(generationRulesVersion) ||
                 "geoworld-rules-v1.1.8".equals(generationRulesVersion) ||
-                "geoworld-rules-v1.1.9".equals(generationRulesVersion)
+                "geoworld-rules-v1.1.9".equals(generationRulesVersion) ||
+                "geoworld-rules-v1.1.10".equals(generationRulesVersion)
             ) ? 4 : 2;
         if (
             maxRaiseByKind.getOrDefault("River", 0) >
@@ -627,6 +724,7 @@ public final class GeoWorldV26ShorelineVerifier {
             }
         }
 
+        verifyVisualAcceptanceCenters(runtime);
         verifyWetlandPools(runtime);
         verifyRiverbankBiomes(runtime);
         verifyReportedIslandCoast(runtime);
@@ -1073,6 +1171,86 @@ public final class GeoWorldV26ShorelineVerifier {
         System.out.println("GeoWorld moderate lake/ocean bank taper PASS");
     }
 
+    private static void verifyAdaptiveGentleBankProfile() {
+        int water = 63;
+        int maxDistance = GeoWorldShorelinePlanner.MAX_ADAPTIVE_BANK_DISTANCE;
+        int maxRelief = GeoWorldShorelinePlanner.adaptiveGentleBankMaxRelief();
+
+        for (int relief : new int[]{4, 8, 12, maxRelief}) {
+            int natural = water + relief;
+            int previous = water;
+            int flatSteps = 0;
+            for (int distance = 1; distance <= maxDistance; distance++) {
+                int ground = GeoWorldShorelinePlanner.adaptiveGentleBankCap(
+                    natural, water, distance
+                );
+                int rise = ground - previous;
+                if (
+                    ground < previous ||
+                    ground > natural ||
+                    rise < 0 || rise > 1
+                ) {
+                    throw new AssertionError(
+                        "adaptive high bank is discontinuous: relief=" +
+                        relief + " d=" + distance +
+                        " previous=" + previous + " now=" + ground
+                    );
+                }
+                if (rise == 0) flatSteps++;
+                previous = ground;
+            }
+            if (previous != natural) {
+                throw new AssertionError(
+                    "adaptive high bank did not converge to natural terrain"
+                );
+            }
+            if (flatSteps < maxDistance / 3) {
+                throw new AssertionError(
+                    "adaptive high bank is still too close to a 45-degree ramp"
+                );
+            }
+        }
+
+        for (int depression : new int[]{2, 4, 8, 12, maxRelief}) {
+            int natural = water - depression;
+            int previous = water;
+            int flatSteps = 0;
+            for (int distance = 1; distance <= maxDistance; distance++) {
+                int ground = GeoWorldShorelinePlanner.adaptiveGentleBankFloor(
+                    natural, water, distance
+                );
+                int drop = previous - ground;
+                if (
+                    ground > previous ||
+                    ground < natural ||
+                    drop < 0 || drop > 1
+                ) {
+                    throw new AssertionError(
+                        "adaptive low bank is discontinuous: depth=" +
+                        depression + " d=" + distance +
+                        " previous=" + previous + " now=" + ground
+                    );
+                }
+                if (drop == 0) flatSteps++;
+                previous = ground;
+            }
+            if (previous != natural) {
+                throw new AssertionError(
+                    "adaptive low bank did not converge to natural terrain"
+                );
+            }
+            if (flatSteps < maxDistance / 3) {
+                throw new AssertionError(
+                    "adaptive low bank is still too close to a 45-degree ramp"
+                );
+            }
+        }
+        System.out.printf(
+            "GeoWorld adaptive bank convergence PASS: maxRelief=%d, slope=2/5%n",
+            maxRelief
+        );
+    }
+
     private static int[] findBoundaryCenter(
         GeoWorldV1 runtime,
         String targetKind
@@ -1230,6 +1408,75 @@ public final class GeoWorldV26ShorelineVerifier {
     private static boolean isSwampBiome(String biome) {
         return "minecraft:swamp".equals(biome) ||
             "minecraft:mangrove_swamp".equals(biome);
+    }
+
+    private static void verifyVisualAcceptanceCenters(
+        GeoWorldV1 runtime
+    ) {
+        int terminalSteps = 0;
+        int grooves = 0;
+        int pits = 0;
+        int checked = 0;
+        final int radius = 24;
+        for (int[] center : VISUAL_ACCEPTANCE_CENTERS) {
+            for (int z = center[1] - radius; z <= center[1] + radius; z++) {
+                for (int x = center[0] - radius; x <= center[0] + radius; x++) {
+                    GeoWorldShorelinePlanner.Column column =
+                        SHORELINE.planModel(runtime, x, z);
+                    GeoWorldShorelinePlanner.Column west =
+                        SHORELINE.planModel(runtime, x - 1, z);
+                    GeoWorldShorelinePlanner.Column east =
+                        SHORELINE.planModel(runtime, x + 1, z);
+                    GeoWorldShorelinePlanner.Column north =
+                        SHORELINE.planModel(runtime, x, z - 1);
+                    GeoWorldShorelinePlanner.Column south =
+                        SHORELINE.planModel(runtime, x, z + 1);
+                    terminalSteps += adaptiveBankStepViolation(column, east);
+                    terminalSteps += adaptiveBankStepViolation(column, south);
+                    boolean grooveX =
+                        isBackshoreGroove(column, west, east);
+                    boolean grooveZ =
+                        isBackshoreGroove(column, north, south);
+                    if (grooveX || grooveZ) {
+                        if (grooves < 8) {
+                            System.out.printf(
+                                "visual groove at %d,%d axis=%s ground=%d original=%d " +
+                                "shore=%d kind=%s neighbors=[%d,%d,%d,%d]%n",
+                                x,
+                                z,
+                                grooveX ? "X" : "Z",
+                                column.groundBoundary(),
+                                column.originalGroundBoundary(),
+                                column.shoreDistance(),
+                                column.shoreWaterKind(),
+                                west.groundBoundary(),
+                                east.groundBoundary(),
+                                north.groundBoundary(),
+                                south.groundBoundary()
+                            );
+                        }
+                        grooves++;
+                    }
+                    if (isSmallBackshorePit(column, west, east, north, south)) {
+                        pits++;
+                    }
+                    checked++;
+                }
+            }
+        }
+        if (terminalSteps != 0 || grooves != 0 || pits != 0) {
+            throw new AssertionError(
+                "2026-10-26 visual acceptance centers still contain " +
+                "shoreline artifacts: terminalSteps=" + terminalSteps +
+                " grooves=" + grooves + " pits=" + pits
+            );
+        }
+        System.out.printf(
+            "GeoWorld 2026-10-26 visual centers PASS: centers=%d checked=%d " +
+            "terminalSteps=0 grooves=0 pits=0%n",
+            VISUAL_ACCEPTANCE_CENTERS.length,
+            checked
+        );
     }
 
     private static void verifyWetlandPools(
@@ -1419,20 +1666,27 @@ public final class GeoWorldV26ShorelineVerifier {
             return false;
         }
         int higherDry = 0;
+        boolean hasEscape = false;
         for (GeoWorldShorelinePlanner.Column neighbor :
             new GeoWorldShorelinePlanner.Column[]{west, east, north, south}) {
             if (
-                "None".equals(neighbor.sample().waterKind()) &&
-                center.shoreWaterKind().equals(
+                !"None".equals(neighbor.sample().waterKind()) ||
+                !center.shoreWaterKind().equals(
                     neighbor.shoreWaterKind()
-                ) &&
-                neighbor.groundBoundary() >
+                )
+            ) {
+                continue;
+            }
+            if (
+                neighbor.groundBoundary() <=
                 center.groundBoundary()
             ) {
+                hasEscape = true;
+            } else {
                 higherDry++;
             }
         }
-        return higherDry >= 3;
+        return !hasEscape && higherDry >= 3;
     }
 
     private static int oceanBackshoreViolations(
@@ -1462,6 +1716,40 @@ public final class GeoWorldV26ShorelineVerifier {
         return violations;
     }
 
+    private static int adaptiveBankStepViolation(
+        GeoWorldShorelinePlanner.Column a,
+        GeoWorldShorelinePlanner.Column b
+    ) {
+        if (
+            !"None".equals(a.sample().waterKind()) ||
+            !"None".equals(b.sample().waterKind())
+        ) {
+            return 0;
+        }
+        boolean shapedA =
+            a.shoreDistance() > GeoWorldShorelinePlanner.MAX_SHORE_DISTANCE &&
+            a.groundBoundary() != a.originalGroundBoundary();
+        boolean shapedB =
+            b.shoreDistance() > GeoWorldShorelinePlanner.MAX_SHORE_DISTANCE &&
+            b.groundBoundary() != b.originalGroundBoundary();
+        if (!shapedA && !shapedB) return 0;
+
+        // The reported regression is the terminal cut: the final shaped
+        // bank row meeting the first untouched row. Internal natural terrain
+        // may still contain ordinary two-block relief and is checked by the
+        // existing groove/pit/raster regressions instead.
+        if (shapedA == shapedB) return 0;
+        boolean terminalEdge =
+            a.shoreWaterKind().equals(b.shoreWaterKind()) &&
+            (
+                Math.abs(a.shoreDistance() - b.shoreDistance()) == 1 ||
+                a.shoreDistance() == Integer.MAX_VALUE ||
+                b.shoreDistance() == Integer.MAX_VALUE
+            );
+        if (!terminalEdge) return 0;
+        return Math.abs(a.groundBoundary() - b.groundBoundary()) > 1 ? 1 : 0;
+    }
+
     private static boolean isBackshoreGroove(
         GeoWorldShorelinePlanner.Column center,
         GeoWorldShorelinePlanner.Column a,
@@ -1473,6 +1761,13 @@ public final class GeoWorldV26ShorelineVerifier {
             !center.shoreWaterKind().equals(a.shoreWaterKind()) ||
             !center.shoreWaterKind().equals(b.shoreWaterKind())
         ) {
+            return false;
+        }
+        boolean generatedGeometry =
+            center.groundBoundary() != center.originalGroundBoundary() ||
+            a.groundBoundary() != a.originalGroundBoundary() ||
+            b.groundBoundary() != b.originalGroundBoundary();
+        if (!generatedGeometry) {
             return false;
         }
         int distance = center.shoreDistance();

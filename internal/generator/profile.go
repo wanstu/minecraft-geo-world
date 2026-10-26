@@ -11,7 +11,7 @@ import (
 
 const (
 	CurrentWorldProfileVersion    = "geoworld-profile-v1.1"
-	CurrentGenerationRulesVersion = "geoworld-rules-v1.1.9"
+	CurrentGenerationRulesVersion = "geoworld-rules-v1.1.10"
 	CurrentWorldModelVersion      = "geoworld-model-v1"
 )
 
@@ -276,11 +276,13 @@ func normalizeWorldProfile(profile WorldProfile) (WorldProfile, error) {
 func usesV117Features(version string) bool {
 	return version == "geoworld-rules-v1.1.7" ||
 		version == "geoworld-rules-v1.1.8" ||
-		version == "geoworld-rules-v1.1.9"
+		version == "geoworld-rules-v1.1.9" ||
+		version == "geoworld-rules-v1.1.10"
 }
 
 func usesV119Features(version string) bool {
-	return version == "geoworld-rules-v1.1.9"
+	return version == "geoworld-rules-v1.1.9" ||
+		version == "geoworld-rules-v1.1.10"
 }
 
 func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
@@ -354,7 +356,7 @@ func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
 	}
 	if cfg.Waterbed.RiverGeometryVersion == 0 {
 		switch cfg.WorldProfile.GenerationRulesVersion {
-		case "geoworld-rules-v1.1.8", "geoworld-rules-v1.1.9":
+		case "geoworld-rules-v1.1.8", "geoworld-rules-v1.1.9", "geoworld-rules-v1.1.10":
 			cfg.Waterbed.RiverGeometryVersion = 3
 		case "geoworld-rules-v1.1.7":
 			cfg.Waterbed.RiverGeometryVersion = 2
