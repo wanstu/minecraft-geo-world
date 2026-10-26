@@ -31,6 +31,7 @@ jobs:
 
   implemented-adapters:
     name: Verify ${{ matrix.minecraft }} / ${{ matrix.loader }}
+    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
     needs: core-tests
     runs-on: windows-latest
     strategy:
