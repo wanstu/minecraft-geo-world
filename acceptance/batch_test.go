@@ -10,8 +10,9 @@ func TestBuildBatchRequiresRepresentativePresetMatrix(t *testing.T) {
 
 	const randomSeed int64 = 777777777777777777
 	seeds := append(append([]int64(nil), FixedAcceptanceSeeds...), randomSeed)
-	reports := make([]Report, 0, len(RepresentativePresets)*len(seeds))
-	for presetIndex, preset := range RepresentativePresets {
+	profiles := RequiredAcceptanceProfiles()
+	reports := make([]Report, 0, len(profiles)*len(seeds))
+	for profileIndex, profile := range profiles {
 		for _, seed := range seeds {
 			results := make([]Result, 0, len(entries))
 			for _, entry := range entries {
@@ -36,8 +37,11 @@ func TestBuildBatchRequiresRepresentativePresetMatrix(t *testing.T) {
 			reports = append(reports, Report{
 				RegistryVersion:         "geoworld-acceptance-v1.1",
 				Seed:                    seed,
-				Preset:                  preset,
-				ParameterSnapshotSHA256: string(rune('a' + presetIndex)),
+				WorldProfileVersion:     "geoworld-profile-v1.1",
+				GenerationRulesVersion:  "geoworld-rules-test",
+				WorldModelVersion:       "geoworld-model-v1",
+				Preset:                  profile,
+				ParameterSnapshotSHA256: string(rune('a' + profileIndex)),
 				Results:                 results,
 			})
 		}
@@ -102,6 +106,81 @@ func TestBuildBatchReportsMissingMatrixAndSample(t *testing.T) {
 	}
 	if batchResultByID(t, batch.Results, "PLATEAU-01").CoverageStatus != BatchMissingSample {
 		t.Fatal("PLATEAU-01 should report missing sample")
+	}
+}
+
+func TestBuildBatchRequiresScaleStressProfiles(t *testing.T) {
+	entries, err := Entries()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const randomSeed int64 = 888888888888888888
+	seeds := append(append([]int64(nil), FixedAcceptanceSeeds...), randomSeed)
+	profiles := []string{
+		"standard",
+		"natural",
+		"civilization",
+		"epic",
+		"stress_large",
+	}
+	reports := make([]Report, 0, len(profiles)*len(seeds))
+	for profileIndex, profile := range profiles {
+		for _, seed := range seeds {
+			results := make([]Result, 0, len(entries))
+			for _, entry := range entries {
+				status := StatusManualRequired
+				if entry.Requirement == RequirementLater &&
+					!laterFeatureImplemented(entry.ID) {
+					status = StatusNotImplemented
+				}
+				result := Result{
+					ID:          entry.ID,
+					Name:        entry.Name,
+					Requirement: entry.Requirement,
+					Inspection:  entry.Inspection,
+					Status:      status,
+				}
+				if entryUsesWorldSamples(entry) &&
+					(entry.Requirement != RequirementLater ||
+						laterFeatureImplemented(entry.ID)) {
+					result.Points = []Point{{TP: "/tp @s 0 80 0"}}
+				}
+				results = append(results, result)
+			}
+			reports = append(reports, Report{
+				RegistryVersion:         "geoworld-acceptance-v1.1",
+				Seed:                    seed,
+				WorldProfileVersion:     "geoworld-profile-v1.1",
+				GenerationRulesVersion:  "geoworld-rules-test",
+				WorldModelVersion:       "geoworld-model-v1",
+				Preset:                  profile,
+				ParameterSnapshotSHA256: string(rune('a' + profileIndex)),
+				Results:                 results,
+			})
+		}
+	}
+
+	batch, err := BuildBatch(reports)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if batch.MatrixComplete {
+		t.Fatal("matrix without stress_small must not be complete")
+	}
+	wantMissing := "stress_small/123456"
+	found := false
+	for _, missing := range batch.MissingCombinations {
+		if missing == wantMissing {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("missing combinations do not include %q: %v", wantMissing, batch.MissingCombinations)
+	}
+	if got := batchResultByID(t, batch.Results, "PARAM-09").CoverageStatus; got != BatchMissingMatrix {
+		t.Fatalf("PARAM-09 coverage=%s want=%s", got, BatchMissingMatrix)
 	}
 }
 

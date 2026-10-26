@@ -71,7 +71,7 @@ func TestGenerateWorldMatchesManualPipeline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	eco, err := ecology.Generate(ecology.InputFromModels(c, h, e, l, g), ecology.Config{})
+	eco, err := ecology.Generate(ecology.InputFromModels(c, h, e, l, g), got.Config.Ecology)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,8 +231,8 @@ func TestRiverDepthDefaultsAreGenerationRuleLocked(t *testing.T) {
 	if got := current.WorldSample.RiverCenterDepthNormalized; math.Abs(got-0.004) > 1e-12 {
 		t.Fatalf("current river center depth=%v want=0.004", got)
 	}
-	if got := current.Waterbed.RiverGeometryVersion; got != 2 {
-		t.Fatalf("current river geometry version=%d want=2", got)
+	if got := current.Waterbed.RiverGeometryVersion; got != 3 {
+		t.Fatalf("current river geometry version=%d want=3", got)
 	}
 	if got := current.Waterbed.LakeGeometryVersion; got != 1 {
 		t.Fatalf("current lake geometry version=%d want=1", got)
@@ -242,6 +242,49 @@ func TestRiverDepthDefaultsAreGenerationRuleLocked(t *testing.T) {
 	}
 	if got := current.Terrain.MountainStrengthScale; math.Abs(got-1) > 1e-12 {
 		t.Fatalf("current mountain strength scale=%v want=1", got)
+	}
+	if !current.Ecology.EnsureWetlandRegion {
+		t.Fatal("current rules must guarantee a natural wetland region")
+	}
+
+	lockedV118Cfg := testConfig(2026)
+	lockedV118Cfg.WorldProfile = StandardWorldProfile()
+	lockedV118Cfg.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.8"
+	lockedV118, err := resolveTopLevelConfig(lockedV118Cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lockedV118.Ecology.EnsureWetlandRegion {
+		t.Fatal("locked v1.1.8 must preserve pre-guarantee wetland behavior")
+	}
+	if got := lockedV118.Waterbed.RiverGeometryVersion; got != 3 {
+		t.Fatalf("locked v1.1.8 river geometry version=%d want=3", got)
+	}
+
+	lockedV117Cfg := testConfig(2026)
+	lockedV117Cfg.WorldProfile = StandardWorldProfile()
+	lockedV117Cfg.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.7"
+	lockedV117, err := resolveTopLevelConfig(lockedV117Cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := lockedV117.Waterbed.MinRiverBedDepthNormalized; math.Abs(got-0.006) > 1e-12 {
+		t.Fatalf("locked v1.1.7 river bed depth=%v want=0.006", got)
+	}
+	if got := lockedV117.WorldSample.RiverCenterDepthNormalized; math.Abs(got-0.004) > 1e-12 {
+		t.Fatalf("locked v1.1.7 river center depth=%v want=0.004", got)
+	}
+	if got := lockedV117.Waterbed.RiverGeometryVersion; got != 2 {
+		t.Fatalf("locked v1.1.7 river geometry version=%d want=2", got)
+	}
+	if got := lockedV117.Waterbed.LakeGeometryVersion; got != 1 {
+		t.Fatalf("locked v1.1.7 lake geometry version=%d want=1", got)
+	}
+	if got := lockedV117.Terrain.RareMacroStrength; math.Abs(got-1) > 1e-12 {
+		t.Fatalf("locked v1.1.7 rare macro strength=%v want=1", got)
+	}
+	if got := lockedV117.Terrain.MountainStrengthScale; math.Abs(got-1) > 1e-12 {
+		t.Fatalf("locked v1.1.7 mountain strength scale=%v want=1", got)
 	}
 
 	lockedV116Cfg := testConfig(2026)

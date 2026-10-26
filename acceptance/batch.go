@@ -21,6 +21,21 @@ var RepresentativePresets = []string{
 	"epic",
 }
 
+// StressProfiles are acceptance-only parameter snapshots. They exercise the
+// v1.1 requirement that the same causal model survives both large-scale and
+// small-scale spatial pressure; they are not additional public generators.
+var StressProfiles = []string{
+	"stress_large",
+	"stress_small",
+}
+
+func RequiredAcceptanceProfiles() []string {
+	out := make([]string, 0, len(RepresentativePresets)+len(StressProfiles))
+	out = append(out, RepresentativePresets...)
+	out = append(out, StressProfiles...)
+	return out
+}
+
 type BatchCoverageStatus string
 
 const (
@@ -62,18 +77,19 @@ type BatchResult struct {
 }
 
 type BatchReport struct {
-	RegistryVersion     string            `json:"registryVersion"`
-	RequiredPresets     []string          `json:"requiredPresets"`
-	FixedSeeds          []int64           `json:"fixedSeeds"`
-	FixedSeedTexts      []string          `json:"fixedSeedTexts"`
-	RandomSeed          *int64            `json:"randomSeed,omitempty"`
-	RandomSeedText      string            `json:"randomSeedText,omitempty"`
-	MatrixComplete      bool              `json:"matrixComplete"`
-	MissingCombinations []string          `json:"missingCombinations,omitempty"`
-	Anomalies           []string          `json:"anomalies,omitempty"`
-	Models              []BatchModel      `json:"models"`
-	Results             []BatchResult     `json:"results"`
-	VerifierEvidence    *VerifierEvidence `json:"verifierEvidence,omitempty"`
+	RegistryVersion        string            `json:"registryVersion"`
+	RequiredPresets        []string          `json:"requiredPresets"`
+	RequiredStressProfiles []string          `json:"requiredStressProfiles"`
+	FixedSeeds             []int64           `json:"fixedSeeds"`
+	FixedSeedTexts         []string          `json:"fixedSeedTexts"`
+	RandomSeed             *int64            `json:"randomSeed,omitempty"`
+	RandomSeedText         string            `json:"randomSeedText,omitempty"`
+	MatrixComplete         bool              `json:"matrixComplete"`
+	MissingCombinations    []string          `json:"missingCombinations,omitempty"`
+	Anomalies              []string          `json:"anomalies,omitempty"`
+	Models                 []BatchModel      `json:"models"`
+	Results                []BatchResult     `json:"results"`
+	VerifierEvidence       *VerifierEvidence `json:"verifierEvidence,omitempty"`
 }
 
 func BuildBatch(reports []Report) (BatchReport, error) {
@@ -86,11 +102,12 @@ func BuildBatch(reports []Report) (BatchReport, error) {
 	}
 
 	out := BatchReport{
-		RegistryVersion: reports[0].RegistryVersion,
-		RequiredPresets: append([]string(nil), RepresentativePresets...),
-		FixedSeeds:      append([]int64(nil), FixedAcceptanceSeeds...),
-		Models:          make([]BatchModel, 0, len(reports)),
-		Results:         make([]BatchResult, 0, len(entries)),
+		RegistryVersion:        reports[0].RegistryVersion,
+		RequiredPresets:        append([]string(nil), RepresentativePresets...),
+		RequiredStressProfiles: append([]string(nil), StressProfiles...),
+		FixedSeeds:             append([]int64(nil), FixedAcceptanceSeeds...),
+		Models:                 make([]BatchModel, 0, len(reports)),
+		Results:                make([]BatchResult, 0, len(entries)),
 	}
 	for _, seed := range FixedAcceptanceSeeds {
 		out.FixedSeedTexts = append(out.FixedSeedTexts, strconv.FormatInt(seed, 10))
@@ -200,14 +217,15 @@ func BuildBatch(reports []Report) (BatchReport, error) {
 	for _, seed := range FixedAcceptanceSeeds {
 		fixed[seed] = true
 	}
+	requiredProfiles := RequiredAcceptanceProfiles()
 	var sharedRandom []int64
-	for seed := range presetSeeds[RepresentativePresets[0]] {
+	for seed := range presetSeeds[requiredProfiles[0]] {
 		if fixed[seed] {
 			continue
 		}
 		presentEverywhere := true
-		for _, preset := range RepresentativePresets[1:] {
-			if !presetSeeds[preset][seed] {
+		for _, profile := range requiredProfiles[1:] {
+			if !presetSeeds[profile][seed] {
 				presentEverywhere = false
 				break
 			}
@@ -223,12 +241,12 @@ func BuildBatch(reports []Report) (BatchReport, error) {
 		out.RandomSeedText = strconv.FormatInt(randomSeed, 10)
 	}
 
-	for _, preset := range RepresentativePresets {
+	for _, profile := range requiredProfiles {
 		for _, seed := range FixedAcceptanceSeeds {
-			if !presetSeeds[preset][seed] {
+			if !presetSeeds[profile][seed] {
 				out.MissingCombinations = append(out.MissingCombinations, fmt.Sprintf(
 					"%s/%s",
-					preset,
+					profile,
 					strconv.FormatInt(seed, 10),
 				))
 			}
@@ -237,14 +255,14 @@ func BuildBatch(reports []Report) (BatchReport, error) {
 	if out.RandomSeed == nil {
 		out.MissingCombinations = append(
 			out.MissingCombinations,
-			"shared-random-seed across standard/natural/civilization/epic",
+			"shared-random-seed across representative presets and scale stress profiles",
 		)
 	} else {
-		for _, preset := range RepresentativePresets {
-			if !presetSeeds[preset][*out.RandomSeed] {
+		for _, profile := range requiredProfiles {
+			if !presetSeeds[profile][*out.RandomSeed] {
 				out.MissingCombinations = append(out.MissingCombinations, fmt.Sprintf(
 					"%s/%s",
-					preset,
+					profile,
 					out.RandomSeedText,
 				))
 			}
@@ -271,10 +289,10 @@ func BuildBatch(reports []Report) (BatchReport, error) {
 		if entry.ID == "PARAM-09" {
 			if out.MatrixComplete {
 				item.CoverageStatus = BatchCovered
-				item.Note = "代表预设 × 固定 4 Seed × 共享随机 Seed 矩阵完整；功能结论仍需各项自动/人工验收。"
+				item.Note = "4 个代表预设 + 2 个尺度压力配置 × 固定 4 Seed × 共享随机 Seed 矩阵完整；功能结论仍需各项自动/人工验收。"
 			} else {
 				item.CoverageStatus = BatchMissingMatrix
-				item.Note = "代表预设完整回归矩阵尚不完整。"
+				item.Note = "代表预设 + 大/小尺度压力配置完整回归矩阵尚不完整。"
 			}
 			out.Results = append(out.Results, item)
 			continue
@@ -313,7 +331,7 @@ func BuildBatch(reports []Report) (BatchReport, error) {
 		}
 		if entry.ID == "PROFILE-08" {
 			item.CoverageStatus = BatchVerifierRequired
-			item.Note = "按分阶段开发流程延期：26.3 Fabric 人工验收通过并移植其他 Loader 后，再做同版本跨 Loader 宏观一致性验证。"
+			item.Note = "该项由同 Minecraft 版本的 Fabric/NeoForge 构建分别执行锁定的 GeoWorld biome-decision fingerprint；批量 World Model 坐标矩阵本身不替代 Loader 侧自动门禁。"
 			out.Results = append(out.Results, item)
 			continue
 		}

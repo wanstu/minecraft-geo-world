@@ -478,7 +478,9 @@ func (m *Model) sampleOuterOcean(x, z float64) runtimeprofile.Sample {
 // Older locked rule versions retain the exact historical single-noise formula.
 func (m *Model) outerOceanSeafloor(x, z, sea, deep float64) float64 {
 	legacy := deep + 0.018*valueNoise(m.Seed+77003, x, z, 5200)
-	if m.GenerationRulesVersion != "geoworld-rules-v1.1.7" {
+	if m.GenerationRulesVersion != "geoworld-rules-v1.1.7" &&
+		m.GenerationRulesVersion != "geoworld-rules-v1.1.8" &&
+		m.GenerationRulesVersion != "geoworld-rules-v1.1.9" {
 		return legacy
 	}
 

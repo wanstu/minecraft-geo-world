@@ -37,9 +37,10 @@ public final class GeoWorldMineralPlanner {
     ) {}
 
     private static boolean usesV117Minerals(GeoWorldV1 model) {
-        return "geoworld-rules-v1.1.7".equals(
-            model.manifest().generationRulesVersion()
-        );
+        String rules = model.manifest().generationRulesVersion();
+        return "geoworld-rules-v1.1.7".equals(rules) ||
+            "geoworld-rules-v1.1.8".equals(rules) ||
+            "geoworld-rules-v1.1.9".equals(rules);
     }
 
     public void planSurfaceOutcrops(

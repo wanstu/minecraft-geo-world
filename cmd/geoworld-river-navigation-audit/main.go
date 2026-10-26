@@ -30,19 +30,23 @@ type bucket struct {
 }
 
 type report struct {
-	Seed                    int64    `json:"seed"`
-	SampleStep              float64  `json:"sampleStepBlocks"`
-	LowGradient             []bucket `json:"lowGradient"`
-	Rapids                  []bucket `json:"rapids"`
-	TotalRises              int      `json:"totalDownstreamRises"`
-	TotalDry                int      `json:"totalDryCenterlineSamples"`
-	MaxAdjacentWaterStep    int      `json:"maxAdjacentWaterStepBlocks"`
-	AdjacentStepViolations  int      `json:"adjacentWaterStepViolations"`
-	MinCenterlineWaterDepth int      `json:"minCenterlineWaterDepthBlocks"`
-	OneBlockDepthSamples    int      `json:"oneBlockCenterlineSamples"`
-	LakeFeeders             int      `json:"lakeFeeders"`
-	DisconnectedLakeFeeders int      `json:"disconnectedLakeFeeders"`
-	StrictPassed            bool     `json:"strictPassed"`
+	Seed                        int64    `json:"seed"`
+	SampleStep                  float64  `json:"sampleStepBlocks"`
+	LowGradient                 []bucket `json:"lowGradient"`
+	Rapids                      []bucket `json:"rapids"`
+	TotalRises                  int      `json:"totalDownstreamRises"`
+	TotalDry                    int      `json:"totalDryCenterlineSamples"`
+	MaxAdjacentWaterStep        int      `json:"maxAdjacentWaterStepBlocks"`
+	AdjacentStepViolations      int      `json:"adjacentWaterStepViolations"`
+	MinCenterlineWaterDepth     int      `json:"minCenterlineWaterDepthBlocks"`
+	OneBlockDepthSamples        int      `json:"oneBlockCenterlineSamples"`
+	LakeFeeders                 int      `json:"lakeFeeders"`
+	DisconnectedLakeFeeders     int      `json:"disconnectedLakeFeeders"`
+	LakeMouths                  int      `json:"lakeMouths"`
+	LakeOutlets                 int      `json:"lakeOutlets"`
+	NarrowLakeConnections       int      `json:"narrowLakeConnections"`
+	MinLakeConnectionWidthRatio float64  `json:"minLakeConnectionWidthRatio"`
+	StrictPassed                bool     `json:"strictPassed"`
 }
 
 func main() {
@@ -160,6 +164,8 @@ func main() {
 
 	maxAdjacentStep, adjacentStepViolations := auditAdjacentWaterSteps(m)
 	lakeFeeders, disconnectedLakeFeeders := auditLakeFeeders(m)
+	lakeMouths, lakeOutlets, narrowLakeConnections, minLakeConnectionWidthRatio :=
+		auditLakeConnectionBreadth(m)
 
 	lowOrder := []bucket{*low["small"], *low["medium"], *low["large"]}
 	rapidOrder := []bucket{*rapid["small"], *rapid["medium"], *rapid["large"]}
@@ -178,23 +184,28 @@ func main() {
 		adjacentStepViolations == 0 &&
 		oneBlockDepthSamples == 0 &&
 		disconnectedLakeFeeders == 0 &&
+		narrowLakeConnections == 0 &&
 		lowOrder[0].ChangesPerK <= 5.0 &&
 		lowOrder[1].ChangesPerK <= 3.5 &&
 		lowOrder[2].ChangesPerK <= 2.0
 	r := report{
-		Seed:                    *seed,
-		SampleStep:              *step,
-		LowGradient:             lowOrder,
-		Rapids:                  rapidOrder,
-		TotalRises:              totalRises,
-		TotalDry:                totalDry,
-		MaxAdjacentWaterStep:    maxAdjacentStep,
-		AdjacentStepViolations:  adjacentStepViolations,
-		MinCenterlineWaterDepth: minCenterlineDepth,
-		OneBlockDepthSamples:    oneBlockDepthSamples,
-		LakeFeeders:             lakeFeeders,
-		DisconnectedLakeFeeders: disconnectedLakeFeeders,
-		StrictPassed:            pass,
+		Seed:                        *seed,
+		SampleStep:                  *step,
+		LowGradient:                 lowOrder,
+		Rapids:                      rapidOrder,
+		TotalRises:                  totalRises,
+		TotalDry:                    totalDry,
+		MaxAdjacentWaterStep:        maxAdjacentStep,
+		AdjacentStepViolations:      adjacentStepViolations,
+		MinCenterlineWaterDepth:     minCenterlineDepth,
+		OneBlockDepthSamples:        oneBlockDepthSamples,
+		LakeFeeders:                 lakeFeeders,
+		DisconnectedLakeFeeders:     disconnectedLakeFeeders,
+		LakeMouths:                  lakeMouths,
+		LakeOutlets:                 lakeOutlets,
+		NarrowLakeConnections:       narrowLakeConnections,
+		MinLakeConnectionWidthRatio: minLakeConnectionWidthRatio,
+		StrictPassed:                pass,
 	}
 	data, _ := json.MarshalIndent(r, "", "  ")
 	fmt.Println(string(data))
@@ -295,6 +306,90 @@ func auditLakeFeeders(m *generator.WorldModel) (int, int) {
 		}
 	}
 	return feeders, disconnected
+}
+
+func auditLakeConnectionBreadth(
+	m *generator.WorldModel,
+) (mouths, outlets, narrow int, minRatio float64) {
+	if m == nil || m.Waterbed == nil || m.Runtime == nil {
+		return 0, 0, 0, 0
+	}
+
+	const minimumTransitionRatio = 1.70
+	first := true
+	for _, seg := range m.Waterbed.Rivers {
+		transitionT := -1.0
+		if seg.LakeMouth {
+			mouths++
+			transitionT = 0.85
+		}
+		if seg.LakeOutlet {
+			outlets++
+			transitionT = 0.15
+		}
+		if transitionT < 0 || seg.HalfWidth <= 0 {
+			continue
+		}
+
+		visibleWidth := visibleWaterCrossSectionWidth(
+			m,
+			seg,
+			transitionT,
+		)
+		ratio := float64(visibleWidth) / (2 * seg.HalfWidth)
+		if first || ratio < minRatio {
+			minRatio = ratio
+			first = false
+		}
+		if ratio < minimumTransitionRatio {
+			narrow++
+		}
+	}
+	return mouths, outlets, narrow, minRatio
+}
+
+func visibleWaterCrossSectionWidth(
+	m *generator.WorldModel,
+	seg waterbed.RiverSegment,
+	t float64,
+) int {
+	centerX, centerZ, normalX, normalZ :=
+		waterbed.RiverCenterFrame(seg, t)
+	if !runtimeWater(m.Runtime.Sample(centerX, centerZ)) {
+		return 0
+	}
+
+	// v1.1.7 river half-width tops out far below this scan radius. A bounded
+	// scan keeps the audit cheap while still allowing a receiving lake to make
+	// the measured connection much wider than its incoming river.
+	const scanRadius = 192
+	left := 0
+	right := 0
+	for distance := 1; distance <= scanRadius; distance++ {
+		d := float64(distance)
+		if !runtimeWater(
+			m.Runtime.Sample(
+				centerX-normalX*d,
+				centerZ-normalZ*d,
+			),
+		) {
+			break
+		}
+		left = distance
+	}
+	for distance := 1; distance <= scanRadius; distance++ {
+		d := float64(distance)
+		if !runtimeWater(
+			m.Runtime.Sample(
+				centerX+normalX*d,
+				centerZ+normalZ*d,
+			),
+		) {
+			break
+		}
+		right = distance
+	}
+	return left + right + 1
 }
 
 func riverGraphTouchesLake(

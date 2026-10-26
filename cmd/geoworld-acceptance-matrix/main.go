@@ -25,11 +25,29 @@ var fixedSeeds = []int64{
 	4034658472718554561,
 }
 
-var representativePresets = []string{
-	"standard",
-	"natural",
-	"civilization",
-	"epic",
+type acceptanceProfile struct {
+	ID         string
+	Parameters string
+}
+
+const (
+	stressLargeParameters = "1.60,1.60,1.60,1.00,1.00,1.50,1.00,1.00,1.00,1.50,1.00,1.00,1.60,1.60,1.00,1.40,1.00,1.00,1.40,1.00,1.00,1.00,1.40,1.00,1.00"
+	stressSmallParameters = "0.65,0.65,0.65,1.00,1.00,0.70,1.00,1.00,1.00,0.70,1.00,1.00,0.65,0.65,1.00,0.70,1.00,1.00,0.70,1.00,1.00,1.00,0.70,1.00,1.00"
+)
+
+var acceptanceProfiles = []acceptanceProfile{
+	{ID: "standard"},
+	{ID: "natural"},
+	{ID: "civilization"},
+	{ID: "epic"},
+	{
+		ID:         "stress_large",
+		Parameters: stressLargeParameters,
+	},
+	{
+		ID:         "stress_small",
+		Parameters: stressSmallParameters,
+	},
 }
 
 func main() {
@@ -65,30 +83,30 @@ func main() {
 	}
 
 	seeds := append(append([]int64(nil), fixedSeeds...), *randomSeed)
-	reports := make([]acceptance.Report, 0, len(seeds)*len(representativePresets))
+	reports := make([]acceptance.Report, 0, len(seeds)*len(acceptanceProfiles))
 
-	for _, preset := range representativePresets {
-		dir := filepath.Join(root, preset)
+	for _, profile := range acceptanceProfiles {
+		dir := filepath.Join(root, profile.ID)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			fatal(err)
 		}
 		for _, seed := range seeds {
 			modelPath := filepath.Join(dir, strconv.FormatInt(seed, 10)+".geoworld")
-			if err := generate(enginePath, modelPath, preset, seed, *timeout); err != nil {
+			if err := generate(enginePath, modelPath, profile, seed, *timeout); err != nil {
 				fatal(err)
 			}
 			model, err := worldmodelio.Load(modelPath)
 			if err != nil {
-				fatal(fmt.Errorf("%s/%d load: %w", preset, seed, err))
+				fatal(fmt.Errorf("%s/%d load: %w", profile.ID, seed, err))
 			}
 			report, err := acceptance.Plan(model)
 			if err != nil {
-				fatal(fmt.Errorf("%s/%d acceptance: %w", preset, seed, err))
+				fatal(fmt.Errorf("%s/%d acceptance: %w", profile.ID, seed, err))
 			}
 			reports = append(reports, report)
 			fmt.Printf(
-				"generated preset=%s seed=%d snapshot=%s\n",
-				preset,
+				"generated profile=%s seed=%d snapshot=%s\n",
+				profile.ID,
 				seed,
 				report.ParameterSnapshotSHA256,
 			)
@@ -133,28 +151,30 @@ func main() {
 func generate(
 	enginePath string,
 	outputPath string,
-	preset string,
+	profile acceptanceProfile,
 	seed int64,
 	timeout time.Duration,
 ) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	cmd := exec.CommandContext(
-		ctx,
-		enginePath,
+	args := []string{
 		"-seed", strconv.FormatInt(seed, 10),
-		"-profile", preset,
+		"-profile", profile.ID,
 		"-output", outputPath,
 		"-force",
-	)
+	}
+	if profile.Parameters != "" {
+		args = append(args, "-parameters", profile.Parameters)
+	}
+	cmd := exec.CommandContext(ctx, enginePath, args...)
 	output, err := cmd.CombinedOutput()
 	if ctx.Err() != nil {
-		return fmt.Errorf("%s/%d engine timeout: %w", preset, seed, ctx.Err())
+		return fmt.Errorf("%s/%d engine timeout: %w", profile.ID, seed, ctx.Err())
 	}
 	if err != nil {
 		return fmt.Errorf(
 			"%s/%d engine failed: %w: %s",
-			preset,
+			profile.ID,
 			seed,
 			err,
 			strings.TrimSpace(string(output)),

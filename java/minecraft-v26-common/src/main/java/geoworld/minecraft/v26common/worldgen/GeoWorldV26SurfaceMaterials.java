@@ -107,7 +107,11 @@ public final class GeoWorldV26SurfaceMaterials {
         if (shoreline != null) return shoreline;
         Cover cover = cover(biome);
         if (
-            "geoworld-rules-v1.1.7".equals(generationRulesVersion) &&
+            (
+                "geoworld-rules-v1.1.7".equals(generationRulesVersion) ||
+                "geoworld-rules-v1.1.8".equals(generationRulesVersion) ||
+                "geoworld-rules-v1.1.9".equals(generationRulesVersion)
+            ) &&
             "Alpine Rock".equals(profile) &&
             (cover == Cover.GRASS || cover == Cover.PODZOL)
         ) {
@@ -130,7 +134,11 @@ public final class GeoWorldV26SurfaceMaterials {
         Cover cover = cover(biome);
         if (
             depth <= 3 &&
-            "geoworld-rules-v1.1.7".equals(generationRulesVersion) &&
+            (
+                "geoworld-rules-v1.1.7".equals(generationRulesVersion) ||
+                "geoworld-rules-v1.1.8".equals(generationRulesVersion) ||
+                "geoworld-rules-v1.1.9".equals(generationRulesVersion)
+            ) &&
             "Alpine Rock".equals(profile) &&
             (cover == Cover.GRASS || cover == Cover.PODZOL)
         ) {

@@ -68,7 +68,8 @@ func (r Region) String() string {
 }
 
 type Config struct {
-	ReferencePrecipMM float64
+	ReferencePrecipMM   float64
+	EnsureWetlandRegion bool
 }
 
 type Input struct {

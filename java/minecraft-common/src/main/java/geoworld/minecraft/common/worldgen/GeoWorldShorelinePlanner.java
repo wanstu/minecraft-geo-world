@@ -58,13 +58,17 @@ public class GeoWorldShorelinePlanner {
         String rules = runtime.manifest().generationRulesVersion();
         return "geoworld-rules-v1.1.5".equals(rules) ||
             "geoworld-rules-v1.1.6".equals(rules) ||
-            "geoworld-rules-v1.1.7".equals(rules);
+            "geoworld-rules-v1.1.7".equals(rules) ||
+            "geoworld-rules-v1.1.8".equals(rules) ||
+            "geoworld-rules-v1.1.9".equals(rules);
     }
 
     private static boolean sealHighRiverBanks(GeoWorldV1 runtime) {
         String rules = runtime.manifest().generationRulesVersion();
         return "geoworld-rules-v1.1.6".equals(rules) ||
-            "geoworld-rules-v1.1.7".equals(rules);
+            "geoworld-rules-v1.1.7".equals(rules) ||
+            "geoworld-rules-v1.1.8".equals(rules) ||
+            "geoworld-rules-v1.1.9".equals(rules);
     }
 
     private record WetlandPond(

@@ -218,6 +218,117 @@ func TestWetFloodplainCanBecomeWetland(t *testing.T) {
 	}
 }
 
+func TestWetlandGuaranteePromotesBestConnectedNaturalLowland(t *testing.T) {
+	in := baseInput(6, 6)
+	anchor := 3*in.Width + 3
+
+	// Keep the world below the ordinary wetland classification threshold but
+	// give one lowland a clearly stronger natural hydrologic context.
+	for i := range in.LandMask {
+		in.AnnualPrecipMM[i] = 850
+		in.WarmSeasonPrecipMM[i] = 480
+		in.ColdSeasonPrecipMM[i] = 370
+		in.Elevation[i] = 0.66
+		in.ReliefIndex[i] = 0.20
+	}
+	for z := 2; z <= 4; z++ {
+		for x := 2; x <= 4; x++ {
+			i := z*in.Width + x
+			in.WetlandPotential[i] = 0.20
+			in.FloodplainWeight[i] = 0.25
+			in.AlluvialPlainWeight[i] = 0.18
+			in.ValleyFloorWidth[i] = 0.55
+			in.PerennialRiverPotential[i] = 0.24
+			in.Elevation[i] = 0.54
+			in.ReliefIndex[i] = 0.06
+		}
+	}
+	in.WetlandPotential[anchor] = 0.34
+	in.FloodplainWeight[anchor] = 0.42
+	in.AlluvialPlainWeight[anchor] = 0.30
+	in.ValleyFloorWidth[anchor] = 0.70
+	in.PerennialRiverPotential[anchor] = 0.38
+
+	withoutGuarantee, err := Generate(in, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, region := range withoutGuarantee.EcoRegion {
+		if region == RegionWetland {
+			t.Fatalf("fixture unexpectedly has a natural wetland at %d", i)
+		}
+	}
+
+	withGuarantee, err := Generate(in, Config{EnsureWetlandRegion: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wetlands := 0
+	anchorNearby := false
+	for i, region := range withGuarantee.EcoRegion {
+		if region != RegionWetland {
+			continue
+		}
+		wetlands++
+		if withGuarantee.WetlandEcology[i] < 0.68 {
+			t.Fatalf("promoted wetland ecology[%d]=%.3f want >= 0.68", i, withGuarantee.WetlandEcology[i])
+		}
+		x := i % in.Width
+		z := i / in.Width
+		ax := anchor % in.Width
+		az := anchor / in.Width
+		if absInt(x-ax) <= 1 && absInt(z-az) <= 1 {
+			anchorNearby = true
+		}
+	}
+	if wetlands < 2 {
+		t.Fatalf("wetland guarantee produced only %d cells", wetlands)
+	}
+	if !anchorNearby {
+		t.Fatal("wetland guarantee ignored the strongest hydrologic lowland")
+	}
+}
+
+func TestWetlandGuaranteeDoesNotChangeExistingWetlandWorld(t *testing.T) {
+	in := singleCellInput()
+	i := 0
+	in.AnnualTempC[i] = 16
+	in.SummerTempC[i] = 25
+	in.WinterTempC[i] = 7
+	in.AnnualPrecipMM[i] = 1700
+	in.WarmSeasonPrecipMM[i] = 900
+	in.ColdSeasonPrecipMM[i] = 800
+	in.WetlandPotential[i] = 1
+	in.FloodplainWeight[i] = 1
+	in.AlluvialPlainWeight[i] = 0.7
+	in.ValleyFloorWidth[i] = 0.8
+	in.PerennialRiverPotential[i] = 0.9
+
+	baseline, err := Generate(in, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	guaranteed, err := Generate(in, Config{EnsureWetlandRegion: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for j := range baseline.EcoRegion {
+		if baseline.EcoRegion[j] != guaranteed.EcoRegion[j] {
+			t.Fatalf("existing wetland world region[%d] changed: %s -> %s", j, baseline.EcoRegion[j], guaranteed.EcoRegion[j])
+		}
+		if math.Abs(baseline.WetlandEcology[j]-guaranteed.WetlandEcology[j]) > 1e-12 {
+			t.Fatalf("existing wetland ecology[%d] changed", j)
+		}
+	}
+}
+
+func absInt(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
 func TestOceanClassificationUsesSST(t *testing.T) {
 	cases := []struct {
 		sst  float64

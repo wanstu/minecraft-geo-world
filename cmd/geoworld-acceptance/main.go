@@ -227,13 +227,14 @@ func batchMarkdown(report acceptance.BatchReport) string {
 	fmt.Fprintf(&out, "- Acceptance Registry: %s\n", report.RegistryVersion)
 	fmt.Fprintf(&out, "- 模型数: %d\n", len(report.Models))
 	fmt.Fprintf(&out, "- 代表预设: %s\n", strings.Join(report.RequiredPresets, ", "))
+	fmt.Fprintf(&out, "- 尺度压力配置: %s\n", strings.Join(report.RequiredStressProfiles, ", "))
 	fmt.Fprintf(&out, "- 固定 Seed: %s\n", strings.Join(report.FixedSeedTexts, ", "))
 	if report.RandomSeed != nil {
 		fmt.Fprintf(&out, "- 本轮共享随机 Seed: %s\n", report.RandomSeedText)
 	} else {
 		fmt.Fprintf(&out, "- 本轮共享随机 Seed: 缺失\n")
 	}
-	fmt.Fprintf(&out, "- 代表预设回归矩阵完整: %t\n", report.MatrixComplete)
+	fmt.Fprintf(&out, "- 代表预设 + 尺度压力完整回归矩阵: %t\n", report.MatrixComplete)
 	if report.VerifierEvidence != nil {
 		fmt.Fprintf(
 			&out,

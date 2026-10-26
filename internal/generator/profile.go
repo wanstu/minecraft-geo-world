@@ -11,7 +11,7 @@ import (
 
 const (
 	CurrentWorldProfileVersion    = "geoworld-profile-v1.1"
-	CurrentGenerationRulesVersion = "geoworld-rules-v1.1.7"
+	CurrentGenerationRulesVersion = "geoworld-rules-v1.1.9"
 	CurrentWorldModelVersion      = "geoworld-model-v1"
 )
 
@@ -273,6 +273,16 @@ func normalizeWorldProfile(profile WorldProfile) (WorldProfile, error) {
 	return profile, nil
 }
 
+func usesV117Features(version string) bool {
+	return version == "geoworld-rules-v1.1.7" ||
+		version == "geoworld-rules-v1.1.8" ||
+		version == "geoworld-rules-v1.1.9"
+}
+
+func usesV119Features(version string) bool {
+	return version == "geoworld-rules-v1.1.9"
+}
+
 func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
 	p := cfg.WorldProfile.Parameters
 
@@ -290,7 +300,7 @@ func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
 	if cfg.Terrain.MountainAmplitude == 0 {
 		cfg.Terrain.MountainAmplitude = 0.075 * p.MountainStrength
 	}
-	if cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.7" &&
+	if usesV117Features(cfg.WorldProfile.GenerationRulesVersion) &&
 		cfg.Terrain.MountainStrengthScale == 0 {
 		cfg.Terrain.MountainStrengthScale = p.MountainStrength
 	}
@@ -312,7 +322,7 @@ func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
 	if cfg.Terrain.CliffFrequency == 0 {
 		cfg.Terrain.CliffFrequency = 1.0 / p.CliffRarity
 	}
-	if cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.7" &&
+	if usesV117Features(cfg.WorldProfile.GenerationRulesVersion) &&
 		cfg.Terrain.RareMacroStrength == 0 {
 		cfg.Terrain.RareMacroStrength = p.RareMacroTerrain
 	}
@@ -329,6 +339,9 @@ func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
 	if cfg.Hydrology.WetlandAccumulationScale == 0 {
 		cfg.Hydrology.WetlandAccumulationScale = 12000 / p.WetlandAbundance
 	}
+	if usesV119Features(cfg.WorldProfile.GenerationRulesVersion) {
+		cfg.Ecology.EnsureWetlandRegion = true
+	}
 
 	if cfg.Waterbed.MinRiverHalfWidthBlocks == 0 {
 		cfg.Waterbed.MinRiverHalfWidthBlocks = 4 * math.Sqrt(p.MainRiverScale)
@@ -341,6 +354,8 @@ func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
 	}
 	if cfg.Waterbed.RiverGeometryVersion == 0 {
 		switch cfg.WorldProfile.GenerationRulesVersion {
+		case "geoworld-rules-v1.1.8", "geoworld-rules-v1.1.9":
+			cfg.Waterbed.RiverGeometryVersion = 3
 		case "geoworld-rules-v1.1.7":
 			cfg.Waterbed.RiverGeometryVersion = 2
 		case "geoworld-rules-v1.1.5", "geoworld-rules-v1.1.6":
@@ -348,7 +363,7 @@ func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
 		}
 	}
 	if cfg.Waterbed.LakeGeometryVersion == 0 &&
-		cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.7" {
+		usesV117Features(cfg.WorldProfile.GenerationRulesVersion) {
 		cfg.Waterbed.LakeGeometryVersion = 1
 	}
 	// v1.1.4 deepens the river channel and its water column together. Old
@@ -358,7 +373,7 @@ func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
 		cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.4" ||
 			cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.5" ||
 			cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.6" ||
-			cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.7"
+			usesV117Features(cfg.WorldProfile.GenerationRulesVersion)
 	if cfg.Waterbed.MinRiverBedDepthNormalized == 0 {
 		if modernRiverDepth {
 			cfg.Waterbed.MinRiverBedDepthNormalized = 0.006
@@ -382,7 +397,7 @@ func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
 		// historically used a fixed 0.22 orographic coefficient. Keep locked
 		// older rules bit-compatible; v1.1.7 is the first ruleset where this
 		// semantic parameter actively scales windward rainout / leeward drying.
-		if cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.7" {
+		if usesV117Features(cfg.WorldProfile.GenerationRulesVersion) {
 			cfg.Climate.OrographicRainStrength = 0.22 * p.RainShadowStrength
 		} else {
 			cfg.Climate.OrographicRainStrength = 0.22

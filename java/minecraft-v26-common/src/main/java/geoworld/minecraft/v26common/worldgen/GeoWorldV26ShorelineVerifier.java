@@ -579,7 +579,9 @@ public final class GeoWorldV26ShorelineVerifier {
         int maxAllowedRiverRaise =
             (
                 "geoworld-rules-v1.1.6".equals(generationRulesVersion) ||
-                "geoworld-rules-v1.1.7".equals(generationRulesVersion)
+                "geoworld-rules-v1.1.7".equals(generationRulesVersion) ||
+                "geoworld-rules-v1.1.8".equals(generationRulesVersion) ||
+                "geoworld-rules-v1.1.9".equals(generationRulesVersion)
             ) ? 4 : 2;
         if (
             maxRaiseByKind.getOrDefault("River", 0) >

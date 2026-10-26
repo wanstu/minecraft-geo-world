@@ -127,10 +127,11 @@ public final class GeoWorldV26SparseCaves {
             }
         }
 
+        String rules = model.manifest().generationRulesVersion();
         if (
-            "geoworld-rules-v1.1.7".equals(
-                model.manifest().generationRulesVersion()
-            )
+            "geoworld-rules-v1.1.7".equals(rules) ||
+            "geoworld-rules-v1.1.8".equals(rules) ||
+            "geoworld-rules-v1.1.9".equals(rules)
         ) {
             carved[0] += populateUndergroundRivers(
                 chunk,

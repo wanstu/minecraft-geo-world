@@ -82,6 +82,9 @@ func Generate(input Input, cfg Config) (*Model, error) {
 			m.classifyOcean(i, input)
 		}
 	}
+	if cfg.EnsureWetlandRegion {
+		m.ensureNaturalWetlandRegion(input)
+	}
 	return m, nil
 }
 
@@ -328,6 +331,121 @@ func (m *Model) classifyLand(i int, input Input) {
 	}
 
 	m.assignBest(i, scores)
+}
+
+func (m *Model) ensureNaturalWetlandRegion(input Input) {
+	for i, region := range m.EcoRegion {
+		if m.LandMask[i] && region == RegionWetland {
+			return
+		}
+	}
+
+	anchor := -1
+	anchorScore := -1.0
+	for i := range m.EcoRegion {
+		if !m.LandMask[i] {
+			continue
+		}
+		score := m.wetlandCandidateScore(i, input)
+		if score > anchorScore {
+			anchor = i
+			anchorScore = score
+		}
+	}
+	if anchor < 0 {
+		return
+	}
+
+	// One macro cell already represents a sizeable continuous area, but a
+	// small connected patch avoids a single-cell "token swamp". Grow from the
+	// strongest naturally suitable lowland and always choose the best adjacent
+	// land cell, keeping the guarantee tied to existing hydrology and climate.
+	const targetCells = 4
+	selected := make([]bool, len(m.EcoRegion))
+	patch := make([]int, 0, targetCells)
+	selected[anchor] = true
+	patch = append(patch, anchor)
+
+	directions := [][2]int{
+		{-1, -1}, {0, -1}, {1, -1},
+		{-1, 0}, {1, 0},
+		{-1, 1}, {0, 1}, {1, 1},
+	}
+	for len(patch) < targetCells {
+		best := -1
+		bestScore := -1.0
+		for _, from := range patch {
+			x := from % m.Width
+			z := from / m.Width
+			for _, direction := range directions {
+				nx := x + direction[0]
+				nz := z + direction[1]
+				if nx < 0 || nx >= m.Width || nz < 0 || nz >= m.Height {
+					continue
+				}
+				i := nz*m.Width + nx
+				if selected[i] || !m.LandMask[i] {
+					continue
+				}
+				score := m.wetlandCandidateScore(i, input)
+				if score > bestScore {
+					best = i
+					bestScore = score
+				}
+			}
+		}
+		if best < 0 {
+			break
+		}
+		selected[best] = true
+		patch = append(patch, best)
+	}
+
+	for _, i := range patch {
+		// Keep the promoted region internally coherent for the later Minecraft
+		// profile stage: biome, wet surface and wetland vegetation must describe
+		// the same natural place.
+		m.WetlandEcology[i] = math.Max(m.WetlandEcology[i], 0.68)
+		m.SoilMoisture[i] = math.Max(m.SoilMoisture[i], 0.62)
+		m.EcoRegion[i] = RegionWetland
+		m.RegionConfidence[i] = math.Max(
+			m.RegionConfidence[i],
+			clamp(0.58+0.22*m.wetlandCandidateScore(i, input), 0, 0.84),
+		)
+	}
+}
+
+func (m *Model) wetlandCandidateScore(i int, input Input) float64 {
+	hydrology := clamp(
+		0.38*input.WetlandPotential[i]+
+			0.26*input.FloodplainWeight[i]+
+			0.16*input.AlluvialPlainWeight[i]+
+			0.12*input.ValleyFloorWidth[i]+
+			0.08*input.PerennialRiverPotential[i],
+		0,
+		1,
+	)
+	moistureSupport := 0.35 + 0.65*smoothstep(0.20, 0.58, m.MoistureIndex[i])
+	warmthSupport := 0.35 + 0.65*smoothstep(-8, 6, input.SummerTempC[i])
+	lowReliefSupport := clamp(
+		1-
+			0.62*input.MountainWeight[i]-
+			0.28*input.FoothillWeight[i]-
+			0.24*input.ReliefIndex[i],
+		0.08,
+		1,
+	)
+	lowlandSupport := 0.45 + 0.55*smoothstep(0.78, 0.52, input.Elevation[i])
+
+	// The small base term makes the world-level guarantee total, while 85% of
+	// the selector still comes from hydrologic suitability. Thus an otherwise
+	// dry seed gets its wetland at its best natural lowland, never at a random
+	// coordinate or by converting every low area.
+	return (0.15 + 0.85*hydrology) *
+		moistureSupport *
+		warmthSupport *
+		lowReliefSupport *
+		lowlandSupport
 }
 
 type regionScore struct {

@@ -299,6 +299,43 @@ func TestV116OuterOceanSeafloorKeepsLegacyFormula(t *testing.T) {
 	}
 }
 
+func TestV119OuterOceanSeafloorInheritsV118RegionalRelief(t *testing.T) {
+	template, err := worldmodelio.Load(filepath.Join("..", "goldenvectors", "testdata", "runtime-v1.geoworld"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := newSeededOuterWorld(template, 123456)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.GenerationRulesVersion != "geoworld-rules-v1.1.9" {
+		t.Fatalf("current outer-world rules=%q want v1.1.9", m.GenerationRulesVersion)
+	}
+
+	sea := m.SeaLevelNormalized
+	deep := math.Max(0.08, sea-0.18)
+	points := [][2]float64{
+		{m.maxX() + 9000, m.minZ() + m.Geometry.SpanZBlocks*0.31},
+		{m.maxX() + 27000, m.minZ() + m.Geometry.SpanZBlocks*0.57},
+		{m.minX() - 41000, m.minZ() + m.Geometry.SpanZBlocks*0.72},
+	}
+	current := make([]float64, len(points))
+	for i, point := range points {
+		current[i] = m.outerOceanSeafloor(point[0], point[1], sea, deep)
+	}
+
+	m.GenerationRulesVersion = "geoworld-rules-v1.1.8"
+	for i, point := range points {
+		locked := m.outerOceanSeafloor(point[0], point[1], sea, deep)
+		if math.Abs(current[i]-locked) > 1e-12 {
+			t.Fatalf(
+				"v1.1.9 outer seafloor diverged from inherited v1.1.8 relief at %.1f,%.1f: current %.12f locked %.12f",
+				point[0], point[1], current[i], locked,
+			)
+		}
+	}
+}
+
 func TestV117OuterOceanSeafloorHasRegionalReliefWithoutEmergentLand(t *testing.T) {
 	template, err := worldmodelio.Load(filepath.Join("..", "goldenvectors", "testdata", "runtime-v1.geoworld"))
 	if err != nil {
@@ -308,6 +345,7 @@ func TestV117OuterOceanSeafloorHasRegionalReliefWithoutEmergentLand(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
+	m.GenerationRulesVersion = "geoworld-rules-v1.1.7"
 	if m.GenerationRulesVersion != "geoworld-rules-v1.1.7" {
 		t.Fatalf("test requires v1.1.7, got %q", m.GenerationRulesVersion)
 	}

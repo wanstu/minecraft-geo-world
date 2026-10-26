@@ -20,7 +20,9 @@ type Config struct {
 	// RiverGeometryVersion versions only horizontal river footprint geometry.
 	// Version 1 (v1.1.5+) prevents wide low-gradient D8 diagonal reaches from
 	// remaining perfectly grid-locked when the legacy random straight-reach
-	// branch fires. Omitted/zero preserves all older worlds exactly.
+	// branch fires. Version 3 (v1.1.8+) scales lake-mouth transition breadth
+	// with large rivers instead of clipping them at the legacy fixed cap.
+	// Omitted/zero preserves all older worlds exactly.
 	RiverGeometryVersion uint8 `json:",omitempty"`
 
 	// MinRiverBedDepthNormalized guarantees that a river centerline is actually

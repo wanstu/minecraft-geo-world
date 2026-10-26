@@ -217,6 +217,12 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 			hydro.LakeID[draft.edge.From] > 0 &&
 			hydro.LakeID[draft.edge.From] != hydro.LakeID[draft.edge.To]
 		mouthExpansionVersion := uint8(3)
+		if cfg.RiverGeometryVersion >= 3 && lakeMouth {
+			// v1.1.8 keeps large lake inlets proportional to the incoming river;
+			// the older fixed lake-mouth cap made the widest rivers form a
+			// visually narrow throat immediately before the receiving lake.
+			mouthExpansionVersion = 6
+		}
 		if cfg.RiverGeometryVersion >= 1 &&
 			!oceanMouth &&
 			!lakeMouth &&
@@ -2089,6 +2095,9 @@ func appendLakeConnectorPath(
 				m.Base.SampleNormalized(x1, z1)
 		lakeMouth := i == len(path)-2
 		mouthExpansionVersion := uint8(3)
+		if cfg.RiverGeometryVersion >= 3 && lakeMouth {
+			mouthExpansionVersion = 6
+		}
 		if cfg.RiverGeometryVersion >= 1 && !lakeMouth {
 			mouthExpansionVersion = 4
 		}
@@ -3142,7 +3151,16 @@ func mouthMaxHalfWidth(seg RiverSegment) float64 {
 		return seg.HalfWidth + extra
 	case seg.LakeMouth:
 		// A low-gradient inlet may naturally spread into a backwater/flood basin
-		// before reaching the persistent lake footprint.
+		// before reaching the persistent lake footprint. v1.1.8 removes the
+		// fixed 42-block ceiling for new models: on a large river that ceiling
+		// made the relative flare smaller as the river itself became wider.
+		if seg.MouthExpansionVersion >= 6 {
+			extra := math.Max(
+				18,
+				(1.35+0.60*basin)*seg.HalfWidth,
+			)
+			return seg.HalfWidth + extra
+		}
 		extra := math.Min(
 			42,
 			math.Max(16, (0.80+1.05*basin)*seg.HalfWidth),

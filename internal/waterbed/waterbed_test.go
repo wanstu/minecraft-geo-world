@@ -560,6 +560,45 @@ func TestOceanMouthFlaresOnlyOnFinalReach(t *testing.T) {
 	}
 }
 
+func TestV6LargeLakeMouthScalesBeyondLegacyFixedCap(t *testing.T) {
+	legacy := RiverSegment{
+		Bed0:                  0.50,
+		Bed1:                  0.50,
+		HalfWidth:             47.7,
+		LakeMouth:             true,
+		MouthExpansionVersion: 3,
+	}
+	modern := legacy
+	modern.MouthExpansionVersion = 6
+
+	legacyMax := mouthMaxHalfWidth(legacy)
+	modernMax := mouthMaxHalfWidth(modern)
+	if math.Abs(legacyMax-(legacy.HalfWidth+42)) > 1e-12 {
+		t.Fatalf("v1.1.7 lake-mouth cap changed: got=%.6f", legacyMax)
+	}
+	if modernMax <= legacyMax {
+		t.Fatalf(
+			"v1.1.8 large lake mouth did not outgrow legacy cap: legacy=%.6f modern=%.6f",
+			legacyMax,
+			modernMax,
+		)
+	}
+
+	transition := riverMouthHalfWidth(modern, 0.85)
+	if ratio := transition / modern.HalfWidth; ratio < 2.0 {
+		t.Fatalf(
+			"v1.1.8 large lake-mouth transition remains too narrow: width=%.6f base=%.6f ratio=%.6f",
+			transition,
+			modern.HalfWidth,
+			ratio,
+		)
+	}
+
+	if got := mouthMaxHalfWidth(legacy); got != legacyMax {
+		t.Fatalf("legacy v3 lake-mouth geometry became unstable: %.6f != %.6f", got, legacyMax)
+	}
+}
+
 func TestV3LakeOutletOceanMouthNeverNarrows(t *testing.T) {
 	seg := RiverSegment{
 		X0:                    0,

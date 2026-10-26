@@ -108,4 +108,20 @@ tasks.register('verifyGeoWorldAdapter') {
         }
     }
 }
-tasks.named('check') { dependsOn tasks.named('verifyGeoWorldAdapter') }
+
+tasks.register('fingerprintGeoWorldBiomeDecisions', JavaExec) {
+    group = 'verification'
+    description = 'Verifies loader-neutral macro geography against the locked biome-decision fingerprint.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir) + sourceSets.main.compileClasspath
+    mainClass = 'geoworld.minecraft.v1_21_1common.worldgen.GeoWorldBiomeDecisionFingerprint'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+    if (project.hasProperty('geoWorldFingerprintSeed')) {
+        args project.property('geoWorldFingerprintSeed').toString()
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyGeoWorldAdapter')
+    dependsOn tasks.named('fingerprintGeoWorldBiomeDecisions')
+}

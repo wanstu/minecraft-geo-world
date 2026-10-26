@@ -1098,10 +1098,12 @@ public final class GeoWorldV1 {
                     z,
                     5200.0
                 );
+        String generationRulesVersion =
+            this.worldProfile.generationRulesVersion();
         if (
-            !"geoworld-rules-v1.1.7".equals(
-                this.worldProfile.generationRulesVersion()
-            )
+            !"geoworld-rules-v1.1.7".equals(generationRulesVersion) &&
+            !"geoworld-rules-v1.1.8".equals(generationRulesVersion) &&
+            !"geoworld-rules-v1.1.9".equals(generationRulesVersion)
         ) {
             return legacy;
         }
@@ -3469,6 +3471,13 @@ public final class GeoWorldV1 {
             return segment.halfWidth() + extra;
         }
         if (segment.lakeMouth()) {
+            if (segment.mouthExpansionVersion() >= 6) {
+                double extra = Math.max(
+                    18.0,
+                    (1.35 + 0.60 * basin) * segment.halfWidth()
+                );
+                return segment.halfWidth() + extra;
+            }
             double extra = Math.min(
                 42.0,
                 Math.max(
