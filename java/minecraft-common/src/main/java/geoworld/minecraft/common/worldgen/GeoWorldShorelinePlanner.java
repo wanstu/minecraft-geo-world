@@ -54,6 +54,19 @@ public class GeoWorldShorelinePlanner {
         String waterKind
     ) {}
 
+    private static boolean smoothRiverBanks(GeoWorldV1 runtime) {
+        String rules = runtime.manifest().generationRulesVersion();
+        return "geoworld-rules-v1.1.5".equals(rules) ||
+            "geoworld-rules-v1.1.6".equals(rules) ||
+            "geoworld-rules-v1.1.7".equals(rules);
+    }
+
+    private static boolean sealHighRiverBanks(GeoWorldV1 runtime) {
+        String rules = runtime.manifest().generationRulesVersion();
+        return "geoworld-rules-v1.1.6".equals(rules) ||
+            "geoworld-rules-v1.1.7".equals(rules);
+    }
+
     private record WetlandPond(
         int waterBoundary,
         boolean inside,
@@ -100,6 +113,8 @@ public class GeoWorldShorelinePlanner {
         Column[] preliminary =
             new Column[plannedStride * plannedStride];
         long seed = runtime.manifest().seed();
+        boolean modernRiverBank = smoothRiverBanks(runtime);
+        boolean sealedHighRiverBank = sealHighRiverBanks(runtime);
         for (int localZ = -fringe; localZ < 16 + fringe; localZ++) {
             for (int localX = -fringe; localX < 16 + fringe; localX++) {
                 preliminary[
@@ -112,7 +127,9 @@ public class GeoWorldShorelinePlanner {
                     localZ + radius,
                     seed,
                     baseX + localX,
-                    baseZ + localZ
+                    baseZ + localZ,
+                    modernRiverBank,
+                    sealedHighRiverBank
                 );
             }
         }
@@ -128,7 +145,8 @@ public class GeoWorldShorelinePlanner {
                     preliminary[index - 1],
                     preliminary[index + 1],
                     preliminary[index - plannedStride],
-                    preliminary[index + plannedStride]
+                    preliminary[index + plannedStride],
+                    sealedHighRiverBank
                 );
             }
         }
@@ -144,8 +162,43 @@ public class GeoWorldShorelinePlanner {
                     grooveClosed[index - 1],
                     grooveClosed[index + 1],
                     grooveClosed[index - plannedStride],
-                    grooveClosed[index + plannedStride]
+                    grooveClosed[index + plannedStride],
+                    sealedHighRiverBank
                 );
+            }
+        }
+
+        Column[] materialPass1 = pitClosed.clone();
+        Column[] materialPass2 = pitClosed.clone();
+        if (sealedHighRiverBank) {
+            for (int localZ = -1; localZ <= 16; localZ++) {
+                for (int localX = -1; localX <= 16; localX++) {
+                    int index =
+                        (localZ + fringe) * plannedStride +
+                        (localX + fringe);
+                    materialPass1[index] = fillRiverMaterialGap(
+                        pitClosed[index],
+                        pitClosed[index - 1],
+                        pitClosed[index + 1],
+                        pitClosed[index - plannedStride],
+                        pitClosed[index + plannedStride]
+                    );
+                }
+            }
+            materialPass2 = materialPass1.clone();
+            for (int localZ = 0; localZ < 16; localZ++) {
+                for (int localX = 0; localX < 16; localX++) {
+                    int index =
+                        (localZ + fringe) * plannedStride +
+                        (localX + fringe);
+                    materialPass2[index] = fillRiverMaterialGap(
+                        materialPass1[index],
+                        materialPass1[index - 1],
+                        materialPass1[index + 1],
+                        materialPass1[index - plannedStride],
+                        materialPass1[index + plannedStride]
+                    );
+                }
             }
         }
 
@@ -155,16 +208,18 @@ public class GeoWorldShorelinePlanner {
                 int index =
                     (localZ + fringe) * plannedStride +
                     (localX + fringe);
-                Column once = pitClosed[index];
+                Column geometryOnce = pitClosed[index];
+                Column once = materialPass2[index];
                 Column shaped =
-                    once != grooveClosed[index]
+                    geometryOnce != grooveClosed[index]
                         ? once
                         : closeSmallBackshorePit(
                             once,
-                            pitClosed[index - 1],
-                            pitClosed[index + 1],
-                            pitClosed[index - plannedStride],
-                            pitClosed[index + plannedStride]
+                            materialPass2[index - 1],
+                            materialPass2[index + 1],
+                            materialPass2[index - plannedStride],
+                            materialPass2[index + plannedStride],
+                            sealedHighRiverBank
                         );
                 result.columns[localZ * 16 + localX] =
                     sealWetlandPoolRim(
@@ -206,6 +261,8 @@ public class GeoWorldShorelinePlanner {
         Column[] preliminary =
             new Column[localStride * localStride];
         long seed = runtime.manifest().seed();
+        boolean modernRiverBank = smoothRiverBanks(runtime);
+        boolean sealedHighRiverBank = sealHighRiverBanks(runtime);
         for (int dz = -localRadius; dz <= localRadius; dz++) {
             for (int dx = -localRadius; dx <= localRadius; dx++) {
                 preliminary[
@@ -218,7 +275,9 @@ public class GeoWorldShorelinePlanner {
                     radius + dz,
                     seed,
                     worldX + dx,
-                    worldZ + dz
+                    worldZ + dz,
+                    modernRiverBank,
+                    sealedHighRiverBank
                 );
             }
         }
@@ -234,7 +293,8 @@ public class GeoWorldShorelinePlanner {
                     preliminary[index - 1],
                     preliminary[index + 1],
                     preliminary[index - localStride],
-                    preliminary[index + localStride]
+                    preliminary[index + localStride],
+                    sealedHighRiverBank
                 );
             }
         }
@@ -250,20 +310,50 @@ public class GeoWorldShorelinePlanner {
                     grooveClosed[index - 1],
                     grooveClosed[index + 1],
                     grooveClosed[index - localStride],
-                    grooveClosed[index + localStride]
+                    grooveClosed[index + localStride],
+                    sealedHighRiverBank
                 );
             }
         }
 
         int center = localRadius * localStride + localRadius;
-        Column shaped = pitClosed[center];
-        if (shaped == grooveClosed[center]) {
+        Column[] materialPass1 = pitClosed.clone();
+        Column[] materialPass2 = pitClosed.clone();
+        if (sealedHighRiverBank) {
+            for (int dz = -1; dz <= 1; dz++) {
+                for (int dx = -1; dx <= 1; dx++) {
+                    int index =
+                        (dz + localRadius) * localStride +
+                        (dx + localRadius);
+                    materialPass1[index] = fillRiverMaterialGap(
+                        pitClosed[index],
+                        pitClosed[index - 1],
+                        pitClosed[index + 1],
+                        pitClosed[index - localStride],
+                        pitClosed[index + localStride]
+                    );
+                }
+            }
+            materialPass2 = materialPass1.clone();
+            materialPass2[center] = fillRiverMaterialGap(
+                materialPass1[center],
+                materialPass1[center - 1],
+                materialPass1[center + 1],
+                materialPass1[center - localStride],
+                materialPass1[center + localStride]
+            );
+        }
+
+        Column geometryShaped = pitClosed[center];
+        Column shaped = materialPass2[center];
+        if (geometryShaped == grooveClosed[center]) {
             shaped = closeSmallBackshorePit(
                 shaped,
-                pitClosed[center - 1],
-                pitClosed[center + 1],
-                pitClosed[center - localStride],
-                pitClosed[center + localStride]
+                materialPass2[center - 1],
+                materialPass2[center + 1],
+                materialPass2[center - localStride],
+                materialPass2[center + localStride],
+                sealedHighRiverBank
             );
         }
         return sealWetlandPoolRim(
@@ -282,7 +372,9 @@ public class GeoWorldShorelinePlanner {
         int centerZ,
         long seed,
         int worldX,
-        int worldZ
+        int worldZ,
+        boolean modernRiverBank,
+        boolean sealedHighRiverBank
     ) {
         GeoWorldV1.RuntimeSample center =
             samples[centerZ * stride + centerX];
@@ -296,7 +388,9 @@ public class GeoWorldShorelinePlanner {
             neighborhood,
             seed,
             worldX,
-            worldZ
+            worldZ,
+            modernRiverBank,
+            sealedHighRiverBank
         );
     }
 
@@ -331,7 +425,9 @@ public class GeoWorldShorelinePlanner {
         Neighborhood neighborhood,
         long seed,
         int worldX,
-        int worldZ
+        int worldZ,
+        boolean modernRiverBank,
+        boolean sealedHighRiverBank
     ) {
         int originalGround = this.heights.boundaryY(center.groundHeight());
         int ownWater = waterBoundaryModel(center, originalGround);
@@ -438,24 +534,60 @@ public class GeoWorldShorelinePlanner {
         boolean shallowFringe = false;
         int deltaToWater = originalGround - shore.waterBoundary();
 
-        // A dry column immediately next to source water may never remain as an
-        // empty slot below that source-water boundary. Repair at most two solid
-        // blocks; if exactly one block of vertical gap remains, make it a
-        // shallow source-water fringe instead of building a 3-block artificial
-        // levee. A deeper remainder is left for the verifier to reject as a
-        // real model problem.
+        // A dry column immediately next to source water must contain that
+        // source layer after Minecraft fluid updates. v1.1.6 seals high river
+        // banks completely; older rules keep the historical two-block repair.
         if (
             shore.distance() == 1 &&
             adjustedGround < shore.waterBoundary()
         ) {
-            adjustedGround = Math.min(
-                shore.waterBoundary(),
-                adjustedGround + 2
+            if (
+                sealedHighRiverBank &&
+                "River".equals(shore.waterKind())
+            ) {
+                int gap = shore.waterBoundary() - adjustedGround;
+                final int maxSolidRaise = 4;
+                if (gap <= maxSolidRaise) {
+                    adjustedGround = shore.waterBoundary();
+                    shallowFringe = false;
+                } else {
+                    adjustedGround = Math.min(
+                        shore.waterBoundary() - 1,
+                        adjustedGround + maxSolidRaise
+                    );
+                    shallowFringe = true;
+                }
+            } else {
+                adjustedGround = Math.min(
+                    shore.waterBoundary(),
+                    adjustedGround + 2
+                );
+                int remainingGap =
+                    shore.waterBoundary() - adjustedGround;
+                if (remainingGap == 1) {
+                    shallowFringe = true;
+                }
+            }
+        }
+
+        // Back the sealed edge with a short 1-block-per-row inland ramp so a
+        // high river does not become a one-column artificial levee. This only
+        // raises already-low dry terrain and never changes the modeled water.
+        if (
+            sealedHighRiverBank &&
+            "River".equals(shore.waterKind()) &&
+            shore.distance() >= 2 &&
+            shore.distance() <= 3
+        ) {
+            int backingTarget =
+                shore.waterBoundary() - (shore.distance() - 1);
+            backingTarget = Math.min(
+                backingTarget,
+                originalGround + 4
             );
-            int remainingGap =
-                shore.waterBoundary() - adjustedGround;
-            if (remainingGap == 1) {
-                shallowFringe = true;
+            if (adjustedGround < backingTarget) {
+                adjustedGround = backingTarget;
+                shallowFringe = false;
             }
         }
 
@@ -517,10 +649,15 @@ public class GeoWorldShorelinePlanner {
             : deltaToWater) >= 2;
         boolean hardBank =
             steep ||
-            (deltaToWater >= 1 &&
+            (!"River".equals(shore.waterKind()) &&
+             deltaToWater >= 1 &&
              shapeNoise < (rocky ? 0.42 : 0.18));
 
-        int shelfWidth = shelfWidth(shore.waterKind(), shapeNoise);
+        int shelfWidth = shelfWidth(
+            shore.waterKind(),
+            shapeNoise,
+            modernRiverBank
+        );
         boolean littoralShelf = false;
         if (
             !hardBank &&
@@ -938,7 +1075,8 @@ public class GeoWorldShorelinePlanner {
         Column west,
         Column east,
         Column north,
-        Column south
+        Column south,
+        boolean blendRepairMaterial
     ) {
         if (
             !"None".equals(center.sample().waterKind()) ||
@@ -972,6 +1110,11 @@ public class GeoWorldShorelinePlanner {
             return center;
         }
 
+        Column materialSource = blendRepairMaterial
+            ? shorewardMaterialSource(
+                center, west, east, north, south
+            )
+            : null;
         return new Column(
             center.sample(),
             center.originalGroundBoundary(),
@@ -981,8 +1124,12 @@ public class GeoWorldShorelinePlanner {
             center.shoreWaterKind(),
             center.shoreWaterBoundary(),
             center.littoralShelf(),
-            center.surfaceOverride(),
-            center.underOverride()
+            materialSource != null
+                ? materialSource.surfaceOverride()
+                : center.surfaceOverride(),
+            materialSource != null
+                ? materialSource.underOverride()
+                : center.underOverride()
         );
     }
 
@@ -991,7 +1138,8 @@ public class GeoWorldShorelinePlanner {
         Column west,
         Column east,
         Column north,
-        Column south
+        Column south,
+        boolean blendRepairMaterial
     ) {
         if (
             !"None".equals(center.sample().waterKind()) ||
@@ -1033,6 +1181,11 @@ public class GeoWorldShorelinePlanner {
             return center;
         }
 
+        Column materialSource = blendRepairMaterial
+            ? shorewardMaterialSource(
+                center, west, east, north, south
+            )
+            : null;
         return new Column(
             center.sample(),
             center.originalGroundBoundary(),
@@ -1042,9 +1195,77 @@ public class GeoWorldShorelinePlanner {
             center.shoreWaterKind(),
             center.shoreWaterBoundary(),
             center.littoralShelf(),
-            center.surfaceOverride(),
-            center.underOverride()
+            materialSource != null
+                ? materialSource.surfaceOverride()
+                : center.surfaceOverride(),
+            materialSource != null
+                ? materialSource.underOverride()
+                : center.underOverride()
         );
+    }
+
+    private Column fillRiverMaterialGap(
+        Column center,
+        Column west,
+        Column east,
+        Column north,
+        Column south
+    ) {
+        if (
+            !"None".equals(center.sample().waterKind()) ||
+            !"River".equals(center.shoreWaterKind()) ||
+            center.shoreDistance() < 2 ||
+            center.shoreDistance() > 3 ||
+            center.surfaceOverride() != null
+        ) {
+            return center;
+        }
+        Column materialSource = shorewardMaterialSource(
+            center, west, east, north, south
+        );
+        if (materialSource == null) {
+            return center;
+        }
+        return new Column(
+            center.sample(),
+            center.originalGroundBoundary(),
+            center.groundBoundary(),
+            center.waterBoundary(),
+            center.shoreDistance(),
+            center.shoreWaterKind(),
+            center.shoreWaterBoundary(),
+            center.littoralShelf(),
+            materialSource.surfaceOverride(),
+            materialSource.underOverride()
+        );
+    }
+
+    private Column shorewardMaterialSource(
+        Column center,
+        Column... neighbors
+    ) {
+        Column best = null;
+        for (Column neighbor : neighbors) {
+            if (
+                neighbor == null ||
+                !"None".equals(neighbor.sample().waterKind()) ||
+                !center.shoreWaterKind().equals(
+                    neighbor.shoreWaterKind()
+                ) ||
+                neighbor.shoreDistance() <= 0 ||
+                neighbor.shoreDistance() >= center.shoreDistance() ||
+                neighbor.surfaceOverride() == null
+            ) {
+                continue;
+            }
+            if (
+                best == null ||
+                neighbor.shoreDistance() < best.shoreDistance()
+            ) {
+                best = neighbor;
+            }
+        }
+        return best;
     }
 
     private int bracketedPlannedGround(
@@ -1080,21 +1301,26 @@ public class GeoWorldShorelinePlanner {
         );
     }
 
-    private int shelfWidth(String waterKind, double noise) {
+    private int shelfWidth(
+        String waterKind,
+        double noise,
+        boolean modernRiverBank
+    ) {
         return switch (waterKind) {
-            // Most low-gradient banks get a second dry shelf row toward land.
-            // Water itself is never expanded; this only fills the visual
-            // saw-tooth backward into the bank.
-            case "River" -> noise >= 0.18 ? 2 : 1;
-            case "Lake" -> noise >= 0.14 ? 2 : 1;
-            case "Ocean" -> noise >= 0.30 ? 2 : 1;
+            // Low-gradient river banks keep a continuous two-block dry shelf.
+            // v1.1.4 accidentally lowered a third river row even though the
+            // River material rules stop at distance 2. On diagonal banks that
+            // left low grass teeth between the sandy shelf and inland slope.
+            case "River" -> modernRiverBank ? 2 : 3;
+            case "Lake" -> noise >= 0.62 ? 3 : 2;
+            case "Ocean" -> noise >= 0.68 ? 3 : 2;
             default -> 1;
         };
     }
 
     private int materialBandWidth(String waterKind) {
         return switch (waterKind) {
-            case "River" -> 2;
+            case "River" -> 3;
             case "Lake" -> 3;
             case "Ocean" -> 4;
             default -> 1;
@@ -1116,21 +1342,21 @@ public class GeoWorldShorelinePlanner {
         int worldX,
         int worldZ
     ) {
-        // Shore materials should read as short natural reaches, not
-        // one-block salt-and-pepper noise. The broad field chooses the reach
-        // material; the smaller field only bends its boundary.
+        // Shore materials should read as long natural reaches, not
+        // one-block salt-and-pepper noise. Keep the secondary field weak so
+        // diagonal river/coast voxelization does not look like a zipper.
         double patch =
-            0.82 * smoothValueNoise(
+            0.92 * smoothValueNoise(
                 seed ^ 0x53484F52455F4D31L,
                 worldX,
                 worldZ,
-                46.0
+                92.0
             ) +
-            0.18 * smoothValueNoise(
+            0.08 * smoothValueNoise(
                 seed ^ 0x53484F52455F4D32L,
                 worldX,
                 worldZ,
-                21.0
+                38.0
             );
 
         String family = sample.biomeFamily();
@@ -1173,6 +1399,21 @@ public class GeoWorldShorelinePlanner {
                     : "minecraft:gravel";
             }
             return patch < 0.55 ? "minecraft:sand" : null;
+        }
+
+        if ("River".equals(waterKind)) {
+            if (distance == 1) {
+                if (patch < 0.16) return "minecraft:gravel";
+                if (patch < 0.70) return "minecraft:sand";
+                if (patch < 0.88) return "minecraft:mud";
+                return "minecraft:dirt";
+            }
+            if (distance == 2) {
+                if (patch < 0.18) return "minecraft:gravel";
+                if (patch < 0.54) return "minecraft:sand";
+                if (patch < 0.68) return "minecraft:mud";
+                return null;
+            }
         }
 
         if ("Ocean".equals(waterKind)) {

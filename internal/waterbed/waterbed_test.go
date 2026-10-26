@@ -10,6 +10,537 @@ import (
 	"geoworld/internal/world"
 )
 
+func TestRareMacroLakeScaleIsLockedAndPhysical(t *testing.T) {
+	large := hydrology.Lake{
+		ID:          7,
+		BasinID:     19,
+		SpillOutlet: 113,
+		AreaBlocks2: 2_000_000,
+	}
+	if got := rareMacroLakeRadiusScale(123456, 0, large); got != 1 {
+		t.Fatalf("locked pre-v1.1.7 lake scale=%v want=1", got)
+	}
+	small := large
+	small.AreaBlocks2 = 400_000
+	if got := rareMacroLakeRadiusScale(123456, 1, small); got != 1 {
+		t.Fatalf("small lake unexpectedly became rare macro lake: scale=%v", got)
+	}
+	standard := rareMacroLakeRadiusScale(123456, 1, large)
+	if standard < 3.4 || standard > 3.7 {
+		t.Fatalf("large natural basin did not become inland-sea scale: %.6f", standard)
+	}
+	epic := rareMacroLakeRadiusScale(123456, 1.45, large)
+	if epic <= standard {
+		t.Fatalf("rare macro strength did not scale giant lake: standard=%.6f epic=%.6f", standard, epic)
+	}
+}
+
+func TestV5FluvialDetailExtendsBeyondLegacyBank(t *testing.T) {
+	legacy := RiverSegment{
+		X0: 0, Z0: 0, X1: 256, Z1: 0,
+		Bed0: 0.55, Bed1: 0.55,
+		HalfWidth:             32,
+		MouthExpansionVersion: 4,
+	}
+	modern := legacy
+	modern.MouthExpansionVersion = 5
+
+	legacyBank := riverMouthHalfWidth(legacy, 0.5) +
+		riverBankBlendBlocks(legacy.HalfWidth)
+	if got := riverFluvialReach(legacy); math.Abs(got-legacyBank) > 1e-12 {
+		t.Fatalf("v4 reach changed: got %.12f want %.12f", got, legacyBank)
+	}
+	if strength := riverFluvialDetailStrength(legacy); strength != 0 {
+		t.Fatalf("v4 unexpectedly has fluvial detail strength %.6f", strength)
+	}
+	if strength := riverFluvialDetailStrength(modern); strength < 0.9 {
+		t.Fatalf("flat wide v5 reach should strongly support fluvial detail: %.6f", strength)
+	}
+	if got := riverFluvialReach(modern); got <= legacyBank+40 {
+		t.Fatalf("v5 floodplain reach did not extend materially: bank=%.3f reach=%.3f", legacyBank, got)
+	}
+}
+
+func TestV5NaturalLeveeIsSparseInterruptedAndLegacyLocked(t *testing.T) {
+	legacy := RiverSegment{
+		X0: 0, Z0: 0, X1: 256, Z1: 0,
+		Bed0: 0.55, Bed1: 0.55,
+		HalfWidth:             32,
+		MouthExpansionVersion: 4,
+	}
+	if riverNaturalLeveeEnabled(legacy) {
+		t.Fatal("v4 must not enable natural levee refinement")
+	}
+	if got := riverNaturalLeveeLift(
+		legacy, 0.5, 128, 64, 0.10,
+	); got != 0 {
+		t.Fatalf("v4 natural levee lift=%v want=0", got)
+	}
+
+	modern := legacy
+	modern.MouthExpansionVersion = 5
+	found := false
+	for x0 := 0; x0 < 10000; x0++ {
+		modern.X0 = float64(x0)
+		modern.X1 = float64(x0 + 256)
+		if riverNaturalLeveeEnabled(modern) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("failed to find deterministic natural-levee reach")
+	}
+
+	maxLift := 0.0
+	zeroSamples := 0
+	asymmetricSamples := 0
+	for i := 4; i <= 16; i++ {
+		tValue := float64(i) / 20
+		cx, cz, nx, nz := RiverCenterFrame(modern, tValue)
+		bankRadius := riverMouthHalfWidth(modern, tValue) +
+			riverBankBlendBlocks(modern.HalfWidth)
+		reach := riverFluvialReach(modern)
+		distance := bankRadius + 0.10*(reach-bankRadius)
+
+		right := riverNaturalLeveeLift(
+			modern,
+			tValue,
+			cx+nx*distance,
+			cz+nz*distance,
+			0.10,
+		)
+		left := riverNaturalLeveeLift(
+			modern,
+			tValue,
+			cx-nx*distance,
+			cz-nz*distance,
+			0.10,
+		)
+		maxLift = math.Max(maxLift, math.Max(right, left))
+		if right < 1e-9 || left < 1e-9 {
+			zeroSamples++
+		}
+		if math.Abs(right-left) > 2e-4 {
+			asymmetricSamples++
+		}
+	}
+	if maxLift < 8e-4 {
+		t.Fatalf("natural levee never became material: max=%.6f", maxLift)
+	}
+	if maxLift > 0.0042+1e-12 {
+		t.Fatalf("natural levee exceeded bounded lift: %.6f", maxLift)
+	}
+	if zeroSamples == 0 {
+		t.Fatal("natural levee became a continuous artificial embankment")
+	}
+	if asymmetricSamples == 0 {
+		t.Fatal("natural levee banks are perfectly mirrored")
+	}
+
+	baseHeight := 0.62
+	surface := 0.55
+	tValue := 0.5
+	cx, cz, nx, nz := RiverCenterFrame(modern, tValue)
+	bankRadius := riverMouthHalfWidth(modern, tValue) +
+		riverBankBlendBlocks(modern.HalfWidth)
+	reach := riverFluvialReach(modern)
+	distance := bankRadius + 0.10*(reach-bankRadius)
+	got := applyRiverFluvialDryDetail(
+		modern,
+		tValue,
+		cx+nx*distance,
+		cz+nz*distance,
+		baseHeight,
+		baseHeight,
+		surface,
+		distance,
+	)
+	if got > baseHeight+1e-12 {
+		t.Fatalf(
+			"natural levee built above original terrain: got=%.6f base=%.6f",
+			got,
+			baseHeight,
+		)
+	}
+}
+
+func TestV5FluvialDetailRespectsOtherRiverBankProtection(t *testing.T) {
+	parent := RiverSegment{
+		X0: 0, Z0: 0, X1: 256, Z1: 0,
+		Bed0: 0.55, Bed1: 0.55,
+		HalfWidth:             32,
+		MouthExpansionVersion: 5,
+	}
+	sibling := parent
+	sibling.Z0 = 60
+	sibling.Z1 = 60
+	rivers := []RiverSegment{parent, sibling}
+
+	worldX, worldZ := 128.0, 60.0
+	parentT, parentDistance := pointRiverSegment(worldX, worldZ, parent)
+	parentBank := riverMouthHalfWidth(parent, parentT) +
+		riverBankBlendBlocks(parent.HalfWidth)
+	if parentDistance < parentBank {
+		t.Fatalf(
+			"probe is unexpectedly inside parent bank: distance=%.3f bank=%.3f",
+			parentDistance,
+			parentBank,
+		)
+	}
+	if parentDistance >= riverFluvialReach(parent) {
+		t.Fatalf(
+			"probe does not exercise parent fluvial reach: distance=%.3f reach=%.3f",
+			parentDistance,
+			riverFluvialReach(parent),
+		)
+	}
+	if !riverBankProtectedAt(rivers, []int{0, 1}, worldX, worldZ) {
+		t.Fatal("sibling active river bank did not protect overlapping fluvial detail")
+	}
+	if riverBankProtectedAt(rivers, []int{0, 1}, worldX, 140) {
+		t.Fatal("point outside both active banks was incorrectly protected")
+	}
+}
+
+func TestV5DeltaBranchesSplitContinuouslyAndLegacyStaysLocked(t *testing.T) {
+	seg := RiverSegment{
+		Z0: 0, Z1: 0,
+		Bed0: 0.55, Bed1: 0.55,
+		HalfWidth:             32,
+		OceanMouth:            true,
+		MouthExpansionVersion: 5,
+	}
+	found := false
+	for x0 := 0; x0 < 10000; x0++ {
+		seg.X0 = float64(x0)
+		seg.X1 = float64(x0 + 256)
+		if riverDeltaBranchCount(seg) > 0 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("failed to find deterministic delta-eligible ocean mouth")
+	}
+
+	legacy := seg
+	legacy.MouthExpansionVersion = 4
+	if got := riverDeltaBranchCount(legacy); got != 0 {
+		t.Fatalf("v1.1.6/v4 unexpectedly gained delta branches: %d", got)
+	}
+	if got := riverDeltaSupportRadius(legacy); got != 0 {
+		t.Fatalf("v1.1.6/v4 unexpectedly gained delta support: %.6f", got)
+	}
+
+	count := riverDeltaBranchCount(seg)
+	if count < 1 || count > 2 {
+		t.Fatalf("delta branch count=%d want 1..2", count)
+	}
+
+	overlapsParent := false
+	for step := 47; step <= 70; step++ {
+		tValue := float64(step) / 100
+		offset, width, _, ok := riverDeltaBranchGeometry(seg, tValue, 0)
+		if !ok {
+			continue
+		}
+		if math.Abs(offset) <= riverMouthHalfWidth(seg, tValue)+width {
+			overlapsParent = true
+			break
+		}
+	}
+	if !overlapsParent {
+		t.Fatal("delta branch never overlaps the parent mouth near its split")
+	}
+
+	offset, width, bank, ok := riverDeltaBranchGeometry(seg, 1, 0)
+	if !ok {
+		t.Fatal("delta branch is not defined at the ocean receiver")
+	}
+	mainWidth := riverMouthHalfWidth(seg, 1)
+	if math.Abs(offset) <= mainWidth+width {
+		t.Fatalf(
+			"delta branch did not separate from parent by the receiver: offset=%.3f main=%.3f branch=%.3f",
+			offset,
+			mainWidth,
+			width,
+		)
+	}
+
+	cx, cz, nx, nz := RiverCenterFrame(seg, 1)
+	worldX := cx + nx*offset
+	worldZ := cz + nz*offset
+	branch, distance, gotWidth, gotBank, ok :=
+		riverDeltaPoint(seg, 1, worldX, worldZ)
+	if !ok || branch != 0 || math.Abs(distance) > 1e-9 {
+		t.Fatalf(
+			"delta centerline lookup failed: branch=%d distance=%.12f ok=%v",
+			branch,
+			distance,
+			ok,
+		)
+	}
+	if math.Abs(gotWidth-width) > 1e-12 ||
+		math.Abs(gotBank-bank) > 1e-12 {
+		t.Fatalf(
+			"delta geometry drifted between branch and point lookup: width %.12f/%.12f bank %.12f/%.12f",
+			gotWidth,
+			width,
+			gotBank,
+			bank,
+		)
+	}
+
+	mainBank := mainWidth + riverBankBlendBlocks(seg.HalfWidth)
+	deltaOuterEdge := math.Abs(offset) + bank
+	if deltaOuterEdge <= mainBank {
+		t.Fatalf(
+			"delta bank never extends beyond parent bank: outer=%.3f parentBank=%.3f",
+			deltaOuterEdge,
+			mainBank,
+		)
+	}
+	protectedLateral := 0.5 * (mainBank + deltaOuterEdge)
+	if offset < 0 {
+		protectedLateral = -protectedLateral
+	}
+	protectedX := cx + nx*protectedLateral
+	protectedZ := cz + nz*protectedLateral
+	_, parentDistance := pointRiverSegment(protectedX, protectedZ, seg)
+	if parentDistance <= mainBank {
+		t.Fatalf(
+			"delta-only protection probe remained inside parent bank: distance=%.3f parentBank=%.3f",
+			parentDistance,
+			mainBank,
+		)
+	}
+	if !riverBankProtectedAt(
+		[]RiverSegment{seg},
+		[]int{0},
+		protectedX,
+		protectedZ,
+	) {
+		t.Fatal("delta distributary outer bank is not part of active river protection")
+	}
+
+	for _, tValue := range []float64{0.60, 0.80, 1.0} {
+		bed := sampleRiverProfile(seg, tValue)
+		naturalSurface := bed + riverCenterDepth(
+			Config{
+				MinRiverHalfWidthBlocks:    4,
+				MaxRiverHalfWidthBlocks:    48,
+				RiverCenterDepthNormalized: 0.004,
+			},
+			seg.HalfWidth,
+		)
+		surface := riverConnectionSurface(seg, tValue, naturalSurface)
+		if math.Abs(surface-(0.55+riverCenterDepth(
+			Config{
+				MinRiverHalfWidthBlocks:    4,
+				MaxRiverHalfWidthBlocks:    48,
+				RiverCenterDepthNormalized: 0.004,
+			},
+			seg.HalfWidth,
+		))) > 1e-12 {
+			t.Fatalf("flat synthetic delta datum drifted at t=%.2f: %.12f", tValue, surface)
+		}
+	}
+}
+
+func TestV1LakeCoreCarveChoosesOnlyPlausibleDryAnchor(t *testing.T) {
+	lakes := []LakeNode{
+		{LakeID: 1, X: 0, WaterSurface: 0.50},
+		{LakeID: 1, X: 1, WaterSurface: 0.50},
+		{LakeID: 1, X: 2, WaterSurface: 0.50},
+		{LakeID: 2, X: 3, WaterSurface: 0.50},
+		{LakeID: 3, X: 4, WaterSurface: 0.50},
+		{LakeID: 3, X: 5, WaterSurface: 0.50},
+	}
+	heights := map[float64]float64{
+		0: 0.535,
+		1: 0.508,
+		2: 0.521,
+		3: 0.501,
+		4: 0.530,
+		5: 0.525,
+	}
+	sampler := func(x, _ float64) float64 { return heights[x] }
+
+	legacy := append([]LakeNode(nil), lakes...)
+	markLakeCoreCarveAnchors(
+		Config{LakeGeometryVersion: 0},
+		legacy,
+		sampler,
+	)
+	for i := range legacy {
+		if legacy[i].CoreCarve {
+			t.Fatalf("legacy lake node %d unexpectedly gained core carve", i)
+		}
+	}
+
+	modern := append([]LakeNode(nil), lakes...)
+	markLakeCoreCarveAnchors(
+		Config{LakeGeometryVersion: 1},
+		modern,
+		sampler,
+	)
+	if !modern[1].CoreCarve {
+		t.Fatal("dry lake did not choose its lowest plausible core anchor")
+	}
+	if modern[0].CoreCarve || modern[2].CoreCarve {
+		t.Fatal("dry lake selected more than one core anchor")
+	}
+	if modern[3].CoreCarve {
+		t.Fatal("naturally renderable lake should not force a core carve")
+	}
+	if modern[4].CoreCarve || modern[5].CoreCarve {
+		t.Fatal("implausibly high lake group should remain unforced")
+	}
+}
+
+func TestV1LakeBedCeilingGuaranteesVisibleDepthWithoutChangingLegacy(t *testing.T) {
+	const (
+		surface = 0.509226
+		shallow = 0.509126
+	)
+	legacy := visibleLakeBedCeiling(
+		Config{
+			MinLakeWaterDepthNormalized: 0.003,
+			LakeGeometryVersion:         0,
+		},
+		surface,
+		shallow,
+	)
+	if legacy != shallow {
+		t.Fatalf("legacy lake bed changed: %.12f want %.12f", legacy, shallow)
+	}
+
+	modernCfg := Config{
+		MinLakeWaterDepthNormalized: 0.003,
+		LakeGeometryVersion:         1,
+	}
+	modern := visibleLakeBedCeiling(modernCfg, surface, shallow)
+	if modern >= surface-modernCfg.MinLakeWaterDepthNormalized {
+		t.Fatalf(
+			"modern lake still cannot expose water: bed=%.12f surface=%.12f minDepth=%.12f",
+			modern,
+			surface,
+			modernCfg.MinLakeWaterDepthNormalized,
+		)
+	}
+	if got := surface - modern; got < 0.004-1e-12 {
+		t.Fatalf("modern visible lake depth=%.12f want >=0.004", got)
+	}
+}
+
+func TestV5OxbowWaterIsClosedAndUsesOneFlatDatum(t *testing.T) {
+	cfg := Config{
+		MinRiverHalfWidthBlocks:     4,
+		MaxRiverHalfWidthBlocks:     48,
+		RiverCenterDepthNormalized:  0.004,
+		MinLakeWaterDepthNormalized: 0.003,
+	}
+	seg := RiverSegment{
+		Z0: 0, Z1: 0,
+		Bed0: 0.55, Bed1: 0.55,
+		HalfWidth:             32,
+		MeanderOffset:         18,
+		MouthExpansionVersion: 5,
+	}
+	found := false
+	for x0 := 0; x0 < 10000; x0++ {
+		seg.X0 = float64(x0)
+		seg.X1 = float64(x0 + 256)
+		key := riverFluvialKey(seg)
+		if key%13 == 0 && (key/13)%3 == 0 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("failed to find deterministic oxbow-eligible segment")
+	}
+
+	pointOnOxbow := func(tValue float64) (float64, float64) {
+		cx, cz, nx, nz := RiverCenterFrame(seg, tValue)
+		offset := riverAbandonedMeanderOffset(
+			seg,
+			tValue,
+			riverFluvialKey(seg),
+		)
+		return cx + nx*offset, cz + nz*offset
+	}
+
+	x1, z1 := pointOnOxbow(0.35)
+	_, activeDistance1 := pointRiverSegment(x1, z1, seg)
+	surface1, floor1, weight1, ok1 :=
+		riverOxbowWater(cfg, seg, 0.35, x1, z1, activeDistance1)
+	x2, z2 := pointOnOxbow(0.65)
+	_, activeDistance2 := pointRiverSegment(x2, z2, seg)
+	surface2, floor2, weight2, ok2 :=
+		riverOxbowWater(cfg, seg, 0.65, x2, z2, activeDistance2)
+	if !ok1 || !ok2 || weight1 < 0.5 || weight2 < 0.5 {
+		t.Fatalf(
+			"eligible oxbow middle is not wet enough: ok=%v/%v weight=%.3f/%.3f",
+			ok1, ok2, weight1, weight2,
+		)
+	}
+	if math.Abs(surface1-surface2) > 1e-12 ||
+		math.Abs(floor1-floor2) > 1e-12 {
+		t.Fatalf(
+			"oxbow datum slopes: surface %.12f/%.12f floor %.12f/%.12f",
+			surface1, surface2, floor1, floor2,
+		)
+	}
+
+	xEnd, zEnd := pointOnOxbow(0.05)
+	_, activeDistanceEnd := pointRiverSegment(xEnd, zEnd, seg)
+	if _, _, _, ok := riverOxbowWater(
+		cfg, seg, 0.05, xEnd, zEnd, activeDistanceEnd,
+	); ok {
+		t.Fatal("oxbow must close before the parent reach endpoint")
+	}
+
+	tMid := 0.5
+	cxMid, czMid, nxMid, nzMid := RiverCenterFrame(seg, tMid)
+	halfMid := riverMouthHalfWidth(seg, tMid)
+	bankMid := halfMid + riverBankBlendBlocks(seg.HalfWidth)
+	insideDistance := 0.5 * (halfMid + bankMid)
+	insideX := cxMid + nxMid*insideDistance
+	insideZ := czMid + nzMid*insideDistance
+	if _, _, _, ok := riverOxbowWater(
+		cfg, seg, tMid, insideX, insideZ, insideDistance,
+	); ok {
+		t.Fatal("oxbow must not invade the active river bank protection corridor")
+	}
+	if got := applyRiverFluvialDryDetail(
+		seg,
+		tMid,
+		insideX,
+		insideZ,
+		0.62,
+		0.60,
+		0.55,
+		insideDistance,
+	); math.Abs(got-0.60) > 1e-12 {
+		t.Fatalf(
+			"fluvial dry detail lowered active bank corridor: got %.12f want 0.60",
+			got,
+		)
+	}
+
+	legacy := seg
+	legacy.MouthExpansionVersion = 4
+	xMid, zMid := pointOnOxbow(0.5)
+	_, legacyDistance := pointRiverSegment(xMid, zMid, legacy)
+	if _, _, _, ok := riverOxbowWater(
+		cfg, legacy, 0.5, xMid, zMid, legacyDistance,
+	); ok {
+		t.Fatal("v1.1.6/v4 must not gain oxbow water")
+	}
+}
+
 func TestOceanMouthFlaresOnlyOnFinalReach(t *testing.T) {
 	upstream := RiverSegment{HalfWidth: 6}
 	mouth := RiverSegment{HalfWidth: 6, OceanMouth: true}
@@ -26,6 +557,440 @@ func TestOceanMouthFlaresOnlyOnFinalReach(t *testing.T) {
 	}
 	if end != 15 {
 		t.Fatalf("expected ocean mouth +9 blocks half width, got=%v", end)
+	}
+}
+
+func TestV3LakeOutletOceanMouthNeverNarrows(t *testing.T) {
+	seg := RiverSegment{
+		X0:                    0,
+		Z0:                    0,
+		X1:                    128,
+		Z1:                    0,
+		Bed0:                  0.5,
+		Bed1:                  0.5,
+		HalfWidth:             45,
+		LakeOutlet:            true,
+		OceanMouth:            true,
+		MouthExpansionVersion: 3,
+	}
+	prev := riverMouthHalfWidth(seg, 0)
+	for i := 1; i <= 100; i++ {
+		tValue := float64(i) / 100
+		got := riverMouthHalfWidth(seg, tValue)
+		if got+1e-12 < prev {
+			t.Fatalf(
+				"combined lake-outlet/ocean-mouth narrowed at t=%.2f: prev=%.6f got=%.6f",
+				tValue,
+				prev,
+				got,
+			)
+		}
+		prev = got
+	}
+	if start, end := riverMouthHalfWidth(seg, 0), riverMouthHalfWidth(seg, 1); end+1e-12 < start {
+		t.Fatalf("combined estuary ends narrower than it starts: start=%.6f end=%.6f", start, end)
+	}
+}
+
+func TestMajorRiverHalfWidthCanExceedOrdinaryMaximum(t *testing.T) {
+	cfg := Config{
+		MinRiverHalfWidthBlocks: 4,
+		MaxRiverHalfWidthBlocks: 18,
+	}
+	ordinary := riverHalfWidth(cfg, 0.30, 1.0, 0, 5000, 0)
+	major := riverHalfWidth(cfg, 0.30, 1.0, 160000, 5000, 5)
+	if ordinary != cfg.MaxRiverHalfWidthBlocks {
+		t.Fatalf("ordinary full-strength river width=%v want=%v", ordinary, cfg.MaxRiverHalfWidthBlocks)
+	}
+	if major <= cfg.MaxRiverHalfWidthBlocks {
+		t.Fatalf("major river width=%v did not exceed ordinary maximum=%v", major, cfg.MaxRiverHalfWidthBlocks)
+	}
+	if major < 45 {
+		t.Fatalf("major river width=%v is still too small for a great-river reach", major)
+	}
+	if major > cfg.MaxRiverHalfWidthBlocks*2.65+1e-12 {
+		t.Fatalf("major river width=%v exceeded intended cap", major)
+	}
+}
+
+func TestV115DiagonalStraightReachGetsAntiGridDeflection(t *testing.T) {
+	const (
+		seed         int64 = 123456
+		from               = 24493
+		to                 = 24172
+		x0                 = 1728.0
+		z0                 = -3008.0
+		x1                 = 1600.0
+		z1                 = -3136.0
+		halfWidth          = 47.7
+		originalDrop       = 0.009
+	)
+
+	legacy := riverMeanderOffset(
+		seed,
+		from,
+		to,
+		x0, z0,
+		x1, z1,
+		halfWidth,
+		originalDrop,
+		0,
+	)
+	if legacy != 0 {
+		t.Fatalf("legacy diagonal straight reach meander=%v want=0", legacy)
+	}
+
+	modern := riverMeanderOffset(
+		seed,
+		from,
+		to,
+		x0, z0,
+		x1, z1,
+		halfWidth,
+		originalDrop,
+		1,
+	)
+	if math.Abs(modern) < 4 {
+		t.Fatalf("v1.1.5 anti-grid meander=%v want magnitude >=4", modern)
+	}
+	if modern >= 0 {
+		t.Fatalf(
+			"v1.1.5 anti-grid meander=%v should favour 0/1 downstream raster steps for same-sign diagonal",
+			modern,
+		)
+	}
+
+	cardinal := riverMeanderOffset(
+		seed,
+		from,
+		to,
+		x0, z0,
+		x0-128, z0,
+		halfWidth,
+		originalDrop,
+		1,
+	)
+	if cardinal != 0 {
+		t.Fatalf("cardinal legacy-straight reach meander=%v want=0", cardinal)
+	}
+}
+
+func TestV115DiagonalRasterBreaksBothBankZippers(t *testing.T) {
+	seg := RiverSegment{
+		X0:                    1728,
+		Z0:                    -3008,
+		X1:                    1600,
+		Z1:                    -3136,
+		HalfWidth:             47.7,
+		MeanderOffset:         -16.93,
+		MouthExpansionVersion: 4,
+	}
+	leftEdges := make([]int, 0, 31)
+	rightEdges := make([]int, 0, 31)
+	for z := -3094; z <= -3064; z++ {
+		left, right := 0, 0
+		found := false
+		for x := 1350; x <= 1800; x++ {
+			tValue, distance := pointRiverSegment(float64(x), float64(z), seg)
+			if distance > riverMouthHalfWidth(seg, tValue) {
+				continue
+			}
+			if !found {
+				left = x
+				found = true
+			}
+			right = x
+		}
+		if !found {
+			t.Fatalf("no wet raster row at z=%d", z)
+		}
+		leftEdges = append(leftEdges, left)
+		rightEdges = append(rightEdges, right)
+	}
+	checkBank := func(name string, edges []int) {
+		repeated := 0
+		maxStep := 0
+		longestSameStep := 0
+		currentRun := 0
+		previousStep := 999
+		for i := 1; i < len(edges); i++ {
+			step := edges[i] - edges[i-1]
+			if step == 0 {
+				repeated++
+			}
+			stepAbs := step
+			if stepAbs < 0 {
+				stepAbs = -stepAbs
+			}
+			if stepAbs > maxStep {
+				maxStep = stepAbs
+			}
+			if step == previousStep {
+				currentRun++
+			} else {
+				currentRun = 1
+				previousStep = step
+			}
+			if currentRun > longestSameStep {
+				longestSameStep = currentRun
+			}
+		}
+		if repeated < 3 {
+			t.Fatalf("%s bank still forms a 1x1 zipper: repeated=%d edges=%v", name, repeated, edges)
+		}
+		if maxStep > 2 {
+			t.Fatalf("%s bank introduced a jump >2 blocks: max=%d edges=%v", name, maxStep, edges)
+		}
+		if longestSameStep > 5 {
+			t.Fatalf("%s bank keeps one voxel phase too long: run=%d edges=%v", name, longestSameStep, edges)
+		}
+	}
+	checkBank("right", rightEdges)
+	_ = leftEdges
+}
+
+func TestV3MeanderKeepsEndpointTangentsChordAligned(t *testing.T) {
+	seg := RiverSegment{
+		X0:                    0,
+		Z0:                    0,
+		X1:                    128,
+		Z1:                    64,
+		MeanderOffset:         18,
+		MouthExpansionVersion: 3,
+	}
+	length := math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0)
+	wantNX := -(seg.Z1 - seg.Z0) / length
+	wantNZ := (seg.X1 - seg.X0) / length
+	for _, tValue := range []float64{0, 1} {
+		_, _, nx, nz := riverCenterAndNormalForSegment(seg, tValue)
+		if math.Abs(nx-wantNX) > 1e-12 || math.Abs(nz-wantNZ) > 1e-12 {
+			t.Fatalf(
+				"v3 meander endpoint t=%v changed chord tangent: normal=(%.12f,%.12f) want=(%.12f,%.12f)",
+				tValue,
+				nx,
+				nz,
+				wantNX,
+				wantNZ,
+			)
+		}
+	}
+	_, _, legacyNX, legacyNZ := riverCenterAndNormalForSegment(
+		RiverSegment{
+			X0:            seg.X0,
+			Z0:            seg.Z0,
+			X1:            seg.X1,
+			Z1:            seg.Z1,
+			MeanderOffset: seg.MeanderOffset,
+		},
+		0,
+	)
+	if math.Abs(legacyNX-wantNX) <= 1e-6 &&
+		math.Abs(legacyNZ-wantNZ) <= 1e-6 {
+		t.Fatal("legacy meander unexpectedly lost its endpoint tangent behavior")
+	}
+}
+
+func TestLakeOutletKeepsBroadWetNearShoreThroat(t *testing.T) {
+	seg := RiverSegment{
+		X0:                       0,
+		Z0:                       0,
+		X1:                       181,
+		Z1:                       0,
+		HalfWidth:                18,
+		LakeOutlet:               true,
+		LakeOutletSurfaceDefined: true,
+		LakeOutletSurface:        0.508,
+		MouthExpansionVersion:    2,
+	}
+	if got := riverMouthHalfWidth(seg, 0); got <= 39 {
+		t.Fatalf("lake outlet source half-width=%v want >39", got)
+	}
+	if got := riverMouthHalfWidth(seg, 82.0/181.0); got <= 39 {
+		t.Fatalf("lake outlet near-shore half-width=%v want >39", got)
+	}
+	if got := riverMouthHalfWidth(seg, 1); math.Abs(got-18) > 1e-12 {
+		t.Fatalf("lake outlet downstream half-width=%v want=18", got)
+	}
+	if got := riverConnectionSurface(seg, 0, 0.504); math.Abs(got-0.508) > 1e-12 {
+		t.Fatalf("lake outlet source surface=%v want=0.508", got)
+	}
+	if got := riverConnectionSurface(seg, 1, 0.504); math.Abs(got-0.504) > 1e-12 {
+		t.Fatalf("lake outlet downstream surface=%v want=0.504", got)
+	}
+}
+
+func TestLakeOutletBackwaterCarriesAcrossConfluence(t *testing.T) {
+	cfg, err := normalizeConfig(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	outlet := RiverSegment{
+		From:                     1,
+		To:                       2,
+		X0:                       0,
+		Z0:                       0,
+		X1:                       128,
+		Z1:                       0,
+		Bed0:                     0.5015,
+		Bed1:                     0.5015,
+		HalfWidth:                4,
+		Profile:                  []float64{0.5015, 0.5015},
+		LakeOutlet:               true,
+		LakeOutletSurfaceDefined: true,
+		LakeOutletSurface:        0.5100,
+		MouthExpansionVersion:    3,
+	}
+	tributary := RiverSegment{
+		From:      3,
+		To:        2,
+		X0:        0,
+		Z0:        128,
+		X1:        128,
+		Z1:        0,
+		Bed0:      0.497,
+		Bed1:      0.497,
+		HalfWidth: 9,
+		Profile:   []float64{0.497, 0.497},
+	}
+	downstream := RiverSegment{
+		From:      2,
+		To:        4,
+		X0:        128,
+		Z0:        0,
+		X1:        256,
+		Z1:        0,
+		Bed0:      0.497,
+		Bed1:      0.497,
+		HalfWidth: 11,
+		Profile:   []float64{0.497, 0.497},
+	}
+	rivers := []RiverSegment{outlet, tributary, downstream}
+	incoming := make([][]int, 5)
+	incoming[2] = []int{0, 1}
+	incoming[4] = []int{2}
+
+	naturalOutlet :=
+		sampleRiverProfile(outlet, 1) +
+			riverCenterDepth(cfg, outlet.HalfWidth)
+	want := riverConnectionSurface(outlet, 1, naturalOutlet)
+	if want <= naturalOutlet+1e-12 {
+		t.Fatalf(
+			"test fixture has no surviving lake-outlet backwater: natural=%.6f effective=%.6f",
+			naturalOutlet,
+			want,
+		)
+	}
+
+	seedLakeOutletConfluenceBackwater(rivers, incoming, cfg)
+	for _, id := range []int{0, 1} {
+		if !rivers[id].ReceiverSurfaceDefined ||
+			math.Abs(rivers[id].ReceiverSurface-want) > 1e-12 {
+			t.Fatalf(
+				"incoming segment %d did not inherit shared junction datum: got=%v/%.6f want=%.6f",
+				id,
+				rivers[id].ReceiverSurfaceDefined,
+				rivers[id].ReceiverSurface,
+				want,
+			)
+		}
+	}
+
+	easeReceiverOutflowDrops(rivers, cfg)
+	downstreamStart :=
+		sampleRiverProfile(rivers[2], 0) +
+			riverCenterDepth(cfg, rivers[2].HalfWidth)
+	if downstreamStart < want-1e-12 {
+		t.Fatalf(
+			"downstream start did not inherit outlet backwater: got=%.6f want>=%.6f",
+			downstreamStart,
+			want,
+		)
+	}
+}
+
+func TestLakeOutletBackwaterRecomputedAfterProfileSettles(t *testing.T) {
+	cfg, err := normalizeConfig(Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	outlet := RiverSegment{
+		From:                     1,
+		To:                       2,
+		X0:                       0,
+		Z0:                       0,
+		X1:                       220,
+		Z1:                       0,
+		Bed0:                     0.540,
+		Bed1:                     0.510,
+		HalfWidth:                18,
+		Profile:                  []float64{0.540, 0.510},
+		LakeOutlet:               true,
+		LakeOutletSurfaceDefined: true,
+		LakeOutletSurface:        0.545,
+		MouthExpansionVersion:    3,
+	}
+	sibling := RiverSegment{
+		From:      3,
+		To:        2,
+		X0:        0,
+		Z0:        128,
+		X1:        220,
+		Z1:        0,
+		Bed0:      0.511,
+		Bed1:      0.510,
+		HalfWidth: 12,
+		Profile:   []float64{0.511, 0.510},
+	}
+	downstream := RiverSegment{
+		From:      2,
+		To:        4,
+		X0:        220,
+		Z0:        0,
+		X1:        348,
+		Z1:        0,
+		Bed0:      0.510,
+		Bed1:      0.509,
+		HalfWidth: 16,
+		Profile:   []float64{0.510, 0.509},
+	}
+	rivers := []RiverSegment{outlet, sibling, downstream}
+	incoming := make([][]int, 5)
+	incoming[2] = []int{0, 1}
+	incoming[4] = []int{2}
+
+	// Before final profile settlement the outlet is steep enough that its lake
+	// datum has faded away before the downstream junction.
+	seedLakeOutletConfluenceBackwater(rivers, incoming, cfg)
+	if rivers[0].ReceiverSurfaceDefined {
+		t.Fatal("steep pre-settlement outlet unexpectedly seeded junction backwater")
+	}
+
+	// Later confluence/cascade repairs can flatten the same reach. The final
+	// basin signal must therefore be recomputed rather than keeping the stale
+	// pre-repair receiver state.
+	rivers[0].Bed0 = 0.512
+	rivers[0].Bed1 = 0.510
+	rivers[0].Profile = []float64{0.512, 0.510}
+	seedLakeOutletConfluenceBackwater(rivers, incoming, cfg)
+	if !rivers[0].ReceiverSurfaceDefined ||
+		!rivers[1].ReceiverSurfaceDefined {
+		t.Fatal("settled lake outlet did not reseed all incoming junction datums")
+	}
+	want := rivers[0].ReceiverSurface
+	if want <= 0.510+riverCenterDepth(cfg, rivers[0].HalfWidth) {
+		t.Fatalf("reseeded junction datum=%.6f is not elevated", want)
+	}
+
+	easeReceiverOutflowDrops(rivers, cfg)
+	downstreamStart :=
+		sampleRiverProfile(rivers[2], 0) +
+			riverCenterDepth(cfg, rivers[2].HalfWidth)
+	if downstreamStart < want-1e-12 {
+		t.Fatalf(
+			"downstream start did not inherit recomputed junction datum: got=%.6f want>=%.6f",
+			downstreamStart,
+			want,
+		)
 	}
 }
 

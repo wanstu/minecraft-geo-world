@@ -125,7 +125,12 @@ public final class GeoWorldChunkGenerator
         return this.support().populateTerrain(
             chunk,
             randomState.seed(),
-            this::ensureModel
+            this::ensureModel,
+            structureManager.startsForStructure(
+                chunk.getPos().x(),
+                chunk.getPos().z(),
+                structure -> true
+            )
         );
     }
 

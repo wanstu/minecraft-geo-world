@@ -9,6 +9,7 @@ import geoworld.runtime.GeoWorldV1;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.level.biome.BiomeGenerationSettings;
 import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.NoiseColumn;
@@ -95,6 +96,15 @@ public final class GeoWorldV26GeneratorSupport {
         long seed,
         GeoWorldV26TerrainPopulator.ModelProvider modelProvider
     ) {
+        return populateTerrain(chunk, seed, modelProvider, null);
+    }
+
+    public CompletableFuture<ChunkAccess> populateTerrain(
+        ChunkAccess chunk,
+        long seed,
+        GeoWorldV26TerrainPopulator.ModelProvider modelProvider,
+        java.util.List<StructureStart> structureStarts
+    ) {
         return GeoWorldV26TerrainPopulator.populate(
             chunk,
             seed,
@@ -106,6 +116,24 @@ public final class GeoWorldV26GeneratorSupport {
                 GeoWorldV26SurfaceMaterials.Cover.BADLANDS,
             this::blockAt,
             this.api.blockSetter(),
+            (target, model, worldSeed, shore) ->
+                GeoWorldV26StructureAdaptation.populate(
+                    target,
+                    model,
+                    structureStarts,
+                    shore,
+                    this.heights,
+                    this.api.blockSetter()
+                ),
+            (target, model, worldSeed, shore) ->
+                GeoWorldV26SparseCaves.populate(
+                    target,
+                    model,
+                    worldSeed,
+                    shore,
+                    this.heights,
+                    this.api.blockSetter()
+                ),
             (target, model, worldSeed, shore) ->
                 GeoWorldV26MineralVeins.populate(
                     target,
@@ -178,7 +206,8 @@ public final class GeoWorldV26GeneratorSupport {
                 surfaceBiome,
                 terracottaStrata,
                 x,
-                z
+                z,
+                model.manifest().generationRulesVersion()
             );
         }
         return new NoiseColumn(minY, states);
@@ -225,7 +254,8 @@ public final class GeoWorldV26GeneratorSupport {
         String surfaceBiome,
         boolean terracottaStrata,
         int worldX,
-        int worldZ
+        int worldZ,
+        String generationRulesVersion
     ) {
         GeoWorldV1.RuntimeSample sample = column.sample();
         int groundBoundary = column.groundBoundary();
@@ -245,10 +275,11 @@ public final class GeoWorldV26GeneratorSupport {
             int depth = groundBoundary - 1 - y;
             if (depth == 0) {
                 return blockState(
-                    GeoWorldV26SurfaceMaterials.top(
+                    GeoWorldV26SurfaceMaterials.topForRules(
                         surfaceBiome,
                         sample.surfaceProfile(),
-                        column.surfaceOverride()
+                        column.surfaceOverride(),
+                        generationRulesVersion
                     )
                 );
             }
@@ -257,14 +288,15 @@ public final class GeoWorldV26GeneratorSupport {
                     ? Blocks.DEEPSLATE.defaultBlockState()
                     : Blocks.STONE.defaultBlockState();
             }
-            String shallow = GeoWorldV26SurfaceMaterials.below(
+            String shallow = GeoWorldV26SurfaceMaterials.belowForRules(
                 surfaceBiome,
                 sample.surfaceProfile(),
                 column.underOverride(),
                 worldX,
                 y,
                 worldZ,
-                depth
+                depth,
+                generationRulesVersion
             );
             if (shallow != null) {
                 return blockState(shallow);

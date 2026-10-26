@@ -6,12 +6,15 @@ import geoworld.minecraft.common.engine.GeoWorldEngineBridge;
 
 import geoworld.minecraft.common.creation.GeoWorldCreationConfig;
 import geoworld.minecraft.common.creation.GeoWorldCreationConfig.ContinentPreset;
+import geoworld.minecraft.common.creation.GeoWorldCreationConfig.Parameters;
+import geoworld.minecraft.common.creation.GeoWorldCreationConfig.WorldPreset;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.ScrollableLayout;
 import net.minecraft.client.gui.components.StringWidget;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.layouts.CommonLayouts;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import net.minecraft.client.gui.layouts.LinearLayout;
@@ -25,6 +28,7 @@ import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -68,8 +72,22 @@ public class GeoWorldV26PresetScreen extends Screen {
         Component.translatable("geoworld.create.fragmentation");
     private static final Component SEPARATION_LABEL =
         Component.translatable("geoworld.create.separation");
+    private static final Component WORLD_PRESET_LABEL =
+        Component.translatable("geoworld.create.world_preset");
     private static final Component PRESET_LABEL =
         Component.translatable("geoworld.create.continent_preset");
+    private static final List<String> PARAMETER_IDS = List.of(
+        "mainland_scale", "region_scale", "transition_width",
+        "mountain_strength", "plain_continuity", "plateau_scale",
+        "cliff_rarity", "rare_macro_terrain",
+        "river_density", "main_river_scale", "lake_abundance", "wetland_abundance",
+        "climate_region_scale", "climate_transition_width",
+        "rain_shadow_strength", "biome_continuity",
+        "cave_richness", "large_cave_rarity", "mineral_regionalization",
+        "spawn_preference", "structure_influence",
+        "outer_island_abundance", "polar_transition_width",
+        "ocean_climate_strength", "prevailing_wind_strength"
+    );
 
     private final CreateWorldScreen parent;
     private final WorldgenAdapter worldgenAdapter;
@@ -79,6 +97,8 @@ public class GeoWorldV26PresetScreen extends Screen {
 
     private GeoWorldCreationConfig initialConfig;
     private ContinentPreset selectedPreset;
+    private WorldPreset selectedWorldPreset;
+    private Parameters selectedParameters;
     private boolean applyingPreset;
 
     private EditBox seedEdit;
@@ -89,7 +109,9 @@ public class GeoWorldV26PresetScreen extends Screen {
     private FractionSlider oceanSlider;
     private FractionSlider fragmentationSlider;
     private FractionSlider separationSlider;
+    private CycleButton<WorldPreset> worldPresetButton;
     private CycleButton<ContinentPreset> presetButton;
+    private final List<FractionSlider> parameterSliders = new ArrayList<>();
     private StringWidget statusText;
     private StringWidget spanText;
     private Button previewButton;
@@ -126,6 +148,8 @@ public class GeoWorldV26PresetScreen extends Screen {
             ? currentConfig
             : GeoWorldV26CreationSession.get(parent.getUiState());
         this.selectedPreset = this.initialConfig.continentPreset();
+        this.selectedWorldPreset = this.initialConfig.worldPreset();
+        this.selectedParameters = this.initialConfig.parameters();
     }
 
     @Override
@@ -169,6 +193,19 @@ public class GeoWorldV26PresetScreen extends Screen {
         );
         body.addChild(new StringWidget(SEED_LABEL, this.font));
         body.addChild(seedRow);
+
+        this.worldPresetButton = CycleButton
+            .builder(preset -> Component.translatable(preset.translationKey()), this.selectedWorldPreset)
+            .withValues(List.of(WorldPreset.values()))
+            .create(
+                0,
+                0,
+                310,
+                20,
+                WORLD_PRESET_LABEL,
+                (button, preset) -> this.applyWorldPreset(preset)
+            );
+        body.addChild(this.worldPresetButton);
 
         this.presetButton = CycleButton
             .builder(preset -> Component.translatable(preset.translationKey()), this.selectedPreset)
@@ -241,27 +278,61 @@ public class GeoWorldV26PresetScreen extends Screen {
             OCEAN_LABEL,
             this.initialConfig.oceanFraction(),
             0.10,
-            0.95
+            0.95,
+            this::onContinentSliderEdited
         );
         this.fragmentationSlider = addFractionSlider(
             body,
             FRAGMENTATION_LABEL,
             this.initialConfig.continentFragmentation(),
             0.05,
-            1.00
+            1.00,
+            this::onContinentSliderEdited
         );
         this.separationSlider = addFractionSlider(
             body,
             SEPARATION_LABEL,
             this.initialConfig.continentSeparation(),
             0.05,
-            1.00
+            1.00,
+            this::onContinentSliderEdited
         );
 
-        this.widthEdit.setResponder(value -> this.onConfigEdited());
-        this.heightEdit.setResponder(value -> this.onConfigEdited());
-        this.cellSizeEdit.setResponder(value -> this.onConfigEdited());
-        this.platesEdit.setResponder(value -> this.onConfigEdited());
+        body.addChild(new StringWidget(
+            Component.translatable("geoworld.create.parameters"),
+            this.font
+        ));
+        double[] parameterValues = this.selectedParameters.values();
+        this.parameterSliders.clear();
+        for (int i = 0; i < PARAMETER_IDS.size(); i++) {
+            String parameterId = PARAMETER_IDS.get(i);
+            double parameterMin =
+                parameterId.equals("spawn_preference") ||
+                parameterId.equals("structure_influence")
+                    ? 0.0
+                    : 0.25;
+            FractionSlider slider = addFractionSlider(
+                body,
+                Component.translatable("geoworld.parameter." + parameterId),
+                parameterValues[i],
+                parameterMin,
+                2.50,
+                this::onParameterEdited
+            );
+            slider.setTooltip(
+                Tooltip.create(
+                    Component.translatable(
+                        "geoworld.parameter." + parameterId + ".desc"
+                    )
+                )
+            );
+            this.parameterSliders.add(slider);
+        }
+
+        this.widthEdit.setResponder(value -> this.onDirectConfigEdited());
+        this.heightEdit.setResponder(value -> this.onDirectConfigEdited());
+        this.cellSizeEdit.setResponder(value -> this.onDirectConfigEdited());
+        this.platesEdit.setResponder(value -> this.onDirectConfigEdited());
 
         this.spanText = body.addChild(
             new StringWidget(Component.empty(), this.font)
@@ -337,7 +408,8 @@ public class GeoWorldV26PresetScreen extends Screen {
         Component label,
         double value,
         double min,
-        double max
+        double max,
+        Runnable onChanged
     ) {
         FractionSlider slider = new FractionSlider(
             310,
@@ -345,10 +417,49 @@ public class GeoWorldV26PresetScreen extends Screen {
             value,
             min,
             max,
-            this::onContinentSliderEdited
+            onChanged
         );
         body.addChild(slider);
         return slider;
+    }
+
+    private void applyWorldPreset(WorldPreset preset) {
+        this.selectedWorldPreset = preset;
+        if (preset == WorldPreset.CUSTOM) {
+            this.onConfigEdited();
+            return;
+        }
+        this.selectedParameters = Parameters.forPreset(preset);
+        this.applyingPreset = true;
+        try {
+            GeoWorldCreationConfig next = this.initialConfig
+                .withParameters(this.selectedParameters)
+                .withWorldPreset(preset);
+            if (this.widthEdit != null) this.widthEdit.setValue(Integer.toString(next.width()));
+            if (this.heightEdit != null) this.heightEdit.setValue(Integer.toString(next.height()));
+            double[] values = this.selectedParameters.values();
+            for (int i = 0; i < this.parameterSliders.size() && i < values.length; i++) {
+                this.parameterSliders.get(i).setActualValue(values[i]);
+            }
+            this.worldPresetButton.setValue(preset);
+        } finally {
+            this.applyingPreset = false;
+        }
+        this.onConfigEdited();
+    }
+
+    private void onParameterEdited() {
+        if (this.applyingPreset || this.parameterSliders.size() != PARAMETER_IDS.size()) {
+            return;
+        }
+        double[] values = new double[this.parameterSliders.size()];
+        for (int i = 0; i < values.length; i++) {
+            values[i] = this.parameterSliders.get(i).actualValue();
+        }
+        this.selectedParameters = Parameters.fromValues(values);
+        this.selectedWorldPreset = WorldPreset.CUSTOM;
+        this.worldPresetButton.setValue(WorldPreset.CUSTOM);
+        this.onConfigEdited();
     }
 
     private void applyPreset(ContinentPreset preset) {
@@ -380,6 +491,12 @@ public class GeoWorldV26PresetScreen extends Screen {
         );
         this.presetButton.setValue(this.selectedPreset);
         this.onConfigEdited();
+    }
+
+    private void onDirectConfigEdited() {
+        if (!this.applyingPreset) {
+            this.onConfigEdited();
+        }
     }
 
     private void onConfigEdited() {
@@ -425,13 +542,23 @@ public class GeoWorldV26PresetScreen extends Screen {
             // restore constructor-time defaults and invalidate the ready model.
             this.initialConfig = config;
             this.selectedPreset = config.continentPreset();
+            this.selectedWorldPreset = config.worldPreset();
+            this.selectedParameters = config.parameters();
             this.previewButton.active = !this.previewGenerating;
+            List<String> warningKeys = config.validationWarningKeys();
             this.spanText.setMessage(
-                Component.translatable(
-                    "geoworld.create.span",
-                    config.spanXBlocks(),
-                    config.spanZBlocks()
-                )
+                warningKeys.isEmpty()
+                    ? Component.translatable(
+                        "geoworld.create.span",
+                        config.spanXBlocks(),
+                        config.spanZBlocks()
+                    )
+                    : Component.translatable(
+                        "geoworld.create.span_warning",
+                        config.spanXBlocks(),
+                        config.spanZBlocks(),
+                        Component.translatable(warningKeys.get(0))
+                    )
             );
 
             long seed = this.syncSeedFromEditor();
@@ -659,6 +786,13 @@ public class GeoWorldV26PresetScreen extends Screen {
     }
 
     private GeoWorldCreationConfig readConfig() {
+        if (this.parameterSliders.size() == PARAMETER_IDS.size()) {
+            double[] values = new double[this.parameterSliders.size()];
+            for (int i = 0; i < values.length; i++) {
+                values[i] = this.parameterSliders.get(i).actualValue();
+            }
+            this.selectedParameters = Parameters.fromValues(values);
+        }
         double ocean = this.oceanSlider.actualValue();
         double fragmentation = this.fragmentationSlider.actualValue();
         double separation = this.separationSlider.actualValue();
@@ -676,7 +810,9 @@ public class GeoWorldV26PresetScreen extends Screen {
             ocean,
             fragmentation,
             separation,
-            preset
+            preset,
+            this.selectedWorldPreset,
+            this.selectedParameters
         );
     }
 

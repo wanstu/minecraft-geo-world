@@ -83,6 +83,49 @@ public final class GeoWorldV26SurfaceBiomeVerifier {
         assertTop("minecraft:swamp", "Wet Mud", "minecraft:mud");
         assertTop("minecraft:swamp", "Grass Loam", "minecraft:grass_block");
 
+        // v1.1.7 fixes the final-material realization of slope-derived
+        // Alpine Rock without changing older locked worlds.
+        assertRulesTop(
+            "minecraft:plains", "Alpine Rock",
+            "geoworld-rules-v1.1.6", "minecraft:grass_block"
+        );
+        assertRulesTop(
+            "minecraft:plains", "Alpine Rock",
+            "geoworld-rules-v1.1.7", "minecraft:stone"
+        );
+        assertRulesTop(
+            "minecraft:old_growth_spruce_taiga", "Alpine Rock",
+            "geoworld-rules-v1.1.6", "minecraft:podzol"
+        );
+        assertRulesTop(
+            "minecraft:old_growth_spruce_taiga", "Alpine Rock",
+            "geoworld-rules-v1.1.7", "minecraft:stone"
+        );
+        if (!"minecraft:dirt".equals(
+            GeoWorldV26SurfaceMaterials.belowForRules(
+                "minecraft:plains", "Alpine Rock", null,
+                128, 120, -256, 1, "geoworld-rules-v1.1.6"
+            )
+        )) {
+            throw new AssertionError("v1.1.6 alpine-rock subsoil changed");
+        }
+        if (!"minecraft:stone".equals(
+            GeoWorldV26SurfaceMaterials.belowForRules(
+                "minecraft:plains", "Alpine Rock", null,
+                128, 120, -256, 1, "geoworld-rules-v1.1.7"
+            )
+        )) {
+            throw new AssertionError("v1.1.7 alpine-rock subsoil is not stone");
+        }
+        if (!"minecraft:gravel".equals(
+            GeoWorldV26SurfaceMaterials.topForRules(
+                "minecraft:plains", "Alpine Rock", "minecraft:gravel",
+                "geoworld-rules-v1.1.7"
+            )
+        )) {
+            throw new AssertionError("shoreline override lost to alpine rock");
+        }
+
         if (!GeoWorldV26SurfaceMaterials.top(
             "minecraft:desert", "Alluvial Silt", "minecraft:sand"
         ).equals("minecraft:sand") ||
@@ -281,6 +324,24 @@ public final class GeoWorldV26SurfaceBiomeVerifier {
             throw new AssertionError(
                 "expected " + expected + " from " + biome +
                 " with soil " + profile + ", got " + actual
+            );
+        }
+    }
+
+    private static void assertRulesTop(
+        String biome,
+        String profile,
+        String rules,
+        String expected
+    ) {
+        String actual = GeoWorldV26SurfaceMaterials.topForRules(
+            biome, profile, null, rules
+        );
+        if (!expected.equals(actual)) {
+            throw new AssertionError(
+                "expected " + expected + " from " + biome +
+                " with soil " + profile + " under " + rules +
+                ", got " + actual
             );
         }
     }

@@ -513,15 +513,7 @@ func auditRuntimeProfile(model *generator.WorldModel) runtimeProfileDiagnostics 
 }
 
 func riverCenter(seg waterbed.RiverSegment, t float64) (float64, float64) {
-	t = math.Max(0, math.Min(1, t))
-	dx, dz := seg.X1-seg.X0, seg.Z1-seg.Z0
-	length := math.Hypot(dx, dz)
-	if length <= 1e-12 {
-		return seg.X0, seg.Z0
-	}
-	nx, nz := -dz/length, dx/length
-	offset := seg.MeanderOffset * math.Sin(math.Pi*t)
-	return seg.X0 + dx*t + nx*offset, seg.Z0 + dz*t + nz*offset
+	return waterbed.RiverCenterPoint(seg, t)
 }
 
 func auditMacroSlopes(m *terrain.Model, geometry world.GridGeometry) float64 {

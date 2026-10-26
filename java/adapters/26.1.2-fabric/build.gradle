@@ -39,6 +39,7 @@ sourceSets.main.java.srcDir '../../minecraft-v26-common/src/main/java'
 sourceSets.main.java.srcDir '../../minecraft-v26_1_2-common/src/main/java'
 
 sourceSets.main.resources.srcDir '../../minecraft-v26-common/src/main/resources'
+sourceSets.main.resources.srcDir '../../../acceptance/resources'
 
 // Shared Minecraft 26.1.2 assets/data are loader-neutral.
 sourceSets.main.resources.srcDir '../../minecraft-v26_1_2-common/src/main/resources'

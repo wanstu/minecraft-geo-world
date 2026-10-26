@@ -8,11 +8,14 @@ import geoworld.minecraft.common.creation.GeoWorldCreationConfig;
 import geoworld.minecraft.v26common.client.GeoWorldV26CreationSession;
 import geoworld.minecraft.v26common.client.GeoWorldV26ScreenNavigator;
 import geoworld.minecraft.common.creation.GeoWorldCreationConfig.ContinentPreset;
+import geoworld.minecraft.common.creation.GeoWorldCreationConfig.Parameters;
+import geoworld.minecraft.common.creation.GeoWorldCreationConfig.WorldPreset;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.StringWidget;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.layouts.CommonLayouts;
 import net.minecraft.client.gui.layouts.FrameLayout;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
@@ -27,6 +30,7 @@ import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -70,8 +74,24 @@ public class GeoWorld1_21_1PresetScreenBase extends Screen {
         Component.translatable("geoworld.create.fragmentation");
     private static final Component SEPARATION_LABEL =
         Component.translatable("geoworld.create.separation");
+    private static final Component WORLD_PRESET_LABEL =
+        Component.translatable("geoworld.create.world_preset");
     private static final Component PRESET_LABEL =
         Component.translatable("geoworld.create.continent_preset");
+    private static final List<String> PARAMETER_IDS = List.of(
+        "mainland_scale", "region_scale", "transition_width",
+        "mountain_strength", "plain_continuity", "plateau_scale",
+        "cliff_rarity", "rare_macro_terrain",
+        "river_density", "main_river_scale", "lake_abundance", "wetland_abundance",
+        "climate_region_scale", "climate_transition_width",
+        "rain_shadow_strength", "biome_continuity",
+        "cave_richness", "large_cave_rarity", "mineral_regionalization",
+        "spawn_preference", "structure_influence",
+        "outer_island_abundance", "polar_transition_width",
+        "ocean_climate_strength", "prevailing_wind_strength"
+    );
+    private static final int PARAMETER_PAGE_SIZE = 3;
+    private static final int PARAMETER_PAGE_COUNT = 9;
 
     private final CreateWorldScreen parent;
     private final WorldgenAdapter worldgenAdapter;
@@ -81,6 +101,9 @@ public class GeoWorld1_21_1PresetScreenBase extends Screen {
 
     private GeoWorldCreationConfig initialConfig;
     private ContinentPreset selectedPreset;
+    private WorldPreset selectedWorldPreset;
+    private Parameters selectedParameters;
+    private int parameterPage;
     private boolean applyingPreset;
 
     private EditBox seedEdit;
@@ -91,7 +114,10 @@ public class GeoWorld1_21_1PresetScreenBase extends Screen {
     private FractionSlider oceanSlider;
     private FractionSlider fragmentationSlider;
     private FractionSlider separationSlider;
+    private CycleButton<WorldPreset> worldPresetButton;
     private CycleButton<ContinentPreset> presetButton;
+    private CycleButton<Integer> parameterPageButton;
+    private final List<FractionSlider> parameterSliders = new ArrayList<>();
     private StringWidget statusText;
     private StringWidget spanText;
     private Button previewButton;
@@ -128,6 +154,8 @@ public class GeoWorld1_21_1PresetScreenBase extends Screen {
             ? currentConfig
             : GeoWorldV26CreationSession.get(parent.getUiState());
         this.selectedPreset = this.initialConfig.continentPreset();
+        this.selectedWorldPreset = this.initialConfig.worldPreset();
+        this.selectedParameters = this.initialConfig.parameters();
     }
 
     @Override
@@ -171,6 +199,22 @@ public class GeoWorld1_21_1PresetScreenBase extends Screen {
         );
         body.addChild(new StringWidget(SEED_LABEL, this.font));
         body.addChild(seedRow);
+
+        this.worldPresetButton = CycleButton
+            .<WorldPreset>builder(
+                preset -> Component.translatable(preset.translationKey())
+            )
+            .withInitialValue(this.selectedWorldPreset)
+            .withValues(WorldPreset.values())
+            .create(
+                0,
+                0,
+                310,
+                20,
+                WORLD_PRESET_LABEL,
+                (button, preset) -> this.applyWorldPreset(preset)
+            );
+        body.addChild(this.worldPresetButton);
 
         this.presetButton = CycleButton
             .<ContinentPreset>builder(
@@ -263,10 +307,56 @@ public class GeoWorld1_21_1PresetScreenBase extends Screen {
             1.00
         );
 
-        this.widthEdit.setResponder(value -> this.onConfigEdited());
-        this.heightEdit.setResponder(value -> this.onConfigEdited());
-        this.cellSizeEdit.setResponder(value -> this.onConfigEdited());
-        this.platesEdit.setResponder(value -> this.onConfigEdited());
+        this.parameterPageButton = CycleButton
+            .<Integer>builder(page -> Component.translatable(
+                "geoworld.create.parameter_page",
+                page + 1,
+                PARAMETER_PAGE_COUNT
+            ))
+            .withInitialValue(this.parameterPage)
+            .withValues(0, 1, 2, 3, 4, 5, 6, 7, 8)
+            .create(
+                0,
+                0,
+                310,
+                20,
+                Component.translatable("geoworld.create.parameters"),
+                (button, page) -> this.switchParameterPage(page)
+            );
+        body.addChild(this.parameterPageButton);
+        this.parameterSliders.clear();
+        double[] parameterValues = this.selectedParameters.values();
+        for (int slot = 0; slot < PARAMETER_PAGE_SIZE; slot++) {
+            int parameterIndex = this.parameterPage * PARAMETER_PAGE_SIZE + slot;
+            boolean valid = parameterIndex < PARAMETER_IDS.size();
+            String parameterId = valid ? PARAMETER_IDS.get(parameterIndex) : null;
+            FractionSlider slider = addFractionSlider(
+                body,
+                valid
+                    ? Component.translatable("geoworld.parameter." + parameterId)
+                    : Component.literal("—"),
+                valid ? parameterValues[parameterIndex] : 1.0,
+                valid ? parameterMinimum(parameterId) : 0.25,
+                2.50,
+                this::onParameterEdited
+            );
+            slider.active = valid;
+            slider.setTooltip(
+                Tooltip.create(
+                    valid
+                        ? Component.translatable(
+                            "geoworld.parameter." + parameterId + ".desc"
+                        )
+                        : Component.empty()
+                )
+            );
+            this.parameterSliders.add(slider);
+        }
+
+        this.widthEdit.setResponder(value -> this.onDirectConfigEdited());
+        this.heightEdit.setResponder(value -> this.onDirectConfigEdited());
+        this.cellSizeEdit.setResponder(value -> this.onDirectConfigEdited());
+        this.platesEdit.setResponder(value -> this.onDirectConfigEdited());
 
         this.spanText = body.addChild(
             new StringWidget(Component.empty(), this.font)
@@ -340,16 +430,120 @@ public class GeoWorld1_21_1PresetScreenBase extends Screen {
         double min,
         double max
     ) {
-        FractionSlider slider = new FractionSlider(
-            310,
+        return addFractionSlider(
+            body,
             label,
             value,
             min,
             max,
             this::onContinentSliderEdited
         );
+    }
+
+    private FractionSlider addFractionSlider(
+        LinearLayout body,
+        Component label,
+        double value,
+        double min,
+        double max,
+        Runnable onChanged
+    ) {
+        FractionSlider slider = new FractionSlider(
+            310,
+            label,
+            value,
+            min,
+            max,
+            onChanged
+        );
         body.addChild(slider);
         return slider;
+    }
+
+    private void applyWorldPreset(WorldPreset preset) {
+        this.selectedWorldPreset = preset;
+        if (preset == WorldPreset.CUSTOM) {
+            this.onConfigEdited();
+            return;
+        }
+        this.selectedParameters = Parameters.forPreset(preset);
+        this.applyingPreset = true;
+        try {
+            GeoWorldCreationConfig next = this.initialConfig
+                .withWorldPreset(preset);
+            this.widthEdit.setValue(Integer.toString(next.width()));
+            this.heightEdit.setValue(Integer.toString(next.height()));
+            this.refreshParameterPage();
+            this.worldPresetButton.setValue(preset);
+        } finally {
+            this.applyingPreset = false;
+        }
+        this.onConfigEdited();
+    }
+
+    private void switchParameterPage(int page) {
+        this.storeVisibleParameterValues();
+        this.parameterPage = Math.max(
+            0,
+            Math.min(PARAMETER_PAGE_COUNT - 1, page)
+        );
+        this.refreshParameterPage();
+    }
+
+    private void refreshParameterPage() {
+        if (this.parameterSliders.size() != PARAMETER_PAGE_SIZE) return;
+        double[] values = this.selectedParameters.values();
+        for (int slot = 0; slot < PARAMETER_PAGE_SIZE; slot++) {
+            int parameterIndex = this.parameterPage * PARAMETER_PAGE_SIZE + slot;
+            FractionSlider slider = this.parameterSliders.get(slot);
+            if (parameterIndex >= PARAMETER_IDS.size()) {
+                slider.setDefinition(Component.literal("—"), 0.25, 2.50, 1.0);
+                slider.setTooltip(Tooltip.create(Component.empty()));
+                slider.active = false;
+                continue;
+            }
+            String parameterId = PARAMETER_IDS.get(parameterIndex);
+            slider.active = true;
+            slider.setDefinition(
+                Component.translatable("geoworld.parameter." + parameterId),
+                parameterMinimum(parameterId),
+                2.50,
+                values[parameterIndex]
+            );
+            slider.setTooltip(
+                Tooltip.create(
+                    Component.translatable(
+                        "geoworld.parameter." + parameterId + ".desc"
+                    )
+                )
+            );
+        }
+    }
+
+    private void storeVisibleParameterValues() {
+        if (this.parameterSliders.size() != PARAMETER_PAGE_SIZE) return;
+        double[] values = this.selectedParameters.values();
+        for (int slot = 0; slot < PARAMETER_PAGE_SIZE; slot++) {
+            int parameterIndex = this.parameterPage * PARAMETER_PAGE_SIZE + slot;
+            if (parameterIndex >= PARAMETER_IDS.size()) continue;
+            values[parameterIndex] = this.parameterSliders.get(slot).actualValue();
+        }
+        this.selectedParameters = Parameters.fromValues(values);
+    }
+
+    private void onParameterEdited() {
+        if (this.applyingPreset) return;
+        this.storeVisibleParameterValues();
+        this.selectedWorldPreset = WorldPreset.CUSTOM;
+        this.worldPresetButton.setValue(WorldPreset.CUSTOM);
+        this.onConfigEdited();
+    }
+
+    private static double parameterMinimum(String parameterId) {
+        return parameterId.equals("spawn_preference") ||
+            parameterId.equals("structure_influence")
+            ? 0.0
+            : 0.25;
     }
 
     private void applyPreset(ContinentPreset preset) {
@@ -381,6 +575,12 @@ public class GeoWorld1_21_1PresetScreenBase extends Screen {
         );
         this.presetButton.setValue(this.selectedPreset);
         this.onConfigEdited();
+    }
+
+    private void onDirectConfigEdited() {
+        if (!this.applyingPreset) {
+            this.onConfigEdited();
+        }
     }
 
     private void onConfigEdited() {
@@ -426,13 +626,23 @@ public class GeoWorld1_21_1PresetScreenBase extends Screen {
             // restore constructor-time defaults and invalidate the ready model.
             this.initialConfig = config;
             this.selectedPreset = config.continentPreset();
+            this.selectedWorldPreset = config.worldPreset();
+            this.selectedParameters = config.parameters();
             this.previewButton.active = !this.previewGenerating;
+            List<String> warningKeys = config.validationWarningKeys();
             this.spanText.setMessage(
-                Component.translatable(
-                    "geoworld.create.span",
-                    config.spanXBlocks(),
-                    config.spanZBlocks()
-                )
+                warningKeys.isEmpty()
+                    ? Component.translatable(
+                        "geoworld.create.span",
+                        config.spanXBlocks(),
+                        config.spanZBlocks()
+                    )
+                    : Component.translatable(
+                        "geoworld.create.span_warning",
+                        config.spanXBlocks(),
+                        config.spanZBlocks(),
+                        Component.translatable(warningKeys.get(0))
+                    )
             );
 
             long seed = this.syncSeedFromEditor();
@@ -660,6 +870,7 @@ public class GeoWorld1_21_1PresetScreenBase extends Screen {
     }
 
     private GeoWorldCreationConfig readConfig() {
+        this.storeVisibleParameterValues();
         double ocean = this.oceanSlider.actualValue();
         double fragmentation = this.fragmentationSlider.actualValue();
         double separation = this.separationSlider.actualValue();
@@ -677,7 +888,9 @@ public class GeoWorld1_21_1PresetScreenBase extends Screen {
             ocean,
             fragmentation,
             separation,
-            preset
+            preset,
+            this.selectedWorldPreset,
+            this.selectedParameters
         );
     }
 
@@ -754,9 +967,9 @@ public class GeoWorld1_21_1PresetScreenBase extends Screen {
     private static final class FractionSlider extends AbstractSliderButton {
         private static final double STEP = 0.01;
 
-        private final Component label;
-        private final double min;
-        private final double max;
+        private Component label;
+        private double min;
+        private double max;
         private final Runnable onChanged;
 
         private FractionSlider(
@@ -777,6 +990,18 @@ public class GeoWorld1_21_1PresetScreenBase extends Screen {
 
         private double actualValue() {
             return snap(this.min + this.value * (this.max - this.min));
+        }
+
+        private void setDefinition(
+            Component label,
+            double min,
+            double max,
+            double actualValue
+        ) {
+            this.label = label;
+            this.min = min;
+            this.max = max;
+            this.setActualValue(actualValue);
         }
 
         private void setActualValue(double actualValue) {

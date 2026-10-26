@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -29,6 +30,7 @@ import (
 	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
+	"geoworld/internal/runtimeworld"
 	"geoworld/internal/terrain"
 	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
@@ -39,30 +41,36 @@ import (
 var webFiles embed.FS
 
 type activeWorld struct {
-	seed                   int64
-	geometry               world.GridGeometry
-	sample                 func(float64, float64) runtimeprofile.Sample
-	riverCount             int
-	lakeCount              int
-	plateCount             int
-	oceanFraction          float64
-	continentFragmentation float64
-	continentSeparation    float64
-	landComponents         int
-	majorLandComponents    int
-	largestLandShare       float64
-	finalRiverUpslope      int
-	finalLakeBedViolations int
-	finalCoastMismatch     int
-	runtimeFallback        int
-	runtimeMismatch        int
-	anomalies              anomalyReport
-	source                 string
-	model                  *generator.WorldModel
-	reopened               *worldmodelio.RuntimeModel
-	modelPath              string
-	generatedAt            time.Time
-	duration               time.Duration
+	seed                    int64
+	geometry                world.GridGeometry
+	sample                  func(float64, float64) runtimeprofile.Sample
+	riverCount              int
+	lakeCount               int
+	plateCount              int
+	oceanFraction           float64
+	continentFragmentation  float64
+	continentSeparation     float64
+	worldPreset             string
+	worldProfileVersion     string
+	generationRulesVersion  string
+	worldModelVersion       string
+	parameterSnapshotSHA256 string
+	parameterSnapshot       generator.ParameterSnapshot
+	landComponents          int
+	majorLandComponents     int
+	largestLandShare        float64
+	finalRiverUpslope       int
+	finalLakeBedViolations  int
+	finalCoastMismatch      int
+	runtimeFallback         int
+	runtimeMismatch         int
+	anomalies               anomalyReport
+	source                  string
+	model                   *generator.WorldModel
+	reopened                *worldmodelio.RuntimeModel
+	modelPath               string
+	generatedAt             time.Time
+	duration                time.Duration
 }
 
 const anomalyPointLimit = 250
@@ -111,6 +119,8 @@ type generateRequest struct {
 	OceanFraction          float64 `json:"oceanFraction"`
 	ContinentFragmentation float64 `json:"continentFragmentation"`
 	ContinentSeparation    float64 `json:"continentSeparation"`
+	WorldPreset            string  `json:"worldPreset"`
+	Parameters             string  `json:"parameters"`
 }
 
 type saveRequest struct {
@@ -258,6 +268,30 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	if req.OceanFraction == 0 {
 		req.OceanFraction = 0.68
 	}
+	if strings.TrimSpace(req.WorldPreset) == "" {
+		req.WorldPreset = "standard"
+	}
+	req.WorldPreset = strings.TrimSpace(req.WorldPreset)
+	switch req.WorldPreset {
+	case "standard", "natural", "civilization", "expansive", "epic", "near_vanilla", "custom":
+	default:
+		writeError(w, http.StatusBadRequest, fmt.Errorf("unknown world preset: %s", req.WorldPreset))
+		return
+	}
+	if req.WorldPreset == "custom" && strings.TrimSpace(req.Parameters) == "" {
+		writeError(w, http.StatusBadRequest, errors.New("custom world preset requires a complete 25-value parameter snapshot"))
+		return
+	}
+	worldProfile := generator.WorldProfileForPreset(req.WorldPreset)
+	if strings.TrimSpace(req.Parameters) != "" {
+		snapshot, err := generator.ParseParameterSnapshotCSV(req.Parameters)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		worldProfile.Preset = strings.TrimSpace(req.WorldPreset)
+		worldProfile.Parameters = snapshot
+	}
 	if req.Width < 16 || req.Height < 16 || req.Width > 1024 || req.Height > 1024 ||
 		req.CellSize <= 0 || req.PlateCount < 2 ||
 		req.OceanFraction <= 0 || req.OceanFraction >= 1 {
@@ -304,6 +338,7 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		model, err = generator.GenerateWorld(r.Context(), generator.Config{
 			Seed:                   req.Seed,
 			Geometry:               g,
+			WorldProfile:           worldProfile,
 			PlateCount:             req.PlateCount,
 			OceanFraction:          req.OceanFraction,
 			ContinentFragmentation: req.ContinentFragmentation,
@@ -326,24 +361,39 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err)
 		return
 	}
+	runtimeWorld, err := runtimeworld.NewGenerated(model)
+	if err != nil {
+		s.mu.Lock()
+		s.generating = false
+		s.lastError = err.Error()
+		s.mu.Unlock()
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	landComponents, majorLandComponents, largestLandShare := summarizeLand(model.Surface)
 	active := &activeWorld{
-		seed:                   model.Config.Seed,
-		geometry:               model.Geometry,
-		sample:                 model.RuntimeProfile.Sample,
-		riverCount:             len(model.Waterbed.Rivers),
-		lakeCount:              len(model.Waterbed.Lakes),
-		plateCount:             model.Config.Phase1.PlateCount,
-		oceanFraction:          model.Config.Phase1.OceanFraction,
-		continentFragmentation: model.Config.Phase1.ContinentFragmentation,
-		continentSeparation:    model.Config.Phase1.ContinentSeparation,
-		landComponents:         landComponents,
-		majorLandComponents:    majorLandComponents,
-		largestLandShare:       largestLandShare,
-		source:                 "generated",
-		model:                  model,
-		generatedAt:            time.Now(),
-		duration:               duration,
+		seed:                    model.Config.Seed,
+		geometry:                model.Geometry,
+		sample:                  runtimeWorld.Sample,
+		riverCount:              len(model.Waterbed.Rivers),
+		lakeCount:               len(model.Waterbed.Lakes),
+		plateCount:              model.Config.Phase1.PlateCount,
+		oceanFraction:           model.Config.Phase1.OceanFraction,
+		continentFragmentation:  model.Config.Phase1.ContinentFragmentation,
+		continentSeparation:     model.Config.Phase1.ContinentSeparation,
+		worldPreset:             model.Config.WorldProfile.Preset,
+		worldProfileVersion:     model.Config.WorldProfile.WorldProfileVersion,
+		generationRulesVersion:  model.Config.WorldProfile.GenerationRulesVersion,
+		worldModelVersion:       model.Config.WorldProfile.WorldModelVersion,
+		parameterSnapshotSHA256: parameterSnapshotSHA256(model.Config.WorldProfile.Parameters),
+		parameterSnapshot:       model.Config.WorldProfile.Parameters,
+		landComponents:          landComponents,
+		majorLandComponents:     majorLandComponents,
+		largestLandShare:        largestLandShare,
+		source:                  "generated",
+		model:                   model,
+		generatedAt:             time.Now(),
+		duration:                duration,
 	}
 	applyAnomalyReport(active, buildAnomalyReport(active))
 	s.mu.Lock()
@@ -522,24 +572,51 @@ func (s *appState) handleLoad(w http.ResponseWriter, r *http.Request, modelDir s
 	if separation == 0 {
 		separation = phase1.DefaultContinentSeparation
 	}
+	loadedPreset := model.Manifest.Preset
+	if loadedPreset == "" {
+		loadedPreset = "legacy"
+	}
+	loadedProfileVersion := model.Manifest.WorldProfileVersion
+	if loadedProfileVersion == "" {
+		loadedProfileVersion = "legacy-rc1"
+	}
+	loadedRulesVersion := model.Manifest.GenerationRulesVersion
+	if loadedRulesVersion == "" {
+		loadedRulesVersion = "legacy-rc1"
+	}
+	loadedModelVersion := model.Manifest.WorldModelVersion
+	if loadedModelVersion == "" {
+		loadedModelVersion = "legacy-model-v1"
+	}
+	runtimeWorld, err := runtimeworld.NewReopened(model)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	active := &activeWorld{
-		seed:                   model.Manifest.Seed,
-		geometry:               model.Geometry,
-		sample:                 model.RuntimeProfile.Sample,
-		riverCount:             len(model.Waterbed.Rivers),
-		lakeCount:              len(model.Waterbed.Lakes),
-		plateCount:             model.Config.Phase1.PlateCount,
-		oceanFraction:          model.Config.Phase1.OceanFraction,
-		continentFragmentation: fragmentation,
-		continentSeparation:    separation,
-		landComponents:         landComponents,
-		majorLandComponents:    majorLandComponents,
-		largestLandShare:       largestLandShare,
-		source:                 "reopened",
-		reopened:               model,
-		modelPath:              path,
-		generatedAt:            time.Now(),
-		duration:               time.Since(start),
+		seed:                    model.Manifest.Seed,
+		geometry:                model.Geometry,
+		sample:                  runtimeWorld.Sample,
+		riverCount:              len(model.Waterbed.Rivers),
+		lakeCount:               len(model.Waterbed.Lakes),
+		plateCount:              model.Config.Phase1.PlateCount,
+		oceanFraction:           model.Config.Phase1.OceanFraction,
+		continentFragmentation:  fragmentation,
+		continentSeparation:     separation,
+		worldPreset:             loadedPreset,
+		worldProfileVersion:     loadedProfileVersion,
+		generationRulesVersion:  loadedRulesVersion,
+		worldModelVersion:       loadedModelVersion,
+		parameterSnapshotSHA256: model.Manifest.ParameterSnapshotSHA256,
+		parameterSnapshot:       model.Config.WorldProfile.Parameters,
+		landComponents:          landComponents,
+		majorLandComponents:     majorLandComponents,
+		largestLandShare:        largestLandShare,
+		source:                  "reopened",
+		reopened:                model,
+		modelPath:               path,
+		generatedAt:             time.Now(),
+		duration:                time.Since(start),
 	}
 	applyAnomalyReport(active, buildAnomalyReport(active))
 	active.duration = time.Since(start)
@@ -796,6 +873,13 @@ func activeSummary(a *activeWorld) map[string]any {
 		"oceanFraction":           a.oceanFraction,
 		"continentFragmentation":  a.continentFragmentation,
 		"continentSeparation":     a.continentSeparation,
+		"worldPreset":             a.worldPreset,
+		"worldProfileVersion":     a.worldProfileVersion,
+		"generationRulesVersion":  a.generationRulesVersion,
+		"worldModelVersion":       a.worldModelVersion,
+		"parameterSnapshotSha256": a.parameterSnapshotSHA256,
+		"parameterSnapshot":       a.parameterSnapshot,
+		"parameterCsv":            parameterSnapshotCSV(a.parameterSnapshot),
 		"landComponents":          a.landComponents,
 		"majorLandComponents":     a.majorLandComponents,
 		"largestLandShare":        a.largestLandShare,
@@ -1363,18 +1447,7 @@ func diagnosticRiverCenter(
 	segment waterbed.RiverSegment,
 	t float64,
 ) (float64, float64) {
-	t = math.Max(0, math.Min(1, t))
-	dx := segment.X1 - segment.X0
-	dz := segment.Z1 - segment.Z0
-	length := math.Hypot(dx, dz)
-	if length <= 1e-12 || math.Abs(segment.MeanderOffset) <= 1e-12 {
-		return segment.X0 + dx*t, segment.Z0 + dz*t
-	}
-	nx := -dz / length
-	nz := dx / length
-	offset := segment.MeanderOffset * math.Sin(math.Pi*t)
-	return segment.X0 + dx*t + nx*offset,
-		segment.Z0 + dz*t + nz*offset
+	return waterbed.RiverCenterPoint(segment, t)
 }
 
 func diagnosticWorldToPixel(g world.GridGeometry, b image.Rectangle, x, z float64) (int, int) {
@@ -1734,6 +1807,35 @@ func maxInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func parameterSnapshotCSV(snapshot generator.ParameterSnapshot) string {
+	values := []float64{
+		snapshot.MainlandScale, snapshot.RegionScale, snapshot.TransitionWidth,
+		snapshot.MountainStrength, snapshot.PlainContinuity, snapshot.PlateauScale,
+		snapshot.CliffRarity, snapshot.RareMacroTerrain, snapshot.RiverDensity,
+		snapshot.MainRiverScale, snapshot.LakeAbundance, snapshot.WetlandAbundance,
+		snapshot.ClimateRegionScale, snapshot.ClimateTransitionWidth,
+		snapshot.RainShadowStrength, snapshot.BiomeContinuity, snapshot.CaveRichness,
+		snapshot.LargeCaveRarity, snapshot.MineralRegionalization,
+		snapshot.SpawnPreference, snapshot.StructureInfluence,
+		snapshot.OuterIslandAbundance, snapshot.PolarTransitionWidth,
+		snapshot.OceanClimateStrength, snapshot.PrevailingWindStrength,
+	}
+	parts := make([]string, len(values))
+	for i, value := range values {
+		parts[i] = strconv.FormatFloat(value, 'f', 6, 64)
+	}
+	return strings.Join(parts, ",")
+}
+
+func parameterSnapshotSHA256(snapshot generator.ParameterSnapshot) string {
+	payload, err := json.Marshal(snapshot)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(payload)
+	return fmt.Sprintf("%x", sum[:])
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

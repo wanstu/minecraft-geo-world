@@ -29,40 +29,55 @@ public final class GeoWorldV26SpawnVerifier {
             );
         }
 
-        GeoWorldSpawnPlanner.Candidate origin =
-            GeoWorldSpawnPlanner.find(runtime);
-        GeoWorldV1.RuntimeSample spawn = runtime.sample(
-            origin.blockX(),
-            origin.blockZ()
-        );
-
-        if (!spawn.sourceLand()) {
-            throw new AssertionError("spawn is not source land: " + spawn);
-        }
-        if (!"None".equals(spawn.waterKind())) {
+        double defaultInfluence = runtime
+            .worldProfile()
+            .parameters()
+            .spawnPreference();
+        GeoWorldSpawnPlanner.Candidate disabled =
+            GeoWorldSpawnPlanner.find(runtime, 0.0);
+        if (
+            disabled.chunkX() != 0 ||
+            disabled.chunkZ() != 0 ||
+            disabled.blockX() != 8 ||
+            disabled.blockZ() != 8
+        ) {
             throw new AssertionError(
-                "spawn contains water: " + spawn.waterKind()
+                "spawn preference 0 must disable GeoWorld origin bias: " +
+                disabled
             );
         }
 
-        int[] offsets = {-12, 0, 12};
-        for (int dz : offsets) {
-            for (int dx : offsets) {
-                GeoWorldV1.RuntimeSample neighbor = runtime.sample(
-                    origin.blockX() + dx,
-                    origin.blockZ() + dz
-                );
-                if (
-                    !neighbor.sourceLand() ||
-                    !"None".equals(neighbor.waterKind())
-                ) {
-                    throw new AssertionError(
-                        "spawn neighborhood unsafe at " +
-                        (origin.blockX() + dx) + "," +
-                        (origin.blockZ() + dz) + ": " + neighbor
-                    );
-                }
-            }
+        GeoWorldSpawnPlanner.Candidate origin =
+            GeoWorldSpawnPlanner.find(runtime, defaultInfluence);
+        if (
+            origin.chunkX() == disabled.chunkX() &&
+            origin.chunkZ() == disabled.chunkZ()
+        ) {
+            throw new AssertionError(
+                "default spawn preference did not move the ocean-center " +
+                "regression seed onto habitable mainland"
+            );
+        }
+        GeoWorldV1.RuntimeSample spawn = assertSafeSpawn(
+            runtime,
+            origin,
+            runtime.manifest().seaLevelNormalized()
+        );
+
+        GeoWorldSpawnPlanner.Candidate strong =
+            GeoWorldSpawnPlanner.find(runtime, 2.5);
+        assertSafeSpawn(
+            runtime,
+            strong,
+            runtime.manifest().seaLevelNormalized()
+        );
+        GeoWorldSpawnPlanner.Candidate strongAgain =
+            GeoWorldSpawnPlanner.find(runtime, 2.5);
+        if (!strong.equals(strongAgain)) {
+            throw new AssertionError(
+                "spawn planner is not deterministic at fixed influence: " +
+                strong + " vs " + strongAgain
+            );
         }
 
         HeightMapping heights = profile.heightMapping();
@@ -70,7 +85,8 @@ public final class GeoWorldV26SpawnVerifier {
 
         System.out.printf(
             "GeoWorld spawn verification passed: seed=%d, center=%s/%s, " +
-            "originChunk=%d,%d, spawn=%d,%d,%d, biome=%s, ground=%.6f, score=%.6f%n",
+            "originChunk=%d,%d, spawn=%d,%d,%d, biome=%s, ground=%.6f, score=%.6f, " +
+            "influence=%.2f, strongChunk=%d,%d%n",
             OCEAN_CENTER_SEED,
             center.waterKind(),
             center.biomeFamily(),
@@ -81,7 +97,44 @@ public final class GeoWorldV26SpawnVerifier {
             origin.blockZ(),
             spawn.biomeFamily(),
             spawn.groundHeight(),
-            origin.score()
+            origin.score(),
+            defaultInfluence,
+            strong.chunkX(),
+            strong.chunkZ()
         );
+    }
+
+    private static GeoWorldV1.RuntimeSample assertSafeSpawn(
+        GeoWorldV1 runtime,
+        GeoWorldSpawnPlanner.Candidate origin,
+        double sea
+    ) {
+        GeoWorldV1.RuntimeSample spawn = runtime.sample(
+            origin.blockX(),
+            origin.blockZ()
+        );
+        if (!GeoWorldSpawnPlanner.isSpawnLand(spawn, sea)) {
+            throw new AssertionError(
+                "spawn is not safe habitable land: " + spawn
+            );
+        }
+
+        int[] offsets = {-12, 0, 12};
+        for (int dz : offsets) {
+            for (int dx : offsets) {
+                GeoWorldV1.RuntimeSample neighbor = runtime.sample(
+                    origin.blockX() + dx,
+                    origin.blockZ() + dz
+                );
+                if (!GeoWorldSpawnPlanner.isSpawnLand(neighbor, sea)) {
+                    throw new AssertionError(
+                        "spawn neighborhood unsafe at " +
+                        (origin.blockX() + dx) + "," +
+                        (origin.blockZ() + dz) + ": " + neighbor
+                    );
+                }
+            }
+        }
+        return spawn;
     }
 }

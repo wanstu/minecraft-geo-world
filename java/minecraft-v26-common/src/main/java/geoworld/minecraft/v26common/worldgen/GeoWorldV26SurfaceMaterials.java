@@ -98,6 +98,55 @@ public final class GeoWorldV26SurfaceMaterials {
         };
     }
 
+    public static String topForRules(
+        String biome,
+        String profile,
+        String shoreline,
+        String generationRulesVersion
+    ) {
+        if (shoreline != null) return shoreline;
+        Cover cover = cover(biome);
+        if (
+            "geoworld-rules-v1.1.7".equals(generationRulesVersion) &&
+            "Alpine Rock".equals(profile) &&
+            (cover == Cover.GRASS || cover == Cover.PODZOL)
+        ) {
+            return "minecraft:stone";
+        }
+        return top(biome, profile, null);
+    }
+
+    public static String belowForRules(
+        String biome,
+        String profile,
+        String shoreUnder,
+        int blockX,
+        int y,
+        int blockZ,
+        int depth,
+        String generationRulesVersion
+    ) {
+        if (shoreUnder != null && depth <= 2) return shoreUnder;
+        Cover cover = cover(biome);
+        if (
+            depth <= 3 &&
+            "geoworld-rules-v1.1.7".equals(generationRulesVersion) &&
+            "Alpine Rock".equals(profile) &&
+            (cover == Cover.GRASS || cover == Cover.PODZOL)
+        ) {
+            return "minecraft:stone";
+        }
+        return below(
+            biome,
+            profile,
+            shoreUnder,
+            blockX,
+            y,
+            blockZ,
+            depth
+        );
+    }
+
     public static String below(
         String biome, String profile, String shoreUnder,
         int blockX, int y, int blockZ, int depth

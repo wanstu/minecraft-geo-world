@@ -8,12 +8,18 @@ import (
 	"reflect"
 	"testing"
 
+	"geoworld/internal/runtimeworld"
 	"geoworld/internal/worldmodelio"
 )
 
 func loadGoldenDocument(t *testing.T) Document {
 	t.Helper()
-	path := filepath.Join("testdata", "runtime-v1.json")
+	return loadGoldenDocumentFile(t, "runtime-v1.json")
+}
+
+func loadGoldenDocumentFile(t *testing.T, name string) Document {
+	t.Helper()
+	path := filepath.Join("testdata", name)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -35,6 +41,82 @@ func loadGoldenDocument(t *testing.T) Document {
 		t.Fatalf("invalid tolerance: %g", doc.FloatTolerance)
 	}
 	return doc
+}
+
+func TestPROFILE06NaturalResultChangesRequireVersionChange(t *testing.T) {
+	want := loadGoldenDocumentFile(t, "runtime-rules-v1.1.json")
+	committed, err := worldmodelio.Load(filepath.Join("testdata", "runtime-rules-v1.1.geoworld"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	freshModel, err := GenerateFixture(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := Build(freshModel)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	changed := !sameGoldenResults(fresh, want)
+	versionChanged :=
+		freshModel.Config.WorldProfile.WorldProfileVersion != committed.Manifest.WorldProfileVersion ||
+			freshModel.Config.WorldProfile.GenerationRulesVersion != committed.Manifest.GenerationRulesVersion ||
+			freshModel.Config.WorldProfile.WorldModelVersion != committed.Manifest.WorldModelVersion
+	if changed && !versionChanged {
+		t.Fatalf(
+			"natural results changed without profile/rules/model version change: profile=%s rules=%s model=%s",
+			committed.Manifest.WorldProfileVersion,
+			committed.Manifest.GenerationRulesVersion,
+			committed.Manifest.WorldModelVersion,
+		)
+	}
+}
+
+func TestPROFILE07PureOptimizationKeepsLockedProfileResults(t *testing.T) {
+	want := loadGoldenDocument(t)
+	committed, err := worldmodelio.Load(filepath.Join("testdata", "runtime-v1.geoworld"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	freshModel, err := GenerateFixture(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := Build(freshModel)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sameVersion :=
+		freshModel.Config.WorldProfile.WorldProfileVersion == committed.Manifest.WorldProfileVersion &&
+			freshModel.Config.WorldProfile.GenerationRulesVersion == committed.Manifest.GenerationRulesVersion &&
+			freshModel.Config.WorldProfile.WorldModelVersion == committed.Manifest.WorldModelVersion
+	if !sameVersion {
+		t.Skip("current generator intentionally uses a different locked profile/rules/model version")
+	}
+	if !sameGoldenResults(fresh, want) {
+		t.Fatal("same locked profile/rules/model version changed natural results")
+	}
+}
+
+func sameGoldenResults(got, want Document) bool {
+	if len(got.Cases) != len(want.Cases) {
+		return false
+	}
+	for i := range want.Cases {
+		gotCase, wantCase := got.Cases[i], want.Cases[i]
+		if gotCase.Name != wantCase.Name ||
+			gotCase.Category != wantCase.Category ||
+			gotCase.X != wantCase.X ||
+			gotCase.Z != wantCase.Z {
+			return false
+		}
+		if CompareSample(gotCase.Expected, wantCase.Expected, want.FloatTolerance) != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func TestCommittedGoldenDocumentMatchesFreshGeneration(t *testing.T) {
@@ -84,10 +166,123 @@ func TestCommittedGoldenModelMatchesGoldenDocument(t *testing.T) {
 		t.Fatalf("golden model metadata does not match golden document: manifest=%+v source=%+v", model.Manifest, doc.Source)
 	}
 
+	runtimeWorld, err := runtimeworld.NewReopened(model)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, testCase := range doc.Cases {
-		got := FromRuntimeSample(model.RuntimeProfile.Sample(testCase.X, testCase.Z))
+		got := FromRuntimeSample(runtimeWorld.Sample(testCase.X, testCase.Z))
 		if err := CompareSample(got, testCase.Expected, doc.FloatTolerance); err != nil {
 			t.Fatalf("%s (%s) at %.6f,%.6f: %v", testCase.Name, testCase.Category, testCase.X, testCase.Z, err)
+		}
+	}
+}
+
+func TestLegacyV11GoldenModelRemainsLocked(t *testing.T) {
+	doc := loadGoldenDocumentFile(t, "runtime-rules-v1.1.json")
+	model, err := worldmodelio.Load(filepath.Join("testdata", "runtime-rules-v1.1.geoworld"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtimeWorld, err := runtimeworld.NewReopened(model)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, testCase := range doc.Cases {
+		got := FromRuntimeSample(runtimeWorld.Sample(testCase.X, testCase.Z))
+		if err := CompareSample(got, testCase.Expected, doc.FloatTolerance); err != nil {
+			t.Fatalf(
+				"legacy v1.1 changed for %s (%s) at %.6f,%.6f: %v",
+				testCase.Name,
+				testCase.Category,
+				testCase.X,
+				testCase.Z,
+				err,
+			)
+		}
+	}
+}
+
+func TestLegacyV113GoldenModelRemainsLocked(t *testing.T) {
+	doc := loadGoldenDocumentFile(t, "runtime-rules-v1.1.3.json")
+	model, err := worldmodelio.Load(filepath.Join("testdata", "runtime-rules-v1.1.3.geoworld"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := model.Manifest.GenerationRulesVersion; got != "geoworld-rules-v1.1.3" {
+		t.Fatalf("legacy v1.1.3 rules=%q want geoworld-rules-v1.1.3", got)
+	}
+	runtimeWorld, err := runtimeworld.NewReopened(model)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, testCase := range doc.Cases {
+		got := FromRuntimeSample(runtimeWorld.Sample(testCase.X, testCase.Z))
+		if err := CompareSample(got, testCase.Expected, doc.FloatTolerance); err != nil {
+			t.Fatalf(
+				"legacy v1.1.3 changed for %s (%s) at %.6f,%.6f: %v",
+				testCase.Name,
+				testCase.Category,
+				testCase.X,
+				testCase.Z,
+				err,
+			)
+		}
+	}
+}
+
+func TestLegacyV114GoldenModelRemainsLocked(t *testing.T) {
+	doc := loadGoldenDocumentFile(t, "runtime-rules-v1.1.4.json")
+	model, err := worldmodelio.Load(filepath.Join("testdata", "runtime-rules-v1.1.4.geoworld"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := model.Manifest.GenerationRulesVersion; got != "geoworld-rules-v1.1.4" {
+		t.Fatalf("legacy v1.1.4 rules=%q want geoworld-rules-v1.1.4", got)
+	}
+	runtimeWorld, err := runtimeworld.NewReopened(model)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, testCase := range doc.Cases {
+		got := FromRuntimeSample(runtimeWorld.Sample(testCase.X, testCase.Z))
+		if err := CompareSample(got, testCase.Expected, doc.FloatTolerance); err != nil {
+			t.Fatalf(
+				"legacy v1.1.4 changed for %s (%s) at %.6f,%.6f: %v",
+				testCase.Name,
+				testCase.Category,
+				testCase.X,
+				testCase.Z,
+				err,
+			)
+		}
+	}
+}
+
+func TestLegacyV115GoldenModelRemainsLocked(t *testing.T) {
+	doc := loadGoldenDocumentFile(t, "runtime-rules-v1.1.5.json")
+	model, err := worldmodelio.Load(filepath.Join("testdata", "runtime-rules-v1.1.5.geoworld"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := model.Manifest.GenerationRulesVersion; got != "geoworld-rules-v1.1.5" {
+		t.Fatalf("legacy v1.1.5 rules=%q want geoworld-rules-v1.1.5", got)
+	}
+	runtimeWorld, err := runtimeworld.NewReopened(model)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, testCase := range doc.Cases {
+		got := FromRuntimeSample(runtimeWorld.Sample(testCase.X, testCase.Z))
+		if err := CompareSample(got, testCase.Expected, doc.FloatTolerance); err != nil {
+			t.Fatalf(
+				"legacy v1.1.5 changed for %s (%s) at %.6f,%.6f: %v",
+				testCase.Name,
+				testCase.Category,
+				testCase.X,
+				testCase.Z,
+				err,
+			)
 		}
 	}
 }
@@ -103,6 +298,7 @@ func TestGoldenCoverageIncludesRequiredCrossLanguageCases(t *testing.T) {
 		"coast":             false,
 		"river-mouth":       false,
 		"lake":              false,
+		"outer-extension":   false,
 	}
 	byName := make(map[string]Case, len(doc.Cases))
 	for _, testCase := range doc.Cases {

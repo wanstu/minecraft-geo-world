@@ -28,6 +28,7 @@ type Config struct {
 	OceanSeasonalityBaseC           float64
 	OceanSeasonalityLatitudeC       float64
 	MonsoonWindStrength             float64
+	PrevailingWindStrength          float64
 	SeasonalMoistureTempCoupling    float64
 	SeasonalSeaSurfaceTempCoupling  float64
 	SeasonalBackgroundMoistureBlend float64

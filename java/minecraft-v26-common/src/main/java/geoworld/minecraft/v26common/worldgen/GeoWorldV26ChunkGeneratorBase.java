@@ -77,8 +77,12 @@ public abstract class GeoWorldV26ChunkGeneratorBase
             return current;
         }
 
+        GeoWorldV1 model = this.ensureModel(seed);
         GeoWorldSpawnPlanner.Candidate candidate =
-            GeoWorldSpawnPlanner.find(this.ensureModel(seed));
+            GeoWorldSpawnPlanner.find(
+                model,
+                model.worldProfile().parameters().spawnPreference()
+            );
         ChunkPos found = new ChunkPos(
             candidate.chunkX(),
             candidate.chunkZ()

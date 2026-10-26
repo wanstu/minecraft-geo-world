@@ -15,7 +15,9 @@ import (
 	"geoworld/internal/landform"
 	"geoworld/internal/mcprofile"
 	"geoworld/internal/phase1"
+	"geoworld/internal/reconcile"
 	"geoworld/internal/terrain"
+	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
 )
 
@@ -47,6 +49,7 @@ func TestGenerateWorldMatchesManualPipeline(t *testing.T) {
 		SeaLevelNormalized: world.DefaultSeaLevelNormalized,
 		PlateCount:         cfg.PlateCount, OceanFraction: cfg.OceanFraction,
 		EdgeOceanBufferFraction: 0.04,
+		RareMacroStrength:       1,
 	})
 	c, err := climate.Generate(climate.InputFromPhase1(p1), climate.Config{SeaLevelNormalized: world.DefaultSeaLevelNormalized})
 	if err != nil {
@@ -76,7 +79,13 @@ func TestGenerateWorldMatchesManualPipeline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tr, err := terrain.Generate(terrain.InputFromModels(e, l, g), terrain.Config{Seed: cfg.Seed})
+	tr, err := terrain.Generate(
+		terrain.InputFromModels(e, l, g),
+		terrain.Config{
+			Seed:              cfg.Seed,
+			RareMacroStrength: 1,
+		},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,6 +216,163 @@ func TestGenerateWorldStoresResolvedConfig(t *testing.T) {
 			t.Fatalf("river constraints were not rebuilt from coast terrain at %v", node)
 		}
 	}
+}
+
+func TestRiverDepthDefaultsAreGenerationRuleLocked(t *testing.T) {
+	currentCfg := testConfig(2026)
+	currentCfg.WorldProfile = StandardWorldProfile()
+	current, err := resolveTopLevelConfig(currentCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := current.Waterbed.MinRiverBedDepthNormalized; math.Abs(got-0.006) > 1e-12 {
+		t.Fatalf("current river bed depth=%v want=0.006", got)
+	}
+	if got := current.WorldSample.RiverCenterDepthNormalized; math.Abs(got-0.004) > 1e-12 {
+		t.Fatalf("current river center depth=%v want=0.004", got)
+	}
+	if got := current.Waterbed.RiverGeometryVersion; got != 2 {
+		t.Fatalf("current river geometry version=%d want=2", got)
+	}
+	if got := current.Waterbed.LakeGeometryVersion; got != 1 {
+		t.Fatalf("current lake geometry version=%d want=1", got)
+	}
+	if got := current.Terrain.RareMacroStrength; math.Abs(got-1) > 1e-12 {
+		t.Fatalf("current rare macro strength=%v want=1", got)
+	}
+	if got := current.Terrain.MountainStrengthScale; math.Abs(got-1) > 1e-12 {
+		t.Fatalf("current mountain strength scale=%v want=1", got)
+	}
+
+	lockedV116Cfg := testConfig(2026)
+	lockedV116Cfg.WorldProfile = StandardWorldProfile()
+	lockedV116Cfg.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.6"
+	lockedV116, err := resolveTopLevelConfig(lockedV116Cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := lockedV116.Waterbed.MinRiverBedDepthNormalized; math.Abs(got-0.006) > 1e-12 {
+		t.Fatalf("locked v1.1.6 river bed depth=%v want=0.006", got)
+	}
+	if got := lockedV116.WorldSample.RiverCenterDepthNormalized; math.Abs(got-0.004) > 1e-12 {
+		t.Fatalf("locked v1.1.6 river center depth=%v want=0.004", got)
+	}
+	if got := lockedV116.Waterbed.RiverGeometryVersion; got != 1 {
+		t.Fatalf("locked v1.1.6 river geometry version=%d want=1", got)
+	}
+	if got := lockedV116.Waterbed.LakeGeometryVersion; got != 0 {
+		t.Fatalf("locked v1.1.6 lake geometry version=%d want=0", got)
+	}
+	if got := lockedV116.Terrain.RareMacroStrength; got != 0 {
+		t.Fatalf("locked v1.1.6 rare macro strength=%v want=0", got)
+	}
+	if got := lockedV116.Terrain.MountainStrengthScale; got != 0 {
+		t.Fatalf("locked v1.1.6 mountain strength scale=%v want=0", got)
+	}
+
+	lockedV114Cfg := testConfig(2026)
+	lockedV114Cfg.WorldProfile = StandardWorldProfile()
+	lockedV114Cfg.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.4"
+	lockedV114, err := resolveTopLevelConfig(lockedV114Cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := lockedV114.Waterbed.MinRiverBedDepthNormalized; math.Abs(got-0.006) > 1e-12 {
+		t.Fatalf("locked v1.1.4 river bed depth=%v want=0.006", got)
+	}
+	if got := lockedV114.WorldSample.RiverCenterDepthNormalized; math.Abs(got-0.004) > 1e-12 {
+		t.Fatalf("locked v1.1.4 river center depth=%v want=0.004", got)
+	}
+	if got := lockedV114.Waterbed.RiverGeometryVersion; got != 0 {
+		t.Fatalf("locked v1.1.4 river geometry version=%d want=0", got)
+	}
+
+	lockedCfg := testConfig(2026)
+	lockedCfg.WorldProfile = StandardWorldProfile()
+	lockedCfg.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.3"
+	locked, err := resolveTopLevelConfig(lockedCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := locked.Waterbed.MinRiverBedDepthNormalized; math.Abs(got-0.004) > 1e-12 {
+		t.Fatalf("locked v1.1.3 river bed depth=%v want=0.004", got)
+	}
+	if got := locked.WorldSample.RiverCenterDepthNormalized; math.Abs(got-0.0025) > 1e-12 {
+		t.Fatalf("locked v1.1.3 river center depth=%v want=0.0025", got)
+	}
+}
+
+func TestV115OrdinaryRiverInnerWetCoreHasNoDryHoles(t *testing.T) {
+	const (
+		seed      = int64(123456)
+		cell      = 128.0
+		width     = 320
+		height    = 200
+		coreRatio = 0.80
+	)
+	cfg := Config{
+		Seed: seed,
+		Geometry: world.GridGeometry{
+			Width: width, Height: height,
+			OriginX:     -float64(width-1) * cell / 2,
+			OriginZ:     -float64(height-1) * cell / 2,
+			SpanXBlocks: float64(width-1) * cell,
+			SpanZBlocks: float64(height-1) * cell,
+		},
+		PlateCount:             18,
+		OceanFraction:          0.68,
+		ContinentFragmentation: 0.35,
+		ContinentSeparation:    0.65,
+		WorldProfile:           StandardWorldProfile(),
+	}
+	m, err := GenerateWorld(context.Background(), cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	samples := 0
+	dry := 0
+	for _, seg := range m.Waterbed.Rivers {
+		if seg.MouthExpansionVersion < 4 ||
+			seg.HalfWidth < 8 ||
+			seg.OceanMouth ||
+			seg.LakeMouth ||
+			seg.LakeOutlet ||
+			math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0) < 80 {
+			continue
+		}
+		for step := 2; step <= 8; step++ {
+			tAlong := float64(step) / 10
+			cx, cz, nx, nz := riverFrameForWetCoreTest(seg, tAlong)
+			for lateral := -8; lateral <= 8; lateral++ {
+				offset := float64(lateral) / 10 * seg.HalfWidth
+				q := m.Runtime.Sample(cx+nx*offset, cz+nz*offset)
+				samples++
+				if !q.WaterSurfaceDefined ||
+					q.WaterKind == reconcile.WaterNone {
+					dry++
+				}
+			}
+		}
+	}
+	if samples < 10000 {
+		t.Fatalf("wet-core regression sampled only %d points", samples)
+	}
+	if dry != 0 {
+		t.Fatalf(
+			"v1.1.5 ordinary river inner %.0f%% wet core has %d dry holes across %d samples",
+			coreRatio*100,
+			dry,
+			samples,
+		)
+	}
+}
+
+func riverFrameForWetCoreTest(
+	seg waterbed.RiverSegment,
+	t float64,
+) (float64, float64, float64, float64) {
+	return waterbed.RiverCenterFrame(seg, t)
 }
 
 func TestGenerateWorldReportsOrderedProgress(t *testing.T) {

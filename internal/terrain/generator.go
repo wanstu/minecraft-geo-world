@@ -181,6 +181,9 @@ func normalizeConfig(cfg Config, geometry world.GridGeometry) Config {
 	if cfg.CanyonExtraDepth <= 0 {
 		cfg.CanyonExtraDepth = 0.006
 	}
+	if cfg.CliffFrequency <= 0 {
+		cfg.CliffFrequency = 1.0
+	}
 	return cfg
 }
 
@@ -271,8 +274,9 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		worldZ,
 		1700,
 	)
+	cliffShift := clamp((m.Config.CliffFrequency-1.0)*0.10, -0.14, 0.14)
 	cliffGate :=
-		smoothstep01(0.56, 0.80, faultRegion) *
+		smoothstep01(0.56-cliffShift, 0.80-cliffShift*0.8, faultRegion) *
 			smoothstep01(0.46, 0.78, crest)
 	faultStep := smoothstep01(-0.010, 0.010, faultSignal)
 	cliffEscarpment := (faultStep - 0.5) * 0.090 * cliffGate
@@ -288,6 +292,100 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	slopeWave := fbm(m.Config.Seed+509, worldX, worldZ, 270, 3) * 0.014
 
 	plateauDetail := fbm(m.Config.Seed+503, worldX, worldZ, 2600, 2) * m.Config.PlateauAmplitude
+
+	// v1.1.7 rare macro landmarks are not independent templates. Every term is
+	// gated by an already-derived terrain skeleton: isolated peaks prefer
+	// hill/foothill country, giant valleys deepen existing valley corridors,
+	// and long scarps follow plateau/mountain support. Locked older worlds keep
+	// RareMacroStrength at zero and therefore retain the historical result.
+	rareStrength := clamp(m.Config.RareMacroStrength, 0, 2.5)
+	rarePeakLift := 0.0
+	rareEscarpment := 0.0
+	rareValleyCarve := 0.0
+	if rareStrength > 0 {
+		rarePeakField := cellularPeak(
+			m.Config.Seed+1601,
+			worldX,
+			worldZ,
+			5200,
+		)
+		rarePeakGate := 0.35 + 0.65*smoothstep01(
+			0.35,
+			0.82,
+			0.5+0.5*valueNoise(
+				m.Config.Seed+1627,
+				worldX,
+				worldZ,
+				9200,
+			),
+		)
+		isolatedPeakSupport := clamp(
+			0.55*hill+0.85*foothill+0.28*mountain,
+			0,
+			1,
+		) * (1 - 0.72*plateau)
+		rarePeakLift =
+			math.Pow(rarePeakField, 7.2) *
+				rarePeakGate *
+				isolatedPeakSupport *
+				0.125 *
+				rareStrength
+
+		rareFaultSignal :=
+			0.78*valueNoise(
+				m.Config.Seed+1709,
+				worldX,
+				worldZ,
+				4200,
+			) +
+				0.22*valueNoise(
+					m.Config.Seed+1723,
+					worldX,
+					worldZ,
+					1500,
+				)
+		rareFaultRegion := 0.5 + 0.5*valueNoise(
+			m.Config.Seed+1747,
+			worldX,
+			worldZ,
+			8500,
+		)
+		rareFaultGate := smoothstep01(0.72, 0.91, rareFaultRegion)
+		rareFaultSupport := clamp(
+			0.58*plateau+0.38*foothill+0.48*mountain,
+			0,
+			1,
+		)
+		rareFaultStep := smoothstep01(-0.015, 0.015, rareFaultSignal)
+		rareEscarpment =
+			(rareFaultStep - 0.5) *
+				0.080 *
+				rareFaultGate *
+				rareFaultSupport *
+				rareStrength
+
+		rareValleyGate := smoothstep01(
+			0.68,
+			0.90,
+			0.5+0.5*valueNoise(
+				m.Config.Seed+1801,
+				worldX,
+				worldZ,
+				7600,
+			),
+		)
+		rareValleyRelief := 0.62 + 0.38*clamp(
+			0.40*hill+0.75*foothill+mountain,
+			0,
+			1,
+		)
+		rareValleyCarve =
+			valley *
+				rareValleyGate *
+				rareValleyRelief *
+				0.030 *
+				rareStrength
+	}
 
 	regionalDetail :=
 		plain*plainDetail +
@@ -326,10 +424,19 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	// to the broad base surface, hills undulate, foothills climb, and mountain /
 	// plateau regions rise materially above their surroundings. These are smooth
 	// weight fields, so the lift does not create terrain-class steps.
+	//
+	// v1.1.7 makes the semantic MountainStrength parameter directional instead
+	// of merely widening a zero-mean detail noise. A zero scale is the explicit
+	// legacy marker: old locked worlds keep the historical 0.090 mountain lift.
+	mountainLiftScale := 1.0
+	if m.Config.MountainStrengthScale > 0 {
+		strength := clamp(m.Config.MountainStrengthScale, 0.25, 2.5)
+		mountainLiftScale = 1 + 0.30*(strength-1)
+	}
 	orographicLift :=
 		0.012*hill +
 			0.030*foothill +
-			0.090*mountain +
+			0.090*mountain*mountainLiftScale +
 			0.020*plateau
 
 	// Deposition fills a small amount of accommodation space. Alluvial fans add
@@ -351,7 +458,14 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 
 	final := boundedAdd(
 		workingBase,
-		regionalDetail+orographicLift+depositionLift-valleyCarve-canyonCarve,
+		regionalDetail+
+			orographicLift+
+			depositionLift+
+			rarePeakLift+
+			rareEscarpment-
+			valleyCarve-
+			canyonCarve-
+			rareValleyCarve,
 	)
 	heightCorrection := 0.0
 	if m.HeightCorrection != nil {
@@ -377,6 +491,9 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		DepositionLift:      depositionLift,
 		ValleyCarve:         valleyCarve,
 		CanyonCarve:         canyonCarve,
+		RareMacroLift:       rarePeakLift,
+		RareMacroCarve:      rareValleyCarve,
+		RareEscarpment:      rareEscarpment,
 		HeightCorrection:    heightCorrection,
 		FinalHeight:         final,
 	}

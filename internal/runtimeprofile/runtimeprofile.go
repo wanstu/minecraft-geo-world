@@ -17,8 +17,25 @@ func Build(
 	profile *mcprofile.Model,
 	runtime *worldsample.Model,
 ) (*Model, error) {
+	return BuildWithContinuity(geometry, eco, profile, runtime, 1.0)
+}
+
+func BuildWithContinuity(
+	geometry world.GridGeometry,
+	eco *ecology.Model,
+	profile *mcprofile.Model,
+	runtime *worldsample.Model,
+	biomeContinuity float64,
+) (*Model, error) {
 	if _, err := geometry.SquareCellSize(); err != nil {
 		return nil, err
+	}
+	if biomeContinuity == 0 {
+		biomeContinuity = 1.0
+	}
+	if math.IsNaN(biomeContinuity) || math.IsInf(biomeContinuity, 0) ||
+		biomeContinuity < 0.25 || biomeContinuity > 2.5 {
+		return nil, errors.New("runtimeprofile: biome continuity must be finite and inside 0.25..2.5")
 	}
 	if eco == nil || profile == nil || runtime == nil {
 		return nil, errors.New("runtimeprofile: ecology, profile and runtime models are required")
@@ -44,11 +61,19 @@ func Build(
 		}
 	}
 	return &Model{
-		Geometry: geometry,
-		Ecology:  eco,
-		Profile:  profile,
-		Runtime:  runtime,
+		Geometry:        geometry,
+		Ecology:         eco,
+		Profile:         profile,
+		Runtime:         runtime,
+		BiomeContinuity: biomeContinuity,
 	}, nil
+}
+
+func (m *Model) SampleSource(
+	worldX, worldZ float64,
+	wantLand bool,
+) (node int, weight float64, fallback bool) {
+	return m.selectSourceNode(worldX, worldZ, wantLand)
 }
 
 func (m *Model) Sample(worldX, worldZ float64) Sample {
@@ -94,8 +119,12 @@ func (m *Model) selectSourceNode(worldX, worldZ float64, wantLand bool) (int, fl
 		seed = m.Runtime.Ground.Base.Config.Seed
 	}
 	cellSize := 0.5 * (spacingX + spacingZ)
-	wavelength := cellSize * 5.0
-	amplitude := cellSize * 0.42
+	continuity := m.BiomeContinuity
+	if continuity <= 0 {
+		continuity = 1.0
+	}
+	wavelength := cellSize * 5.0 * continuity
+	amplitude := cellSize * 0.42 / math.Sqrt(continuity)
 	warpX := 0.72*valueNoise(seed+12011, worldX, worldZ, wavelength) +
 		0.28*valueNoise(seed+12029, worldX, worldZ, wavelength*0.5)
 	warpZ := 0.72*valueNoise(seed+22003, worldX, worldZ, wavelength) +

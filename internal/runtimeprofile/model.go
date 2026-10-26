@@ -13,10 +13,11 @@ import (
 // Minecraft-facing labels are selected from the same land/ocean semantic side
 // as the final Ground/Water sample.
 type Model struct {
-	Geometry world.GridGeometry
-	Ecology  *ecology.Model
-	Profile  *mcprofile.Model
-	Runtime  *worldsample.Model
+	Geometry        world.GridGeometry
+	Ecology         *ecology.Model
+	Profile         *mcprofile.Model
+	Runtime         *worldsample.Model
+	BiomeContinuity float64
 }
 
 type Sample struct {

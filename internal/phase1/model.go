@@ -95,6 +95,11 @@ type Config struct {
 	// repel each other and how strongly overlap corridors are suppressed.
 	// Zero uses the default.
 	ContinentSeparation float64
+
+	// RareMacroStrength is zero for locked pre-v1.1.7 worlds. It only scales
+	// exceptional tectonic expressions; ordinary plate boundaries keep their
+	// historical dimensions.
+	RareMacroStrength float64
 }
 
 type World struct {

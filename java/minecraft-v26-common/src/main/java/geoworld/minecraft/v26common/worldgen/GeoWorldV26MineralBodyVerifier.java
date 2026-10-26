@@ -1,5 +1,9 @@
 package geoworld.minecraft.v26common.worldgen;
 
+import geoworld.minecraft.common.worldgen.GeoWorldMineralPlanner;
+import geoworld.minecraft.common.worldgen.GeoWorldMineralRules;
+import geoworld.minecraft.v26common.MinecraftV26HeightMapping;
+
 import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Set;
@@ -9,12 +13,15 @@ public final class GeoWorldV26MineralBodyVerifier {
     private GeoWorldV26MineralBodyVerifier() {}
 
     public static void main(String[] args) {
-        for (var mineral : GeoWorldV26MineralVeins.Mineral.values()) {
+        GeoWorldMineralPlanner planner = new GeoWorldMineralPlanner(
+            new MinecraftV26HeightMapping()
+        );
+        for (var mineral : GeoWorldMineralRules.Kind.values()) {
             int normal = 0;
             for (boolean exposed : new boolean[]{false, true}) {
                 for (long seed : new long[]{71L, 123456L, 10400L}) {
-                    Set<GeoWorldV26MineralVeins.Placement> body = new HashSet<>();
-                    GeoWorldV26MineralVeins.planReferenceBody(
+                    Set<GeoWorldMineralPlanner.Placement> body = new HashSet<>();
+                    planner.planReferenceBody(
                         mineral, exposed, seed, body::add
                     );
                     if (body.isEmpty()) {
@@ -74,11 +81,11 @@ public final class GeoWorldV26MineralBodyVerifier {
     }
 
     private static int largest6ConnectedComponent(
-        Set<GeoWorldV26MineralVeins.Placement> points
+        Set<GeoWorldMineralPlanner.Placement> points
     ) {
-        Set<GeoWorldV26MineralVeins.Placement> remaining =
+        Set<GeoWorldMineralPlanner.Placement> remaining =
             new HashSet<>(points);
-        ArrayDeque<GeoWorldV26MineralVeins.Placement> queue =
+        ArrayDeque<GeoWorldMineralPlanner.Placement> queue =
             new ArrayDeque<>();
         int largest = 0;
         final int[][] dirs = {
@@ -93,7 +100,7 @@ public final class GeoWorldV26MineralBodyVerifier {
                 var p = queue.removeFirst();
                 count++;
                 for (var d : dirs) {
-                    var neighbor = new GeoWorldV26MineralVeins.Placement(
+                    var neighbor = new GeoWorldMineralPlanner.Placement(
                         p.x() + d[0], p.y() + d[1], p.z() + d[2], p.mineral()
                     );
                     if (remaining.remove(neighbor)) queue.addLast(neighbor);

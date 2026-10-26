@@ -18,12 +18,22 @@ type Config struct {
 	HillAmplitude     float64
 	FoothillAmplitude float64
 	MountainAmplitude float64
-	PlateauAmplitude  float64
-	ValleyDepth       float64
+	// MountainStrengthScale is zero for locked pre-v1.1.7 worlds. Current
+	// rules persist the semantic mountain-strength multiplier here so it can
+	// raise/lower the whole mountain envelope while MountainAmplitude continues
+	// to control internal relief. Zero deliberately preserves legacy sampling.
+	MountainStrengthScale float64 `json:",omitempty"`
+	PlateauAmplitude      float64
+	ValleyDepth           float64
 
 	DepositionLift   float64
 	AlluvialFanLift  float64
 	CanyonExtraDepth float64
+	CliffFrequency   float64
+	// RareMacroStrength is zero for locked pre-v1.1.7 worlds. Current
+	// profiles map RareMacroTerrain here so rare landmarks can scale without
+	// changing the ordinary terrain language.
+	RareMacroStrength float64
 }
 
 type Input struct {
@@ -94,6 +104,9 @@ type Sample struct {
 	DepositionLift   float64
 	ValleyCarve      float64
 	CanyonCarve      float64
+	RareMacroLift    float64
+	RareMacroCarve   float64
+	RareEscarpment   float64
 	HeightCorrection float64
 	FinalHeight      float64
 }

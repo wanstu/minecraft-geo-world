@@ -715,6 +715,17 @@ func (w *World) computeTectonicInfluence() {
 			feature := w.Feature[i]
 			intensity := w.TectonicIntensity[i]
 			radiusBlocks, amplitude := featureBand(feature, intensity)
+			if feature == ContinentalRift && w.Config.RareMacroStrength > 0 {
+				rare := clamp(
+					(intensity-0.68)/(0.95-0.68),
+					0,
+					1,
+				)
+				rare = rare * rare * (3 - 2*rare)
+				strength := clamp(w.Config.RareMacroStrength, 0, 2.5)
+				radiusBlocks *= 1 + 0.65*rare*strength
+				amplitude *= 1 + 0.55*rare*strength
+			}
 			if radiusBlocks == 0 || amplitude == 0 {
 				continue
 			}

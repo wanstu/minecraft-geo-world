@@ -12,8 +12,14 @@ import (
 )
 
 const (
-	lakeShoreAllowanceNormalized    = 0.0015
-	navigationSurfaceStepNormalized = 0.009
+	lakeShoreAllowanceNormalized     = 0.0015
+	lakeCoreCarveAllowanceNormalized = 0.012
+	navigationSurfaceStepNormalized  = 0.009
+	// v4 ordinary rivers make the full hydraulic half-width geometry-owned.
+	// The dry-bank transition already lives outside halfWidth in bankRadius;
+	// keeping another dry strip inside the channel lets broad-terrain noise bite
+	// chunks out of the visible river again.
+	riverWetCoreFraction = 1.0
 )
 
 func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cfg Config) (*Model, error) {
@@ -95,8 +101,10 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 			cfg,
 			rec.Config.RiverStrengthThreshold,
 			edge.RiverStrength,
+			edge.FlowAccumulation,
+			hydro.RiverThreshold,
+			edge.RiverOrder,
 		)
-		length := math.Hypot(x1-x0, z1-z0)
 		drafts[id] = riverDraft{
 			edge: edge,
 			x0:   x0, z0: z0, x1: x1, z1: z1,
@@ -105,9 +113,11 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 				base.Config.Seed,
 				edge.From,
 				edge.To,
-				length,
+				x0, z0,
+				x1, z1,
 				halfWidth,
 				edge.OriginalDrop,
+				cfg.RiverGeometryVersion,
 			),
 		}
 		outgoing[edge.From] = id
@@ -157,6 +167,26 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 			continue
 		}
 		draft := drafts[edgeID]
+		if len(incomingSegments[node]) > 0 {
+			// A trunk must not become narrower again immediately downstream.
+			// Preserve the widest incoming channel, and let real confluences grow
+			// a little beyond it according to the combined cross-section.
+			maxIncoming := 0.0
+			sumSquares := 0.0
+			for _, incomingID := range incomingSegments[node] {
+				incomingWidth := m.Rivers[incomingID].HalfWidth
+				maxIncoming = math.Max(maxIncoming, incomingWidth)
+				sumSquares += incomingWidth * incomingWidth
+			}
+			requiredWidth := maxIncoming
+			if len(incomingSegments[node]) > 1 {
+				requiredWidth = math.Max(
+					requiredWidth,
+					0.86*math.Sqrt(sumSquares),
+				)
+			}
+			draft.halfWidth = math.Max(draft.halfWidth, requiredWidth)
+		}
 		centerDepth := riverCenterDepth(cfg, draft.halfWidth)
 		bed0 := effectiveBed[draft.edge.From]
 		if lakeID := hydro.LakeID[draft.edge.From]; lakeID > 0 {
@@ -175,6 +205,28 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 				math.Max(0, effectiveSurface[draft.edge.From]-centerDepth),
 			)
 		}
+		oceanMouth := draft.edge.To >= 0 &&
+			draft.edge.To < len(rec.WaterKind) &&
+			rec.WaterKind[draft.edge.To] == reconcile.WaterOcean
+		lakeMouth := draft.edge.To >= 0 &&
+			draft.edge.To < len(hydro.LakeID) &&
+			hydro.LakeID[draft.edge.To] > 0 &&
+			hydro.LakeID[draft.edge.From] != hydro.LakeID[draft.edge.To]
+		lakeOutlet := draft.edge.From >= 0 &&
+			draft.edge.From < len(hydro.LakeID) &&
+			hydro.LakeID[draft.edge.From] > 0 &&
+			hydro.LakeID[draft.edge.From] != hydro.LakeID[draft.edge.To]
+		mouthExpansionVersion := uint8(3)
+		if cfg.RiverGeometryVersion >= 1 &&
+			!oceanMouth &&
+			!lakeMouth &&
+			!lakeOutlet {
+			mouthExpansionVersion = 4
+			if cfg.RiverGeometryVersion >= 2 {
+				mouthExpansionVersion = 5
+			}
+		}
+
 		bed1 := math.Min(effectiveBed[draft.edge.To], bed0)
 		widthT := riverWidthFraction(cfg, draft.halfWidth)
 		profile := buildRiverProfile(
@@ -184,6 +236,7 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 			bed0, bed1,
 			draft.halfWidth,
 			draft.meanderOffset,
+			mouthExpansionVersion,
 			cfg.RiverProfileStepBlocks,
 			cfg.MinRiverBedDepthNormalized*(1+1.5*widthT),
 		)
@@ -214,15 +267,28 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 			effectiveSurfaceDefined[draft.edge.To] = true
 			effectiveSurface[draft.edge.To] = outletSurface
 		}
+		lakeOutletSurface := 0.0
+		lakeOutletSurfaceDefined := false
+		if lakeOutlet {
+			if surface, ok := lakeSurfaces[hydro.LakeID[draft.edge.From]]; ok && finite(surface) {
+				lakeOutletSurface = surface
+				lakeOutletSurfaceDefined = true
+			}
+		}
 		segment := RiverSegment{
 			From: draft.edge.From, To: draft.edge.To,
 			X0: draft.x0, Z0: draft.z0, X1: draft.x1, Z1: draft.z1,
-			Bed0:          bed0,
-			Bed1:          effectiveBed[draft.edge.To],
-			HalfWidth:     draft.halfWidth,
-			MeanderOffset: draft.meanderOffset,
-			Profile:       profile,
-			OceanMouth:    draft.edge.To >= 0 && draft.edge.To < len(rec.WaterKind) && rec.WaterKind[draft.edge.To] == reconcile.WaterOcean,
+			Bed0:                     bed0,
+			Bed1:                     effectiveBed[draft.edge.To],
+			HalfWidth:                draft.halfWidth,
+			MeanderOffset:            draft.meanderOffset,
+			Profile:                  profile,
+			OceanMouth:               oceanMouth,
+			LakeMouth:                lakeMouth,
+			LakeOutlet:               lakeOutlet,
+			LakeOutletSurfaceDefined: lakeOutletSurfaceDefined,
+			LakeOutletSurface:        lakeOutletSurface,
+			MouthExpansionVersion:    mouthExpansionVersion,
 		}
 		id := len(m.Rivers)
 		m.Rivers = append(m.Rivers, segment)
@@ -278,7 +344,39 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 			m.Rivers[i].ReceiverSurface = spatial
 		}
 	}
+	seedLakeOutletConfluenceBackwater(
+		m.Rivers,
+		incomingSegments,
+		cfg,
+	)
 	easeReceiverMouthDrops(
+		m.Rivers,
+		incomingSegments,
+		cfg,
+	)
+	harmonizeReceiverConfluences(
+		m.Rivers,
+		incomingSegments,
+	)
+	propagateReceiverBackwater(
+		m.Rivers,
+		incomingSegments,
+		cfg,
+	)
+	easeReceiverOutflowDrops(m.Rivers, cfg)
+	enforceSupportedRiverCascades(m.Rivers, cfg)
+	harmonizeFinalConfluences(
+		m.Rivers,
+		incomingSegments,
+		cfg,
+	)
+	// Final profile repairs can change Bed0/Bed1 enough to change the v3
+	// LakeOutlet basin signal and therefore how much source-lake datum survives
+	// to the downstream junction. Recompute that derived backwater only after
+	// the longitudinal profiles have settled; otherwise Runtime can alternate
+	// block-by-block between the stale lower junction datum and the now-higher
+	// LakeOutlet taper.
+	seedLakeOutletConfluenceBackwater(
 		m.Rivers,
 		incomingSegments,
 		cfg,
@@ -450,6 +548,55 @@ func enforceSegmentCascadeSlope(
 	return changed
 }
 
+func rareMacroLakeRadiusScale(
+	seed int64,
+	strength float64,
+	lake hydrology.Lake,
+) float64 {
+	strength = clamp(strength, 0, 2.5)
+	if strength <= 0 || lake.AreaBlocks2 < 550_000 {
+		return 1
+	}
+
+	areaWeight := smoothstep(
+		550_000,
+		1_500_000,
+		lake.AreaBlocks2,
+	)
+	guaranteed := smoothstep(
+		1_000_000,
+		1_500_000,
+		lake.AreaBlocks2,
+	)
+
+	// Medium-large basins only occasionally become a macro landmark. Truly
+	// exceptional natural basins increasingly bypass that random gate so a
+	// world can still contain an inland-sea-scale lake without a second
+	// artificial lake generator.
+	h := uint64(seed) ^
+		uint64(int64(lake.BasinID))*0x9E3779B185EBCA87 ^
+		uint64(int64(lake.ID))*0xC2B2AE3D27D4EB4F ^
+		uint64(int64(lake.SpillOutlet))*0x165667B19E3779F9
+	h ^= h >> 30
+	h *= 0xBF58476D1CE4E5B9
+	h ^= h >> 27
+	h *= 0x94D049BB133111EB
+	h ^= h >> 31
+	const inv53 = 1.0 / 9007199254740992.0
+	u := float64(h>>11) * inv53
+	randomSelection :=
+		smoothstep(0.78, 0.96, u) * areaWeight
+	selected := math.Max(guaranteed, randomSelection)
+	if selected <= 0 {
+		return 1
+	}
+
+	return 1 +
+		selected*
+			strength*
+			(1.8+0.8*areaWeight)
+}
+
 func buildLakeNodes(
 	base *terrain.Model,
 	rec *reconcile.Model,
@@ -458,6 +605,14 @@ func buildLakeNodes(
 ) (map[int]float64, error) {
 	spacing := base.Geometry.SpacingX()
 	inner := spacing * 0.50
+	lakeScale := make(map[int]float64, len(hydro.Lakes))
+	for _, lake := range hydro.Lakes {
+		lakeScale[lake.ID] = rareMacroLakeRadiusScale(
+			base.Config.Seed,
+			base.Config.RareMacroStrength,
+			lake,
+		)
+	}
 	// Lake cells are rendered with a rounded-square (L4/superellipse)
 	// footprint rather than independent circles. This keeps D8-connected
 	// hydrological cells continuous without exposing the raw macro-grid as
@@ -475,13 +630,17 @@ func buildLakeNodes(
 		}
 		xi, zi := i%base.Geometry.Width, i/base.Geometry.Width
 		x, z := base.Geometry.NodePosition(xi, zi)
+		scale := lakeScale[lakeID]
+		if scale <= 0 {
+			scale = 1
+		}
 		node := LakeNode{
 			Index:  i,
 			LakeID: lakeID,
 			X:      x, Z: z,
 			BedCeiling:   rec.LakeBedCeiling[i],
-			InnerRadius:  inner,
-			OuterRadius:  outer,
+			InnerRadius:  inner * scale,
+			OuterRadius:  outer * scale,
 			WaterSurface: rec.WaterSurfaceElevation[i],
 		}
 		id := len(m.Lakes)
@@ -494,6 +653,20 @@ func buildLakeNodes(
 	// against the actual detailed union rim and lower the datum when a lower
 	// spill route exists.
 	capLakeSurfacesToDetailedRims(base, m.Lakes)
+	if m.Config.LakeGeometryVersion >= 1 {
+		for i := range m.Lakes {
+			m.Lakes[i].BedCeiling = visibleLakeBedCeiling(
+				m.Config,
+				m.Lakes[i].WaterSurface,
+				m.Lakes[i].BedCeiling,
+			)
+		}
+		markLakeCoreCarveAnchors(
+			m.Config,
+			m.Lakes,
+			base.SampleNormalized,
+		)
+	}
 
 	lakeSurfaces := make(map[int]float64)
 	for _, lake := range m.Lakes {
@@ -503,6 +676,68 @@ func buildLakeNodes(
 		}
 	}
 	return lakeSurfaces, nil
+}
+
+func visibleLakeBedCeiling(cfg Config, waterSurface, bedCeiling float64) float64 {
+	if cfg.LakeGeometryVersion < 1 {
+		return bedCeiling
+	}
+	// Runtime exposes a Lake only below waterSurface-MinLakeWaterDepth. Keep a
+	// little extra depth so equality/rounding cannot turn a persisted lake back
+	// into a dry macro candidate after reopen.
+	visibleDepth := math.Max(
+		0.004,
+		cfg.MinLakeWaterDepthNormalized*1.10,
+	)
+	return math.Min(
+		bedCeiling,
+		math.Max(0, waterSurface-visibleDepth),
+	)
+}
+
+func markLakeCoreCarveAnchors(
+	cfg Config,
+	lakes []LakeNode,
+	sampleHeight func(worldX, worldZ float64) float64,
+) {
+	if cfg.LakeGeometryVersion < 1 || len(lakes) == 0 || sampleHeight == nil {
+		return
+	}
+	groups := make(map[int][]int)
+	for i := range lakes {
+		lakes[i].CoreCarve = false
+		groups[lakes[i].LakeID] = append(groups[lakes[i].LakeID], i)
+	}
+	for _, ids := range groups {
+		// Do not force a core when detailed terrain already leaves any persisted
+		// lake node naturally renderable. The anchor exists only to reconcile a
+		// completely dry macro lake with detailed terrain.
+		naturallyRenderable := false
+		bestID := -1
+		bestExcess := math.Inf(1)
+		for _, id := range ids {
+			node := lakes[id]
+			h := sampleHeight(node.X, node.Z)
+			if !finite(h) {
+				continue
+			}
+			excess := h - node.WaterSurface
+			if excess <= lakeShoreAllowanceNormalized {
+				naturallyRenderable = true
+				break
+			}
+			if excess < bestExcess {
+				bestExcess = excess
+				bestID = id
+			}
+		}
+		if naturallyRenderable || bestID < 0 {
+			continue
+		}
+		if bestExcess <= lakeCoreCarveAllowanceNormalized {
+			lakes[bestID].CoreCarve = true
+		}
+	}
 }
 
 func capLakeSurfacesToDetailedRims(base *terrain.Model, lakes []LakeNode) {
@@ -590,33 +825,44 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		return sample
 	}
 
+	riverIDs := m.riverBuckets[bucket]
+	activeRiverBankProtected := riverBankProtectedAt(
+		m.Rivers,
+		riverIDs,
+		worldX,
+		worldZ,
+	)
+
 	riverDatumWeight := -1.0
 	riverDatumT := 2.0
-	for _, id := range m.riverBuckets[bucket] {
+	geometryWetOwned := false
+	bestOxbowSurface := math.Inf(-1)
+	for _, id := range riverIDs {
 		seg := m.Rivers[id]
 		t, distance := pointRiverSegment(worldX, worldZ, seg)
 		halfWidth := riverMouthHalfWidth(seg, t)
 		bankRadius := halfWidth + riverBankBlendBlocks(seg.HalfWidth)
-		if distance >= bankRadius {
+		fluvialReach := math.Max(bankRadius, riverFluvialReach(seg))
+		_, deltaDistance, deltaHalfWidth, deltaBankRadius, deltaOK :=
+			riverDeltaPoint(seg, t, worldX, worldZ)
+		deltaInBank := deltaOK && deltaDistance < deltaBankRadius
+		deltaInWater := deltaOK && deltaDistance < deltaHalfWidth
+		if distance >= fluvialReach && !deltaInBank {
 			continue
 		}
 		bed := sampleRiverProfile(seg, t)
+		naturalSurface := bed + riverCenterDepth(m.Config, seg.HalfWidth)
+		surface := riverConnectionSurface(seg, t, naturalSurface)
 
-		if distance >= halfWidth {
-			// Shape a short dry river valley around the navigable channel.
-			// The river is the local low point; terrain rises smoothly back to
-			// the untouched broad surface instead of meeting water as a noisy
-			// staircase or vertical trench wall.
-			surface := bed + riverCenterDepth(m.Config, seg.HalfWidth)
-			if seg.ReceiverSurfaceDefined &&
-				seg.ReceiverSurface > surface {
-				surface = seg.ReceiverSurface
-			}
-			innerBank := math.Min(baseHeight, surface+0.0022)
+		if deltaInBank && !deltaInWater {
+			// Delta distributaries own a real dry bank corridor too. This keeps
+			// each branch connected to the surrounding floodplain without turning
+			// the split into a water trench cut through untouched terrain.
+			innerBank := math.Min(baseHeight, surface+0.0018)
 			bankWeight := 1 - smoothstep(
-				halfWidth,
-				bankRadius,
-				distance,
+				deltaHalfWidth,
+				deltaBankRadius,
+				deltaDistance,
 			)
 			candidate := lerp(baseHeight, innerBank, bankWeight)
 			if candidate < finalHeight {
@@ -626,10 +872,104 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 					baseHeight-candidate,
 				)
 			}
+		}
+
+		if distance >= halfWidth && !deltaInWater {
+			// Shape a short dry river valley around the navigable channel.
+			// The river is the local low point; terrain rises smoothly back to
+			// the untouched broad surface instead of meeting water as a noisy
+			// staircase or vertical trench wall.
+			if distance < bankRadius {
+				innerBank := math.Min(baseHeight, surface+0.0022)
+				bankWeight := 1 - smoothstep(
+					halfWidth,
+					bankRadius,
+					distance,
+				)
+				candidate := lerp(baseHeight, innerBank, bankWeight)
+				if candidate < finalHeight {
+					finalHeight = candidate
+					sample.RiverCarve = math.Max(
+						sample.RiverCarve,
+						baseHeight-candidate,
+					)
+				}
+			}
+
+			// Floodplain, abandoned-meander and oxbow detail belongs outside
+			// every active river-bank protection corridor, not merely outside
+			// the parent segment's bank. At confluences/overlaps an old meander
+			// from one segment must never excavate another segment's live bank.
+			if !activeRiverBankProtected {
+				// v1.1.7 broadens a small subset of wide, low-gradient reaches
+				// into a floodplain/terrace envelope. This code existed before but
+				// was not connected to Runtime sampling.
+				finalHeight = applyRiverFluvialDryDetail(
+					seg,
+					t,
+					worldX,
+					worldZ,
+					baseHeight,
+					finalHeight,
+					surface,
+					distance,
+				)
+
+				// A still rarer subset of those abandoned meanders retains shallow,
+				// flat water. Record the candidate here but do not assign ownership
+				// until every active river has been checked; a real river always wins.
+				if oxbowSurface, oxbowFloor, oxbowWeight, ok :=
+					riverOxbowWater(
+						m.Config,
+						seg,
+						t,
+						worldX,
+						worldZ,
+						distance,
+					); ok && finalHeight <= oxbowSurface+0.010 {
+					candidate := lerp(
+						finalHeight,
+						math.Min(finalHeight, oxbowFloor),
+						oxbowWeight,
+					)
+					if candidate < finalHeight {
+						finalHeight = candidate
+						sample.LakeCarve = math.Max(
+							sample.LakeCarve,
+							baseHeight-candidate,
+						)
+					}
+					if finalHeight <
+						oxbowSurface-m.Config.MinLakeWaterDepthNormalized &&
+						oxbowSurface > bestOxbowSurface {
+						bestOxbowSurface = oxbowSurface
+					}
+				}
+			}
 			continue
 		}
 
-		weight := 1 - smoothstep(0, halfWidth, distance)
+		channelHalfWidth := halfWidth
+		channelDistance := distance
+		weight := -1.0
+		if distance < halfWidth {
+			weight = 1 - smoothstep(0, halfWidth, distance)
+		}
+		if deltaInWater {
+			deltaWeight := 1 - smoothstep(
+				0,
+				deltaHalfWidth,
+				deltaDistance,
+			)
+			if deltaWeight > weight {
+				weight = deltaWeight
+				channelHalfWidth = deltaHalfWidth
+				channelDistance = deltaDistance
+			}
+		}
+		if weight <= 0 {
+			continue
+		}
 		if weight > sample.RiverWeight {
 			sample.RiverWeight = weight
 		}
@@ -648,12 +988,11 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			sample.RiverBedElevation = bed
 			// Mouth flare changes the footprint, not the river's depth datum.
 			sample.RiverHalfWidth = seg.HalfWidth
-			sample.RiverReceiverSurfaceDefined = seg.ReceiverSurfaceDefined
-			sample.RiverReceiverSurface = seg.ReceiverSurface
-			if seg.ReceiverSurfaceDefined {
-				// Receiver datum is a backwater floor, not a downstream ramp.
-				// Propagation during Build guarantees the floor continues
-				// upstream far enough to avoid an upward step at segment joins.
+			sample.RiverReceiverSurfaceDefined = surface > naturalSurface+1e-12
+			sample.RiverReceiverSurface = surface
+			if sample.RiverReceiverSurfaceDefined {
+				// The effective connection datum may be either downstream
+				// backwater or the short lake-outlet source taper.
 				sample.RiverReceiverWeight = 1
 			} else {
 				sample.RiverReceiverWeight = 0
@@ -661,24 +1000,95 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			riverDatumWeight = weight
 			riverDatumT = t
 		}
-		surface := bed + riverCenterDepth(m.Config, seg.HalfWidth)
-		if seg.ReceiverSurfaceDefined &&
-			seg.ReceiverSurface > surface {
-			surface = seg.ReceiverSurface
-		}
 		channelShoulder := math.Min(baseHeight, surface+0.0022)
-		crossT := smoothstep(0, halfWidth, distance)
+		if outletWeight := lakeOutletSourceWeight(seg, t); outletWeight > 0 {
+			// A formal lake outlet must remain wet across its near-shore throat.
+			// Blend the channel shoulder below the inherited lake surface, then
+			// return to the ordinary dry-bank profile as the outlet weight fades.
+			wetShoulder := math.Min(
+				baseHeight,
+				surface-m.Config.MinLakeWaterDepthNormalized,
+			)
+			channelShoulder = lerp(
+				channelShoulder,
+				wetShoulder,
+				outletWeight,
+			)
+		}
+		crossT := smoothstep(0, channelHalfWidth, channelDistance)
+		if seg.MouthExpansionVersion >= 3 {
+			// v1.1.3: great rivers keep a broad wet middle and rise only near
+			// the bank. This makes the visible water width match the stored
+			// hydraulic width instead of looking like a narrow channel in a
+			// nominally large corridor.
+			widthT := riverWidthFraction(m.Config, seg.HalfWidth)
+			crossT = math.Pow(crossT, 1.65+0.95*widthT)
+		} else if seg.MouthExpansionVersion >= 2 {
+			widthT := riverWidthFraction(m.Config, seg.HalfWidth)
+			crossT = math.Pow(crossT, 1.35+0.65*widthT)
+		}
 		candidate := math.Min(
 			baseHeight,
 			lerp(bed, channelShoulder, crossT),
 		)
+		v4WetCore := seg.MouthExpansionVersion >= 4 &&
+			!seg.OceanMouth &&
+			!seg.LakeMouth &&
+			!seg.LakeOutlet
+		insideWetCore :=
+			!v4WetCore ||
+				channelDistance <= channelHalfWidth*riverWetCoreFraction
+		if v4WetCore && insideWetCore {
+			geometryWetOwned = true
+			// The visible bank is a geometric river boundary, not another
+			// threshold against broad-terrain noise. Keep the full ordinary
+			// hydraulic corridor at least half a center-depth below the surface;
+			// the dry transition begins outside halfWidth in bankRadius.
+			minimumWetDepth :=
+				0.5 * riverCenterDepth(m.Config, seg.HalfWidth)
+			candidate = math.Min(
+				candidate,
+				math.Max(0, surface-minimumWetDepth),
+			)
+		}
 		if candidate < finalHeight {
 			finalHeight = candidate
 			sample.RiverCarve = math.Max(sample.RiverCarve, baseHeight-candidate)
 		}
 		if sample.WaterKind == reconcile.WaterNone {
+			// The whole hydraulic corridor remains a river candidate. The v4
+			// wet core above is only a minimum-depth guarantee; the outer
+			// corridor still becomes wet or dry from its actual carved depth.
 			sample.WaterKind = reconcile.WaterRiver
 		}
+	}
+
+	if geometryWetOwned &&
+		sample.WaterKind == reconcile.WaterRiver &&
+		sample.RiverBedDefined {
+		// Overlapping river corridors can choose a different strongest datum than
+		// the segment that first established the geometric wet core. Re-apply the
+		// wet-floor guarantee against the final selected owner surface so Runtime
+		// cannot turn that overlap into a dry hole.
+		ownerDepth := riverCenterDepth(m.Config, sample.RiverHalfWidth)
+		ownerSurface := sample.RiverBedElevation + ownerDepth
+		if sample.RiverReceiverSurfaceDefined &&
+			sample.RiverReceiverSurface > ownerSurface {
+			ownerSurface = sample.RiverReceiverSurface
+		}
+		finalHeight = math.Min(
+			finalHeight,
+			math.Max(0, ownerSurface-0.5*ownerDepth),
+		)
+	}
+
+	if sample.WaterKind == reconcile.WaterNone &&
+		bestOxbowSurface > math.Inf(-1) &&
+		finalHeight <
+			bestOxbowSurface-m.Config.MinLakeWaterDepthNormalized {
+		sample.WaterKind = reconcile.WaterLake
+		sample.WaterSurfaceDefined = true
+		sample.WaterSurfaceElevation = bestOxbowSurface
 	}
 
 	// Explicit lakes override river classification where their raster footprint
@@ -692,7 +1102,8 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		// already stands materially above the spill-controlled lake datum,
 		// otherwise a broad macro basin turns into an artificial raised
 		// reservoir with vertical water walls.
-		if baseHeight > node.WaterSurface+lakeShoreAllowanceNormalized {
+		if baseHeight > node.WaterSurface+lakeShoreAllowanceNormalized &&
+			!node.CoreCarve {
 			continue
 		}
 		dx := worldX - node.X
@@ -716,8 +1127,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		// Do not expose sub-block-thin water at the fringe. That looked
 		// like a flood sheet creeping over otherwise dry terrain. A shallow
 		// carved margin remains as a natural bank before the actual lake.
-		const minLakeWaterDepthNormalized = 0.003
-		if finalHeight < node.WaterSurface-minLakeWaterDepthNormalized &&
+		if finalHeight < node.WaterSurface-m.Config.MinLakeWaterDepthNormalized &&
 			node.WaterSurface > bestLakeSurface {
 			bestLakeSurface = node.WaterSurface
 			sample.WaterKind = reconcile.WaterLake
@@ -732,10 +1142,14 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 
 func (m *Model) indexRiver(id int, seg RiverSegment) {
 	spacing := m.Geometry.SpacingX()
-	supportRadius :=
-		mouthMaxHalfWidth(seg) +
-			math.Abs(seg.MeanderOffset) +
+	channelSupport :=
+		riverMaxHalfWidth(seg) +
 			riverBankBlendBlocks(seg.HalfWidth)
+	supportRadius :=
+		math.Max(
+			math.Max(channelSupport, riverFluvialReach(seg)),
+			riverDeltaSupportRadius(seg),
+		) + math.Abs(seg.MeanderOffset)
 	expansion := int(math.Ceil(supportRadius/spacing)) + 1
 	x0, z0 := seg.From%m.Geometry.Width, seg.From/m.Geometry.Width
 	x1, z1 := seg.To%m.Geometry.Width, seg.To/m.Geometry.Width
@@ -791,6 +1205,9 @@ func normalizeConfig(cfg Config) (Config, error) {
 	if cfg.RiverCenterDepthNormalized == 0 {
 		cfg.RiverCenterDepthNormalized = 0.0025
 	}
+	if cfg.MinLakeWaterDepthNormalized == 0 {
+		cfg.MinLakeWaterDepthNormalized = 0.003
+	}
 	if !finite(cfg.MinRiverHalfWidthBlocks) || !finite(cfg.MaxRiverHalfWidthBlocks) ||
 		cfg.MinRiverHalfWidthBlocks <= 0 ||
 		cfg.MaxRiverHalfWidthBlocks < cfg.MinRiverHalfWidthBlocks {
@@ -808,6 +1225,11 @@ func normalizeConfig(cfg Config) (Config, error) {
 		cfg.RiverCenterDepthNormalized <= 0 ||
 		cfg.RiverCenterDepthNormalized >= 0.05 {
 		return Config{}, errors.New("waterbed: river center depth must be finite and inside (0,0.05)")
+	}
+	if !finite(cfg.MinLakeWaterDepthNormalized) ||
+		cfg.MinLakeWaterDepthNormalized <= 0 ||
+		cfg.MinLakeWaterDepthNormalized >= 0.05 {
+		return Config{}, errors.New("waterbed: minimum lake water depth must be finite and inside (0,0.05)")
 	}
 	return cfg, nil
 }
@@ -894,7 +1316,8 @@ func buildRiverProfile(
 	x0, z0, x1, z1,
 	bed0, bed1,
 	halfWidth,
-	meanderOffset,
+	meanderOffset float64,
+	mouthExpansionVersion uint8,
 	stepBlocks,
 	minBedDepthNormalized float64,
 ) []float64 {
@@ -902,14 +1325,18 @@ func buildRiverProfile(
 	steps := maxInt(1, int(math.Ceil(length/stepBlocks)))
 	profile := make([]float64, steps+1)
 	bankOffset := halfWidth + 3
+	geometrySegment := RiverSegment{
+		X0:                    x0,
+		Z0:                    z0,
+		X1:                    x1,
+		Z1:                    z1,
+		MeanderOffset:         meanderOffset,
+		MouthExpansionVersion: mouthExpansionVersion,
+	}
 	for j := 0; j <= steps; j++ {
 		t := float64(j) / float64(steps)
-		x, z, nx, nz := riverCenterAndNormalAt(
-			x0,
-			z0,
-			x1,
-			z1,
-			meanderOffset,
+		x, z, nx, nz := riverCenterAndNormalForSegment(
+			geometrySegment,
 			t,
 		)
 		target := lerp(bed0, bed1, t)
@@ -1177,19 +1604,17 @@ func riverMeanderOffset(
 	seed int64,
 	from,
 	to int,
-	length,
+	x0, z0,
+	x1, z1,
 	halfWidth,
 	originalDrop float64,
+	geometryVersion uint8,
 ) float64 {
+	length := math.Hypot(x1-x0, z1-z0)
 	if length <= 1e-9 {
 		return 0
 	}
 	u := riverHashUnit(seed, from, to)
-	// Some reaches really are straight. Keeping a minority untouched also
-	// avoids turning the river network into uniform decorative sine waves.
-	if u < 0.20 {
-		return 0
-	}
 	lowSlope := 1 - smoothstep(
 		0.010,
 		0.050,
@@ -1199,6 +1624,34 @@ func riverMeanderOffset(
 		return 0
 	}
 	maxOffset := math.Min(length*0.17, 5+1.35*halfWidth)
+
+	// Legacy rules intentionally leave 20% of reaches perfectly straight.
+	// That is visually fine for cardinal reaches, but a D8 diagonal is exactly
+	// 45 degrees to Minecraft's block grid: a wide 128-block straight reach
+	// then becomes a long 1x1 zipper bank. v1.1.5 keeps the "straight river"
+	// character while adding only a small, low-frequency lateral deflection to
+	// wide, low-gradient diagonal reaches that hit this legacy branch.
+	if u < 0.20 {
+		if geometryVersion < 1 ||
+			halfWidth < 8 ||
+			lowSlope < 0.35 ||
+			!riverChordIsGridDiagonal(x0, z0, x1, z1) {
+			return 0
+		}
+		amplitude := math.Min(
+			maxOffset,
+			math.Max(4, 0.55*maxOffset*lowSlope),
+		)
+		// Pick the anti-grid deflection side deliberately instead of randomly:
+		// in the downstream half this makes an exact D8 diagonal slightly more
+		// axis-favouring (0/1 voxel steps) rather than steeper (1/2 jumps).
+		// Endpoints remain fixed, so this introduces no network drift.
+		if (x1-x0)*(z1-z0) > 0 {
+			amplitude = -amplitude
+		}
+		return amplitude
+	}
+
 	amplitude := maxOffset * lowSlope * (0.55 + 0.45*u)
 	if amplitude < 1.5 {
 		return 0
@@ -1207,6 +1660,15 @@ func riverMeanderOffset(
 		amplitude = -amplitude
 	}
 	return amplitude
+}
+
+func riverChordIsGridDiagonal(x0, z0, x1, z1 float64) bool {
+	dx := math.Abs(x1 - x0)
+	dz := math.Abs(z1 - z0)
+	scale := math.Max(1, math.Max(dx, dz))
+	return dx > 1e-9 &&
+		dz > 1e-9 &&
+		math.Abs(dx-dz) <= 1e-9*scale
 }
 
 func riverHashUnit(seed int64, from, to int) float64 {
@@ -1247,6 +1709,97 @@ func riverCenterAndNormalAt(
 		return x, z, chordNX, chordNZ
 	}
 	return x, z, -tz / tangentLength, tx / tangentLength
+}
+
+func riverCenterAndNormalAtV3(
+	x0, z0, x1, z1,
+	meanderOffset,
+	t float64,
+) (float64, float64, float64, float64) {
+	t = clamp(t, 0, 1)
+	dx := x1 - x0
+	dz := z1 - z0
+	length := math.Hypot(dx, dz)
+	if length <= 1e-12 {
+		return x0, z0, 1, 0
+	}
+	chordNX := -dz / length
+	chordNZ := dx / length
+	phase := math.Pi * t
+	s := math.Sin(phase)
+	c := math.Cos(phase)
+	shape := s * s
+	shapeDerivative := 2 * math.Pi * s * c
+	x := x0 + dx*t + chordNX*meanderOffset*shape
+	z := z0 + dz*t + chordNZ*meanderOffset*shape
+	tx := dx + chordNX*meanderOffset*shapeDerivative
+	tz := dz + chordNZ*meanderOffset*shapeDerivative
+	tangentLength := math.Hypot(tx, tz)
+	if tangentLength <= 1e-12 {
+		return x, z, chordNX, chordNZ
+	}
+	return x, z, -tz / tangentLength, tx / tangentLength
+}
+
+func riverMeanderShapeForSegment(
+	seg RiverSegment,
+	t float64,
+) (float64, float64, float64) {
+	t = clamp(t, 0, 1)
+	phase := math.Pi * t
+	s := math.Sin(phase)
+	c := math.Cos(phase)
+
+	if seg.MouthExpansionVersion >= 3 {
+		return s * s,
+			2 * math.Pi * s * c,
+			2 * math.Pi * math.Pi * (c*c - s*s)
+	}
+	return s,
+		math.Pi * c,
+		-math.Pi * math.Pi * s
+}
+
+func riverCenterAndNormalForSegment(
+	seg RiverSegment,
+	t float64,
+) (float64, float64, float64, float64) {
+	t = clamp(t, 0, 1)
+	dx := seg.X1 - seg.X0
+	dz := seg.Z1 - seg.Z0
+	length := math.Hypot(dx, dz)
+	if length <= 1e-12 {
+		return seg.X0, seg.Z0, 1, 0
+	}
+	chordNX := -dz / length
+	chordNZ := dx / length
+	shape, shapeDerivative, _ :=
+		riverMeanderShapeForSegment(seg, t)
+	x := seg.X0 + dx*t + chordNX*seg.MeanderOffset*shape
+	z := seg.Z0 + dz*t + chordNZ*seg.MeanderOffset*shape
+	tx := dx + chordNX*seg.MeanderOffset*shapeDerivative
+	tz := dz + chordNZ*seg.MeanderOffset*shapeDerivative
+	tangentLength := math.Hypot(tx, tz)
+	if tangentLength <= 1e-12 {
+		return x, z, chordNX, chordNZ
+	}
+	return x, z, -tz / tangentLength, tx / tangentLength
+}
+
+// RiverCenterFrame returns the authoritative rendered centerline position and
+// unit normal for a persisted river segment. Acceptance tools and previews use
+// this instead of duplicating versioned meander formulas.
+func RiverCenterFrame(
+	seg RiverSegment,
+	t float64,
+) (float64, float64, float64, float64) {
+	return riverCenterAndNormalForSegment(seg, t)
+}
+
+// RiverCenterPoint returns only the authoritative rendered centerline position.
+func RiverCenterPoint(seg RiverSegment, t float64) (float64, float64) {
+	x, z, _, _ := riverCenterAndNormalForSegment(seg, t)
+	return x, z
 }
 
 func sampleRiverProfile(seg RiverSegment, t float64) float64 {
@@ -1534,13 +2087,20 @@ func appendLakeConnectorPath(
 		originalDrop :=
 			m.Base.SampleNormalized(x0, z0) -
 				m.Base.SampleNormalized(x1, z1)
+		lakeMouth := i == len(path)-2
+		mouthExpansionVersion := uint8(3)
+		if cfg.RiverGeometryVersion >= 1 && !lakeMouth {
+			mouthExpansionVersion = 4
+		}
 		meander := riverMeanderOffset(
 			m.Base.Config.Seed,
 			from,
 			to,
-			lengths[i],
+			x0, z0,
+			x1, z1,
 			halfWidth,
 			originalDrop,
+			cfg.RiverGeometryVersion,
 		)
 		profile := buildRiverProfile(
 			m.Base,
@@ -1552,6 +2112,7 @@ func appendLakeConnectorPath(
 			desiredEnd,
 			halfWidth,
 			meander,
+			mouthExpansionVersion,
 			cfg.RiverProfileStepBlocks,
 			cfg.MinRiverBedDepthNormalized*(1+1.5*widthT),
 		)
@@ -1594,6 +2155,8 @@ func appendLakeConnectorPath(
 			Profile:                profile,
 			ReceiverSurfaceDefined: true,
 			ReceiverSurface:        receiverSurface,
+			LakeMouth:              lakeMouth,
+			MouthExpansionVersion:  mouthExpansionVersion,
 		}
 		id := len(m.Rivers)
 		m.Rivers = append(m.Rivers, segment)
@@ -1627,14 +2190,7 @@ func riverPathTouchesLake(
 		steps := maxInt(1, int(math.Ceil(length/4)))
 		for j := 0; j <= steps; j++ {
 			t := float64(j) / float64(steps)
-			x, z, _, _ := riverCenterAndNormalAt(
-				seg.X0,
-				seg.Z0,
-				seg.X1,
-				seg.Z1,
-				seg.MeanderOffset,
-				t,
-			)
+			x, z, _, _ := riverCenterAndNormalForSegment(seg, t)
 			if m.Sample(x, z).WaterKind == reconcile.WaterLake {
 				return true
 			}
@@ -1663,14 +2219,7 @@ func spatialLakeReceiverSurface(
 	found := false
 	for j := 0; j <= steps; j++ {
 		t := float64(j) / float64(steps)
-		x, z, _, _ := riverCenterAndNormalAt(
-			seg.X0,
-			seg.Z0,
-			seg.X1,
-			seg.Z1,
-			seg.MeanderOffset,
-			t,
-		)
+		x, z, _, _ := riverCenterAndNormalForSegment(seg, t)
 		bucket := m.bucketIndexForWorld(x, z)
 		if bucket < 0 {
 			continue
@@ -1742,6 +2291,54 @@ func easeReceiverMouthDrops(
 				receiver,
 				cfg,
 			)
+		}
+	}
+}
+
+func seedLakeOutletConfluenceBackwater(
+	rivers []RiverSegment,
+	incomingSegments [][]int,
+	cfg Config,
+) {
+	// MouthExpansionVersion 3 lets a low-gradient lake outlet carry its lake
+	// datum well beyond the immediate shoreline. When that elevated surface
+	// survives to the outlet segment's downstream node, every river footprint
+	// meeting at that node must share the same water datum. Otherwise runtime
+	// ownership can alternate block-by-block between the elevated outlet and a
+	// lower sibling/downstream reach, producing a checkerboard water wall.
+	for id := range rivers {
+		seg := rivers[id]
+		if seg.MouthExpansionVersion < 3 ||
+			!seg.LakeOutlet ||
+			!seg.LakeOutletSurfaceDefined ||
+			lakeOutletSourceWeight(seg, 1) <= 1e-9 ||
+			len(seg.Profile) == 0 {
+			continue
+		}
+
+		naturalEnd :=
+			sampleRiverProfile(seg, 1) +
+				riverCenterDepth(cfg, seg.HalfWidth)
+		sharedSurface :=
+			riverConnectionSurface(seg, 1, naturalEnd)
+		if sharedSurface <= naturalEnd+1e-12 {
+			continue
+		}
+
+		node := seg.To
+		if node < 0 || node >= len(incomingSegments) {
+			continue
+		}
+		for _, incomingID := range incomingSegments[node] {
+			if incomingID < 0 || incomingID >= len(rivers) {
+				continue
+			}
+			incoming := &rivers[incomingID]
+			if !incoming.ReceiverSurfaceDefined ||
+				incoming.ReceiverSurface < sharedSurface {
+				incoming.ReceiverSurfaceDefined = true
+				incoming.ReceiverSurface = sharedSurface
+			}
 		}
 	}
 }
@@ -1975,13 +2572,43 @@ func lakeBoundaryOffset(angle, radius float64) (float64, float64) {
 	return c * scale, s * scale
 }
 
-func riverHalfWidth(cfg Config, threshold, strength float64) float64 {
-	denom := math.Max(1e-9, 1-threshold)
-	t := clamp((strength-threshold)/denom, 0, 1)
+func riverHalfWidth(
+	cfg Config,
+	strengthThreshold,
+	strength,
+	accumulation,
+	accumulationThreshold float64,
+	order uint8,
+) float64 {
+	denom := math.Max(1e-9, 1-strengthThreshold)
+	t := clamp((strength-strengthThreshold)/denom, 0, 1)
+
 	// sqrt gives medium/large rivers enough width without making threshold
 	// rivers abruptly wide.
 	t = math.Sqrt(t)
-	return lerp(cfg.MinRiverHalfWidthBlocks, cfg.MaxRiverHalfWidthBlocks, t)
+	base := lerp(cfg.MinRiverHalfWidthBlocks, cfg.MaxRiverHalfWidthBlocks, t)
+
+	// RiverStrength mainly distinguishes visible streams from ordinary rivers.
+	// True trunk rivers also carry much larger accumulated runoff and higher
+	// Strahler order. Let those rare reaches exceed the ordinary Max width so
+	// GeoWorld can form actual large rivers without widening every tributary.
+	flowSignal := 0.0
+	if accumulationThreshold > 0 && accumulation > accumulationThreshold {
+		flowSignal = clamp(
+			math.Log2(accumulation/accumulationThreshold)/5.0,
+			0,
+			1,
+		)
+	}
+	orderSignal := clamp((float64(order)-2)/3.0, 0, 1)
+	majorSignal := math.Max(flowSignal, orderSignal)
+	// Keep ordinary rivers close to the configured maximum, but let only the
+	// very highest-flow/high-order trunk reaches become true "great rivers".
+	// The quartic term stays tiny for medium rivers and rises strongly only
+	// near majorSignal=1, yielding roughly 90-100 block full widths in Standard.
+	majorBoost := cfg.MaxRiverHalfWidthBlocks *
+		(0.55*majorSignal*majorSignal + 1.10*math.Pow(majorSignal, 4))
+	return base + majorBoost
 }
 
 func riverWidthFraction(cfg Config, halfWidth float64) float64 {
@@ -1994,23 +2621,642 @@ func riverCenterDepth(cfg Config, halfWidth float64) float64 {
 	return cfg.RiverCenterDepthNormalized * (1 + 2*math.Pow(widthT, 1.15))
 }
 
-func mouthMaxHalfWidth(seg RiverSegment) float64 {
-	if !seg.OceanMouth {
-		return seg.HalfWidth
+func connectionBasinSignal(seg RiverSegment) float64 {
+	if seg.MouthExpansionVersion < 3 {
+		return 0
 	}
-	return seg.HalfWidth + math.Min(12, math.Max(9, seg.HalfWidth))
+	// Low total drop over one macro reach is a good proxy for a broad alluvial
+	// lowland/backwater setting. Steep valleys keep a normal confined channel.
+	drop := math.Max(0, seg.Bed0-seg.Bed1)
+	return 1 - smoothstep(0.004, 0.016, drop)
 }
 
-// Flare the final ocean-bound reach before it enters the coastline.
-// The macro receiver node can sit far offshore, so the widening begins
-// well before the endpoint and does not depend on a voxelized shore pixel.
-func riverMouthHalfWidth(seg RiverSegment, t float64) float64 {
-	if !seg.OceanMouth {
+func lakeOutletExtraHalfWidth(seg RiverSegment) float64 {
+	if seg.MouthExpansionVersion < 3 {
+		return math.Min(24, math.Max(14, 1.25*seg.HalfWidth))
+	}
+	basin := connectionBasinSignal(seg)
+	factor := 1.25 + 0.85*basin
+	return math.Min(48, math.Max(18, factor*seg.HalfWidth))
+}
+
+func riverDiagonalRasterWidthAmplitude(seg RiverSegment) float64 {
+	if seg.MouthExpansionVersion < 4 ||
+		seg.OceanMouth ||
+		seg.LakeMouth ||
+		seg.LakeOutlet ||
+		seg.HalfWidth < 24 ||
+		!riverChordIsGridDiagonal(seg.X0, seg.Z0, seg.X1, seg.Z1) {
+		return 0
+	}
+	return clamp(0.19*seg.HalfWidth, 4, 9)
+}
+
+func riverDiagonalRasterWidthDelta(seg RiverSegment, t float64) float64 {
+	amplitude := riverDiagonalRasterWidthAmplitude(seg)
+	if amplitude <= 0 {
+		return 0
+	}
+	t = clamp(t, 0, 1)
+	s := math.Sin(math.Pi * t)
+	return -amplitude * s * s * math.Sin(4*math.Pi*t)
+}
+
+func riverFluvialDetailStrength(seg RiverSegment) float64 {
+	if seg.MouthExpansionVersion < 5 ||
+		seg.OceanMouth ||
+		seg.LakeMouth ||
+		seg.LakeOutlet ||
+		seg.HalfWidth < 14 {
+		return 0
+	}
+	length := math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0)
+	if length <= 1e-9 {
+		return 0
+	}
+	start := sampleRiverProfile(seg, 0)
+	end := sampleRiverProfile(seg, 1)
+	drop := math.Max(0, start-end) * 128 / length
+	widthWeight := smoothstep(14, 34, seg.HalfWidth)
+	lowGradient := 1 - smoothstep(0.008, 0.030, drop)
+	return clamp(widthWeight*lowGradient, 0, 1)
+}
+
+func riverFluvialReach(seg RiverSegment) float64 {
+	bankRadius := riverMouthHalfWidth(seg, 0.5) +
+		riverBankBlendBlocks(seg.HalfWidth)
+	strength := riverFluvialDetailStrength(seg)
+	if strength <= 0 {
+		return bankRadius
+	}
+	return bankRadius + strength*(28+2.15*seg.HalfWidth)
+}
+
+func riverFluvialKey(seg RiverSegment) uint64 {
+	h := uint64(1469598103934665603)
+	values := [...]int64{
+		int64(math.Round(seg.X0)),
+		int64(math.Round(seg.Z0)),
+		int64(math.Round(seg.X1)),
+		int64(math.Round(seg.Z1)),
+	}
+	for _, value := range values {
+		h ^= uint64(value)
+		h *= uint64(1099511628211)
+	}
+	return h
+}
+
+func riverFluvialPhase(seg RiverSegment) float64 {
+	const inv53 = 1.0 / 9007199254740992.0
+	h := riverFluvialKey(seg)
+	return float64(h>>11) * inv53 * 2 * math.Pi
+}
+
+func riverAbandonedMeanderOffset(
+	seg RiverSegment,
+	t float64,
+	key uint64,
+) float64 {
+	t = clamp(t, 0, 1)
+	s := math.Sin(math.Pi * t)
+	side := 1.0
+	if key&1 != 0 {
+		side = -1
+	}
+	bankRadius := riverMouthHalfWidth(seg, t) +
+		riverBankBlendBlocks(seg.HalfWidth)
+	bulge := (0.55*seg.HalfWidth + 6) * s * s
+	return side * (bankRadius + 4 + bulge)
+}
+
+func riverNaturalLeveeEnabled(seg RiverSegment) bool {
+	strength := riverFluvialDetailStrength(seg)
+	if strength < 0.56 {
+		return false
+	}
+	// Only a deterministic subset of eligible wide, low-gradient reaches gets
+	// levee refinement. This keeps levees as regional detail instead of the
+	// default visual language of every large river.
+	return riverFluvialKey(seg)%5 < 2
+}
+
+func riverNaturalLeveeLift(
+	seg RiverSegment,
+	t,
+	worldX,
+	worldZ,
+	n float64,
+) float64 {
+	if !riverNaturalLeveeEnabled(seg) {
+		return 0
+	}
+	t = clamp(t, 0, 1)
+	n = clamp(n, 0, 1)
+	strength := riverFluvialDetailStrength(seg)
+	if strength <= 0 {
+		return 0
+	}
+
+	// The levee is a broad shoulder immediately outside the active bank, not
+	// an embankment. It fades before the middle floodplain/terrace band.
+	bankBand :=
+		smoothstep(0.015, 0.065, n) *
+			(1 - smoothstep(0.16, 0.28, n))
+	if bankBand <= 0 {
+		return 0
+	}
+
+	cx, cz, nx, nz := RiverCenterFrame(seg, t)
+	lateral := (worldX-cx)*nx + (worldZ-cz)*nz
+	side := 1.0
+	if lateral < 0 {
+		side = -1
+	}
+	phase := riverFluvialPhase(seg)
+	sectionSignal := 0.5 + 0.5*math.Sin(
+		2*math.Pi*t+phase+0.82*side,
+	)
+	continuity := smoothstep(0.34, 0.72, sectionSignal)
+	endFade :=
+		smoothstep(0.04, 0.16, t) *
+			(1 - smoothstep(0.84, 0.96, t))
+	return 0.0042 * strength * bankBand * continuity * endFade
+}
+
+func applyRiverFluvialDryDetail(
+	seg RiverSegment,
+	t,
+	worldX,
+	worldZ,
+	baseHeight,
+	currentHeight,
+	surface,
+	distance float64,
+) float64 {
+	strength := riverFluvialDetailStrength(seg)
+	if strength <= 0 {
+		return currentHeight
+	}
+	halfWidth := riverMouthHalfWidth(seg, t)
+	bankRadius := halfWidth + riverBankBlendBlocks(seg.HalfWidth)
+	reach := riverFluvialReach(seg)
+	if distance < bankRadius || distance >= reach {
+		return currentHeight
+	}
+
+	phase := riverFluvialPhase(seg)
+	if distance >= bankRadius {
+		n := clamp(
+			(distance-bankRadius)/math.Max(1e-9, reach-bankRadius),
+			0,
+			1,
+		)
+		envelope := (1 - smoothstep(0, 1, n)) * strength
+		terrace := smoothstep(0.38, 0.56, n) *
+			(1 - smoothstep(0.74, 0.92, n)) *
+			strength
+		floodTarget := surface +
+			0.0055 +
+			0.0011*math.Sin(2*math.Pi*t+phase)
+		terraceTarget := surface +
+			0.015 +
+			0.0018*math.Sin(math.Pi*t+phase*0.5)
+		target := lerp(floodTarget, terraceTarget, terrace)
+		// Natural levees are modeled as a narrow zone that is carved slightly
+		// less than the surrounding floodplain. The target is still capped by
+		// baseHeight below, so this can never build an artificial wall above the
+		// original terrain.
+		target += riverNaturalLeveeLift(
+			seg,
+			t,
+			worldX,
+			worldZ,
+			n,
+		)
+		weight := envelope * (0.74 - 0.24*terrace)
+		candidate := lerp(
+			baseHeight,
+			math.Min(baseHeight, target),
+			clamp(weight, 0, 1),
+		)
+		currentHeight = math.Min(currentHeight, candidate)
+	}
+
+	// Only a small deterministic subset of wide low-gradient reaches receives
+	// an abandoned meander. It is a dry/shallow geomorphic groove, not another
+	// hydrologic river edge, so the real drainage graph remains unchanged.
+	key := riverFluvialKey(seg)
+	if distance >= bankRadius && key%13 == 0 && strength >= 0.52 {
+		cx, cz, nx, nz := RiverCenterFrame(seg, t)
+		lateral := (worldX-cx)*nx + (worldZ-cz)*nz
+		s := math.Sin(math.Pi * clamp(t, 0, 1))
+		offset := riverAbandonedMeanderOffset(seg, t, key)
+		oldDistance := math.Abs(lateral - offset)
+		radius := clamp(0.18*seg.HalfWidth, 4, 11)
+		grooveWeight := (1 - smoothstep(0.35*radius, radius, oldDistance)) *
+			s * s * strength
+		if grooveWeight > 0 {
+			oldTarget := surface +
+				0.0045 +
+				0.0008*math.Sin(2*math.Pi*t+phase)
+			candidate := lerp(
+				baseHeight,
+				math.Min(baseHeight, oldTarget),
+				clamp(0.72*grooveWeight, 0, 1),
+			)
+			currentHeight = math.Min(currentHeight, candidate)
+		}
+	}
+	return currentHeight
+}
+
+func riverOxbowWater(
+	cfg Config,
+	seg RiverSegment,
+	t,
+	worldX,
+	worldZ,
+	activeDistance float64,
+) (surface, floor, weight float64, ok bool) {
+	strength := riverFluvialDetailStrength(seg)
+	bankRadius := riverMouthHalfWidth(seg, t) +
+		riverBankBlendBlocks(seg.HalfWidth)
+	if seg.MouthExpansionVersion < 5 ||
+		seg.OceanMouth ||
+		seg.LakeMouth ||
+		seg.LakeOutlet ||
+		seg.HalfWidth < 18 ||
+		strength < 0.62 ||
+		activeDistance < bankRadius {
+		return 0, 0, 0, false
+	}
+
+	// Oxbows are a rarer wet subset of the already-rare abandoned meanders.
+	// The unsigned river key is deterministic across regenerated/reopened worlds.
+	key := riverFluvialKey(seg)
+	if key%13 != 0 || (key/13)%3 != 0 {
+		return 0, 0, 0, false
+	}
+
+	t = clamp(t, 0, 1)
+	s := math.Sin(math.Pi * t)
+	if s <= 0.18 {
+		return 0, 0, 0, false
+	}
+	cx, cz, nx, nz := RiverCenterFrame(seg, t)
+	lateral := (worldX-cx)*nx + (worldZ-cz)*nz
+	offset := riverAbandonedMeanderOffset(seg, t, key)
+	oldDistance := math.Abs(lateral - offset)
+	radius := clamp(0.20*seg.HalfWidth, 5, 13)
+	core := 1 - smoothstep(0.35*radius, radius, oldDistance)
+	weight = clamp(
+		core*s*s*(0.82+0.18*strength),
+		0,
+		1,
+	)
+	if weight <= 0 {
+		return 0, 0, 0, false
+	}
+
+	// A disconnected oxbow has one still-water datum. Use the middle of the
+	// low-gradient parent reach rather than the local t value so the crescent
+	// cannot become a sloping staircase of source water.
+	midBed := sampleRiverProfile(seg, 0.5)
+	midNaturalSurface := midBed + riverCenterDepth(cfg, seg.HalfWidth)
+	surface = riverConnectionSurface(seg, 0.5, midNaturalSurface)
+	depth := math.Max(
+		cfg.MinLakeWaterDepthNormalized*1.35,
+		0.0042,
+	) * (0.90 + 0.25*strength)
+	floor = math.Max(0, surface-depth)
+	return surface, floor, weight, true
+}
+
+func riverDeltaKey(seg RiverSegment) uint64 {
+	return riverFluvialKey(seg) ^ 0xD371A5EED17A5EED
+}
+
+func riverDeltaStrength(seg RiverSegment) float64 {
+	if seg.MouthExpansionVersion < 5 ||
+		!seg.OceanMouth ||
+		seg.LakeMouth ||
+		seg.LakeOutlet ||
+		seg.HalfWidth < 16 {
+		return 0
+	}
+	basin := connectionBasinSignal(seg)
+	if basin < 0.52 {
+		return 0
+	}
+	key := riverDeltaKey(seg)
+	if key%3 != 0 {
+		return 0
+	}
+	width := smoothstep(16, 34, seg.HalfWidth)
+	lowGradient := smoothstep(0.52, 0.90, basin)
+	return clamp(width*lowGradient, 0, 1)
+}
+
+func riverDeltaBranchCount(seg RiverSegment) int {
+	strength := riverDeltaStrength(seg)
+	if strength <= 0 {
+		return 0
+	}
+	key := riverDeltaKey(seg)
+	if strength >= 0.72 && (key/3)%2 == 0 {
+		return 2
+	}
+	return 1
+}
+
+func riverDeltaBranchSide(seg RiverSegment, branch int) float64 {
+	count := riverDeltaBranchCount(seg)
+	if count <= 0 {
+		return 0
+	}
+	if count == 2 {
+		if branch == 0 {
+			return -1
+		}
+		return 1
+	}
+	if riverDeltaKey(seg)&1 != 0 {
+		return -1
+	}
+	return 1
+}
+
+func riverDeltaCentralFlareScale(seg RiverSegment) float64 {
+	strength := riverDeltaStrength(seg)
+	if strength <= 0 {
+		return 1
+	}
+	return 0.40 - 0.08*strength
+}
+
+func riverDeltaBranchGeometry(
+	seg RiverSegment,
+	t float64,
+	branch int,
+) (offset, halfWidth, bankRadius float64, ok bool) {
+	strength := riverDeltaStrength(seg)
+	count := riverDeltaBranchCount(seg)
+	if strength <= 0 || branch < 0 || branch >= count {
+		return 0, 0, 0, false
+	}
+	start := 0.46
+	u := clamp((t-start)/(1-start), 0, 1)
+	if u <= 0 {
+		return 0, 0, 0, false
+	}
+	growth := smoothstep(0, 0.24, u)
+	targetWidth := clamp(
+		seg.HalfWidth*(0.22+0.07*strength),
+		4.5,
+		13.5,
+	)
+	halfWidth = targetWidth * growth
+	if halfWidth < 1.25 {
+		return 0, 0, 0, false
+	}
+
+	normalExtra := mouthMaxHalfWidth(seg) - seg.HalfWidth
+	centralEnd := seg.HalfWidth +
+		normalExtra*riverDeltaCentralFlareScale(seg)
+	landGap := 3.5 + 4.5*strength
+	terminalSeparation := math.Min(
+		82,
+		centralEnd+targetWidth+landGap,
+	)
+	separation := terminalSeparation * smoothstep(0, 1, u)
+	offset = riverDeltaBranchSide(seg, branch) * separation
+	bankRadius = halfWidth + riverBankBlendBlocks(halfWidth)
+	return offset, halfWidth, bankRadius, true
+}
+
+func riverDeltaSupportRadius(seg RiverSegment) float64 {
+	count := riverDeltaBranchCount(seg)
+	if count <= 0 {
+		return 0
+	}
+	maxSupport := 0.0
+	for branch := 0; branch < count; branch++ {
+		offset, _, bankRadius, ok :=
+			riverDeltaBranchGeometry(seg, 1, branch)
+		if !ok {
+			continue
+		}
+		maxSupport = math.Max(
+			maxSupport,
+			math.Abs(offset)+bankRadius,
+		)
+	}
+	return maxSupport
+}
+
+func riverDeltaPoint(
+	seg RiverSegment,
+	t,
+	worldX,
+	worldZ float64,
+) (
+	branch int,
+	distance,
+	halfWidth,
+	bankRadius float64,
+	ok bool,
+) {
+	count := riverDeltaBranchCount(seg)
+	if count <= 0 {
+		return 0, 0, 0, 0, false
+	}
+	cx, cz, nx, nz := RiverCenterFrame(seg, t)
+	lateral := (worldX-cx)*nx + (worldZ-cz)*nz
+	bestDistance := math.Inf(1)
+	bestBranch := -1
+	bestWidth := 0.0
+	bestBank := 0.0
+	for i := 0; i < count; i++ {
+		offset, width, bank, valid :=
+			riverDeltaBranchGeometry(seg, t, i)
+		if !valid {
+			continue
+		}
+		d := math.Abs(lateral - offset)
+		if d < bestDistance {
+			bestDistance = d
+			bestBranch = i
+			bestWidth = width
+			bestBank = bank
+		}
+	}
+	if bestBranch < 0 {
+		return 0, 0, 0, 0, false
+	}
+	return bestBranch, bestDistance, bestWidth, bestBank, true
+}
+
+func riverMaxHalfWidth(seg RiverSegment) float64 {
+	maxWidth := mouthMaxHalfWidth(seg) +
+		riverDiagonalRasterWidthAmplitude(seg)
+	if seg.MouthExpansionVersion >= 2 && seg.LakeOutlet {
+		maxWidth = math.Max(
+			maxWidth,
+			seg.HalfWidth+lakeOutletExtraHalfWidth(seg),
+		)
+	}
+	return maxWidth
+}
+
+func mouthMaxHalfWidth(seg RiverSegment) float64 {
+	if seg.MouthExpansionVersion < 2 {
+		if !seg.OceanMouth {
+			return seg.HalfWidth
+		}
+		return seg.HalfWidth +
+			math.Min(12, math.Max(9, seg.HalfWidth))
+	}
+	if seg.MouthExpansionVersion == 2 {
+		switch {
+		case seg.OceanMouth:
+			extra := math.Min(18, math.Max(12, 0.85*seg.HalfWidth))
+			return seg.HalfWidth + extra
+		case seg.LakeMouth:
+			extra := math.Min(12, math.Max(6, 0.55*seg.HalfWidth))
+			return seg.HalfWidth + extra
+		default:
+			return seg.HalfWidth
+		}
+	}
+
+	basin := connectionBasinSignal(seg)
+	switch {
+	case seg.OceanMouth:
+		// The final reach starts from an already non-shrinking trunk and then
+		// opens further into the sea; no narrow "gourd neck" is introduced.
+		extra := math.Min(
+			32,
+			math.Max(16, (0.90+0.35*basin)*seg.HalfWidth),
+		)
+		return seg.HalfWidth + extra
+	case seg.LakeMouth:
+		// A low-gradient inlet may naturally spread into a backwater/flood basin
+		// before reaching the persistent lake footprint.
+		extra := math.Min(
+			42,
+			math.Max(16, (0.80+1.05*basin)*seg.HalfWidth),
+		)
+		return seg.HalfWidth + extra
+	default:
 		return seg.HalfWidth
 	}
-	progress := clamp((t-0.12)/0.62, 0, 1)
-	return seg.HalfWidth +
-		(mouthMaxHalfWidth(seg)-seg.HalfWidth)*smoothstep(0, 1, progress)
+}
+
+// Flare formal water connections at their receiving and source ends. A river
+// entering a lake/ocean opens toward the receiver; a formal lake outlet starts
+// broad enough to overlap the rendered lake shore and then narrows naturally.
+// Hydrology must establish the relation first, so this never connects unrelated
+// nearby water bodies merely because they are geometrically close.
+func riverMouthHalfWidth(seg RiverSegment, t float64) float64 {
+	if seg.MouthExpansionVersion >= 3 &&
+		seg.LakeOutlet &&
+		seg.OceanMouth {
+		// A short lake outlet can also be the final ocean-mouth reach. Treat
+		// that as one broad estuary instead of superimposing an outlet taper
+		// and an ocean flare, which can create a mid-reach bulge followed by
+		// narrowing at the sea. The source breadth is preserved and the final
+		// reach may only hold or widen from there.
+		sourceExtra := lakeOutletExtraHalfWidth(seg)
+		receiverExtra := mouthMaxHalfWidth(seg) - seg.HalfWidth
+		targetExtra := math.Max(sourceExtra, receiverExtra)
+		progress := smoothstep(0.04, 0.90, clamp(t, 0, 1))
+		return seg.HalfWidth + lerp(sourceExtra, targetExtra, progress)
+	}
+	if seg.MouthExpansionVersion < 2 {
+		if !seg.OceanMouth {
+			return seg.HalfWidth
+		}
+		progress := clamp((t-0.12)/0.62, 0, 1)
+		return seg.HalfWidth +
+			(mouthMaxHalfWidth(seg)-seg.HalfWidth)*smoothstep(0, 1, progress)
+	}
+
+	width := seg.HalfWidth + riverDiagonalRasterWidthDelta(seg, t)
+	if seg.OceanMouth || seg.LakeMouth {
+		start, span := 0.18, 0.70
+		if seg.LakeMouth {
+			start, span = 0.34, 0.56
+		}
+		if seg.MouthExpansionVersion >= 3 {
+			if seg.OceanMouth {
+				start, span = 0.04, 0.86
+			} else {
+				start, span = 0.18, 0.76
+			}
+		}
+		progress := clamp((t-start)/span, 0, 1)
+		receiverExtra :=
+			(mouthMaxHalfWidth(seg) - seg.HalfWidth) *
+				smoothstep(0, 1, progress)
+		if seg.OceanMouth {
+			receiverExtra *= riverDeltaCentralFlareScale(seg)
+		}
+		receiverWidth := seg.HalfWidth + receiverExtra
+		width = math.Max(width, receiverWidth)
+	}
+
+	if seg.LakeOutlet {
+		extra := lakeOutletExtraHalfWidth(seg)
+		length := math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0)
+		along := clamp(t, 0, 1) * length
+		startFade, endFade := 96.0, 176.0
+		if seg.MouthExpansionVersion >= 3 {
+			basin := connectionBasinSignal(seg)
+			startFade = 88 - 24*basin
+			endFade = 190 + 90*basin
+		}
+		fade := 1 - smoothstep(startFade, endFade, along)
+		width = math.Max(width, seg.HalfWidth+extra*fade)
+	}
+	return width
+}
+
+func lakeOutletSourceWeight(seg RiverSegment, t float64) float64 {
+	if seg.MouthExpansionVersion < 2 ||
+		!seg.LakeOutletSurfaceDefined {
+		return 0
+	}
+	length := math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0)
+	along := clamp(t, 0, 1) * length
+	if seg.MouthExpansionVersion >= 3 {
+		basin := connectionBasinSignal(seg)
+		return 1 - smoothstep(
+			72-16*basin,
+			196+96*basin,
+			along,
+		)
+	}
+	return 1 - smoothstep(96, 176, along)
+}
+
+func riverConnectionSurface(seg RiverSegment, t, naturalSurface float64) float64 {
+	surface := naturalSurface
+	if seg.ReceiverSurfaceDefined && seg.ReceiverSurface > surface {
+		surface = seg.ReceiverSurface
+	}
+	outletWeight := lakeOutletSourceWeight(seg, t)
+	if outletWeight > 0 && seg.LakeOutletSurface > naturalSurface {
+		outletSurface := lerp(
+			naturalSurface,
+			seg.LakeOutletSurface,
+			outletWeight,
+		)
+		if outletSurface > surface {
+			surface = outletSurface
+		}
+	}
+	return math.Min(1, surface)
 }
 
 func riverBankBlendBlocks(halfWidth float64) float64 {
@@ -2037,19 +3283,19 @@ func pointRiverSegment(
 		1,
 	)
 
-	// Newton-refine the nearest point on the curved centerline
-	// P(t)=P0+tD+N*A*sin(pi*t). Offsets are intentionally modest, so the
-	// chord projection is a stable starting point.
+	// Newton-refine the nearest point on the curved centerline. Legacy
+	// reaches use sin(pi*t); v3 uses sin(pi*t)^2 so the meander has zero
+	// lateral derivative at both macro-node endpoints. Offsets are modest,
+	// so the chord projection remains a stable starting point.
 	for iter := 0; iter < 4 && math.Abs(seg.MeanderOffset) > 1e-9; iter++ {
-		phase := math.Pi * t
-		s := math.Sin(phase)
-		c := math.Cos(phase)
-		x := seg.X0 + dx*t + nx*seg.MeanderOffset*s
-		z := seg.Z0 + dz*t + nz*seg.MeanderOffset*s
-		tx := dx + nx*seg.MeanderOffset*math.Pi*c
-		tz := dz + nz*seg.MeanderOffset*math.Pi*c
-		ax := -nx * seg.MeanderOffset * math.Pi * math.Pi * s
-		az := -nz * seg.MeanderOffset * math.Pi * math.Pi * s
+		shape, shapeDerivative, shapeSecondDerivative :=
+			riverMeanderShapeForSegment(seg, t)
+		x := seg.X0 + dx*t + nx*seg.MeanderOffset*shape
+		z := seg.Z0 + dz*t + nz*seg.MeanderOffset*shape
+		tx := dx + nx*seg.MeanderOffset*shapeDerivative
+		tz := dz + nz*seg.MeanderOffset*shapeDerivative
+		ax := nx * seg.MeanderOffset * shapeSecondDerivative
+		az := nz * seg.MeanderOffset * shapeSecondDerivative
 		rx := x - px
 		rz := z - pz
 		f := rx*tx + rz*tz
@@ -2065,14 +3311,7 @@ func pointRiverSegment(
 		t = next
 	}
 
-	x, z, _, _ := riverCenterAndNormalAt(
-		seg.X0,
-		seg.Z0,
-		seg.X1,
-		seg.Z1,
-		seg.MeanderOffset,
-		t,
-	)
+	x, z, _, _ := riverCenterAndNormalForSegment(seg, t)
 	return t, math.Hypot(px-x, pz-z)
 }
 
@@ -2203,25 +3442,11 @@ func (m *Model) Audit(samplesPerSegment int, epsilon float64) Diagnostics {
 		if profileSteps := 2 * (len(seg.Profile) - 1); profileSteps > steps {
 			steps = profileSteps
 		}
-		prevX, prevZ, _, _ := riverCenterAndNormalAt(
-			seg.X0,
-			seg.Z0,
-			seg.X1,
-			seg.Z1,
-			seg.MeanderOffset,
-			0,
-		)
+		prevX, prevZ, _, _ := riverCenterAndNormalForSegment(seg, 0)
 		prevOwn := sampleRiverProfile(seg, 0)
 		for j := 1; j <= steps; j++ {
 			t := float64(j) / float64(steps)
-			x, z, _, _ := riverCenterAndNormalAt(
-				seg.X0,
-				seg.Z0,
-				seg.X1,
-				seg.Z1,
-				seg.MeanderOffset,
-				t,
-			)
+			x, z, _, _ := riverCenterAndNormalForSegment(seg, t)
 			own := sampleRiverProfile(seg, t)
 			ownRise := own - prevOwn
 			d.RiverSampleSteps++
@@ -2260,6 +3485,32 @@ func (m *Model) Audit(samplesPerSegment int, epsilon float64) Diagnostics {
 		}
 	}
 	return d
+}
+
+func riverBankProtectedAt(
+	rivers []RiverSegment,
+	ids []int,
+	worldX,
+	worldZ float64,
+) bool {
+	for _, id := range ids {
+		if id < 0 || id >= len(rivers) {
+			continue
+		}
+		seg := rivers[id]
+		t, distance := pointRiverSegment(worldX, worldZ, seg)
+		bankRadius := riverMouthHalfWidth(seg, t) +
+			riverBankBlendBlocks(seg.HalfWidth)
+		if distance < bankRadius {
+			return true
+		}
+		_, deltaDistance, _, deltaBankRadius, deltaOK :=
+			riverDeltaPoint(seg, t, worldX, worldZ)
+		if deltaOK && deltaDistance < deltaBankRadius {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Model) riverOverlapCount(worldX, worldZ float64) int {

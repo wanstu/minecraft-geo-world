@@ -1,4 +1,5 @@
 output/
+.tmp/
 **/build/
 **/.gradle/
 **/geoworld-cache/

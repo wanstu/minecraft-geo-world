@@ -42,6 +42,7 @@ sourceSets.main.java.exclude 'geoworld/minecraft/v26common/client/GeoWorldV26Pre
 sourceSets.main.java.exclude 'geoworld/minecraft/v26common/client/GeoWorldV26PreviewScreen.java'
 
 sourceSets.main.resources.srcDir '../../minecraft-v26-common/src/main/resources'
+sourceSets.main.resources.srcDir '../../../acceptance/resources'
 
 // Shared Minecraft 1.20.1 assets/data are loader-neutral.
 sourceSets.main.resources.srcDir '../../minecraft-v1_20_1-common/src/main/resources'

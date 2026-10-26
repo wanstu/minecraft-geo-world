@@ -50,7 +50,8 @@ public final class GeoWorldV26TerrainPopulator {
             String surfaceBiome,
             boolean terracottaStrata,
             int worldX,
-            int worldZ
+            int worldZ,
+            String generationRulesVersion
         );
     }
 
@@ -79,6 +80,8 @@ public final class GeoWorldV26TerrainPopulator {
         BadlandsClassifier badlandsClassifier,
         ColumnBlockResolver blockResolver,
         BlockSetter blockSetter,
+        OverlayPopulator structurePopulator,
+        OverlayPopulator cavePopulator,
         OverlayPopulator mineralPopulator,
         OverlayPopulator amethystPopulator
     ) {
@@ -140,7 +143,8 @@ public final class GeoWorldV26TerrainPopulator {
                         surfaceBiome,
                         terracottaStrata,
                         worldX,
-                        worldZ
+                        worldZ,
+                        runtime.manifest().generationRulesVersion()
                     );
                     if (state.isAir()) continue;
 
@@ -156,6 +160,8 @@ public final class GeoWorldV26TerrainPopulator {
         }
 
         final long voxelReady = measure ? System.nanoTime() : 0L;
+        structurePopulator.populate(chunk, runtime, seed, shoreline);
+        cavePopulator.populate(chunk, runtime, seed, shoreline);
         mineralPopulator.populate(chunk, runtime, seed, shoreline);
         final long mineralsReady = measure ? System.nanoTime() : 0L;
         amethystPopulator.populate(chunk, runtime, seed, shoreline);

@@ -7,6 +7,8 @@ import (
 	"geoworld/internal/world"
 )
 
+const defaultOrographicRainStrength = 0.22
+
 func Generate(input Input, cfg Config) (*Model, error) {
 	if input.Width < 2 || input.Height < 2 {
 		return nil, errors.New("climate: input grid must be at least 2x2")
@@ -103,8 +105,8 @@ func Generate(input Input, cfg Config) (*Model, error) {
 
 			pressure, wx, wz := circulationAtLatitude(lat)
 			m.PressureIndex[i] = pressure
-			m.WindX[i] = wx
-			m.WindZ[i] = wz
+			m.WindX[i] = wx * cfg.PrevailingWindStrength
+			m.WindZ[i] = wz * cfg.PrevailingWindStrength
 		}
 	}
 
@@ -192,7 +194,7 @@ func normalizeConfig(cfg Config) Config {
 		cfg.MoistureDiffusion = 0.08
 	}
 	if cfg.OrographicRainStrength <= 0 {
-		cfg.OrographicRainStrength = 0.22
+		cfg.OrographicRainStrength = defaultOrographicRainStrength
 	}
 	if cfg.PrecipitationScaleMM <= 0 {
 		cfg.PrecipitationScaleMM = 40000
@@ -211,6 +213,9 @@ func normalizeConfig(cfg Config) Config {
 	}
 	if cfg.MonsoonWindStrength <= 0 {
 		cfg.MonsoonWindStrength = 0.75
+	}
+	if cfg.PrevailingWindStrength <= 0 {
+		cfg.PrevailingWindStrength = 1.0
 	}
 	if cfg.SeasonalMoistureTempCoupling <= 0 || cfg.SeasonalMoistureTempCoupling > 1 {
 		cfg.SeasonalMoistureTempCoupling = 0.35
@@ -606,6 +611,15 @@ func (m *Model) solveMoistureAndPrecipitation(
 	}
 
 	stepCells := m.referenceStepCells()
+	// Preserve the historical/default climate exactly at 0.22 while making
+	// the semantic rain-shadow parameter actually scale orographic rainout
+	// and condensation. World profiles map 1.0 -> 0.22, so locked/default
+	// models retain their established precipitation field.
+	orographicScale := clamp(
+		m.Config.OrographicRainStrength/defaultOrographicRainStrength,
+		0,
+		2.5,
+	)
 	for iter := 0; iter < m.Config.MoistureIterations; iter++ {
 		for z := 0; z < m.Height; z++ {
 			for x := 0; x < m.Width; x++ {
@@ -622,7 +636,9 @@ func (m *Model) solveMoistureAndPrecipitation(
 				diffused := neighborAverageAtStep(prev, m.Width, m.Height, x, z, stepCells)
 				lowPressureLift := clamp((0.58-m.PressureIndex[i])/0.36, 0, 1)
 
-				rainout := 0.003 + lowPressureLift*0.008 + lift[i]*0.10
+				rainout := 0.003 +
+					lowPressureLift*0.008 +
+					lift[i]*0.10*orographicScale
 				rainout = clamp(rainout, 0.002, 0.18)
 
 				oceanSource := 0.0
@@ -662,7 +678,9 @@ func (m *Model) solveMoistureAndPrecipitation(
 
 	for i := 0; i < n; i++ {
 		lowPressureLift := clamp((0.58-m.PressureIndex[i])/0.36, 0, 1)
-		condensation := 0.018 + lowPressureLift*0.045 + lift[i]*0.30
+		condensation := 0.018 +
+			lowPressureLift*0.045 +
+			lift[i]*0.30*orographicScale
 
 		tempFactor := clamp((tempC[i]+25)/45, 0.05, 1)
 		rate := moisture[i] * condensation * tempFactor

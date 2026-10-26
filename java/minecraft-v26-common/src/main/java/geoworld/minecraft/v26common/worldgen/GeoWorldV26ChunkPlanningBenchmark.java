@@ -2,6 +2,7 @@ package geoworld.minecraft.v26common.worldgen;
 
 import geoworld.minecraft.common.MinecraftVersionProfile;
 import geoworld.minecraft.common.worldgen.GeoWorldShorelinePlanner;
+import geoworld.minecraft.common.worldgen.GeoWorldMineralPlanner;
 import geoworld.minecraft.v26common.GeoWorldV26BiomeRealizer;
 import geoworld.minecraft.common.creation.GeoWorldCreationConfig;
 import geoworld.minecraft.common.engine.GeoWorldEngineBridge;
@@ -21,6 +22,7 @@ public final class GeoWorldV26ChunkPlanningBenchmark {
 
     private static GeoWorldV26BiomeRealizer BIOMES;
     private static GeoWorldShorelinePlanner SHORELINE;
+    private static GeoWorldMineralPlanner MINERALS;
 
     public static void run(
         MinecraftVersionProfile profile,
@@ -28,6 +30,7 @@ public final class GeoWorldV26ChunkPlanningBenchmark {
     ) throws Exception {
         BIOMES = new GeoWorldV26BiomeRealizer(profile);
         SHORELINE = new GeoWorldShorelinePlanner(profile.heightMapping());
+        MINERALS = new GeoWorldMineralPlanner(profile.heightMapping());
         long seed = args.length > 0 ? Long.parseLong(args[0]) : 123456L;
         GeoWorldV1 model = GeoWorldEngineBridge.generate(
             seed, GeoWorldCreationConfig.defaults()
@@ -72,7 +75,7 @@ public final class GeoWorldV26ChunkPlanningBenchmark {
             }
             biomeTime[i] = System.nanoTime() - start;
             start = System.nanoTime();
-            GeoWorldV26MineralVeins.plan(
+            MINERALS.plan(
                 model, seed, bx, bx + 15, bz, bz + 15,
                 placement -> planCount[0]++
             );

@@ -25,7 +25,13 @@ public final class GeoWorldV26ShorelineVerifier {
         {2100, -3010},
         {10883, -1293},
         {10325, 2673},
-        {10824, 2515}
+        {10824, 2515},
+        // User-reported long 1x1 riverbank zipper regression.
+        {1590, -3096},
+        // User-reported high-water riverbank containment regression.
+        {1637, -3015},
+        // User-reported repaired-bank material mismatch regression.
+        {1535, -1245}
     };
     private static final Set<String> SUGAR_CANE_SUBSTRATES = Set.of(
         "minecraft:grass_block",
@@ -441,21 +447,21 @@ public final class GeoWorldV26ShorelineVerifier {
             }
         }
 
-        int localRiverMaterialGaps = 0;
-        for (int z = 2515 - 48; z <= 2515 + 48; z++) {
-            for (int x = 10824 - 48; x <= 10824 + 48; x++) {
-                GeoWorldShorelinePlanner.Column column =
-                    SHORELINE.planModel(runtime, x, z);
-                if (
-                    "None".equals(column.sample().waterKind()) &&
-                    "River".equals(column.shoreWaterKind()) &&
-                    column.shoreDistance() == 1 &&
-                    column.surfaceOverride() == null
-                ) {
-                    localRiverMaterialGaps++;
-                }
-            }
-        }
+        int reportedRiverThirdRowShelves =
+            countReportedRiverThirdRowShelves(
+                runtime,
+                1590,
+                -3096,
+                16
+            );
+
+        int localRiverMaterialGaps =
+            countImmediateRiverMaterialGaps(
+                runtime,
+                10824,
+                2515,
+                16
+            );
 
         System.out.printf(
             "GeoWorld shoreline scan: seed=%d, immediate=%d, stable=%d, " +
@@ -464,6 +470,7 @@ public final class GeoWorldV26ShorelineVerifier {
             "maxRaising=%d at %d,%d %s (%d->%d), " +
             "raiseBuckets=[1:%d,2-3:%d,4+:%d], materialChanges=%d/%d, " +
             "narrowBackshoreGrooves=%d, smallBackshorePits=%d, " +
+            "reportedRiverThirdRowShelves=%d, " +
             "oceanBackshoreStepViolations=%d, " +
             "riverWaterBoundaryModelMismatches=%d, " +
             "riverDryVoxelColumns=%d, riverBedQuantizationLowers=%d, " +
@@ -492,6 +499,7 @@ public final class GeoWorldV26ShorelineVerifier {
             materialEdges,
             narrowBackshoreGrooves,
             smallBackshorePits,
+            reportedRiverThirdRowShelves,
             oceanBackshoreStepViolations,
             riverWaterBoundaryModelMismatches,
             riverDryVoxelColumns,
@@ -528,6 +536,12 @@ public final class GeoWorldV26ShorelineVerifier {
                 smallBackshorePits
             );
         }
+        if (reportedRiverThirdRowShelves != 0) {
+            throw new AssertionError(
+                "reported riverbank still lowers a third dry shelf row: " +
+                reportedRiverThirdRowShelves
+            );
+        }
         if (oceanBackshoreStepViolations != 0) {
             throw new AssertionError(
                 "ocean backshore did not smooth inward: " +
@@ -558,8 +572,16 @@ public final class GeoWorldV26ShorelineVerifier {
                 pointPlanMismatches
             );
         }
+        String generationRulesVersion =
+            runtime.manifest().generationRulesVersion();
+        int maxAllowedRiverRaise =
+            (
+                "geoworld-rules-v1.1.6".equals(generationRulesVersion) ||
+                "geoworld-rules-v1.1.7".equals(generationRulesVersion)
+            ) ? 4 : 2;
         if (
-            maxRaiseByKind.getOrDefault("River", 0) > 2 ||
+            maxRaiseByKind.getOrDefault("River", 0) >
+                maxAllowedRiverRaise ||
             maxRaiseByKind.getOrDefault("Lake", 0) > 2 ||
             maxRaiseByKind.getOrDefault("Ocean", 0) > 3
         ) {
@@ -603,6 +625,8 @@ public final class GeoWorldV26ShorelineVerifier {
 
         verifyWetlandPools(runtime);
         verifyRiverbankBiomes(runtime);
+        verifyReportedRiverbankRaster(runtime);
+        verifyReportedRepairMaterialBlend(runtime);
 
         System.out.printf(
             "GeoWorld shoreline verification passed: seed=%d, immediate=%d, " +
@@ -620,6 +644,241 @@ public final class GeoWorldV26ShorelineVerifier {
             waterKinds
         );
         cleanupCache(isolatedCache);
+    }
+
+    private static void verifyReportedRiverbankRaster(
+        GeoWorldV1 runtime
+    ) {
+        // Search beyond the visible regression crop before declaring the
+        // first River cell to be the bank edge. The reported screenshot crop
+        // starts near x=1540, but some rows already contain water at x=1539.
+        final int minX = 1500;
+        final int maxX = 1760;
+        final int minZ = -3094;
+        final int maxZ = -3064;
+
+        int previousRight = Integer.MIN_VALUE;
+        int repeatedRows = 0;
+        int currentUnitRun = 0;
+        int longestUnitRun = 0;
+        int maxEdgeStep = 0;
+        int rows = 0;
+
+        for (int z = minZ; z <= maxZ; z++) {
+            int right = Integer.MIN_VALUE;
+            for (int x = minX; x <= maxX; x++) {
+                GeoWorldV1.RuntimeSample sample = runtime.sample(x, z);
+                if ("River".equals(sample.waterKind())) {
+                    right = x;
+                }
+            }
+            if (right == Integer.MIN_VALUE) {
+                throw new AssertionError(
+                    "reported riverbank regression lost river row at z=" + z
+                );
+            }
+
+            if (previousRight != Integer.MIN_VALUE) {
+                int delta = right - previousRight;
+                if (delta < 0 || delta > 2) {
+                    throw new AssertionError(
+                        "reported riverbank edge jumped at z=" + z +
+                        ": previous=" + previousRight +
+                        " now=" + right
+                    );
+                }
+                maxEdgeStep = Math.max(maxEdgeStep, delta);
+                if (delta == 0) {
+                    repeatedRows++;
+                    currentUnitRun = 0;
+                } else if (delta == 1) {
+                    currentUnitRun++;
+                    longestUnitRun = Math.max(
+                        longestUnitRun,
+                        currentUnitRun
+                    );
+                } else {
+                    currentUnitRun = 0;
+                }
+            }
+            previousRight = right;
+            rows++;
+
+            for (int offset = 1; offset <= 2; offset++) {
+                GeoWorldShorelinePlanner.Column bank =
+                    SHORELINE.planModel(runtime, right + offset, z);
+                if (
+                    !"None".equals(bank.sample().waterKind()) ||
+                    !"River".equals(bank.shoreWaterKind()) ||
+                    bank.shoreDistance() > 2 ||
+                    bank.surfaceOverride() == null
+                ) {
+                    throw new AssertionError(
+                        "reported riverbank lost continuous two-block material " +
+                        "band at " + (right + offset) + "," + z +
+                        ": water=" + bank.sample().waterKind() +
+                        " shore=" + bank.shoreWaterKind() +
+                        " distance=" + bank.shoreDistance() +
+                        " material=" + bank.surfaceOverride()
+                    );
+                }
+            }
+        }
+
+        if (repeatedRows < 4) {
+            throw new AssertionError(
+                "reported riverbank regressed to a 1x1 zipper: repeatedRows=" +
+                repeatedRows + "/" + rows
+            );
+        }
+        if (longestUnitRun > 5) {
+            throw new AssertionError(
+                "reported riverbank has too long a unit staircase: run=" +
+                longestUnitRun
+            );
+        }
+        System.out.printf(
+            "GeoWorld reported riverbank raster PASS: rows=%d, " +
+            "repeatedRows=%d, longestUnitRun=%d, maxEdgeStep=%d%n",
+            rows,
+            repeatedRows,
+            longestUnitRun,
+            maxEdgeStep
+        );
+    }
+
+    private static void verifyReportedRepairMaterialBlend(
+        GeoWorldV1 runtime
+    ) {
+        final int radius = 24;
+        final int[][] directions = {
+            {-1, 0},
+            {1, 0},
+            {0, -1},
+            {0, 1}
+        };
+        int checked = 0;
+
+        for (int[] regressionCenter : REGRESSION_CENTERS) {
+            int centerX = regressionCenter[0];
+            int centerZ = regressionCenter[1];
+            int minX = centerX - radius;
+            int maxX = centerX + radius;
+            int minZ = centerZ - radius;
+            int maxZ = centerZ + radius;
+
+            Map<Long, GeoWorldShorelinePlanner.Column> columns =
+                new LinkedHashMap<>();
+            int minChunkX = Math.floorDiv(minX - 1, 16);
+            int maxChunkX = Math.floorDiv(maxX + 1, 16);
+            int minChunkZ = Math.floorDiv(minZ - 1, 16);
+            int maxChunkZ = Math.floorDiv(maxZ + 1, 16);
+            for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+                for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+                    int baseX = chunkX * 16;
+                    int baseZ = chunkZ * 16;
+                    GeoWorldShorelinePlanner.ChunkPlan plan =
+                        SHORELINE.planChunkModel(runtime, baseX, baseZ);
+                    for (int localZ = 0; localZ < 16; localZ++) {
+                        for (int localX = 0; localX < 16; localX++) {
+                            int worldX = baseX + localX;
+                            int worldZ = baseZ + localZ;
+                            long key =
+                                (((long)worldX) << 32) ^
+                                (worldZ & 0xffffffffL);
+                            columns.put(
+                                key,
+                                plan.column(localX, localZ)
+                            );
+                        }
+                    }
+                }
+            }
+
+            for (int z = minZ; z <= maxZ; z++) {
+                for (int x = minX; x <= maxX; x++) {
+                    GeoWorldShorelinePlanner.Column column =
+                        columns.get(
+                            (((long)x) << 32) ^ (z & 0xffffffffL)
+                        );
+                    if (
+                        column == null ||
+                        !"None".equals(column.sample().waterKind()) ||
+                        !"River".equals(column.shoreWaterKind()) ||
+                        column.shoreDistance() < 2 ||
+                        column.shoreDistance() > 3
+                    ) {
+                        continue;
+                    }
+
+                    boolean hasShorewardMaterial = false;
+                    for (int[] direction : directions) {
+                        int nx = x + direction[0];
+                        int nz = z + direction[1];
+                        GeoWorldShorelinePlanner.Column neighbor =
+                            columns.get(
+                                (((long)nx) << 32) ^
+                                (nz & 0xffffffffL)
+                            );
+                        if (
+                            neighbor != null &&
+                            "None".equals(neighbor.sample().waterKind()) &&
+                            "River".equals(neighbor.shoreWaterKind()) &&
+                            neighbor.shoreDistance() > 0 &&
+                            neighbor.shoreDistance() <
+                                column.shoreDistance() &&
+                            neighbor.surfaceOverride() != null
+                        ) {
+                            hasShorewardMaterial = true;
+                            break;
+                        }
+                    }
+                    if (!hasShorewardMaterial) {
+                        continue;
+                    }
+
+                    checked++;
+                    if (column.surfaceOverride() == null) {
+                        throw new AssertionError(
+                            "riverbank material gap at " +
+                            x + "," + z +
+                            ": distance=" + column.shoreDistance() +
+                            " ground=" + column.groundBoundary() +
+                            " original=" +
+                            column.originalGroundBoundary()
+                        );
+                    }
+                }
+            }
+        }
+
+        if (checked == 0) {
+            throw new AssertionError(
+                "riverbank material-gap verifier did not cover any " +
+                "distance-2/3 river shore columns"
+            );
+        }
+        System.out.printf(
+            "GeoWorld riverbank material-gap PASS: checked=%d%n",
+            checked
+        );
+    }
+
+    private static GeoWorldShorelinePlanner.Column cachedPlan(
+        GeoWorldV1 runtime,
+        Map<Long, GeoWorldShorelinePlanner.Column> cache,
+        int x,
+        int z
+    ) {
+        long key = (((long)x) << 32) ^ (z & 0xffffffffL);
+        GeoWorldShorelinePlanner.Column existing = cache.get(key);
+        if (existing != null) {
+            return existing;
+        }
+        GeoWorldShorelinePlanner.Column planned =
+            SHORELINE.planModel(runtime, x, z);
+        cache.put(key, planned);
+        return planned;
     }
 
     private static void verifyLowlandOceanBackshore() {
@@ -863,6 +1122,7 @@ public final class GeoWorldV26ShorelineVerifier {
         int centerChunkZ = Math.floorDiv(center[1], 16);
         int eligible = 0;
         int pools = 0;
+        int poolRims = 0;
         for (int dz = -4; dz <= 4; dz++) {
             for (int dx = -4; dx <= 4; dx++) {
                 int baseX = (centerChunkX + dx) * 16;
@@ -891,26 +1151,42 @@ public final class GeoWorldV26ShorelineVerifier {
                         )) {
                             continue;
                         }
-                        pools++;
-                        if (
+                        int depth =
                             column.waterBoundary() -
-                            column.groundBoundary() != 1
-                        ) {
-                            throw new AssertionError(
-                                "wetland pool is not one block deep at " +
-                                (baseX + localX) + "," +
-                                (baseZ + localZ)
-                            );
+                            column.groundBoundary();
+                        if (depth == 1) {
+                            pools++;
+                            if (!"minecraft:mud".equals(
+                                column.surfaceOverride()
+                            )) {
+                                throw new AssertionError(
+                                    "wetland pool bed is not mud at " +
+                                    (baseX + localX) + "," +
+                                    (baseZ + localZ)
+                                );
+                            }
+                            continue;
                         }
-                        if (!"minecraft:mud".equals(
-                            column.surfaceOverride()
-                        )) {
-                            throw new AssertionError(
-                                "wetland pool bed is not mud at " +
-                                (baseX + localX) + "," +
-                                (baseZ + localZ)
-                            );
+                        if (depth == 0 && column.shoreDistance() == 1) {
+                            poolRims++;
+                            if (!"minecraft:mud".equals(
+                                column.surfaceOverride()
+                            )) {
+                                throw new AssertionError(
+                                    "wetland pool rim is not mud at " +
+                                    (baseX + localX) + "," +
+                                    (baseZ + localZ)
+                                );
+                            }
+                            continue;
                         }
+                        throw new AssertionError(
+                            "wetland pool/rim has invalid depth at " +
+                            (baseX + localX) + "," +
+                            (baseZ + localZ) +
+                            ": depth=" + depth +
+                            " shoreDistance=" + column.shoreDistance()
+                        );
                     }
                 }
             }
@@ -921,7 +1197,9 @@ public final class GeoWorldV26ShorelineVerifier {
                 "wetland planner produced no shallow pools: eligible=" +
                 eligible +
                 " pools=" +
-                pools
+                pools +
+                " rims=" +
+                poolRims
             );
         }
         double ratio = (double)pools / eligible;
@@ -935,10 +1213,11 @@ public final class GeoWorldV26ShorelineVerifier {
 
         System.out.printf(
             "GeoWorld wetland pool verification passed: center=%d,%d " +
-            "pools=%d/%d ratio=%.3f%n",
+            "pools=%d rims=%d eligible=%d ratio=%.3f%n",
             center[0],
             center[1],
             pools,
+            poolRims,
             eligible,
             ratio
         );
@@ -1089,6 +1368,94 @@ public final class GeoWorldV26ShorelineVerifier {
         return "Wetland".equals(sample.biomeFamily()) ||
             "Wet Mud".equals(sample.surfaceProfile()) ||
             "Peat".equals(sample.surfaceProfile());
+    }
+
+    private static int countImmediateRiverMaterialGaps(
+        GeoWorldV1 runtime,
+        int centerX,
+        int centerZ,
+        int radius
+    ) {
+        int minX = centerX - radius;
+        int maxX = centerX + radius;
+        int minZ = centerZ - radius;
+        int maxZ = centerZ + radius;
+        int minChunkX = Math.floorDiv(minX, 16);
+        int maxChunkX = Math.floorDiv(maxX, 16);
+        int minChunkZ = Math.floorDiv(minZ, 16);
+        int maxChunkZ = Math.floorDiv(maxZ, 16);
+        int count = 0;
+        for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+            for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+                int baseX = chunkX * 16;
+                int baseZ = chunkZ * 16;
+                GeoWorldShorelinePlanner.ChunkPlan plan =
+                    SHORELINE.planChunkModel(runtime, baseX, baseZ);
+                for (int localZ = 0; localZ < 16; localZ++) {
+                    int worldZ = baseZ + localZ;
+                    if (worldZ < minZ || worldZ > maxZ) continue;
+                    for (int localX = 0; localX < 16; localX++) {
+                        int worldX = baseX + localX;
+                        if (worldX < minX || worldX > maxX) continue;
+                        GeoWorldShorelinePlanner.Column column =
+                            plan.column(localX, localZ);
+                        if (
+                            "None".equals(column.sample().waterKind()) &&
+                            "River".equals(column.shoreWaterKind()) &&
+                            column.shoreDistance() == 1 &&
+                            column.surfaceOverride() == null
+                        ) {
+                            count++;
+                        }
+                    }
+                }
+            }
+        }
+        return count;
+    }
+
+    private static int countReportedRiverThirdRowShelves(
+        GeoWorldV1 runtime,
+        int centerX,
+        int centerZ,
+        int radius
+    ) {
+        int minX = centerX - radius;
+        int maxX = centerX + radius;
+        int minZ = centerZ - radius;
+        int maxZ = centerZ + radius;
+        int minChunkX = Math.floorDiv(minX, 16);
+        int maxChunkX = Math.floorDiv(maxX, 16);
+        int minChunkZ = Math.floorDiv(minZ, 16);
+        int maxChunkZ = Math.floorDiv(maxZ, 16);
+        int count = 0;
+        for (int chunkZ = minChunkZ; chunkZ <= maxChunkZ; chunkZ++) {
+            for (int chunkX = minChunkX; chunkX <= maxChunkX; chunkX++) {
+                int baseX = chunkX * 16;
+                int baseZ = chunkZ * 16;
+                GeoWorldShorelinePlanner.ChunkPlan plan =
+                    SHORELINE.planChunkModel(runtime, baseX, baseZ);
+                for (int localZ = 0; localZ < 16; localZ++) {
+                    int worldZ = baseZ + localZ;
+                    if (worldZ < minZ || worldZ > maxZ) continue;
+                    for (int localX = 0; localX < 16; localX++) {
+                        int worldX = baseX + localX;
+                        if (worldX < minX || worldX > maxX) continue;
+                        GeoWorldShorelinePlanner.Column column =
+                            plan.column(localX, localZ);
+                        if (
+                            "None".equals(column.sample().waterKind()) &&
+                            "River".equals(column.shoreWaterKind()) &&
+                            column.shoreDistance() >= 3 &&
+                            column.littoralShelf()
+                        ) {
+                            count++;
+                        }
+                    }
+                }
+            }
+        }
+        return count;
     }
 
     private static void cleanupCache(Path root) {

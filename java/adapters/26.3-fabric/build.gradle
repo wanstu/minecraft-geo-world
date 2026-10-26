@@ -35,6 +35,7 @@ sourceSets.main.java.srcDir '../../minecraft-v26-common/src/main/java'
 sourceSets.main.java.srcDir '../../minecraft-v26_3-common/src/main/java'
 
 sourceSets.main.resources.srcDir '../../minecraft-v26-common/src/main/resources'
+sourceSets.main.resources.srcDir '../../../acceptance/resources'
 
 // Shared Minecraft 26.3 assets/data are loader-neutral.
 sourceSets.main.resources.srcDir '../../minecraft-v26_3-common/src/main/resources'
@@ -93,4 +94,106 @@ tasks.register('verifyGeoWorldAdapter') {
         }
     }
 }
-tasks.named('check') { dependsOn tasks.named('verifyGeoWorldAdapter') }
+tasks.register('verifyGeoWorldModelQuery', JavaExec) {
+    group = 'verification'
+    description = 'Runs black-box World Model/API acceptance checks against the locked v1.1 golden model.'
+    dependsOn tasks.named('compileJava')
+    classpath = sourceSets.main.output.classesDirs
+    mainClass = 'geoworld.runtime.GeoWorldModelVerifier'
+    args file('../../../internal/goldenvectors/testdata/runtime-v1.geoworld').absolutePath
+}
+
+tasks.register('verifyGeoWorldEngineBridge', JavaExec) {
+    group = 'verification'
+    description = 'Generates a fresh model through the embedded engine and verifies locked profile/rules/model identity.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir) + sourceSets.main.compileClasspath
+    mainClass = 'geoworld.minecraft.common.verification.GeoWorldEngineBridgeVerifier'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+    systemProperty 'geoworld.cache.dir', layout.buildDirectory.dir('engine-bridge-verifier-cache').get().asFile.absolutePath
+    doFirst {
+        delete layout.buildDirectory.dir('engine-bridge-verifier-cache')
+    }
+}
+
+tasks.register('verifyGeoWorldParameterEffects', JavaExec) {
+    group = 'verification'
+    description = 'Verifies PARAM-03 by generating same-Seed high/low parameter models through the embedded engine.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir) + sourceSets.main.compileClasspath
+    mainClass = 'geoworld.minecraft.common.verification.GeoWorldParameterEffectsVerifier'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+    systemProperty 'geoworld.cache.dir', layout.buildDirectory.dir('parameter-effects-verifier-cache').get().asFile.absolutePath
+    doFirst {
+        delete layout.buildDirectory.dir('parameter-effects-verifier-cache')
+    }
+}
+
+tasks.register('verifyGeoWorldCreationConfig', JavaExec) {
+    group = 'verification'
+    description = 'Verifies semantic parameter defaults, localization, warnings, snapshots, preset bundles, and delegates PARAM-03 to world-output verification.'
+    dependsOn tasks.named('compileJava')
+    dependsOn tasks.named('verifyGeoWorldParameterEffects')
+    classpath = sourceSets.main.output.classesDirs + sourceSets.main.compileClasspath + files('../../minecraft-v26-common/src/main/resources')
+    mainClass = 'geoworld.minecraft.common.creation.GeoWorldCreationConfigVerifier'
+}
+
+tasks.register('verifyGeoWorldPreviewModel', JavaExec) {
+    group = 'verification'
+    description = 'Verifies PROFILE-03: preview reads the exact locked World Model and profile.'
+    dependsOn tasks.named('compileJava')
+    classpath = sourceSets.main.output.classesDirs
+    mainClass = 'geoworld.minecraft.common.preview.GeoWorldPreviewModelVerifier'
+    args file('../../../internal/goldenvectors/testdata/runtime-v1.geoworld').absolutePath
+}
+
+tasks.register('verifyGeoWorldSpawn', JavaExec) {
+    group = 'verification'
+    description = 'Verifies SPAWN-01/02/03: parameterized deterministic habitable-mainland spawn selection.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir) + sourceSets.main.compileClasspath
+    mainClass = 'geoworld.minecraft.v26_3common.worldgen.GeoWorldSpawnVerifier'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+}
+
+tasks.register('verifyGeoWorldShoreline', JavaExec) {
+    group = 'verification'
+    description = 'Runs 26.3 shoreline and riverbank regression checks, including reported real-world coordinates.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir) + sourceSets.main.compileClasspath
+    mainClass = 'geoworld.minecraft.v26_3common.worldgen.GeoWorldShorelineVerifier'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+}
+
+tasks.register('verifyGeoWorldSurfaceBiome', JavaExec) {
+    group = 'verification'
+    description = 'Runs 26.3 final biome/surface material regression checks.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir) + sourceSets.main.compileClasspath
+    mainClass = 'geoworld.minecraft.v26_3common.worldgen.GeoWorldSurfaceBiomeVerifier'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+}
+
+tasks.register('fingerprintGeoWorldBiomeDecisions', JavaExec) {
+    group = 'verification'
+    description = 'Verifies the locked 26.3 3D biome-decision fingerprints for current generation rules.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir) + sourceSets.main.compileClasspath
+    mainClass = 'geoworld.minecraft.v26_3common.worldgen.GeoWorldBiomeDecisionFingerprint'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+    if (project.hasProperty('geoWorldFingerprintSeed')) {
+        args project.property('geoWorldFingerprintSeed').toString()
+    }
+}
+
+tasks.named('check') {
+    dependsOn tasks.named('verifyGeoWorldAdapter')
+    dependsOn tasks.named('verifyGeoWorldEngineBridge')
+    dependsOn tasks.named('verifyGeoWorldModelQuery')
+    dependsOn tasks.named('verifyGeoWorldCreationConfig')
+    dependsOn tasks.named('verifyGeoWorldPreviewModel')
+    dependsOn tasks.named('verifyGeoWorldSpawn')
+    dependsOn tasks.named('verifyGeoWorldShoreline')
+    dependsOn tasks.named('verifyGeoWorldSurfaceBiome')
+    dependsOn tasks.named('fingerprintGeoWorldBiomeDecisions')
+}

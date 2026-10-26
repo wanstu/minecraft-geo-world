@@ -26,10 +26,12 @@ type RiverEdgeConstraint struct {
 	From int
 	To   int
 
-	RiverStrength  float64
-	OriginalDrop   float64
-	RawTerrainRise float64
-	TargetBedDrop  float64
+	RiverStrength    float64
+	FlowAccumulation float64
+	RiverOrder       uint8
+	OriginalDrop     float64
+	RawTerrainRise   float64
+	TargetBedDrop    float64
 }
 
 // Model translates current cross-stage inconsistencies into explicit targets.

@@ -6,7 +6,16 @@ public final class GeoWorldSpawnPlanner {
     private GeoWorldSpawnPlanner() {}
 
     public static Candidate find(GeoWorldV1 runtime) {
+        return find(runtime, 1.0);
+    }
+
+    public static Candidate find(GeoWorldV1 runtime, double influence) {
         GeoWorldV1.Geometry geometry = runtime.manifest().geometry();
+        influence = Math.max(0.0, Math.min(2.5, influence));
+
+        if (influence <= 1.0e-9) {
+            return new Candidate(0, 0, 8, 8, 0.0);
+        }
 
         double centerX = geometry.originX() + geometry.spanXBlocks() * 0.5;
         double centerZ = geometry.originZ() + geometry.spanZBlocks() * 0.5;
@@ -61,10 +70,10 @@ public final class GeoWorldSpawnPlanner {
                 double heightPenalty = Math.abs(
                     center.groundHeight() - targetHeight
                 );
+                double suitability = relief * 6.0 + heightPenalty;
                 double score =
                     distance * 12.0 +
-                    relief * 6.0 +
-                    heightPenalty;
+                    suitability * influence;
 
                 if (score < bestScore) {
                     bestScore = score;

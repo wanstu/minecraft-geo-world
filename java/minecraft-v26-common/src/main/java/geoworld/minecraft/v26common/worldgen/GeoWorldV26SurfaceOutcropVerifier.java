@@ -2,6 +2,7 @@ package geoworld.minecraft.v26common.worldgen;
 
 import geoworld.minecraft.common.MinecraftVersionProfile;
 import geoworld.minecraft.common.worldgen.GeoWorldShorelinePlanner;
+import geoworld.minecraft.common.worldgen.GeoWorldMineralPlanner;
 import geoworld.minecraft.v26common.GeoWorldV26BiomeRealizer;
 import geoworld.minecraft.common.creation.GeoWorldCreationConfig;
 import geoworld.minecraft.common.engine.GeoWorldEngineBridge;
@@ -27,6 +28,8 @@ public final class GeoWorldV26SurfaceOutcropVerifier {
     ) throws Exception {
         BIOMES = new GeoWorldV26BiomeRealizer(profile);
         SHORELINE = new GeoWorldShorelinePlanner(profile.heightMapping());
+        GeoWorldMineralPlanner mineralPlanner =
+            new GeoWorldMineralPlanner(profile.heightMapping());
         long seed = args.length > 0
             ? Long.parseLong(args[0]) : -563659577384754347L;
         var model = GeoWorldEngineBridge.generate(
@@ -35,15 +38,15 @@ public final class GeoWorldV26SurfaceOutcropVerifier {
 
         // Representative high mountain near the screenshot, rather than only
         // artificial ore-class eligibility values.
-        List<GeoWorldV26MineralVeins.Placement> planned = new ArrayList<>();
-        GeoWorldV26MineralVeins.planSurfaceOutcrops(
+        List<GeoWorldMineralPlanner.Placement> planned = new ArrayList<>();
+        mineralPlanner.planSurfaceOutcrops(
             model, seed, 1680, 2700, -2950, -1650, planned::add
         );
 
         int upperDeposits = 0;
         int visibleTopRock = 0;
         int upperCandidateRock = 0;
-        GeoWorldV26MineralVeins.Placement first = null;
+        GeoWorldMineralPlanner.Placement first = null;
         Set<Long> visibleCoords = new HashSet<>();
         Map<Long, GeoWorldShorelinePlanner.Column> columns = new HashMap<>();
         Map<Long, Set<Integer>> oreColumnHeights = new HashMap<>();
@@ -122,17 +125,17 @@ public final class GeoWorldV26SurfaceOutcropVerifier {
         }
         int baseX = Math.floorDiv(first.x(), 16) * 16;
         int baseZ = Math.floorDiv(first.z(), 16) * 16;
-        Map<GeoWorldV26MineralVeins.Placement, Integer> whole = new HashMap<>();
-        Map<GeoWorldV26MineralVeins.Placement, Integer> split = new HashMap<>();
-        GeoWorldV26MineralVeins.planSurfaceOutcrops(
+        Map<GeoWorldMineralPlanner.Placement, Integer> whole = new HashMap<>();
+        Map<GeoWorldMineralPlanner.Placement, Integer> split = new HashMap<>();
+        mineralPlanner.planSurfaceOutcrops(
             model, seed, baseX - 16, baseX + 15, baseZ, baseZ + 15,
             p -> whole.merge(p, 1, Integer::sum)
         );
-        GeoWorldV26MineralVeins.planSurfaceOutcrops(
+        mineralPlanner.planSurfaceOutcrops(
             model, seed, baseX - 16, baseX - 1, baseZ, baseZ + 15,
             p -> split.merge(p, 1, Integer::sum)
         );
-        GeoWorldV26MineralVeins.planSurfaceOutcrops(
+        mineralPlanner.planSurfaceOutcrops(
             model, seed, baseX, baseX + 15, baseZ, baseZ + 15,
             p -> split.merge(p, 1, Integer::sum)
         );

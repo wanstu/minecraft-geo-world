@@ -10,7 +10,10 @@ public final class GeoWorldBiomeDecisionFingerprint {
     public static void main(String[] args) throws Exception {
         GeoWorldV26BiomeDecisionFingerprint.run(
             Minecraft26_1_2Profile.INSTANCE,
-            java.util.Map.of(),
+            java.util.Map.of(
+                123456L, 0x4bf4f799308306beL,
+                -563659577384754347L, 0xaed86fc7d48860beL
+            ),
             args
         );
     }

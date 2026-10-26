@@ -1,0 +1,180 @@
+# GeoWorld Acceptance Registry v1.1
+# Canonical source: GeoWorld Core Design & Acceptance Specification v1.1 §17
+# id	requirement	inspection	name	pass_standard	method
+CORE-01	CONSTRAINT	AUTOMATIC_AND_MANUAL	只改世界生成/自然模型	不修改玩家、物品、实体、配方、战斗等运行机制。	自动/人工
+CORE-02	CONSTRAINT	AUTOMATIC_AND_MANUAL	Vanilla 可卸载存档	已生成区域只包含 Vanilla 可理解内容；卸载后可正常读取。	自动/人工
+CORE-03	CONSTRAINT	AUTOMATIC_AND_MANUAL	Overworld-only Core	核心当前不扩展 Nether/End。	自动/人工
+CORE-04	CONSTRAINT	AUTOMATIC_AND_MANUAL	全部 Vanilla 主世界群系	所有原版 Overworld biome 都存在。	自动/人工
+MACRO-01	CORE	REGION	有限主大陆	存在单一有限主大陆，外围不再生成第二主大陆。	区域/关系
+MACRO-02	CORE	REGION	一级区域层级	大陆具有可识别的大区域，而非等价碎片。	区域/关系
+MACRO-03	CORE	REGION	大陆性格	不同 Seed 宏观主导结构明显不同。	区域/关系
+MACRO-04	CORE	REGION	区域分隔	大区域由真实自然结构分隔。	区域/关系
+MACRO-05	CORE	REGION	优势不高度重合	矿业、建设、港口等优势不普遍集中一处。	区域/关系
+MACRO-06	CORE	REGION	有效范围空间充足	宏观特征和过渡不因范围不足被硬塞。	区域/关系
+MTN-01	CORE	ROUTE	山系连续	山是长距离山系而非孤立噪声高点。	点/路线
+MTN-02	CORE	ROUTE	平缓为主	大多数山体自然平缓，不全局尖锐化。	点/路线
+MTN-03	CORE	ROUTE	峰感	主峰相对山脊有清晰峰谷关系。	点/路线
+MTN-04	CORE	ROUTE	稀疏悬崖	悬崖存在但保持稀少。	点/路线
+MTN-05	CORE	ROUTE	山体基座	山脚—山麓—主山体层次完整。	点/路线
+MTN-06	CORE	ROUTE	交通阻隔	大型山系能形成真实地理阻隔。	点/路线
+HILL-01	CORE	ROUTE	平原—丘陵过渡	高度逐步上升，不突然撞山墙。	路线/区域
+HILL-02	CORE	ROUTE	丘陵连续区域	不是随机土包。	路线/区域
+HILL-03	CORE	ROUTE	丘陵低谷/鞍部	存在自然可走通道。	路线/区域
+HILL-04	CORE	ROUTE	丘陵不吞平原	仍保留真正大平原。	路线/区域
+PLATEAU-01	CORE	REGION	大尺度高原	高原是完整区域而非大桌面。	区域/路线
+PLATEAU-02	CORE	REGION	内部变化	高原内部仍有平原/丘陵/谷地/水系。	区域/路线
+PLATEAU-03	CORE	REGION	边缘多样	缓坡、陡坎、河谷切口合理混合。	区域/路线
+PLATEAU-04	CORE	REGION	上下通道	少量自然进入/离开高原的路线。	区域/路线
+BASIN-01	CORE	REGION	大型盆地	有数百格尺度和外围包围感。	区域/路线
+BASIN-02	CORE	REGION	盆地内部完整	内部可有平原、河流、湖泊等。	区域/路线
+BASIN-03	CORE	REGION	有限出口	出口少而合理，不是四面同样开阔。	区域/路线
+PLAIN-01	CORE	REGION	大尺度平缓	平原连续缓坡而非超平坦。	区域
+PLAIN-02	CORE	REGION	连续可建设空间	可连续施工而非局部平地。	区域
+PLAIN-03	CORE	REGION	中尺度自然分区	河流、林带、湿地、低丘等少量分隔。	区域
+PLAIN-04	CORE	REGION	冲积平原	大型主河附近可形成真正冲积低地。	区域
+PLAIN-05	CORE	REGION	台地/河阶地	存在高于河漫滩的稳定缓平台。	区域
+RIVER-01	CORE	ROUTE	河流等级	溪流/支流/大支流/主河层级清晰。	路线
+RIVER-02	CORE	ROUTE	汇流增宽	汇流后河宽与河谷规模总体增加。	路线
+RIVER-03	CORE	ROUTE	支流连续接主流	不能断接。	路线
+RIVER-04	CORE	ROUTE	主河连续入海	必须真正到海。	路线
+RIVER-05	CORE	ROUTE	统一水面	同一河段避免阶梯水面。	路线
+RIVER-06	CORE	ROUTE	无悬空河床	河床与周围地形连续。	路线
+RIVER-07	CORE	ROUTE	无异常凸起/抬高	河中和入海口无异常地形抬升。	路线
+RIVER-08	CORE	ROUTE	河谷影响带	大河塑造宽于河床的低地带。	路线
+RIVER-09	CORE	ROUTE	纵向演化	上游→中游→下游→河口连续变化。	路线
+RIVER-10	CORE	ROUTE	大尺度曲流	下游大河弯曲不是高频抖动。	路线
+RIVER-11	CORE	ROUTE	航运与瓶颈共存	中下游大尺度水面稳定，同时允许峡谷/窄段。	路线
+RIVER-12	CORE	ROUTE	河源合理	主河由小水系/谷地逐步形成而非突然出现。	路线
+FLOOD-01	LATER	REGION	河漫滩	靠河低地自然且不过度。	点/区域
+FLOOD-02	LATER	REGION	河阶地	较高稳定阶地可辨识。	点/区域
+FLOOD-03	LATER	REGION	牛轭湖/旧河道	低频出现且不泛滥。	点/区域
+FLOOD-04	LATER	REGION	天然堤岸细化	若实现，必须自然、不像人工堤。	点/区域
+LAKE-01	CORE	ROUTE	湖泊层级	小湖/区域湖/大湖尺度差异。	点/路线/区域
+LAKE-02	CORE	ROUTE	大湖区域性	大湖不是巨大水坑。	点/路线/区域
+LAKE-03	CORE	ROUTE	合理入水口	河流入湖连续。	点/路线/区域
+LAKE-04	CORE	ROUTE	大湖出水口	多数大型淡水湖连接下游水系。	点/路线/区域
+LAKE-05	CORE	ROUTE	少量内流湖	允许存在但不成为常态。	点/路线/区域
+LAKE-06	CORE	ROUTE	湖岸多样	平缓/湿地/山地/悬崖/河口并存。	点/路线/区域
+WET-01	CORE	REGION	湿地位置合理	主要出现在水系低地。	区域
+WET-02	CORE	REGION	湿地不泛滥	不能把所有低地变湿地。	区域
+WET-03	CORE	REGION	浅水洼自然	沼泽等保留自然浅水形态。	区域
+EST-01	CORE	ROUTE	宽河口	主河入海逐步扩展。	路线
+EST-02	CORE	ROUTE	河口地势协调	河口、滨海低地、海面衔接自然。	路线
+EST-03	CORE	ROUTE	三角洲连续性	若实现，所有分汊连续并保持水位稳定。	路线
+COAST-01	CORE	REGION	海岸宏观分区	不同海岸段有明显性格。	区域/点
+COAST-02	CORE	REGION	海岸分区尺度	不几十格切换。	区域/点
+COAST-03	CORE	REGION	低缓滨海平原	存在连续沿海建设空间。	区域/点
+COAST-04	CORE	REGION	山地海岸	山可自然入海但非整段墙化。	区域/点
+COAST-05	CORE	REGION	大型海湾	海湾为区域级结构。	区域/点
+COAST-06	CORE	REGION	半岛/岬角	轮廓可识别。	区域/点
+COAST-07	CORE	REGION	海峡	存在有意义的窄水道。	区域/点
+COAST-08	CORE	REGION	海岸不过度锯齿	轮廓自然。	区域/点
+SEA-01	CORE	REGION	大陆架	近岸浅海具有宏观层级。	区域/路线
+SEA-02	CORE	REGION	大陆坡	浅海到深海渐变自然。	区域/路线
+SEA-03	CORE	REGION	深海盆地	大尺度连续。	区域/路线
+SEA-04	CORE	REGION	海底山脊/海山	少而有意义。	区域/路线
+SEA-05	CORE	REGION	海峡水下连续	海峡不被浅滩堵断。	区域/路线
+SEA-06	CORE	REGION	港湾/河口深水连续	重要水域无随机大浅滩。	区域/路线
+ISLAND-01	CORE	REGION	近岸岛关系性	与大陆架/半岛等有关。	区域
+ISLAND-02	CORE	REGION	远洋岛稀疏	远离主大陆后岛密度显著下降。	区域
+ISLAND-03	CORE	REGION	不形成第二大陆	极远洋不重新形成大面积陆地。	区域
+CLIMATE-01	CORE	REGION	纬度梯度	南北温度总体趋势合理。	区域/路线
+CLIMATE-02	CORE	REGION	海陆湿度梯度	海岸到内陆有趋势。	区域/路线
+CLIMATE-03	CORE	REGION	迎风/背风差异	大型山脉可产生雨影。	区域/路线
+CLIMATE-04	CORE	REGION	干湿过渡链	湿润到干旱有充分过渡。	区域/路线
+CLIMATE-05	CORE	REGION	大河湿润走廊	干旱区大河附近生态合理变化。	区域/路线
+CLIMATE-06	CORE	REGION	大湖局部影响	大湖可有限改变周边湿度。	区域/路线
+CLIMATE-07	CORE	REGION	不同 Seed 气候差异	主湿气方向/区域关系不模板化。	区域/路线
+BIOME-01	CORE	REGION	全部 Overworld biome	没有因新模型丢失原版主世界群系。	区域
+BIOME-02	CORE	REGION	大尺度连续	群系形成区域而非拼布。	区域
+BIOME-03	CORE	REGION	合理热冷湿干过渡	相邻环境有地理逻辑。	区域
+BIOME-04	CORE	REGION	垂直群系变化	山脚到高峰随海拔合理变化。	区域
+BIOME-05	CORE	REGION	同 biome 不同 Terrain Context	同 ID 可呈现不同地貌性格。	区域
+FOREST-01	CORE	REGION	大型连续森林	森林是真正区域。	区域/路线
+FOREST-02	CORE	REGION	森林内部变化	空地、草甸、溪谷等。	区域/路线
+FOREST-03	CORE	REGION	渐进森林边缘	平原到核心森林自然过渡。	区域/路线
+FOREST-04	CORE	REGION	山地森林垂直变化	与海拔/气候协调。	区域/路线
+FOREST-05	CORE	REGION	河谷开放走廊	河流穿森林时地貌协调。	区域/路线
+POLAR-01	CORE	ROUTE	高纬渐进过渡	温带到冻洋无硬切。	路线/区域
+POLAR-02	CORE	ROUTE	极地内部多样	平原/山地/湖泊/群岛存在差异。	路线/区域
+POLAR-03	CORE	ROUTE	山系跨纬度连续	宏观地貌不中断。	路线/区域
+POLAR-04	CORE	ROUTE	极地水系	河流湖泊仍然完整。	路线/区域
+POLAR-05	CORE	ROUTE	冻洋海底结构	冰冻洋不是平底。	路线/区域
+ORE-01	CORE	REGION	普通散矿保留	Vanilla 基础生存资源可正常获得。	点/区域
+ORE-02	CORE	REGION	矿产省	存在区域级矿产倾向。	点/区域
+ORE-03	CORE	REGION	大型矿床	具长期矿山价值。	点/区域
+ORE-04	CORE	REGION	三维矿体	纵向/横向都有规模。	点/区域
+ORE-05	CORE	REGION	矿床非纯矿球	普通岩石与富矿混合。	点/区域
+ORE-06	CORE	REGION	矿种形态差异	煤/铁/铜/金/钻石形态与规模不同。	点/区域
+ORE-07	CORE	REGION	自然露头	悬崖/河谷/洞穴可偶然暴露矿体。	点/区域
+ORE-08	CORE	REGION	资源与建设优势错开	避免常态化全优重合。	点/区域
+CAVE-01	CORE	REGION	洞穴总体减少	地下完整岩体比例明显提高。	点/区域
+CAVE-02	CORE	REGION	洞穴层级	小洞常见、大洞稀有。	点/区域
+CAVE-03	CORE	REGION	大洞稀有记忆点	大型洞穴不成为默认背景。	点/区域
+CAVE-04	CORE	REGION	地下河	若实现，仅做静态生成水道，不做动态水文。	点/区域
+CORRIDOR-01	CORE	ROUTE	河谷陆路走廊	沿河具备可利用低地。	路线
+CORRIDOR-02	CORE	ROUTE	丘陵通道	存在低成本绕行/谷地。	路线
+CORRIDOR-03	CORE	ROUTE	山口完整路线	两侧接近路线完整。	路线
+CORRIDOR-04	CORE	ROUTE	高原上下通道	少量可达入口。	路线
+CORRIDOR-05	CORE	ROUTE	盆地出入口	进出关系清晰。	路线
+CORRIDOR-06	CORE	ROUTE	低分水岭	存在潜在跨流域工程机会。	路线
+NODE-01	CORE	RELATION	大型汇流节点	汇流地貌清晰。	点/关系
+NODE-02	CORE	RELATION	大湖出口节点	湖—河转换自然。	点/关系
+NODE-03	CORE	RELATION	河口节点	河口/港湾/平原关系清楚。	点/关系
+NODE-04	CORE	RELATION	山口节点	低鞍部且连接两侧区域。	点/关系
+NODE-05	CORE	RELATION	海峡/地峡节点	跨海/运河潜力可识别。	点/关系
+NODE-06	CORE	RELATION	节点稀缺	不能到处都是最佳点。	点/关系
+EDGE-01	CORE	ROUTE	大陆到远洋连续	无硬半径边界。	路线/区域
+EDGE-02	CORE	ROUTE	远洋仍有地理	海底仍具大尺度结构。	路线/区域
+EDGE-03	CORE	ROUTE	外围岛屿递减	离大陆越远越少。	路线/区域
+EDGE-04	CORE	ROUTE	南北冻洋连续混合	普通远洋到冻洋无角落接缝。	路线/区域
+EDGE-05	CORE	ROUTE	大陆轮廓不暴露圆/方边界	不同方向离岸距离明显不同。	路线/区域
+RARE-01	LATER	REGION	大型裂谷	低频、服从大陆骨架。	点/区域
+RARE-02	LATER	REGION	巨型河谷	低频、具有区域尺度。	点/区域
+RARE-03	LATER	REGION	巨型湖区/内海	低频但完整。	点/区域
+RARE-04	LATER	REGION	巨型孤峰	稀有自然地标。	点/区域
+RARE-05	LATER	REGION	大型断崖带	稀有而非全局视觉语言。	点/区域
+VSTRUCT-01	CONSTRAINT	AUTOMATIC_AND_MANUAL	不接管 Structure Placement	Vanilla placement 仍由 Vanilla 决定。	自动/人工
+VSTRUCT-02	CONSTRAINT	AUTOMATIC_AND_MANUAL	宏观地理不为普通结构牺牲	主河/山系/湖泊/海峡不可被普通结构改写。	自动/人工
+VSTRUCT-03	CONSTRAINT	AUTOMATIC_AND_MANUAL	Vanilla 局部 terrain adaptation 保留	结构局部适配正常工作。	自动/人工
+VSTRUCT-04	CONSTRAINT	AUTOMATIC_AND_MANUAL	关键结构完整性	Stronghold 等流程关键结构正常可获得。	自动/人工
+VSTRUCT-05	CONSTRAINT	AUTOMATIC_AND_MANUAL	地下/海底结构环境保留	洞穴/海底变化不系统性挤掉原版结构。	自动/人工
+SPAWN-01	CORE	POINT	出生偏好可参数化	影响度可调。	点/统计
+SPAWN-02	CORE	POINT	默认正常宜居	优先主大陆宜居区域。	点/统计
+SPAWN-03	CORE	POINT	不按资源价值选神点	出生算法不做资源最优解。	点/统计
+PARAM-01	CONSTRAINT	UI	合理默认值	默认配置是首要质量目标。	UI/自动/人工
+PARAM-02	CONSTRAINT	UI	UI 说明完整	说明控制内容、两端影响与代价。	UI/自动/人工
+PARAM-03	CONSTRAINT	UI	参数效果可辨识	调节产生稳定可观察变化。	UI/自动/人工
+PARAM-04	CONSTRAINT	UI	参数冲突提示	空间不足/组合矛盾有提示。	UI/自动/人工
+PARAM-05	CONSTRAINT	UI	参数快照锁定	旧世界不受默认值变化影响。	UI/自动/人工
+PARAM-06	CONSTRAINT	UI	预设只是参数集合	不能产生分叉生成器。	UI/自动/人工
+MODEL-01	CONSTRAINT	API	Natural Model 确定性	Seed+Profile+参数决定自然值。	API/性能
+MODEL-02	CONSTRAINT	API	未加载可查询	Model Query 不依赖 Chunk。	API/性能
+MODEL-03	CONSTRAINT	API	不触发 Chunk Load	任何 Model Query 禁止加载世界。	API/性能
+MODEL-04	CONSTRAINT	API	Local Reality 仅已加载	当前世界采样不跨未加载区域。	API/性能
+MODEL-05	CONSTRAINT	API	未加载动态值 unavailable	不能用 0 冒充不存在的实时状态。	API/性能
+MODEL-06	CONSTRAINT	API	1/4/16 分辨率	最少支持三档空间查询。	API/性能
+MODEL-07	CONSTRAINT	API	调用方共享缓存	同 Cell 多消费者复用结果。	API/性能
+MODEL-08	CONSTRAINT	API	按字段懒计算	只算请求的信息。	API/性能
+RUNTIME-01	CONSTRAINT	PERFORMANCE	无全局实时风/水网	Core 不维护全世界动态环境。	性能
+RUNTIME-02	CONSTRAINT	PERFORMANCE	Consumer-driven	没有消费者时无额外动态计算。	性能
+RUNTIME-03	CONSTRAINT	PERFORMANCE	大规模改造不触发全局重算	世界吞噬者不导致气候/流域重新计算。	性能
+RUNTIME-04	CONSTRAINT	PERFORMANCE	共享局部采样	多个附属可复用已加载区域通用采样。	性能
+RUNTIME-05	CONSTRAINT	PERFORMANCE	世界越大不线性增加运行期开销	运行成本主要随活动区域/消费者增长。	性能
+PROFILE-01	CONSTRAINT	AUTOMATIC	世界规则锁定	老世界新 Chunk 继续旧规则。	自动
+PROFILE-02	CONSTRAINT	AUTOMATIC	完整参数快照	不只保存预设名称。	自动
+PROFILE-03	CONSTRAINT	AUTOMATIC	Preview 同规则	老世界预览用老 Profile。	自动
+PROFILE-04	CONSTRAINT	AUTOMATIC	Query API 同规则	API 使用当前世界锁定模型。	自动
+PROFILE-05	CONSTRAINT	AUTOMATIC	验收器同规则	坐标根据 Seed+Profile+参数定位。	自动
+PROFILE-06	CONSTRAINT	AUTOMATIC	结果变化需新 Profile	影响自然世界结果的算法变化版本化。	自动
+PROFILE-07	CONSTRAINT	AUTOMATIC	纯优化不改结果	性能/缓存优化不改变旧 Profile。	自动
+PROFILE-08	CONSTRAINT	AUTOMATIC	同版本 Loader 宏观一致	平台适配不产生另一套世界。	自动
+SURFACE-01	CORE	REGION	河岸材质协调	河滩/冲积区 Surface 合理。	点/区域
+SURFACE-02	CORE	REGION	高山裸岩	坡度/海拔对应合理岩石暴露。	点/区域
+SURFACE-03	CORE	REGION	海岸材质差异	不同海岸类型 Surface 有变化。	点/区域
+SURFACE-04	CORE	REGION	无斑点噪声	材质不高频随机散点。	点/区域
+CORE-05	CONSTRAINT	AUTOMATIC_AND_MANUAL	合理有趣优先于现实复刻	现实规律仅作为因果工具；最终结果必须适合 Minecraft 尺度与体验。	自动/人工
+PARAM-07	CONSTRAINT	UI	模型能力与参数分离	“是否存在某因果关系”属于模型；强度/尺度/频率属于参数。	设计/UI/自动
+PARAM-08	CONSTRAINT	AUTOMATIC	官方预设共享单一模型	Standard/Natural/Civilization/Epic 等不得分叉为独立生成器。	自动/设计
+PARAM-09	CONSTRAINT	AUTOMATIC_AND_MANUAL	代表预设全量回归	主要官方预设均执行多 Seed 全特征回归。	自动/人工
+CLIMATE-08	CORE	REGION	长期背景因果可感知	风向/海洋影响等若启用，必须产生可感知且可解释的气候差异，不要求实时模拟。	区域/路线

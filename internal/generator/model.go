@@ -23,6 +23,7 @@ type Config struct {
 	Seed               int64
 	Geometry           world.GridGeometry
 	SeaLevelNormalized float64
+	WorldProfile       WorldProfile
 
 	PlateCount              int
 	OceanFraction           float64
@@ -49,6 +50,7 @@ type ResolvedConfig struct {
 	Seed               int64
 	Geometry           world.GridGeometry
 	SeaLevelNormalized float64
+	WorldProfile       WorldProfile
 
 	Phase1      phase1.Config
 	Climate     climate.Config

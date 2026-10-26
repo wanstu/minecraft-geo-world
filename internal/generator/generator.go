@@ -57,6 +57,7 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 		EdgeOceanBufferFraction: resolved.EdgeOceanBufferFraction,
 		ContinentFragmentation:  resolved.ContinentFragmentation,
 		ContinentSeparation:     resolved.ContinentSeparation,
+		RareMacroStrength:       resolved.Terrain.RareMacroStrength,
 	}
 	w, err := phase1.GenerateChecked(phase1Cfg)
 	if err != nil {
@@ -206,7 +207,7 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 	if err := checkContext(ctx); err != nil {
 		return nil, err
 	}
-	runtimeProfile, err := runtimeprofile.Build(w.Geometry, eco, p, runtimeModel)
+	runtimeProfile, err := runtimeprofile.BuildWithContinuity(w.Geometry, eco, p, runtimeModel, resolved.WorldProfile.Parameters.BiomeContinuity)
 	if err != nil {
 		return nil, fmt.Errorf("generator: runtimeprofile: %w", err)
 	}
@@ -234,6 +235,7 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 		Seed:               resolved.Seed,
 		Geometry:           w.Geometry,
 		SeaLevelNormalized: w.Surface.SeaLevelNormalized,
+		WorldProfile:       resolved.WorldProfile,
 		Phase1:             w.Config,
 		Climate:            c.Config,
 		Hydrology:          h.Config,
@@ -262,6 +264,12 @@ func resolveTopLevelConfig(cfg Config) (resolvedTopLevel, error) {
 	if _, err := cfg.Geometry.SquareCellSize(); err != nil {
 		return resolvedTopLevel{}, fmt.Errorf("generator: geometry: %w", err)
 	}
+	profile, err := normalizeWorldProfile(cfg.WorldProfile)
+	if err != nil {
+		return resolvedTopLevel{}, err
+	}
+	cfg.WorldProfile = profile
+	applyWorldProfile(&cfg, cfg.Geometry)
 
 	if cfg.SeaLevelNormalized == 0 {
 		cfg.SeaLevelNormalized = world.DefaultSeaLevelNormalized

@@ -27,9 +27,12 @@ import java.util.WeakHashMap;
 public final class GeoWorldV26DecorationPolicy {
     private static final String VANILLA_SPRING_WATER =
         "minecraft:spring_water";
-    // GeoWorld replaces these overworld ore families with deterministic
-    // mineral veins. Keep vanilla decorative stone, gravel, dirt, flowers,
-    // trees, structures, and Nether-only ancient debris untouched.
+    // GeoWorld filters these vanilla placed-feature ore families only inside
+    // GeoWorld worlds, then v1.1.7+ restores the ordinary gameplay layer with
+    // deterministic small scattered veins and adds separate large geological
+    // bodies. This keeps old locked worlds stable while retaining both small
+    // ores and GeoWorld-scale deposits in new worlds. Decorative stone, gravel,
+    // dirt, flowers, trees, structures and Nether-only ancient debris remain.
     private static final List<String> REPLACED_ORE_PREFIXES = List.of(
         "ore_coal", "ore_iron", "ore_copper", "ore_gold",
         "ore_lapis", "ore_redstone", "ore_diamond", "ore_emerald"
@@ -111,7 +114,8 @@ public final class GeoWorldV26DecorationPolicy {
 
         BiomeGenerationSettings.PlainBuilder builder =
             new BiomeGenerationSettings.PlainBuilder();
-        api.copyCarvers(source, builder);
+        // GeoWorld owns cave density. Do not copy Vanilla noise carvers here;
+        // deterministic sparse caves are carved by GeoWorldV26SparseCaves.
         for (int step = 0; step < filteredSteps.size(); step++) {
             for (Holder<PlacedFeature> feature : filteredSteps.get(step)) {
                 builder.addFeature(step, feature);

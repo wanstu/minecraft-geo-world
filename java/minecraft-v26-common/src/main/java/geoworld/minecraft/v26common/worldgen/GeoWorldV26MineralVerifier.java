@@ -3,6 +3,8 @@ package geoworld.minecraft.v26common.worldgen;
 import geoworld.minecraft.v26common.MinecraftV26HeightMapping;
 import geoworld.minecraft.common.creation.GeoWorldCreationConfig;
 import geoworld.minecraft.common.engine.GeoWorldEngineBridge;
+import geoworld.minecraft.common.worldgen.GeoWorldMineralPlanner;
+import geoworld.minecraft.common.worldgen.GeoWorldMineralRules;
 import geoworld.runtime.GeoWorldV1;
 
 import java.util.EnumMap;
@@ -23,27 +25,28 @@ public final class GeoWorldV26MineralVerifier {
         ).model();
 
         // Geological tendency remains meaningful even with reserve seams.
-        if (GeoWorldV26MineralVeins.affinity(
-                GeoWorldV26MineralVeins.Mineral.IRON, "Mountain", "Alpine", 30
-            ) <= GeoWorldV26MineralVeins.affinity(
-                GeoWorldV26MineralVeins.Mineral.IRON, "Plain", "Temperate Forest", 30
+        if (GeoWorldMineralRules.affinity(
+                GeoWorldMineralRules.Kind.IRON, "Mountain", "Alpine", 30
+            ) <= GeoWorldMineralRules.affinity(
+                GeoWorldMineralRules.Kind.IRON, "Plain", "Temperate Forest", 30
             )) {
             throw new AssertionError("iron mineral bias not shaped by geology");
         }
-        if (GeoWorldV26MineralVeins.affinity(
-                GeoWorldV26MineralVeins.Mineral.COAL, "Plain", "Temperate Forest", 30
-            ) <= GeoWorldV26MineralVeins.affinity(
-                GeoWorldV26MineralVeins.Mineral.COAL, "Mountain", "Alpine", 30
+        if (GeoWorldMineralRules.affinity(
+                GeoWorldMineralRules.Kind.COAL, "Plain", "Temperate Forest", 30
+            ) <= GeoWorldMineralRules.affinity(
+                GeoWorldMineralRules.Kind.COAL, "Mountain", "Alpine", 30
             )) {
             throw new AssertionError("coal sedimentary preference disappeared");
         }
 
         var g = model.manifest().geometry();
         var heightMapping = new MinecraftV26HeightMapping();
-        var found = new EnumMap<GeoWorldV26MineralVeins.Mineral, boolean[]>(
-            GeoWorldV26MineralVeins.Mineral.class
+        var mineralPlanner = new GeoWorldMineralPlanner(heightMapping);
+        var found = new EnumMap<GeoWorldMineralRules.Kind, boolean[]>(
+            GeoWorldMineralRules.Kind.class
         );
-        for (var mineral : GeoWorldV26MineralVeins.Mineral.values()) {
+        for (var mineral : GeoWorldMineralRules.Kind.values()) {
             found.put(mineral, new boolean[2]);
         }
         int verified = 0;
@@ -61,7 +64,7 @@ public final class GeoWorldV26MineralVerifier {
         );
         for (int superX = firstCellX; superX <= lastCellX && verified < 16; superX++) {
             for (int superZ = firstCellZ; superZ <= lastCellZ && verified < 16; superZ++) {
-                for (var mineral : GeoWorldV26MineralVeins.Mineral.values()) {
+                for (var mineral : GeoWorldMineralRules.Kind.values()) {
                     boolean[] variants = found.get(mineral);
                     for (int deep = 0; deep < 2; deep++) {
                         if (variants[deep]) continue;
@@ -70,7 +73,7 @@ public final class GeoWorldV26MineralVerifier {
                         int cellZ = superZ * 16 + 4 + (slot / 4) * 8;
                         int x = cellX * 64 + 32;
                         int z = cellZ * 64 + 32;
-                        int y = GeoWorldV26MineralVeins.guaranteeY(mineral, deep == 1);
+                        int y = GeoWorldMineralRules.guaranteeY(mineral, deep == 1);
                         if (x < g.originX() + 32 || x > g.originX() + g.spanXBlocks() - 32 ||
                             z < g.originZ() + 32 || z > g.originZ() + g.spanZBlocks() - 32) {
                             continue;
@@ -82,7 +85,7 @@ public final class GeoWorldV26MineralVerifier {
                         // the host is STONE or DEEPSLATE before the ore pass.
                         if (y >= ground - 5) continue;
                         final boolean[] placed = {false};
-                        GeoWorldV26MineralVeins.plan(
+                        mineralPlanner.plan(
                             model, seed, x - 6, x + 6, z - 6, z + 6,
                             p -> {
                                 if (p.mineral() == mineral &&
@@ -116,19 +119,19 @@ public final class GeoWorldV26MineralVerifier {
         for (int x = -256; x <= 256; x += 8) {
             for (int z = -256; z <= 256; z += 8) {
                 outcropSamples++;
-                boolean exposed = GeoWorldV26MineralVeins.isOutcropLocation(
-                    GeoWorldV26MineralVeins.Mineral.IRON, "Mountain",
+                boolean exposed = GeoWorldMineralRules.isOutcropLocation(
+                    GeoWorldMineralRules.Kind.IRON, "Mountain",
                     "None", x, z, seed
                 );
                 if (exposed) eligibleOutcrops++;
-                if (GeoWorldV26MineralVeins.isOutcropLocation(
-                    GeoWorldV26MineralVeins.Mineral.IRON, "Mountain",
+                if (GeoWorldMineralRules.isOutcropLocation(
+                    GeoWorldMineralRules.Kind.IRON, "Mountain",
                     "Ocean", x, z, seed
-                ) || GeoWorldV26MineralVeins.isOutcropLocation(
-                    GeoWorldV26MineralVeins.Mineral.DIAMOND, "Mountain",
+                ) || GeoWorldMineralRules.isOutcropLocation(
+                    GeoWorldMineralRules.Kind.DIAMOND, "Mountain",
                     "None", x, z, seed
-                ) || GeoWorldV26MineralVeins.isOutcropLocation(
-                    GeoWorldV26MineralVeins.Mineral.COPPER, "Plain",
+                ) || GeoWorldMineralRules.isOutcropLocation(
+                    GeoWorldMineralRules.Kind.COPPER, "Plain",
                     "None", x, z, seed
                 )) {
                     throw new AssertionError("unsafe ore exposure class/region");
@@ -169,13 +172,13 @@ public final class GeoWorldV26MineralVerifier {
 
         // Replanning as one region or as two adjacent chunks must return the
         // same world-space ore blocks, independent of chunk request order.
-        Map<GeoWorldV26MineralVeins.Placement, Integer> joined = new HashMap<>();
-        GeoWorldV26MineralVeins.plan(model, seed, -16, -1, 0, 15,
+        Map<GeoWorldMineralPlanner.Placement, Integer> joined = new HashMap<>();
+        mineralPlanner.plan(model, seed, -16, -1, 0, 15,
             p -> joined.merge(p, 1, Integer::sum));
-        GeoWorldV26MineralVeins.plan(model, seed, 0, 15, 0, 15,
+        mineralPlanner.plan(model, seed, 0, 15, 0, 15,
             p -> joined.merge(p, 1, Integer::sum));
-        Map<GeoWorldV26MineralVeins.Placement, Integer> whole = new HashMap<>();
-        GeoWorldV26MineralVeins.plan(model, seed, -16, 15, 0, 15,
+        Map<GeoWorldMineralPlanner.Placement, Integer> whole = new HashMap<>();
+        mineralPlanner.plan(model, seed, -16, 15, 0, 15,
             p -> whole.merge(p, 1, Integer::sum));
         if (!joined.equals(whole)) {
             throw new AssertionError("ore plan differs across chunk boundaries");

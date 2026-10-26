@@ -379,12 +379,28 @@ function updateContinentLabels(){
   $('separationValue').textContent=Number($('separation').value).toFixed(2);
 }
 
+function updateWorldProfileControls(){
+  const preset=$('worldPreset').value;
+  const custom=preset==='custom';
+  const legacy=preset==='legacy';
+  $('parameterCsvLabel').hidden=!custom;
+  $('profileHelp').textContent=legacy
+    ? 'Legacy rc.1 模型继续按创建时旧规则读取；Tester 不会把它伪装成 v1.1 Profile。'
+    : custom
+      ? 'Custom 使用下方完整 25 参数快照；这份快照会进入 .geoworld 并锁定。'
+      : '当前使用 '+$('worldPreset').selectedOptions[0].textContent+' 参数组；Preview、Minecraft 与验收读取同一锁定 Profile。';
+}
+
 ['width','height','cellSize'].forEach(id=>$(id).addEventListener('input',updateRangePreview));
 ['ocean','fragmentation','separation'].forEach(id=>$(id).addEventListener('input',()=>{
   updateContinentLabels();
   syncContinentPreset();
 }));
 $('continentPreset').addEventListener('change',()=>applyContinentPreset($('continentPreset').value));
+$('worldPreset').addEventListener('change',()=>{
+  if($('worldPreset').value!=='custom')$('parameterCsv').value='';
+  updateWorldProfileControls();
+});
 $('modelName').addEventListener('input',()=>{modelNameTouched=true});
 $('exportName').addEventListener('input',()=>{exportNameTouched=true});
 $('randomSeed').addEventListener('click',()=>{
@@ -415,7 +431,9 @@ $('generate').onclick=async()=>{
       plateCount:Number($('plates').value),
       oceanFraction:Number($('ocean').value),
       continentFragmentation:Number($('fragmentation').value),
-      continentSeparation:Number($('separation').value)
+      continentSeparation:Number($('separation').value),
+      worldPreset:$('worldPreset').value,
+      parameters:$('worldPreset').value==='custom' ? $('parameterCsv').value.trim() : ''
     })});
     active=next;
     resetMapView();
@@ -624,6 +642,12 @@ $('load').onclick=async()=>{
     $('ocean').value=active.oceanFraction;
     $('fragmentation').value=active.continentFragmentation||0.35;
     $('separation').value=active.continentSeparation||0.65;
+    $('worldPreset').value=active.worldPreset||'standard';
+    if(!$('worldPreset').querySelector(`option[value="${$('worldPreset').value}"]`)){
+      $('worldPreset').value='custom';
+    }
+    $('parameterCsv').value=active.worldPreset==='legacy' ? '' : (active.parameterCsv||'');
+    updateWorldProfileControls();
     updateRangePreview();
     updateContinentLabels();
     syncContinentPreset();
@@ -792,6 +816,11 @@ function renderStats(){
     ${kv('洋壳比例',Number(active.oceanFraction).toFixed(2))}
     ${kv('大陆破碎度',Number(active.continentFragmentation).toFixed(2))}
     ${kv('大陆分离度',Number(active.continentSeparation).toFixed(2))}
+    ${kv('世界预设',active.worldPreset||'legacy')}
+    ${kv('Profile',active.worldProfileVersion||'—')}
+    ${kv('生成规则',active.generationRulesVersion||'—')}
+    ${kv('World Model',active.worldModelVersion||'—')}
+    ${kv('参数快照',active.parameterSnapshotSha256 ? active.parameterSnapshotSha256.slice(0,16)+'…' : 'legacy')}
     ${kv('主要陆块',active.majorLandComponents)}
     ${kv('全部陆块',active.landComponents)}
     ${kv('最大陆块占比',(Number(active.largestLandShare)*100).toFixed(1)+'%')}
@@ -876,6 +905,7 @@ window.addEventListener('beforeunload',()=>{if(mapObjectURL)URL.revokeObjectURL(
 updateRangePreview();
 updateContinentLabels();
 syncContinentPreset();
+updateWorldProfileControls();
 updateLayerHelp();
 updateActionState();
 renderEmptyAnomalies();

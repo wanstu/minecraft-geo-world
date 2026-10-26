@@ -279,6 +279,103 @@ func TestSampledBaseWeightsRemainNormalizedInInteriorLand(t *testing.T) {
 	}
 }
 
+func TestRareMacroTerrainIsOptInAndSkeletonGated(t *testing.T) {
+	const (
+		width  = 88
+		height = 88
+	)
+	plain := uniformInput(width, height, 0.66)
+	foothill := uniformInput(width, height, 0.66)
+	valley := uniformInput(width, height, 0.66)
+	plateau := uniformInput(width, height, 0.66)
+	for i := range plain.BaseElevation {
+		foothill.RollingPlainWeight[i] = 0
+		foothill.FoothillWeight[i] = 1
+		valley.ValleyWeight[i] = 1
+		plateau.RollingPlainWeight[i] = 0
+		plateau.PlateauWeight[i] = 1
+	}
+
+	cfg := Config{
+		Seed:              20261025,
+		CellSizeBlocks:    128,
+		RareMacroStrength: 1.0,
+	}
+	plainModel, err := Generate(plain, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	foothillModel, err := Generate(foothill, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	valleyModel, err := Generate(valley, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plateauModel, err := Generate(plateau, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	disabledModel, err := Generate(
+		foothill,
+		Config{Seed: cfg.Seed, CellSizeBlocks: 128},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	maxPeak := 0.0
+	maxValley := 0.0
+	maxEscarpment := 0.0
+	const span = 10000.0
+	for z := 128.0; z <= span; z += 192 {
+		for x := 128.0; x <= span; x += 192 {
+			p := plainModel.Sample(x, z)
+			if p.RareMacroLift != 0 ||
+				p.RareMacroCarve != 0 ||
+				p.RareEscarpment != 0 {
+				t.Fatalf(
+					"rare macro landmark escaped terrain skeleton at %.0f,%.0f: lift=%.6f carve=%.6f scarp=%.6f",
+					x, z,
+					p.RareMacroLift,
+					p.RareMacroCarve,
+					p.RareEscarpment,
+				)
+			}
+			d := disabledModel.Sample(x, z)
+			if d.RareMacroLift != 0 ||
+				d.RareMacroCarve != 0 ||
+				d.RareEscarpment != 0 {
+				t.Fatalf(
+					"disabled rare macro terrain still changed sample at %.0f,%.0f",
+					x, z,
+				)
+			}
+
+			f := foothillModel.Sample(x, z)
+			maxPeak = math.Max(maxPeak, f.RareMacroLift)
+			v := valleyModel.Sample(x, z)
+			maxValley = math.Max(maxValley, v.RareMacroCarve)
+			pt := plateauModel.Sample(x, z)
+			maxEscarpment = math.Max(
+				maxEscarpment,
+				math.Abs(pt.RareEscarpment),
+			)
+		}
+	}
+
+	if maxPeak < 0.010 {
+		t.Fatalf("rare isolated peak field never became material: max=%.6f", maxPeak)
+	}
+	if maxValley < 0.008 {
+		t.Fatalf("rare giant valley field never became material: max=%.6f", maxValley)
+	}
+	if maxEscarpment < 0.008 {
+		t.Fatalf("rare escarpment field never became material: max=%.6f", maxEscarpment)
+	}
+}
+
 func TestRegionalTerrainOutputFiniteAndBounded(t *testing.T) {
 	in := uniformInput(8, 6, 0.64)
 	for i := range in.BaseElevation {
@@ -337,6 +434,73 @@ func detailStdDev(m *Model) float64 {
 	}
 	variance /= float64(len(values))
 	return math.Sqrt(variance)
+}
+
+func TestMountainStrengthScaleRaisesEnvelopeAndPreservesLegacyDefault(t *testing.T) {
+	in := uniformInput(20, 20, 0.64)
+	for i := range in.BaseElevation {
+		in.RollingPlainWeight[i] = 0
+		in.MountainWeight[i] = 1
+	}
+
+	baseConfig := Config{
+		Seed:              20261026,
+		CellSizeBlocks:    128,
+		MountainAmplitude: 0.075,
+	}
+	legacy, err := Generate(in, baseConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	standardConfig := baseConfig
+	standardConfig.MountainStrengthScale = 1
+	standard, err := Generate(in, standardConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lowConfig := baseConfig
+	lowConfig.MountainStrengthScale = 0.5
+	low, err := Generate(in, lowConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	highConfig := baseConfig
+	highConfig.MountainStrengthScale = 1.8
+	high, err := Generate(in, highConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	points := [][2]float64{
+		{256, 256},
+		{768, 512},
+		{1280, 1024},
+		{1792, 1536},
+	}
+	lowMean := 0.0
+	highMean := 0.0
+	for _, point := range points {
+		legacyHeight := legacy.SampleNormalized(point[0], point[1])
+		standardHeight := standard.SampleNormalized(point[0], point[1])
+		if math.Abs(legacyHeight-standardHeight) > 1e-12 {
+			t.Fatalf(
+				"standard v1.1.7 mountain scale changed historical default: legacy=%.12f standard=%.12f",
+				legacyHeight,
+				standardHeight,
+			)
+		}
+		lowMean += low.SampleNormalized(point[0], point[1])
+		highMean += high.SampleNormalized(point[0], point[1])
+	}
+	lowMean /= float64(len(points))
+	highMean /= float64(len(points))
+	if highMean <= lowMean+0.025 {
+		t.Fatalf(
+			"stronger mountain scale did not raise mountain envelope enough: low=%.6f high=%.6f",
+			lowMean,
+			highMean,
+		)
+	}
 }
 
 func TestMountainStructureCreatesSummitsAndSaddles(t *testing.T) {

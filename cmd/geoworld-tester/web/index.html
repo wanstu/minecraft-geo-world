@@ -37,6 +37,22 @@
       </select>
     </label>
     <div id="rangePreview" class="muted small"></div>
+    <label>世界预设
+      <select id="worldPreset">
+        <option value="standard">Standard · 标准</option>
+        <option value="natural">Natural · 自然</option>
+        <option value="civilization">Civilization · 文明地理</option>
+        <option value="expansive">Expansive · 辽阔大陆</option>
+        <option value="epic">Epic · 史诗</option>
+        <option value="near_vanilla">Near Vanilla · 接近原版</option>
+        <option value="custom">Custom · 自定义</option>
+        <option value="legacy" disabled>Legacy rc.1 · 旧规则（只读）</option>
+      </select>
+    </label>
+    <label id="parameterCsvLabel" hidden>25 参数快照 CSV
+      <input id="parameterCsv" placeholder="25 个逗号分隔参数；留空则使用所选预设默认值">
+    </label>
+    <div id="profileHelp" class="muted small parameter-help">验收工具与 Minecraft 使用同一 World Profile；Custom 可粘贴完整参数快照。</div>
     <div class="two">
       <label>板块数<input id="plates" type="number" value="18" min="2"></label>
       <label>洋壳比例<input id="ocean" type="number" value="0.68" min="0.1" max="0.9" step="0.01"></label>

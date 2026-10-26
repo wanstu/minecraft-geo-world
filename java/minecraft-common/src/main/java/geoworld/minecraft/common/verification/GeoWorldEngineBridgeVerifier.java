@@ -26,6 +26,30 @@ public final class GeoWorldEngineBridgeVerifier {
         if (generated.model().manifest().seed() != seed) {
             throw new AssertionError("seed mismatch");
         }
+        if (!"geoworld-profile-v1.1".equals(
+            generated.model().manifest().worldProfileVersion()
+        )) {
+            throw new AssertionError(
+                "world profile mismatch: " +
+                generated.model().manifest().worldProfileVersion()
+            );
+        }
+        if (!"geoworld-rules-v1.1.7".equals(
+            generated.model().manifest().generationRulesVersion()
+        )) {
+            throw new AssertionError(
+                "generation rules mismatch: " +
+                generated.model().manifest().generationRulesVersion()
+            );
+        }
+        if (!"geoworld-model-v1".equals(
+            generated.model().manifest().worldModelVersion()
+        )) {
+            throw new AssertionError(
+                "world model mismatch: " +
+                generated.model().manifest().worldModelVersion()
+            );
+        }
         var geometry = generated.model().manifest().geometry();
         if (geometry.width() != 48 || geometry.height() != 30) {
             throw new AssertionError(

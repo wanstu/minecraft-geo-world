@@ -16,6 +16,7 @@ import (
 	"geoworld/internal/ecology"
 	"geoworld/internal/generator"
 	"geoworld/internal/mcprofile"
+	"geoworld/internal/phase1"
 	"geoworld/internal/runtimeprofile"
 	"geoworld/internal/sampling"
 	"geoworld/internal/terrain"
@@ -93,18 +94,28 @@ func envelopeFromWorldModel(path string, model *generator.WorldModel) (fileEnvel
 		return fileEnvelope{}, fmt.Errorf("worldmodelio: encode payload checksum: %w", err)
 	}
 	sum := sha256.Sum256(payloadJSON)
+	parameterJSON, err := json.Marshal(model.Config.WorldProfile.Parameters)
+	if err != nil {
+		return fileEnvelope{}, fmt.Errorf("worldmodelio: encode parameter snapshot checksum: %w", err)
+	}
+	parameterSum := sha256.Sum256(parameterJSON)
 
 	manifest := Manifest{
-		Magic:              FormatMagic,
-		SchemaVersion:      CurrentSchemaVersion,
-		GeneratorVersion:   CurrentGeneratorVersion,
-		FileEncoding:       FileEncoding,
-		ChecksumAlgorithm:  ChecksumAlgorithm,
-		PayloadSHA256:      hex.EncodeToString(sum[:]),
-		PayloadBytes:       int64(len(payloadJSON)),
-		Seed:               model.Config.Seed,
-		Geometry:           model.Geometry,
-		SeaLevelNormalized: model.Config.SeaLevelNormalized,
+		Magic:                   FormatMagic,
+		SchemaVersion:           CurrentSchemaVersion,
+		GeneratorVersion:        CurrentGeneratorVersion,
+		WorldProfileVersion:     model.Config.WorldProfile.WorldProfileVersion,
+		GenerationRulesVersion:  model.Config.WorldProfile.GenerationRulesVersion,
+		WorldModelVersion:       model.Config.WorldProfile.WorldModelVersion,
+		Preset:                  model.Config.WorldProfile.Preset,
+		ParameterSnapshotSHA256: hex.EncodeToString(parameterSum[:]),
+		FileEncoding:            FileEncoding,
+		ChecksumAlgorithm:       ChecksumAlgorithm,
+		PayloadSHA256:           hex.EncodeToString(sum[:]),
+		PayloadBytes:            int64(len(payloadJSON)),
+		Seed:                    model.Config.Seed,
+		Geometry:                model.Geometry,
+		SeaLevelNormalized:      model.Config.SeaLevelNormalized,
 	}
 	return fileEnvelope{Manifest: manifest, Payload: p}, nil
 }
@@ -247,25 +258,20 @@ func Validate(path string) (Inspection, error) {
 }
 
 func Load(path string) (*RuntimeModel, error) {
+	// Validate hashes against the exact persisted payload bytes before decoding
+	// into the current struct shape. Re-marshalling a legacy payload after a
+	// schema-compatible struct extension would otherwise introduce zero-value
+	// fields and create a false checksum mismatch.
+	inspection, err := Validate(path)
+	if err != nil {
+		return nil, err
+	}
 	env, err := readEnvelope(path)
 	if err != nil {
 		return nil, err
 	}
-	if err := validateManifest(env.Manifest); err != nil {
-		return nil, err
-	}
-
-	payloadJSON, err := json.Marshal(env.Payload)
-	if err != nil {
-		return nil, fmt.Errorf("worldmodelio: re-encode payload: %w", err)
-	}
-	sum := sha256.Sum256(payloadJSON)
-	if env.Manifest.PayloadBytes != int64(len(payloadJSON)) ||
-		env.Manifest.PayloadSHA256 != hex.EncodeToString(sum[:]) {
-		return nil, ErrChecksumMismatch
-	}
-	if err := validateEnvelopeContracts(env); err != nil {
-		return nil, err
+	if env.Manifest != inspection.Manifest {
+		return nil, errors.New("worldmodelio: manifest changed between validation and load")
 	}
 
 	g := env.Manifest.Geometry
@@ -312,9 +318,17 @@ func Load(path string) (*RuntimeModel, error) {
 	if err != nil {
 		return nil, err
 	}
-	runtimeProfile, err := runtimeprofile.Build(g, eco, profile, runtimeModel)
+	runtimeProfile, err := runtimeprofile.BuildWithContinuity(g, eco, profile, runtimeModel, env.Payload.Config.WorldProfile.Parameters.BiomeContinuity)
 	if err != nil {
 		return nil, fmt.Errorf("worldmodelio: restore runtime profile: %w", err)
+	}
+	hydrologyQuery, err := restoreHydrologyQuery(n, env.Payload.HydrologyQuery)
+	if err != nil {
+		return nil, err
+	}
+	tectonicQuery, err := restoreTectonicQuery(n, env.Payload.TectonicQuery)
+	if err != nil {
+		return nil, err
 	}
 
 	return &RuntimeModel{
@@ -329,6 +343,8 @@ func Load(path string) (*RuntimeModel, error) {
 		Profile:        profile,
 		RuntimeProfile: runtimeProfile,
 		ClimatePreview: restoreClimatePreview(env.Payload.ClimatePreview),
+		HydrologyQuery: hydrologyQuery,
+		TectonicQuery:  tectonicQuery,
 	}, nil
 }
 
@@ -371,6 +387,15 @@ func validateManifest(m Manifest) error {
 	if m.GeneratorVersion != CurrentGeneratorVersion {
 		return ErrUnsupportedGeneratorVersion
 	}
+	identityPresent := m.WorldProfileVersion != "" || m.GenerationRulesVersion != "" ||
+		m.WorldModelVersion != "" || m.Preset != "" || m.ParameterSnapshotSHA256 != ""
+	if identityPresent {
+		if m.WorldProfileVersion == "" || m.GenerationRulesVersion == "" ||
+			m.WorldModelVersion == "" || m.Preset == "" ||
+			len(m.ParameterSnapshotSHA256) != sha256.Size*2 {
+			return errors.New("worldmodelio: incomplete world profile identity")
+		}
+	}
 	if err := m.Geometry.Validate(); err != nil {
 		return fmt.Errorf("worldmodelio: invalid manifest geometry: %w", err)
 	}
@@ -397,13 +422,29 @@ func validateEnvelopeContracts(env fileEnvelope) error {
 	if env.Payload.Waterbed.Config != c.Waterbed {
 		return errors.New("worldmodelio: waterbed config differs from resolved config")
 	}
+	if m.WorldProfileVersion != "" {
+		p := c.WorldProfile
+		if p.WorldProfileVersion != m.WorldProfileVersion ||
+			p.GenerationRulesVersion != m.GenerationRulesVersion ||
+			p.WorldModelVersion != m.WorldModelVersion || p.Preset != m.Preset {
+			return errors.New("worldmodelio: manifest and world profile identity disagree")
+		}
+		parameterJSON, err := json.Marshal(p.Parameters)
+		if err != nil {
+			return fmt.Errorf("worldmodelio: encode persisted parameter snapshot checksum: %w", err)
+		}
+		parameterSum := sha256.Sum256(parameterJSON)
+		if hex.EncodeToString(parameterSum[:]) != m.ParameterSnapshotSHA256 {
+			return errors.New("worldmodelio: parameter snapshot checksum mismatch")
+		}
+	}
 	return nil
 }
 
 func snapshotFromWorldModel(m *generator.WorldModel) (payload, error) {
-	if m == nil || m.Surface == nil || m.CoastTerrain == nil ||
-		m.Waterbed == nil || m.Runtime == nil || m.Climate == nil || m.Ecology == nil ||
-		m.Profile == nil || m.RuntimeProfile == nil {
+	if m == nil || m.Surface == nil || m.CoastTerrain == nil || m.Phase1 == nil ||
+		m.Waterbed == nil || m.Runtime == nil || m.Climate == nil || m.Hydrology == nil ||
+		m.Ecology == nil || m.Profile == nil || m.RuntimeProfile == nil {
 		return payload{}, errors.New("worldmodelio: world model is not Runtime-complete")
 	}
 	if err := m.Geometry.Validate(); err != nil {
@@ -439,6 +480,18 @@ func snapshotFromWorldModel(m *generator.WorldModel) (payload, error) {
 			MonsoonIndex:    cloneFloat64(m.Climate.MonsoonIndex),
 			WindX:           cloneFloat64(m.Climate.WindX),
 			WindZ:           cloneFloat64(m.Climate.WindZ),
+		},
+		HydrologyQuery: &hydrologyQuerySnapshot{
+			BasinID:          append([]int(nil), m.Hydrology.BasinID...),
+			FlowTo:           append([]int(nil), m.Hydrology.FlowTo...),
+			FlowAccumulation: cloneFloat64(m.Hydrology.FlowAccumulation),
+			RiverOrder:       append([]uint8(nil), m.Hydrology.RiverOrder...),
+		},
+		TectonicQuery: &tectonicQuerySnapshot{
+			Feature:          append([]phase1.TectonicFeature(nil), m.Phase1.Feature...),
+			Intensity:        cloneFloat64(m.Phase1.TectonicIntensity),
+			InfluenceFeature: append([]phase1.TectonicFeature(nil), m.Phase1.InfluenceFeature...),
+			Influence:        cloneFloat64(m.Phase1.TectonicInfluence),
 		},
 		Ecology: ecologySnapshot{
 			LandMask:         append([]bool(nil), m.Ecology.LandMask...),
@@ -480,6 +533,10 @@ func snapshotTerrain(m *terrain.Model) terrainSnapshot {
 }
 
 func restoreTerrain(g world.GridGeometry, s terrainSnapshot) (*terrain.Model, error) {
+	if s.Config.CliffFrequency == 0 {
+		// Legacy v1 payloads predate the explicit cliff-frequency parameter.
+		s.Config.CliffFrequency = 1.0
+	}
 	makeGrid := func(name string, values []float64) (sampling.ScalarGrid, error) {
 		grid, err := sampling.NewScalarGridWithGeometry(g, values)
 		if err != nil {
@@ -630,6 +687,53 @@ func cloneRivers(in []waterbed.RiverSegment) []waterbed.RiverSegment {
 		out[i] = seg
 	}
 	return out
+}
+
+func restoreHydrologyQuery(n int, s *hydrologyQuerySnapshot) (*HydrologyQuery, error) {
+	if s == nil {
+		return nil, nil
+	}
+	if len(s.BasinID) != n || len(s.FlowTo) != n ||
+		len(s.FlowAccumulation) != n || len(s.RiverOrder) != n {
+		return nil, errors.New("worldmodelio: persisted hydrology query size does not match geometry")
+	}
+	for i := 0; i < n; i++ {
+		if s.BasinID[i] < 0 ||
+			s.FlowTo[i] < -1 || s.FlowTo[i] >= n ||
+			!finite(s.FlowAccumulation[i]) || s.FlowAccumulation[i] < 0 {
+			return nil, errors.New("worldmodelio: persisted hydrology query contains invalid value")
+		}
+	}
+	return &HydrologyQuery{
+		BasinID:          append([]int(nil), s.BasinID...),
+		FlowTo:           append([]int(nil), s.FlowTo...),
+		FlowAccumulation: cloneFloat64(s.FlowAccumulation),
+		RiverOrder:       append([]uint8(nil), s.RiverOrder...),
+	}, nil
+}
+
+func restoreTectonicQuery(n int, s *tectonicQuerySnapshot) (*TectonicQuery, error) {
+	if s == nil {
+		return nil, nil
+	}
+	if len(s.Feature) != n || len(s.Intensity) != n ||
+		len(s.InfluenceFeature) != n || len(s.Influence) != n {
+		return nil, errors.New("worldmodelio: persisted tectonic query size does not match geometry")
+	}
+	for i := 0; i < n; i++ {
+		if s.Feature[i] > phase1.TransformFault ||
+			s.InfluenceFeature[i] > phase1.TransformFault ||
+			!finite(s.Intensity[i]) || s.Intensity[i] < 0 || s.Intensity[i] > 1 ||
+			!finite(s.Influence[i]) {
+			return nil, errors.New("worldmodelio: persisted tectonic query contains invalid value")
+		}
+	}
+	return &TectonicQuery{
+		Feature:          append([]phase1.TectonicFeature(nil), s.Feature...),
+		Intensity:        cloneFloat64(s.Intensity),
+		InfluenceFeature: append([]phase1.TectonicFeature(nil), s.InfluenceFeature...),
+		Influence:        cloneFloat64(s.Influence),
+	}, nil
 }
 
 func restoreClimatePreview(s *climatePreviewSnapshot) *ClimatePreview {

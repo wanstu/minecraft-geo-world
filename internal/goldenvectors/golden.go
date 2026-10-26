@@ -10,6 +10,7 @@ import (
 	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
+	"geoworld/internal/runtimeworld"
 	"geoworld/internal/world"
 	"geoworld/internal/worldmodelio"
 )
@@ -112,7 +113,7 @@ type pointSpec struct {
 func FixtureConfig() generator.Config {
 	const cell = world.DefaultMacroSpacingBlocks
 	return generator.Config{
-		Seed: 731894205,
+		Seed: 22,
 		Geometry: world.GridGeometry{
 			Width:       48,
 			Height:      30,
@@ -138,7 +139,11 @@ func Build(model *generator.WorldModel) (Document, error) {
 	if model == nil || model.Surface == nil || model.Waterbed == nil || model.RuntimeProfile == nil {
 		return Document{}, errors.New("goldenvectors: complete runtime world model is required")
 	}
-	specs, err := selectPoints(model)
+	runtimeWorld, err := runtimeworld.NewGenerated(model)
+	if err != nil {
+		return Document{}, err
+	}
+	specs, err := selectPoints(model, runtimeWorld)
 	if err != nil {
 		return Document{}, err
 	}
@@ -167,7 +172,7 @@ func Build(model *generator.WorldModel) (Document, error) {
 			Description: p.description,
 			X:           p.x,
 			Z:           p.z,
-			Expected:    FromRuntimeSample(model.RuntimeProfile.Sample(p.x, p.z)),
+			Expected:    FromRuntimeSample(runtimeWorld.Sample(p.x, p.z)),
 		})
 	}
 	return doc, nil
@@ -242,7 +247,7 @@ func CompareSample(got, want Sample, tolerance float64) error {
 	return nil
 }
 
-func selectPoints(model *generator.WorldModel) ([]pointSpec, error) {
+func selectPoints(model *generator.WorldModel, runtimeWorld *runtimeworld.Model) ([]pointSpec, error) {
 	g := model.Geometry
 	if err := g.Validate(); err != nil {
 		return nil, err
@@ -337,13 +342,73 @@ func selectPoints(model *generator.WorldModel) ([]pointSpec, error) {
 		return nil, errors.New("goldenvectors: fixture contains no rendered lake center")
 	}
 
+	// All cases above are finite-model invariants. Keep validating them before
+	// deliberately appending infinite-exterior cases.
 	for _, point := range points {
 		if point.x < g.OriginX-1e-9 || point.x > endX+1e-9 ||
 			point.z < g.OriginZ-1e-9 || point.z > endZ+1e-9 {
 			return nil, fmt.Errorf("goldenvectors: point %s lies outside fixture geometry: %.3f,%.3f", point.name, point.x, point.z)
 		}
 	}
+
+	transition := math.Max(
+		2048,
+		0.5*(g.SpacingX()+g.SpacingZ())*24*model.Config.WorldProfile.Parameters.TransitionWidth,
+	)
+	points = append(points,
+		pointSpec{
+			"outer_far_ocean",
+			"outer-extension",
+			"far-ocean sample beyond the finite east edge",
+			endX + 3*transition,
+			midZ,
+		},
+		pointSpec{
+			"outer_polar_ocean",
+			"outer-extension",
+			"high-latitude sample beyond the north edge that must resolve to frozen ocean",
+			midX,
+			g.OriginZ - 2*transition,
+		},
+	)
+	if island, ok := firstOuterIsland(runtimeWorld, g, transition); ok {
+		points = append(points, pointSpec{
+			"outer_sparse_island",
+			"outer-extension",
+			"deterministically located sparse offshore island outside the finite model",
+			island[0],
+			island[1],
+		})
+	} else {
+		return nil, errors.New("goldenvectors: fixture contains no sparse outer island")
+	}
 	return points, nil
+}
+
+func firstOuterIsland(
+	runtimeWorld *runtimeworld.Model,
+	g world.GridGeometry,
+	transition float64,
+) ([2]float64, bool) {
+	minZ := g.OriginZ + 0.20*g.SpanZBlocks
+	maxZ := g.OriginZ + 0.80*g.SpanZBlocks
+	minDistance := 0.20 * transition
+	maxDistance := 2.40 * transition
+	step := math.Max(48, math.Min(g.SpacingX(), g.SpacingZ())*0.5)
+	for distance := minDistance; distance <= maxDistance; distance += step {
+		for z := minZ; z <= maxZ; z += step {
+			for _, x := range []float64{
+				g.OriginX - distance,
+				g.OriginX + g.SpanXBlocks + distance,
+			} {
+				sample := runtimeWorld.Sample(x, z)
+				if sample.SourceLand && sample.World.WaterKind == reconcile.WaterNone {
+					return [2]float64{x, z}, true
+				}
+			}
+		}
+	}
+	return [2]float64{}, false
 }
 
 func firstMixedCoastPoint(model *generator.WorldModel) ([2]float64, bool) {

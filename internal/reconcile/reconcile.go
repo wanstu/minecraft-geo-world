@@ -540,11 +540,21 @@ func (m *Model) buildRiverConstraints(macroElevation []float64, h *hydrology.Mod
 			),
 			edgeStrengthFloor[i],
 		)
+		flowAccumulation := 0.0
+		if i < len(h.FlowAccumulation) {
+			flowAccumulation = h.FlowAccumulation[i]
+		}
+		riverOrder := uint8(0)
+		if i < len(h.RiverOrder) {
+			riverOrder = h.RiverOrder[i]
+		}
 		m.RiverEdges = append(m.RiverEdges, RiverEdgeConstraint{
 			From: i, To: to,
-			RiverStrength:  strength,
-			OriginalDrop:   originalDrop,
-			RawTerrainRise: rawRise,
+			RiverStrength:    strength,
+			FlowAccumulation: flowAccumulation,
+			RiverOrder:       riverOrder,
+			OriginalDrop:     originalDrop,
+			RawTerrainRise:   rawRise,
 		})
 	}
 

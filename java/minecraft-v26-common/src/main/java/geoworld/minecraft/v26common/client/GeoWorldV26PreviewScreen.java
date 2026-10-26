@@ -1,6 +1,7 @@
 package geoworld.minecraft.v26common.client;
 
 import geoworld.minecraft.common.engine.GeoWorldEngineBridge;
+import geoworld.minecraft.common.preview.GeoWorldPreviewModel;
 import geoworld.minecraft.common.worldgen.HeightMapping;
 import geoworld.runtime.GeoWorldV1;
 
@@ -48,7 +49,7 @@ public class GeoWorldV26PreviewScreen extends Screen {
 
 
     private final Screen parent;
-    private final GeoWorldV1 model;
+    private final GeoWorldPreviewModel previewModel;
     private final HeightMapping heights;
     private final BiomeIdResolver biomeIdResolver;
     private final GeoWorldV26ScreenNavigator screenNavigator;
@@ -118,7 +119,7 @@ public class GeoWorldV26PreviewScreen extends Screen {
     ) {
         super(TITLE);
         this.parent = parent;
-        this.model = model;
+        this.previewModel = new GeoWorldPreviewModel(model);
         this.heights = java.util.Objects.requireNonNull(heights, "heights");
         this.biomeIdResolver = java.util.Objects.requireNonNull(
             biomeIdResolver,
@@ -274,7 +275,7 @@ public class GeoWorldV26PreviewScreen extends Screen {
             return;
         }
 
-        GeoWorldV1.Geometry geometry = this.model.manifest().geometry();
+        GeoWorldV1.Geometry geometry = this.previewModel.manifest().geometry();
         double deltaX = -dx / this.mapWidth * this.viewSpanX;
         double deltaZ = -dy / this.mapHeight * this.viewSpanZ;
 
@@ -328,7 +329,7 @@ public class GeoWorldV26PreviewScreen extends Screen {
     }
 
     private void resetGlobalView() {
-        GeoWorldV1.Geometry geometry = this.model.manifest().geometry();
+        GeoWorldV1.Geometry geometry = this.previewModel.manifest().geometry();
         this.localView = false;
         this.viewOriginX = geometry.originX();
         this.viewOriginZ = geometry.originZ();
@@ -338,7 +339,7 @@ public class GeoWorldV26PreviewScreen extends Screen {
     }
 
     private void resetLocalView() {
-        GeoWorldV1.Geometry geometry = this.model.manifest().geometry();
+        GeoWorldV1.Geometry geometry = this.previewModel.manifest().geometry();
         this.localView = true;
 
         this.viewSpanX = Math.min(
@@ -459,7 +460,7 @@ public class GeoWorldV26PreviewScreen extends Screen {
                 double x = this.viewOriginX + fx * this.viewSpanX;
 
                 GeoWorldV1.RuntimeSample sample =
-                    this.model.sample(x, z);
+                    this.previewModel.sample(x, z);
                 this.colors[row * this.columns + column] =
                     this.colorForLayer(x, z, sample);
                 this.count(sample);
@@ -664,7 +665,7 @@ public class GeoWorldV26PreviewScreen extends Screen {
     }
 
     private void renderSummary(GuiGraphicsExtractor graphics) {
-        GeoWorldV1.Manifest manifest = this.model.manifest();
+        GeoWorldV1.Manifest manifest = this.previewModel.manifest();
         double sampleScale = Math.max(
             this.columns > 1
                 ? this.viewSpanX / (this.columns - 1)
@@ -727,10 +728,10 @@ public class GeoWorldV26PreviewScreen extends Screen {
             this.viewOriginZ + clamp(fz, 0.0, 1.0) * this.viewSpanZ;
 
         GeoWorldV1.RuntimeSample sample =
-            this.model.sample(worldX, worldZ);
+            this.previewModel.sample(worldX, worldZ);
         String minecraftBiome =
             this.biomeIdResolver.biomeId(
-                this.model,
+                this.previewModel.lockedModel(),
                 worldX,
                 worldZ
             );
@@ -768,7 +769,7 @@ public class GeoWorldV26PreviewScreen extends Screen {
         }
 
         GeoWorldV1.ClimateSample climate =
-            this.model.sampleClimate(worldX, worldZ);
+            this.previewModel.sampleClimate(worldX, worldZ);
         Component climateLine = climate.available()
             ? Component.translatable(
                 "geoworld.preview.hover_climate",
@@ -903,7 +904,7 @@ public class GeoWorldV26PreviewScreen extends Screen {
         double mouseY,
         double scrollY
     ) {
-        GeoWorldV1.Geometry geometry = this.model.manifest().geometry();
+        GeoWorldV1.Geometry geometry = this.previewModel.manifest().geometry();
 
         double anchorXFraction = clamp(
             (mouseX - this.mapLeft) / this.mapWidth,
@@ -1033,17 +1034,17 @@ public class GeoWorldV26PreviewScreen extends Screen {
         GeoWorldV1.RuntimeSample sample
     ) {
         return switch (this.previewLayer) {
-            case BIOME -> color(this.model, x, z, sample);
+            case BIOME -> color(this.previewModel.lockedModel(), x, z, sample);
             case CONTINENT -> continentColor(sample);
             case TERRAIN -> terrainLayerColor(sample);
             case TEMPERATURE -> climateTemperatureColor(
-                this.model.sampleClimate(x, z)
+                this.previewModel.sampleClimate(x, z)
             );
             case PRECIPITATION -> climatePrecipitationColor(
-                this.model.sampleClimate(x, z)
+                this.previewModel.sampleClimate(x, z)
             );
             case MONSOON -> climateMonsoonColor(
-                this.model.sampleClimate(x, z)
+                this.previewModel.sampleClimate(x, z)
             );
         };
     }

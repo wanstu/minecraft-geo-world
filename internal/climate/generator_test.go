@@ -668,6 +668,39 @@ func TestOrographicLiftAppearsOnWindwardSlope(t *testing.T) {
 	}
 }
 
+func TestOrographicRainStrengthChangesPrecipitation(t *testing.T) {
+	low := syntheticRainShadowModel(t)
+	high := syntheticRainShadowModel(t)
+	low.Config.OrographicRainStrength = defaultOrographicRainStrength * 0.50
+	high.Config.OrographicRainStrength = defaultOrographicRainStrength * 1.80
+
+	low.computeMoistureAndPrecipitation()
+	high.computeMoistureAndPrecipitation()
+
+	totalDelta := 0.0
+	for i := range low.AnnualPrecipMM {
+		totalDelta += math.Abs(
+			high.AnnualPrecipMM[i] - low.AnnualPrecipMM[i],
+		)
+	}
+	if totalDelta < 10 {
+		t.Fatalf(
+			"orographic rain strength had no material precipitation effect: total delta %.3f mm",
+			totalDelta,
+		)
+	}
+
+	z := 2
+	windward := z*low.Width + 10
+	if high.AnnualPrecipMM[windward] <= low.AnnualPrecipMM[windward] {
+		t.Fatalf(
+			"stronger rain shadow did not increase windward precipitation: low %.3f high %.3f",
+			low.AnnualPrecipMM[windward],
+			high.AnnualPrecipMM[windward],
+		)
+	}
+}
+
 func TestMountainProducesRainShadow(t *testing.T) {
 	m := syntheticRainShadowModel(t)
 	m.computeMoistureAndPrecipitation()

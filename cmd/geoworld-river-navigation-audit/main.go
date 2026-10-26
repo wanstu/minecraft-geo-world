@@ -38,6 +38,8 @@ type report struct {
 	TotalDry                int      `json:"totalDryCenterlineSamples"`
 	MaxAdjacentWaterStep    int      `json:"maxAdjacentWaterStepBlocks"`
 	AdjacentStepViolations  int      `json:"adjacentWaterStepViolations"`
+	MinCenterlineWaterDepth int      `json:"minCenterlineWaterDepthBlocks"`
+	OneBlockDepthSamples    int      `json:"oneBlockCenterlineSamples"`
 	LakeFeeders             int      `json:"lakeFeeders"`
 	DisconnectedLakeFeeders int      `json:"disconnectedLakeFeeders"`
 	StrictPassed            bool     `json:"strictPassed"`
@@ -84,6 +86,7 @@ func main() {
 	}
 
 	totalRises, totalDry := 0, 0
+	minCenterlineDepth, oneBlockDepthSamples := 0, 0
 	for _, seg := range m.Waterbed.Rivers {
 		if seg.HalfWidth < 8 {
 			continue
@@ -124,6 +127,22 @@ func main() {
 				continue
 			}
 			y := minecraftWaterY(s.WaterSurfaceElevation)
+			if s.WaterKind == reconcile.WaterRiver {
+				groundY := minecraftGroundY(s.GroundHeight)
+				depthBlocks := y - groundY
+				// Mirror the Minecraft shoreline fallback: a planned river column
+				// is never shallower than one block even when integer rounding
+				// would otherwise collapse water and ground to the same boundary.
+				if depthBlocks < 1 {
+					depthBlocks = 1
+				}
+				if minCenterlineDepth == 0 || depthBlocks < minCenterlineDepth {
+					minCenterlineDepth = depthBlocks
+				}
+				if depthBlocks == 1 {
+					oneBlockDepthSamples++
+				}
+			}
 			if prevSet && y != prevY {
 				target.Changes++
 				d := prevY - y
@@ -157,6 +176,7 @@ func main() {
 
 	pass := totalRises == 0 &&
 		adjacentStepViolations == 0 &&
+		oneBlockDepthSamples == 0 &&
 		disconnectedLakeFeeders == 0 &&
 		lowOrder[0].ChangesPerK <= 5.0 &&
 		lowOrder[1].ChangesPerK <= 3.5 &&
@@ -170,6 +190,8 @@ func main() {
 		TotalDry:                totalDry,
 		MaxAdjacentWaterStep:    maxAdjacentStep,
 		AdjacentStepViolations:  adjacentStepViolations,
+		MinCenterlineWaterDepth: minCenterlineDepth,
+		OneBlockDepthSamples:    oneBlockDepthSamples,
 		LakeFeeders:             lakeFeeders,
 		DisconnectedLakeFeeders: disconnectedLakeFeeders,
 		StrictPassed:            pass,
@@ -297,12 +319,33 @@ func riverGraphTouchesLake(
 			t := float64(j) / float64(steps)
 			x, z := riverCenter(seg, t)
 			s := m.Runtime.Sample(x, z)
-			if s.WaterKind == reconcile.WaterLake &&
+			if s.WaterSurfaceDefined &&
+				s.WaterKind != reconcile.WaterNone &&
 				sampleBelongsToLake(m, x, z, lakeID) {
+				// A river can remain the categorical owner while crossing a
+				// hydrologic lake cell (especially at a narrow inlet/outlet).
+				// Connectivity only asks whether continuous water entered the
+				// target LakeID; visible lake breadth is audited separately.
 				return true
 			}
 		}
-		for _, next := range outgoing[seg.To] {
+		nextIDs := outgoing[seg.To]
+		if len(nextIDs) == 0 &&
+			seg.To >= 0 &&
+			seg.To < len(m.Hydrology.LakeID) &&
+			m.Hydrology.LakeID[seg.To] == lakeID {
+			// Connectivity is about continuous navigable water, not the final
+			// categorical owner of an overlap. A tiny/shallow hydrologic lake
+			// can be absorbed by a wide river, while a coastal lake can hand
+			// off to Ocean at the final connector node. Both are connected if
+			// the formal feeder reaches the target basin without a dry gap.
+			end := m.Runtime.Sample(seg.X1, seg.Z1)
+			if end.WaterSurfaceDefined &&
+				end.WaterKind != reconcile.WaterNone {
+				return true
+			}
+		}
+		for _, next := range nextIDs {
 			if !visited[next] {
 				queue = append(queue, next)
 			}
@@ -345,15 +388,7 @@ func widthBucket(halfWidth float64) string {
 }
 
 func riverCenter(seg waterbed.RiverSegment, t float64) (float64, float64) {
-	t = clamp(t, 0, 1)
-	dx, dz := seg.X1-seg.X0, seg.Z1-seg.Z0
-	length := math.Hypot(dx, dz)
-	if length <= 1e-12 {
-		return seg.X0, seg.Z0
-	}
-	nx, nz := -dz/length, dx/length
-	offset := seg.MeanderOffset * math.Sin(math.Pi*t)
-	return seg.X0 + dx*t + nx*offset, seg.Z0 + dz*t + nz*offset
+	return waterbed.RiverCenterPoint(seg, t)
 }
 
 func riverCenterDepth(cfg waterbed.Config, halfWidth float64) float64 {
@@ -371,6 +406,17 @@ func minecraftWaterY(h float64) int {
 		mapped = 63 + 257*((h-0.5)/0.5)
 	}
 	return int(math.Ceil(mapped - 1e-9))
+}
+
+func minecraftGroundY(h float64) int {
+	h = clamp(h, 0, 1)
+	var mapped float64
+	if h <= 0.5 {
+		mapped = -64 + 127*(h/0.5)
+	} else {
+		mapped = 63 + 257*((h-0.5)/0.5)
+	}
+	return int(math.Round(mapped))
 }
 
 func clamp(v, lo, hi float64) float64 {

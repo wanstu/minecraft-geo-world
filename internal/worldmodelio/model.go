@@ -6,6 +6,7 @@ import (
 	"geoworld/internal/ecology"
 	"geoworld/internal/generator"
 	"geoworld/internal/mcprofile"
+	"geoworld/internal/phase1"
 	"geoworld/internal/runtimeprofile"
 	"geoworld/internal/terrain"
 	"geoworld/internal/waterbed"
@@ -29,16 +30,21 @@ var (
 )
 
 type Manifest struct {
-	Magic              string             `json:"magic"`
-	SchemaVersion      int                `json:"schemaVersion"`
-	GeneratorVersion   string             `json:"generatorVersion"`
-	FileEncoding       string             `json:"fileEncoding"`
-	ChecksumAlgorithm  string             `json:"checksumAlgorithm"`
-	PayloadSHA256      string             `json:"payloadSha256"`
-	PayloadBytes       int64              `json:"payloadBytes"`
-	Seed               int64              `json:"seed"`
-	Geometry           world.GridGeometry `json:"geometry"`
-	SeaLevelNormalized float64            `json:"seaLevelNormalized"`
+	Magic                   string             `json:"magic"`
+	SchemaVersion           int                `json:"schemaVersion"`
+	GeneratorVersion        string             `json:"generatorVersion"`
+	WorldProfileVersion     string             `json:"worldProfileVersion,omitempty"`
+	GenerationRulesVersion  string             `json:"generationRulesVersion,omitempty"`
+	WorldModelVersion       string             `json:"worldModelVersion,omitempty"`
+	Preset                  string             `json:"preset,omitempty"`
+	ParameterSnapshotSHA256 string             `json:"parameterSnapshotSha256,omitempty"`
+	FileEncoding            string             `json:"fileEncoding"`
+	ChecksumAlgorithm       string             `json:"checksumAlgorithm"`
+	PayloadSHA256           string             `json:"payloadSha256"`
+	PayloadBytes            int64              `json:"payloadBytes"`
+	Seed                    int64              `json:"seed"`
+	Geometry                world.GridGeometry `json:"geometry"`
+	SeaLevelNormalized      float64            `json:"seaLevelNormalized"`
 }
 
 type Inspection struct {
@@ -62,6 +68,8 @@ type RuntimeModel struct {
 	Profile        *mcprofile.Model
 	RuntimeProfile *runtimeprofile.Model
 	ClimatePreview *ClimatePreview
+	HydrologyQuery *HydrologyQuery
+	TectonicQuery  *TectonicQuery
 }
 
 type ClimatePreview struct {
@@ -70,6 +78,25 @@ type ClimatePreview struct {
 	MonsoonIndex    []float64
 	WindX           []float64
 	WindZ           []float64
+}
+
+// HydrologyQuery is the persisted read-only hydrology subset required by the
+// public World Model Query API. It is intentionally independent from loaded
+// Minecraft chunks.
+type HydrologyQuery struct {
+	BasinID          []int
+	FlowTo           []int
+	FlowAccumulation []float64
+	RiverOrder       []uint8
+}
+
+// TectonicQuery is the persisted read-only Phase1 subset needed by acceptance
+// and public model inspection. It never participates in Runtime generation.
+type TectonicQuery struct {
+	Feature          []phase1.TectonicFeature
+	Intensity        []float64
+	InfluenceFeature []phase1.TectonicFeature
+	Influence        []float64
 }
 
 func (m *RuntimeModel) Sample(worldX, worldZ float64) runtimeprofile.Sample {
@@ -87,6 +114,8 @@ type payload struct {
 	Terrain        terrainSnapshot          `json:"terrain"`
 	Waterbed       waterbedSnapshot         `json:"waterbed"`
 	ClimatePreview *climatePreviewSnapshot  `json:"climatePreview,omitempty"`
+	HydrologyQuery *hydrologyQuerySnapshot  `json:"hydrologyQuery,omitempty"`
+	TectonicQuery  *tectonicQuerySnapshot   `json:"tectonicQuery,omitempty"`
 	Ecology        ecologySnapshot          `json:"ecology"`
 	Profile        profileSnapshot          `json:"profile"`
 }
@@ -127,6 +156,20 @@ type climatePreviewSnapshot struct {
 	MonsoonIndex    []float64 `json:"monsoonIndex,omitempty"`
 	WindX           []float64 `json:"windX,omitempty"`
 	WindZ           []float64 `json:"windZ,omitempty"`
+}
+
+type hydrologyQuerySnapshot struct {
+	BasinID          []int     `json:"basinId,omitempty"`
+	FlowTo           []int     `json:"flowTo,omitempty"`
+	FlowAccumulation []float64 `json:"flowAccumulation,omitempty"`
+	RiverOrder       []uint8   `json:"riverOrder,omitempty"`
+}
+
+type tectonicQuerySnapshot struct {
+	Feature          []phase1.TectonicFeature `json:"feature,omitempty"`
+	Intensity        []float64                `json:"intensity,omitempty"`
+	InfluenceFeature []phase1.TectonicFeature `json:"influenceFeature,omitempty"`
+	Influence        []float64                `json:"influence,omitempty"`
 }
 
 type ecologySnapshot struct {

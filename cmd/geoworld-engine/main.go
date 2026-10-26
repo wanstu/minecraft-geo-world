@@ -44,6 +44,8 @@ func main() {
 		ocean         = flag.Float64("ocean", 0.68, "oceanic crust fraction")
 		fragmentation = flag.Float64("fragmentation", 0.35, "continent fragmentation")
 		separation    = flag.Float64("separation", 0.65, "continent separation")
+		profilePreset = flag.String("profile", "standard", "world profile preset id")
+		parameters    = flag.String("parameters", "", "25-value world parameter snapshot CSV")
 		output        = flag.String("output", "", "output .geoworld path")
 		force         = flag.Bool("force", false, "replace an existing output atomically")
 		progressJSON  = flag.Bool("progress-json", false, "emit line-delimited progress JSON on stderr")
@@ -74,10 +76,20 @@ func main() {
 		SpanZBlocks: float64(*height-1) * *cellSize,
 	}
 
+	worldProfile := generator.WorldProfileForPreset(*profilePreset)
+	if *parameters != "" {
+		snapshot, err := generator.ParseParameterSnapshotCSV(*parameters)
+		if err != nil {
+			exitError(err)
+		}
+		worldProfile.Parameters = snapshot
+	}
+
 	start := time.Now()
 	model, err := generator.GenerateWorld(ctx, generator.Config{
 		Seed:                   *seed,
 		Geometry:               geometry,
+		WorldProfile:           worldProfile,
 		PlateCount:             *plateCount,
 		OceanFraction:          *ocean,
 		ContinentFragmentation: *fragmentation,

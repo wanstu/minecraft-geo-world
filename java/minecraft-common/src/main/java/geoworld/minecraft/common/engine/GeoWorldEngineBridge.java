@@ -22,6 +22,13 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public final class GeoWorldEngineBridge {
+    private static final String CACHE_FORMAT_VERSION = "v20";
+    private static final String EXPECTED_WORLD_PROFILE_VERSION =
+        "geoworld-profile-v1.1";
+    private static final String EXPECTED_GENERATION_RULES_VERSION =
+        "geoworld-rules-v1.1.7";
+    private static final String EXPECTED_WORLD_MODEL_VERSION =
+        "geoworld-model-v1";
     private static final Duration GENERATION_TIMEOUT = Duration.ofMinutes(5);
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "GeoWorld-Engine");
@@ -126,6 +133,8 @@ public final class GeoWorldEngineBridge {
             "--ocean", format(config.oceanFraction()),
             "--fragmentation", format(config.continentFragmentation()),
             "--separation", format(config.continentSeparation()),
+            "--profile", config.worldPreset().id(),
+            "--parameters", config.parameters().toCsv(),
             "--output", output.toString(),
             "--force"
         );
@@ -299,7 +308,10 @@ public final class GeoWorldEngineBridge {
     ) {
         String canonical = String.join(
             "|",
-            "v17",
+            CACHE_FORMAT_VERSION,
+            EXPECTED_WORLD_PROFILE_VERSION,
+            EXPECTED_GENERATION_RULES_VERSION,
+            EXPECTED_WORLD_MODEL_VERSION,
             Long.toString(seed),
             Integer.toString(config.width()),
             Integer.toString(config.height()),
@@ -307,7 +319,9 @@ public final class GeoWorldEngineBridge {
             Integer.toString(config.plateCount()),
             format(config.oceanFraction()),
             format(config.continentFragmentation()),
-            format(config.continentSeparation())
+            format(config.continentSeparation()),
+            config.worldPreset().id(),
+            config.parameters().toCsv()
         );
         try {
             byte[] digest = MessageDigest
@@ -331,6 +345,59 @@ public final class GeoWorldEngineBridge {
                 " expected=" +
                 seed
             );
+        }
+
+        if (model.manifest().worldProfileVersion().isBlank()) {
+            throw new IllegalArgumentException("GeoWorld cache has no locked world profile identity");
+        }
+        if (!EXPECTED_WORLD_PROFILE_VERSION.equals(
+            model.manifest().worldProfileVersion()
+        )) {
+            throw new IllegalArgumentException(
+                "GeoWorld cache world-profile mismatch: model=" +
+                model.manifest().worldProfileVersion() +
+                " expected=" + EXPECTED_WORLD_PROFILE_VERSION
+            );
+        }
+        if (!EXPECTED_GENERATION_RULES_VERSION.equals(
+            model.manifest().generationRulesVersion()
+        )) {
+            throw new IllegalArgumentException(
+                "GeoWorld cache generation-rules mismatch: model=" +
+                model.manifest().generationRulesVersion() +
+                " expected=" + EXPECTED_GENERATION_RULES_VERSION
+            );
+        }
+        if (!EXPECTED_WORLD_MODEL_VERSION.equals(
+            model.manifest().worldModelVersion()
+        )) {
+            throw new IllegalArgumentException(
+                "GeoWorld cache world-model mismatch: model=" +
+                model.manifest().worldModelVersion() +
+                " expected=" + EXPECTED_WORLD_MODEL_VERSION
+            );
+        }
+        if (!model.manifest().preset().equals(config.worldPreset().id())) {
+            throw new IllegalArgumentException(
+                "GeoWorld cache preset mismatch: model=" + model.manifest().preset() +
+                " expected=" + config.worldPreset().id()
+            );
+        }
+        double[] modelParameters = model.worldProfile().parameters().values();
+        double[] expectedParameters = config.parameters().values();
+        if (modelParameters.length != expectedParameters.length) {
+            throw new IllegalArgumentException(
+                "GeoWorld cache parameter snapshot length mismatch"
+            );
+        }
+        for (int i = 0; i < modelParameters.length; i++) {
+            if (Math.abs(modelParameters[i] - expectedParameters[i]) > 1.0e-9) {
+                throw new IllegalArgumentException(
+                    "GeoWorld cache parameter mismatch at index " + i +
+                    ": model=" + modelParameters[i] +
+                    " expected=" + expectedParameters[i]
+                );
+            }
         }
 
         GeoWorldV1.Geometry geometry = model.manifest().geometry();
