@@ -881,6 +881,8 @@ async function refreshModels(selectName=''){
 async function focusWorldPoint(x,z){
   if(!active)return;
   lastFocusPoint={x,z};
+  if($('structureSearchX'))$('structureSearchX').value=String(Math.round(x));
+  if($('structureSearchZ'))$('structureSearchZ').value=String(Math.round(z));
   renderCursorOverlay();
   try{
     renderSample(await api('/api/sample?x='+encodeURIComponent(x)+'&z='+encodeURIComponent(z)));
@@ -1366,6 +1368,15 @@ function showMineralDetail(body){
     ' · 长约 '+body.length.toFixed(1)+' · 半径约 '+body.radius.toFixed(1);
 }
 
+const STRUCTURE_SET_IDS=[
+  'minecraft:abandoned_camp','minecraft:ancient_cities','minecraft:buried_treasures',
+  'minecraft:desert_pyramids','minecraft:igloos','minecraft:jungle_temples',
+  'minecraft:mineshafts','minecraft:ocean_monuments','minecraft:ocean_ruins',
+  'minecraft:pillager_outposts','minecraft:ruined_portals','minecraft:shipwrecks',
+  'minecraft:swamp_huts','minecraft:trail_ruins','minecraft:trial_chambers',
+  'minecraft:villages','minecraft:woodland_mansions','minecraft:strongholds'
+];
+
 function structureSetName(id){
   return ({
     'minecraft:abandoned_camp':'废弃营地',
@@ -1387,6 +1398,18 @@ function structureSetName(id){
     'minecraft:woodland_mansions':'林地府邸',
     'minecraft:strongholds':'强要塞'
   })[id]||id;
+}
+
+function populateStructureSelectors(){
+  const options=STRUCTURE_SET_IDS
+    .map(id=>'<option value="'+escapeAttr(id)+'">'+escapeHtml(structureSetName(id))+'</option>')
+    .join('');
+  $('structureFilter').innerHTML='<option value="">全部结构</option>'+options;
+  $('structureSearchType').innerHTML='<option value="">最近任意结构</option>'+options;
+}
+
+function selectedStructureFilter(){
+  return $('structureFilter')?.value||'';
 }
 
 function structureVariantName(id){
@@ -1540,6 +1563,92 @@ function showStructureClusterDetail(cluster){
     '</div>'+
     '<div class="structure-detail-note">图标落在该聚合区域内的真实候选位置，不使用几何平均产生虚假坐标；继续放大会缩小聚合范围，64× 时全部展开。</div>';
   openStructureInspector();
+}
+
+async function copyPlainText(text){
+  try{
+    if(navigator.clipboard&&window.isSecureContext){
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  }catch(_){}
+  const area=document.createElement('textarea');
+  area.value=text;
+  area.setAttribute('readonly','');
+  area.style.position='fixed';
+  area.style.opacity='0';
+  document.body.appendChild(area);
+  area.select();
+  const ok=document.execCommand('copy');
+  area.remove();
+  return ok;
+}
+
+function structureTpCommand(candidate){
+  return '/tp @s '+Math.round(candidate.x)+' ~ '+Math.round(candidate.z);
+}
+
+function renderStructureSearchResult(data){
+  const el=$('structureSearchResult');
+  const candidate=data.candidate;
+  const command=structureTpCommand(candidate);
+  const exact=Boolean(data.exactStronghold);
+  el.hidden=false;
+  el.innerHTML=
+    '<b>'+escapeHtml(structureSetName(candidate.setId))+'</b>'+
+    '<div>坐标：'+escapeHtml(candidate.x+', '+candidate.z)+'</div>'+
+    '<div>区块：'+escapeHtml(candidate.chunkX+', '+candidate.chunkZ)+'</div>'+
+    '<div>距离：约 '+Math.round(Number(data.distance||0)).toLocaleString()+' 方块</div>'+
+    '<div>'+(exact?'精确强要塞位置':'原版结构放置候选位置')+'</div>'+
+    '<code class="structure-tp-command">'+escapeHtml(command)+'</code>'+
+    '<div class="structure-search-actions">'+
+      '<button id="structureSearchLocate" class="primary" type="button">地图定位</button>'+
+      '<button id="structureSearchCopy" type="button">复制 /tp</button>'+
+    '</div>';
+  $('structureSearchLocate').onclick=()=>{
+    centerMapOnWorld(candidate.x,candidate.z,Math.max(24,mapZoom));
+    showStructureDetail(candidate);
+    void focusWorldPoint(candidate.x,candidate.z);
+  };
+  $('structureSearchCopy').onclick=async()=>{
+    const button=$('structureSearchCopy');
+    const ok=await copyPlainText(command);
+    button.textContent=ok?'已复制':'复制失败';
+    setTimeout(()=>{if(button)button.textContent='复制 /tp';},1200);
+  };
+}
+
+async function searchNearestStructure(){
+  if(!active){
+    $('structureSearchResult').hidden=false;
+    $('structureSearchResult').textContent='请先生成或打开一个 World Model。';
+    return;
+  }
+  const x=Number($('structureSearchX').value);
+  const z=Number($('structureSearchZ').value);
+  if(!Number.isFinite(x)||!Number.isFinite(z)){
+    $('structureSearchResult').hidden=false;
+    $('structureSearchResult').textContent='请输入有效的 X / Z 坐标。';
+    return;
+  }
+  const button=$('structureSearchButton');
+  button.disabled=true;
+  button.textContent='查找中…';
+  try{
+    const q=new URLSearchParams({x:String(Math.round(x)),z:String(Math.round(z))});
+    const setId=$('structureSearchType').value;
+    if(setId)q.set('setId',setId);
+    const data=await api('/api/structure-search?'+q.toString());
+    renderStructureSearchResult(data);
+  }catch(e){
+    $('structureSearchResult').hidden=false;
+    $('structureSearchResult').textContent=
+      e.status===503?'当前启动方式无法精确查询强要塞，请从可执行 GeoWorld JAR 启动 Web 工具。':
+      '查找失败：'+e.message;
+  }finally{
+    button.disabled=false;
+    button.textContent='查找';
+  }
 }
 
 function overlayUnitScale(){
@@ -2111,7 +2220,9 @@ function renderFeatureOverlay(){
   if(enabled.has('structures')&&structureCandidates){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-structures');
+    const structureFilter=selectedStructureFilter();
     const visibleCandidates=(structureCandidates.candidates||[]).filter(candidate=>
+      (!structureFilter||candidate.setId===structureFilter)&&
       overlayPointVisible(worldToOverlay(candidate.x,candidate.z),24)
     );
     if(mapZoom<FULL_DETAIL_ZOOM-.001){
@@ -2123,9 +2234,9 @@ function renderFeatureOverlay(){
         .sort((a,b)=>structureCandidatePriority(b.first)-structureCandidatePriority(a.first));
       for(const cluster of clusters){
         cluster.approx=Boolean(structureCandidates.truncated);
-        const markerKind=cluster.key==='all'
+        const markerKind=cluster.typeCount>1
           ? 'mixed'
-          : (mapZoom<10?cluster.key:structureMarkerKind(cluster.first.setId));
+          : structureMarkerKind(cluster.first.setId);
         appendClusterMarker(group,cluster,{
           className:'structure-cluster structure-'+markerKind,
           title:c=>c.typeCount>1
@@ -2235,6 +2346,12 @@ document.querySelectorAll('input[name="acceptanceType"]').forEach(radio=>radio.a
 $('acceptanceGenerate').onclick=generateAcceptanceTable;
 $('acceptanceBigFilter').onchange=renderAcceptanceTable;
 document.querySelectorAll('.acceptance-download').forEach(btn=>btn.onclick=()=>downloadAcceptance(btn.dataset.format));
+$('structureFilter').onchange=()=>renderFeatureOverlay();
+$('structureSearchButton').onclick=searchNearestStructure;
+['structureSearchX','structureSearchZ'].forEach(id=>$(id).addEventListener('keydown',e=>{
+  if(e.key==='Enter')$('structureSearchButton').click();
+}));
+
 document.querySelectorAll('.feature-toggle').forEach(input=>input.onchange=()=>{
   if(input.dataset.feature==='minerals'){
     if(input.checked){
@@ -2271,6 +2388,7 @@ window.addEventListener('resize',()=>{
   renderFeatureOverlay();
 });
 window.addEventListener('beforeunload',()=>{if(mapObjectURL)URL.revokeObjectURL(mapObjectURL)});
+populateStructureSelectors();
 
 updateRangePreview();
 updateContinentLabels();

@@ -105,6 +105,17 @@
           <label><input class="feature-toggle" type="checkbox" data-feature="minerals" checked><span class="marker-sample mineral"></span>真实规划矿体</label>
           <label><input class="feature-toggle" type="checkbox" data-feature="structures" checked><span class="marker-sample structure"></span>原版结构候选</label>
         </div>
+        <div class="structure-tools">
+          <div class="structure-tools-title">结构工具</div>
+          <label class="structure-tool-field"><span>地图结构筛选</span><select id="structureFilter"></select></label>
+          <label class="structure-tool-field"><span>查找最近结构</span><select id="structureSearchType"></select></label>
+          <div class="structure-search-coords">
+            <input id="structureSearchX" type="number" placeholder="X" value="0">
+            <input id="structureSearchZ" type="number" placeholder="Z" value="0">
+            <button id="structureSearchButton" type="button">查找</button>
+          </div>
+          <div id="structureSearchResult" class="structure-search-result" hidden></div>
+        </div>
         <div id="featureNote" class="muted small marker-note">这些要素直接来自 World Model / Minecraft 原版规则，不来自验收表。</div>
         <div id="mineralStatus" class="muted small mineral-status">放大到 5× 后加载主要矿体；10× 后切换详细矿体。小型散布矿体数量很大时会按当前视野上限显示。</div>
         <div class="muted small mineral-caveat">矿体几何直接来自 Minecraft 正式 Planner；最终矿石方块仍会受宿主岩石、地表与水岸条件过滤。</div>

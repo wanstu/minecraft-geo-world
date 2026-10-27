@@ -178,7 +178,7 @@ type modelInfo struct {
 
 func main() {
 	addr := flag.String("addr", "0.0.0.0:8788", "listen address")
-	openBrowser := flag.Bool("open", true, "open browser automatically")
+	openBrowser := flag.Bool("open", false, "open browser automatically")
 	modelDir := flag.String("models", filepath.FromSlash("output/models"), "saved model directory")
 	flag.Parse()
 
@@ -211,6 +211,7 @@ func main() {
 	mux.HandleFunc("/api/features", state.handlePreviewFeatures)
 	mux.HandleFunc("/api/minerals", state.handleMineralBodies)
 	mux.HandleFunc("/api/structures", state.handleStructureCandidates)
+	mux.HandleFunc("/api/structure-search", state.handleStructureSearch)
 	mux.HandleFunc("/api/layer", state.handleLayer)
 	mux.HandleFunc("/api/save", func(w http.ResponseWriter, r *http.Request) { state.handleSave(w, r, *modelDir) })
 	mux.HandleFunc("/api/load", func(w http.ResponseWriter, r *http.Request) { state.handleLoad(w, r, *modelDir) })

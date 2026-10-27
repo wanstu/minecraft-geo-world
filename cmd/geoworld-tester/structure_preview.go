@@ -86,6 +86,16 @@ type structurePreviewResponse struct {
 	Note              string                             `json:"note"`
 }
 
+type structureSearchResponse struct {
+	Seed            int64              `json:"seed"`
+	QueryX          int                `json:"queryX"`
+	QueryZ          int                `json:"queryZ"`
+	RequestedSetID  string             `json:"requestedSetId,omitempty"`
+	Candidate       structureCandidate `json:"candidate"`
+	Distance        float64            `json:"distance"`
+	ExactStronghold bool               `json:"exactStronghold"`
+}
+
 var (
 	structureSnapshotOnce sync.Once
 	structureSnapshotData structureSnapshot
@@ -285,6 +295,219 @@ func (s *appState) handleStructureCandidates(w http.ResponseWriter, r *http.Requ
 		SkippedStronghold: strongholdErr != nil,
 		Note:              note,
 	})
+}
+
+func (s *appState) handleStructureSearch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+	snapshot, err := loadStructureSnapshot()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	s.mu.RLock()
+	active := s.active
+	s.mu.RUnlock()
+	if active == nil {
+		writeError(w, http.StatusConflict, errNoActiveWorld)
+		return
+	}
+
+	queryX, err := queryInt(r, "x", 0)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	queryZ, err := queryInt(r, "z", 0)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	setID := strings.TrimSpace(r.URL.Query().Get("setId"))
+	if setID != "" && setID != "minecraft:strongholds" && !overworldRandomSpreadSets[setID] {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("unsupported overworld structure set %q", setID))
+		return
+	}
+
+	g := active.geometry
+	modelMinX := int(math.Floor(g.OriginX))
+	modelMaxX := int(math.Ceil(g.OriginX + g.SpanXBlocks))
+	modelMinZ := int(math.Floor(g.OriginZ))
+	modelMaxZ := int(math.Ceil(g.OriginZ + g.SpanZBlocks))
+	if queryX < modelMinX || queryX > modelMaxX || queryZ < modelMinZ || queryZ > modelMaxZ {
+		writeError(w, http.StatusBadRequest, errors.New("search coordinate is outside the current World Model"))
+		return
+	}
+
+	bestDistance := math.Inf(1)
+	best := structureCandidate{}
+	found := false
+	exactStronghold := false
+
+	if setID == "" || setID == "minecraft:strongholds" {
+		strongholds, strongholdErr := s.strongholdPreviewCandidates(active)
+		if strongholdErr != nil {
+			if setID == "minecraft:strongholds" {
+				writeError(w, http.StatusServiceUnavailable, strongholdErr)
+				return
+			}
+		} else {
+			for _, candidate := range strongholds {
+				if candidate.X < modelMinX || candidate.X > modelMaxX ||
+					candidate.Z < modelMinZ || candidate.Z > modelMaxZ {
+					continue
+				}
+				distance := math.Hypot(float64(candidate.X-queryX), float64(candidate.Z-queryZ))
+				if distance < bestDistance {
+					bestDistance = distance
+					best = candidate
+					found = true
+					exactStronghold = true
+				}
+			}
+		}
+	}
+
+	setIDs := make([]string, 0, len(overworldRandomSpreadSets))
+	for id := range overworldRandomSpreadSets {
+		if setID != "" && id != setID {
+			continue
+		}
+		setIDs = append(setIDs, id)
+	}
+	sort.Strings(setIDs)
+	for _, id := range setIDs {
+		candidate, distance, ok := findNearestRandomSpreadCandidate(
+			active.seed, snapshot, id,
+			queryX, queryZ,
+			modelMinX, modelMaxX, modelMinZ, modelMaxZ,
+		)
+		if ok && distance < bestDistance {
+			bestDistance = distance
+			best = candidate
+			found = true
+			exactStronghold = false
+		}
+	}
+
+	if !found {
+		writeError(w, http.StatusNotFound, errors.New("no matching structure candidate inside the current World Model"))
+		return
+	}
+	writeJSON(w, http.StatusOK, structureSearchResponse{
+		Seed: active.seed, QueryX: queryX, QueryZ: queryZ,
+		RequestedSetID: setID, Candidate: best,
+		Distance: bestDistance, ExactStronghold: exactStronghold,
+	})
+}
+
+func findNearestRandomSpreadCandidate(
+	seed int64,
+	snapshot *structureSnapshot,
+	setID string,
+	queryX, queryZ int,
+	modelMinX, modelMaxX, modelMinZ, modelMaxZ int,
+) (structureCandidate, float64, bool) {
+	set, ok := snapshot.StructureSets[setID]
+	if !ok || set.Placement.Type != "minecraft:random_spread" {
+		return structureCandidate{}, 0, false
+	}
+	placement := set.Placement
+	if placement.Spacing <= 0 || placement.Separation < 0 ||
+		placement.Separation >= placement.Spacing {
+		return structureCandidate{}, 0, false
+	}
+
+	minChunkX := floorDiv(modelMinX, 16)
+	maxChunkX := floorDiv(modelMaxX, 16)
+	minChunkZ := floorDiv(modelMinZ, 16)
+	maxChunkZ := floorDiv(modelMaxZ, 16)
+	minRegionX := floorDiv(minChunkX, placement.Spacing) - 1
+	maxRegionX := floorDiv(maxChunkX, placement.Spacing) + 1
+	minRegionZ := floorDiv(minChunkZ, placement.Spacing) - 1
+	maxRegionZ := floorDiv(maxChunkZ, placement.Spacing) + 1
+	centerRegionX := floorDiv(floorDiv(queryX, 16), placement.Spacing)
+	centerRegionZ := floorDiv(floorDiv(queryZ, 16), placement.Spacing)
+
+	maxRadius := 0
+	for _, d := range []int{
+		centerRegionX - minRegionX, maxRegionX - centerRegionX,
+		centerRegionZ - minRegionZ, maxRegionZ - centerRegionZ,
+	} {
+		if d < 0 {
+			d = -d
+		}
+		if d > maxRadius {
+			maxRadius = d
+		}
+	}
+
+	bestDistance := math.Inf(1)
+	best := structureCandidate{}
+	found := false
+	consider := func(regionX, regionZ int) {
+		if regionX < minRegionX || regionX > maxRegionX ||
+			regionZ < minRegionZ || regionZ > maxRegionZ {
+			return
+		}
+		baseChunkX := regionX * placement.Spacing
+		baseChunkZ := regionZ * placement.Spacing
+		chunkX, chunkZ := randomSpreadPotentialChunk(seed, baseChunkX, baseChunkZ, placement)
+		if chunkX < minChunkX || chunkX > maxChunkX ||
+			chunkZ < minChunkZ || chunkZ > maxChunkZ {
+			return
+		}
+		if !structureFrequencyAllowed(seed, chunkX, chunkZ, placement) {
+			return
+		}
+		if placement.ExclusionZone != nil &&
+			structureExcludedByOtherSet(snapshot, seed, chunkX, chunkZ, *placement.ExclusionZone) {
+			return
+		}
+		offsetX, offsetZ := 0, 0
+		if len(placement.LocateOffset) >= 3 {
+			offsetX = placement.LocateOffset[0]
+			offsetZ = placement.LocateOffset[2]
+		}
+		x := chunkX*16 + offsetX
+		z := chunkZ*16 + offsetZ
+		if x < modelMinX || x > modelMaxX || z < modelMinZ || z > modelMaxZ {
+			return
+		}
+		distance := math.Hypot(float64(x-queryX), float64(z-queryZ))
+		if distance < bestDistance {
+			bestDistance = distance
+			best = structureCandidate{SetID: setID, ChunkX: chunkX, ChunkZ: chunkZ, X: x, Z: z}
+			found = true
+		}
+	}
+
+	for radius := 0; radius <= maxRadius; radius++ {
+		if radius == 0 {
+			consider(centerRegionX, centerRegionZ)
+		} else {
+			minRX, maxRX := centerRegionX-radius, centerRegionX+radius
+			minRZ, maxRZ := centerRegionZ-radius, centerRegionZ+radius
+			for regionX := minRX; regionX <= maxRX; regionX++ {
+				consider(regionX, minRZ)
+				consider(regionX, maxRZ)
+			}
+			for regionZ := minRZ + 1; regionZ < maxRZ; regionZ++ {
+				consider(minRX, regionZ)
+				consider(maxRX, regionZ)
+			}
+		}
+		if found {
+			lowerBound := float64(radius*placement.Spacing*16 - 64)
+			if lowerBound > 0 && lowerBound >= bestDistance {
+				break
+			}
+		}
+	}
+	return best, bestDistance, found
 }
 
 func predictStructureCandidates(

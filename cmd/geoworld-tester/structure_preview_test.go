@@ -39,3 +39,29 @@ func TestOutpostExclusionUsesVillagePlacement(t *testing.T) {
 		t.Fatalf("unexpected exclusion: %+v", outpost.Placement.ExclusionZone)
 	}
 }
+
+func TestFindNearestVillageCandidate(t *testing.T) {
+	snapshot, err := loadStructureSnapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidate, distance, ok := findNearestRandomSpreadCandidate(
+		123456, snapshot, "minecraft:villages",
+		0, 0, -12000, 12000, -12000, 12000,
+	)
+	if !ok {
+		t.Fatal("nearest village candidate not found")
+	}
+	if candidate.SetID != "minecraft:villages" {
+		t.Fatalf("set = %q", candidate.SetID)
+	}
+	if distance < 0 {
+		t.Fatalf("distance = %f", distance)
+	}
+	placement := snapshot.StructureSets["minecraft:villages"].Placement
+	if !isRandomSpreadPlacementChunk(
+		123456, candidate.ChunkX, candidate.ChunkZ, placement, true, snapshot,
+	) {
+		t.Fatalf("returned chunk is not a valid village placement: %+v", candidate)
+	}
+}
