@@ -13,6 +13,24 @@ import (
 	"geoworld/internal/worldmodelio"
 )
 
+func TestBrowserURL(t *testing.T) {
+	tests := []struct {
+		addr string
+		want string
+	}{
+		{"0.0.0.0:8788", "http://127.0.0.1:8788"},
+		{":8788", "http://127.0.0.1:8788"},
+		{"127.0.0.1:8788", "http://127.0.0.1:8788"},
+		{"192.168.1.41:8788", "http://192.168.1.41:8788"},
+		{"[::]:8788", "http://127.0.0.1:8788"},
+	}
+	for _, tt := range tests {
+		if got := browserURL(tt.addr); got != tt.want {
+			t.Fatalf("browserURL(%q) = %q, want %q", tt.addr, got, tt.want)
+		}
+	}
+}
+
 func TestSanitizeFolderName(t *testing.T) {
 	tests := []struct {
 		in   string

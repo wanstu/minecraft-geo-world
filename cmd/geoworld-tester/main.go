@@ -14,6 +14,7 @@ import (
 	"io/fs"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -170,7 +171,7 @@ type modelInfo struct {
 }
 
 func main() {
-	addr := flag.String("addr", "127.0.0.1:8788", "listen address")
+	addr := flag.String("addr", "0.0.0.0:8788", "listen address")
 	openBrowser := flag.Bool("open", true, "open browser automatically")
 	modelDir := flag.String("models", filepath.FromSlash("output/models"), "saved model directory")
 	flag.Parse()
@@ -211,8 +212,9 @@ func main() {
 	})
 	mux.HandleFunc("/api/open-folder", handleOpenFolder)
 
-	url := "http://" + *addr
-	fmt.Printf("GeoWorld Tester: %s\n", url)
+	url := browserURL(*addr)
+	fmt.Printf("GeoWorld Tester listening: http://%s\n", *addr)
+	fmt.Printf("GeoWorld Tester local: %s\n", url)
 	fmt.Printf("models: %s\n", *modelDir)
 	fmt.Printf("repo: %s\n", repoRoot)
 	if *openBrowser {
@@ -2098,6 +2100,18 @@ func logRequests(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 		log.Printf("%s %s %s", r.Method, r.URL.Path, time.Since(start).Round(time.Millisecond))
 	})
+}
+
+func browserURL(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "http://" + addr
+	}
+	switch host {
+	case "", "0.0.0.0", "::":
+		host = "127.0.0.1"
+	}
+	return "http://" + net.JoinHostPort(host, port)
 }
 
 func openURL(url string) error {
