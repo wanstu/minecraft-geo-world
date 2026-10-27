@@ -632,7 +632,9 @@ $('jumpToCoord').onclick=async()=>{
 $('mapWrap').addEventListener('wheel',e=>{
   if(!active||$('mapWrap').classList.contains('empty'))return;
   e.preventDefault();
-  zoomMapAt(e.clientX,e.clientY,mapZoom*(e.deltaY<0?1.22:0.82));
+  const delta=Math.max(-140,Math.min(140,e.deltaY));
+  const factor=Math.exp(-delta*0.0017);
+  zoomMapAt(e.clientX,e.clientY,mapZoom*factor);
 },{passive:false});
 
 $('mapWrap').addEventListener('dblclick',e=>{
@@ -1239,7 +1241,7 @@ function resetStructurePreview(){
   const detail=$('structureDetail');
   if(detail){detail.hidden=true;detail.textContent='';}
   const status=$('structureStatus');
-  if(status)status.textContent='总览时按同类结构聚合显示；4× 后按具体结构聚合；8× 后显示单个候选并加入矿井与埋藏宝藏。';
+  if(status)status.textContent='低倍缩放只显示结构的大概分布；缩放越大，同类结构会按空间逐步拆分得更精确；16× 最大缩放展开当前视野全部候选。';
 }
 
 function scheduleStructureRefresh(delay=300){
@@ -1264,11 +1266,9 @@ async function refreshStructureCandidates(){
   const bounds=mineralViewportBounds();
   if(!bounds)return;
   const mode=mapZoom>=8?'all':'major';
-  const limit=window.innerWidth<=900?25000:50000;
+  const limit=window.innerWidth<=1250?25000:50000;
   const token=++structureLoadToken;
-  $('structureStatus').textContent=mode==='all'
-    ? '正在加载当前视野的详细结构候选…'
-    : '正在加载当前视野的主要结构候选…';
+  $('structureStatus').textContent=mode==='all'?'正在加载当前视野的详细结构候选…':'正在加载当前视野的主要结构分布…';
   try{
     const q=new URLSearchParams({
       minX:String(bounds.minX),maxX:String(bounds.maxX),
@@ -1281,9 +1281,14 @@ async function refreshStructureCandidates(){
     const structureSuffix=data.truncated
       ? '（共 '+Number(data.total||0).toLocaleString()+' 个，已按结构类别与视野位置均匀显示 '+Number(data.returned||0).toLocaleString()+' 个）'
       : Number(data.total||0).toLocaleString()+' 个';
+    const visibleTypes=new Set((data.candidates||[]).map(candidate=>candidate.setId)).size;
     $('structureStatus').textContent=
-      (mode==='all'?'详细结构候选 ':'主要结构候选 ')+
-      structureSuffix+
+      structureSuffix+' · '+visibleTypes+' 种结构 · '+
+      (mapZoom>=15.999
+        ? '最大缩放：当前视野全部展开'
+        : mapZoom<4
+          ? '概略显示：每种结构约 1 个代表位置'
+          : '聚合显示：继续放大可逐步提高位置精度')+
       (data.skippedStronghold?' · 强要塞不可用':' · 含强要塞');
     renderFeatureOverlay();
   }catch(e){
@@ -1392,20 +1397,77 @@ function structureMarkerKind(id){
   return 'landmark';
 }
 
+function structureGlyphPath(id){
+  return ({
+    'minecraft:villages':'M-6 1 L0-5 L6 1 M-4 0 V5 H4 V0 M-1 5 V1 H2 V5',
+    'minecraft:abandoned_camp':'M-6 5 L0-5 L6 5 Z M0-5 V5',
+    'minecraft:pillager_outposts':'M-5-4 H5 M-4-4 V5 H4 V-4 M-6 5 H6 M-2-1 H2',
+    'minecraft:woodland_mansions':'M-6 5 V0 L0-5 L6 0 V5 M-4 5 V1 H4 V5 M-2 1 V5 M2 1 V5',
+    'minecraft:ocean_monuments':'M-6 4 H6 M-5 4 V0 L0-4 L5 0 V4 M-3 1 H3 M0-4 V4',
+    'minecraft:ocean_ruins':'M-6 5 H6 M-5 5 V-1 H-1 V5 M1 5 V-4 H5 V5',
+    'minecraft:shipwrecks':'M-6 1 H6 L3 5 H-3 Z M0 1 V-5 M0-4 L4-1 H0',
+    'minecraft:ancient_cities':'M-6 5 V1 L-3-2 L0 1 L3-4 L6 1 V5 M-4 5 V2 M0 5 V2 M4 5 V2',
+    'minecraft:mineshafts':'M-6 5 V0 A6 6 0 0 1 6 0 V5 M-4 5 L-1 0 M4 5 L1 0 M-5 3 H5',
+    'minecraft:trial_chambers':'M-5-5 H5 V5 H-5 Z M0-5 V5 M-5 0 H5 M-2-2 H2 V2 H-2 Z',
+    'minecraft:ruined_portals':'M-5 5 V-5 H5 V5 H2 V-2 H-2 V5 Z',
+    'minecraft:buried_treasures':'M-6-1 H6 V5 H-6 Z M-5-4 H5 L6-1 H-6 Z M-1 1 H1 V3 H-1 Z',
+    'minecraft:desert_pyramids':'M-6 5 L0-5 L6 5 Z M-3 5 L0 0 L3 5 M-1 5 V2 H1 V5',
+    'minecraft:igloos':'M-6 4 A6 6 0 0 1 6 4 H-6 M2 4 V1 H6 V4',
+    'minecraft:jungle_temples':'M-6 5 H6 M-5 5 V2 H-3 V-1 H0 V-4 H3 V-1 H5 V5',
+    'minecraft:swamp_huts':'M-6 0 L0-4 L6 0 M-5 0 H5 V4 H-5 Z M-4 4 V6 M4 4 V6',
+    'minecraft:trail_ruins':'M-6 5 H6 M-5 5 V2 H-1 V-1 H3 V-4 H6 M-3 2 H1 M1-1 H5',
+    'minecraft:strongholds':'M-6 5 V-2 H-3 V-5 H0 V-2 H3 V-5 H6 V5 M-6 1 H6 M-2 5 V1 H2 V5'
+  })[id]||'M-5 5 H5 V-1 L0-5 L-5-1 Z';
+}
+
+function appendStructureGlyph(parent,id,scaleX,scaleY){
+  const ns='http://www.w3.org/2000/svg';
+  const glyph=document.createElementNS(ns,'path');
+  glyph.setAttribute('d',structureGlyphPath(id));
+  glyph.setAttribute('class','structure-glyph');
+  glyph.setAttribute('transform',`scale(${scaleX} ${scaleY})`);
+  parent.appendChild(glyph);
+}
+
+function openStructureInspector(){
+  if(window.matchMedia('(max-width: 900px)').matches)setMobileSheet('features',true);
+}
+
 function showStructureDetail(candidate){
   const el=$('structureDetail');
   el.hidden=false;
   const meta=structureCandidates?.sets?.[candidate.setId]||{};
   const variants=(meta.structures||[]).map(v=>String(v).replace('minecraft:','')).join(' / ');
   const stronghold=candidate.setId==='minecraft:strongholds';
-  el.textContent=
-    structureSetName(candidate.setId)+
-    ' · X '+candidate.x+', Z '+candidate.z+
-    ' · Chunk '+candidate.chunkX+', '+candidate.chunkZ+
-    (variants?' · 候选结构 '+variants:'')+
-    (stronghold
-      ? ' · 强要塞位置由 Minecraft 26.3 concentric-rings + GeoWorld 群系偏移规则精确规划，并经过原生实现逐点校验。'
-      : ' · 这是 Minecraft 26.3 原版 placement 候选，不代表 StructureStart 已确认生成。');
+  el.innerHTML=
+    '<div class="structure-detail-title">'+escapeHtml(structureSetName(candidate.setId))+'</div>'+
+    '<div class="structure-detail-grid">'+
+      '<span>坐标</span><b>'+escapeHtml(candidate.x+', '+candidate.z)+'</b>'+
+      '<span>Chunk</span><b>'+escapeHtml(candidate.chunkX+', '+candidate.chunkZ)+'</b>'+
+      (variants?'<span>候选结构</span><b>'+escapeHtml(variants)+'</b>':'')+
+      '<span>性质</span><b>'+(stronghold?'精确规划位置':'原版 placement 候选')+'</b>'+
+    '</div>'+
+    '<div class="structure-detail-note">'+
+      (stronghold
+        ? 'Minecraft 26.3 concentric-rings + GeoWorld 群系偏移，且经过原生实现逐点校验。'
+        : '候选位置不等于 StructureStart 已确认生成。')+
+    '</div>';
+  openStructureInspector();
+}
+
+function showStructureClusterDetail(cluster){
+  const candidate=cluster.first;
+  const el=$('structureDetail');
+  el.hidden=false;
+  el.innerHTML=
+    '<div class="structure-detail-title">'+escapeHtml(structureSetName(candidate.setId))+'</div>'+
+    '<div class="structure-detail-grid">'+
+      '<span>当前聚合</span><b>'+Number(cluster.count).toLocaleString()+' 个候选</b>'+
+      '<span>区域中心</span><b>'+Math.round(cluster.worldX)+', '+Math.round(cluster.worldZ)+'</b>'+
+      '<span>当前精度</span><b>每种结构最多 '+structurePrecisionPerType()+' 个区域图标</b>'+
+    '</div>'+
+    '<div class="structure-detail-note">继续放大会逐步拆分为更精确的位置；16× 时展开当前视野全部候选。</div>';
+  openStructureInspector();
 }
 
 function overlayUnitScale(){
@@ -1425,10 +1487,11 @@ function clusterOverlayItems(items,{point,key,cellPx}){
   for(const item of items||[]){
     const p=point(item);
     if(!p||p.x<0||p.x>1000||p.y<0||p.y>1000)continue;
-    const bucketKey=key(item)+'|'+Math.floor(p.x/cellX)+'|'+Math.floor(p.y/cellY);
+    const itemKey=key(item);
+    const bucketKey=itemKey+'|'+Math.floor(p.x/cellX)+'|'+Math.floor(p.y/cellY);
     let bucket=buckets.get(bucketKey);
     if(!bucket){
-      bucket={key:key(item),count:0,sumX:0,sumY:0,sumWorldX:0,sumWorldZ:0,first:item};
+      bucket={key:itemKey,count:0,sumX:0,sumY:0,sumWorldX:0,sumWorldZ:0,first:item};
       buckets.set(bucketKey,bucket);
     }
     bucket.count++;
@@ -1446,33 +1509,282 @@ function clusterOverlayItems(items,{point,key,cellPx}){
   }));
 }
 
-function appendClusterMarker(group,cluster,{className,title,targetZoom}){
+function aggregateOverlayItemsByKey(items,{point,key}){
+  return clusterOverlayItemsByKeyPrecision(items,{point,key,perKey:1});
+}
+
+function clusterOverlayItemsByKeyPrecision(items,{point,key,perKey=1}){
+  const grouped=new Map();
+  for(const item of items||[]){
+    const p=point(item);
+    if(!p||p.x<0||p.x>1000||p.y<0||p.y>1000)continue;
+    const itemKey=key(item);
+    if(!grouped.has(itemKey))grouped.set(itemKey,[]);
+    grouped.get(itemKey).push({item,p});
+  }
+
+  const clusters=[];
+  const buildCluster=(itemKey,entries)=>{
+    let sumX=0,sumY=0,sumWorldX=0,sumWorldZ=0;
+    for(const entry of entries){
+      sumX+=entry.p.x;
+      sumY+=entry.p.y;
+      sumWorldX+=Number(entry.item.x);
+      sumWorldZ+=Number(entry.item.z);
+    }
+    const count=entries.length;
+    return {
+      key:itemKey,
+      count,
+      x:sumX/count,
+      y:sumY/count,
+      worldX:sumWorldX/count,
+      worldZ:sumWorldZ/count,
+      first:entries[0].item
+    };
+  };
+
+  for(const [itemKey,entries] of grouped){
+    const k=Math.min(Math.max(1,Math.floor(perKey)),entries.length);
+    if(k===1){
+      clusters.push(buildCluster(itemKey,entries));
+      continue;
+    }
+
+    const mean=buildCluster(itemKey,entries);
+    const centers=[];
+    let first=entries[0];
+    let firstDistance=-1;
+    for(const entry of entries){
+      const d=(entry.p.x-mean.x)**2+(entry.p.y-mean.y)**2;
+      if(d>firstDistance){first=entry;firstDistance=d;}
+    }
+    centers.push({x:first.p.x,y:first.p.y});
+
+    while(centers.length<k){
+      let chosen=entries[0];
+      let chosenDistance=-1;
+      for(const entry of entries){
+        let nearest=Infinity;
+        for(const center of centers){
+          const d=(entry.p.x-center.x)**2+(entry.p.y-center.y)**2;
+          if(d<nearest)nearest=d;
+        }
+        if(nearest>chosenDistance){chosen=entry;chosenDistance=nearest;}
+      }
+      centers.push({x:chosen.p.x,y:chosen.p.y});
+    }
+
+    let buckets=[];
+    for(let iteration=0;iteration<4;iteration++){
+      buckets=Array.from({length:k},()=>[]);
+      for(const entry of entries){
+        let best=0;
+        let bestDistance=Infinity;
+        for(let i=0;i<centers.length;i++){
+          const center=centers[i];
+          const d=(entry.p.x-center.x)**2+(entry.p.y-center.y)**2;
+          if(d<bestDistance){best=i;bestDistance=d;}
+        }
+        buckets[best].push(entry);
+      }
+      for(let i=0;i<k;i++){
+        if(!buckets[i].length)continue;
+        const bucket=buildCluster(itemKey,buckets[i]);
+        centers[i]={x:bucket.x,y:bucket.y};
+      }
+    }
+
+    for(const bucket of buckets){
+      if(bucket.length)clusters.push(buildCluster(itemKey,bucket));
+    }
+  }
+  return clusters;
+}
+
+function structurePrecisionPerType(){
+  if(mapZoom<5)return 1;
+  if(mapZoom<9)return 2;
+  if(mapZoom<13)return 3;
+  if(mapZoom<15.999)return 4;
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function overlayPointVisible(p,padPx=18){
+  const img=$('map').getBoundingClientRect();
+  const wrap=$('mapWrap').getBoundingClientRect();
+  if(img.width<=0||img.height<=0)return false;
+  const x=img.left+p.x/1000*img.width;
+  const y=img.top+p.y/1000*img.height;
+  return x>=wrap.left-padPx&&x<=wrap.right+padPx&&y>=wrap.top-padPx&&y<=wrap.bottom+padPx;
+}
+
+function structureDisplayBudget(typeCount){
+  if(mapZoom<4)return Math.max(1,typeCount);
+  if(mapZoom<8)return Math.max(typeCount,Math.min(24,typeCount*2));
+  if(mapZoom<12)return Math.max(typeCount,Math.min(36,typeCount*3));
+  return Math.max(typeCount,Math.min(60,typeCount*5));
+}
+
+function structureClusterCellPx(){
+  if(mapZoom<4)return 10000;
+  if(mapZoom<8)return 220;
+  if(mapZoom<12)return 145;
+  return 92;
+}
+
+function limitStructureClusters(clusters,maxTotal){
+  if(clusters.length<=maxTotal)return clusters;
+  const groups=new Map();
+  for(const cluster of clusters){
+    if(!groups.has(cluster.key))groups.set(cluster.key,[]);
+    groups.get(cluster.key).push(cluster);
+  }
+  for(const group of groups.values()){
+    group.sort((a,b)=>b.count-a.count);
+  }
+  const orderedKeys=[...groups.keys()].sort((a,b)=>{
+    const ga=groups.get(a),gb=groups.get(b);
+    const pa=ga?.[0]?structureCandidatePriority(ga[0].first):0;
+    const pb=gb?.[0]?structureCandidatePriority(gb[0].first):0;
+    return pb-pa;
+  });
+  const selected=[];
+  let round=0;
+  while(selected.length<maxTotal){
+    let added=false;
+    for(const key of orderedKeys){
+      const item=groups.get(key)?.[round];
+      if(!item)continue;
+      selected.push(item);
+      added=true;
+      if(selected.length>=maxTotal)break;
+    }
+    if(!added)break;
+    round++;
+  }
+  return selected;
+}
+
+function declutterOverlayClusters(clusters,minGapPx,priority=()=>0){
+  const rect=$('map').getBoundingClientRect();
+  if(rect.width<=0||rect.height<=0||clusters.length<2)return clusters;
+  const ordered=[...clusters].sort((a,b)=>{
+    const p=priority(b)-priority(a);
+    if(p!==0)return p;
+    return b.count-a.count;
+  });
+  const kept=[];
+  for(const cluster of ordered){
+    const px=cluster.x/1000*rect.width;
+    const py=cluster.y/1000*rect.height;
+    let blocked=false;
+    for(const other of kept){
+      const ox=other.x/1000*rect.width;
+      const oy=other.y/1000*rect.height;
+      if(Math.hypot(px-ox,py-oy)<minGapPx){
+        blocked=true;
+        break;
+      }
+    }
+    if(!blocked)kept.push(cluster);
+  }
+  return kept;
+}
+
+function appendClusterMarker(group,cluster,{className,title,targetZoom,radiusScale=1,glyphId='',onClick=null}){
   const ns='http://www.w3.org/2000/svg';
   const scale=overlayUnitScale();
-  const radiusPx=cluster.count>=100?15:cluster.count>=10?13:11;
+  const radiusPx=(cluster.count>=100?11:cluster.count>=10?10:9)*radiusScale;
   const marker=document.createElementNS(ns,'g');
   marker.setAttribute('class','feature-cluster '+className);
   marker.setAttribute('transform',`translate(${cluster.x} ${cluster.y})`);
   marker.style.pointerEvents='all';
   marker.style.cursor='pointer';
 
-  const halo=document.createElementNS(ns,'ellipse');
-  halo.setAttribute('rx',radiusPx*scale.x);
-  halo.setAttribute('ry',radiusPx*scale.y);
+  if(className.includes('structure-stronghold')){
+    const ring=document.createElementNS(ns,'ellipse');
+    ring.setAttribute('rx',(radiusPx+3)*scale.x);
+    ring.setAttribute('ry',(radiusPx+3)*scale.y);
+    ring.setAttribute('class','feature-cluster-ring');
+    marker.appendChild(ring);
+  }
+
+  let halo;
+  if(className.includes('structure-settlement')){
+    halo=document.createElementNS(ns,'rect');
+    halo.setAttribute('x',-radiusPx*scale.x);
+    halo.setAttribute('y',-radiusPx*scale.y);
+    halo.setAttribute('width',radiusPx*2*scale.x);
+    halo.setAttribute('height',radiusPx*2*scale.y);
+    halo.setAttribute('rx',3*scale.x);
+    halo.setAttribute('ry',3*scale.y);
+  }else if(className.includes('structure-underground')){
+    halo=document.createElementNS(ns,'polygon');
+    halo.setAttribute('points',[
+      [0,-radiusPx*scale.y],
+      [radiusPx*.86*scale.x,-radiusPx*.5*scale.y],
+      [radiusPx*.86*scale.x,radiusPx*.5*scale.y],
+      [0,radiusPx*scale.y],
+      [-radiusPx*.86*scale.x,radiusPx*.5*scale.y],
+      [-radiusPx*.86*scale.x,-radiusPx*.5*scale.y]
+    ].map(p=>p.join(',')).join(' '));
+  }else if(className.includes('structure-landmark')||className.includes('structure-stronghold')){
+    halo=document.createElementNS(ns,'polygon');
+    halo.setAttribute('points',[
+      [0,-radiusPx*scale.y],
+      [radiusPx*scale.x,0],
+      [0,radiusPx*scale.y],
+      [-radiusPx*scale.x,0]
+    ].map(p=>p.join(',')).join(' '));
+  }else if(className.includes('structure-portal')){
+    halo=document.createElementNS(ns,'polygon');
+    halo.setAttribute('points',[
+      [0,-radiusPx*scale.y],
+      [radiusPx*scale.x,radiusPx*.82*scale.y],
+      [-radiusPx*scale.x,radiusPx*.82*scale.y]
+    ].map(p=>p.join(',')).join(' '));
+  }else{
+    halo=document.createElementNS(ns,'ellipse');
+    halo.setAttribute('rx',radiusPx*scale.x);
+    halo.setAttribute('ry',radiusPx*scale.y);
+  }
   halo.setAttribute('class','feature-cluster-bubble');
   marker.appendChild(halo);
 
+  if(glyphId){
+    appendStructureGlyph(marker,glyphId,scale.x*.9,scale.y*.9);
+  }
+
   if(cluster.count>1){
-    const text=document.createElementNS(ns,'text');
-    text.setAttribute('x','0');
-    text.setAttribute('y',String(3.8*scale.y));
-    text.setAttribute('text-anchor','middle');
-    text.setAttribute('class','feature-cluster-count');
-    text.setAttribute('font-size',String(11*scale.y));
-    text.textContent=cluster.approx
-      ? '+'
-      : (cluster.count>=1000?Math.round(cluster.count/100)/10+'k':String(cluster.count));
-    marker.appendChild(text);
+    if(glyphId){
+      const badge=document.createElementNS(ns,'ellipse');
+      badge.setAttribute('cx',String(radiusPx*.72*scale.x));
+      badge.setAttribute('cy',String(-radiusPx*.72*scale.y));
+      badge.setAttribute('rx',String(6.2*scale.x));
+      badge.setAttribute('ry',String(5.2*scale.y));
+      badge.setAttribute('class','feature-cluster-badge');
+      marker.appendChild(badge);
+      const text=document.createElementNS(ns,'text');
+      text.setAttribute('x',String(radiusPx*.72*scale.x));
+      text.setAttribute('y',String((-radiusPx*.72+1.9)*scale.y));
+      text.setAttribute('text-anchor','middle');
+      text.setAttribute('class','feature-cluster-badge-count');
+      text.setAttribute('font-size',String(7.2*scale.y));
+      text.textContent=cluster.approx?'+':(cluster.count>99?'99+':String(cluster.count));
+      marker.appendChild(text);
+    }else{
+      const text=document.createElementNS(ns,'text');
+      text.setAttribute('x','0');
+      text.setAttribute('y',String(3.2*scale.y));
+      text.setAttribute('text-anchor','middle');
+      text.setAttribute('class','feature-cluster-count');
+      text.setAttribute('font-size',String(9.5*scale.y));
+      text.textContent=cluster.approx
+        ? '+'
+        : (cluster.count>=1000?Math.round(cluster.count/100)/10+'k':String(cluster.count));
+      marker.appendChild(text);
+    }
   }
 
   const tooltip=document.createElementNS(ns,'title');
@@ -1480,13 +1792,98 @@ function appendClusterMarker(group,cluster,{className,title,targetZoom}){
   marker.appendChild(tooltip);
   marker.addEventListener('click',e=>{
     e.stopPropagation();
+    if(onClick)onClick(cluster);
     centerMapOnWorld(cluster.worldX,cluster.worldZ,targetZoom(cluster));
   });
   group.appendChild(marker);
 }
 
+function structureDisplayLevel(){
+  if(mapZoom<2.5)return 'overview';
+  if(mapZoom<5)return 'regional';
+  if(mapZoom<8)return 'near';
+  if(mapZoom<12)return 'detail';
+  if(mapZoom<16)return 'precision';
+  return 'raw';
+}
+
 function structureClusterZoom(){
-  return mapZoom<4?4.5:8.5;
+  const level=structureDisplayLevel();
+  if(level==='overview')return 3.1;
+  if(level==='regional')return 5.4;
+  if(level==='near')return 8.5;
+  if(level==='detail')return 12.5;
+  if(level==='precision')return 16.5;
+  return Math.min(24,mapZoom*1.35);
+}
+
+function structureClusterPriority(cluster){
+  const kind=cluster.first?structureMarkerKind(cluster.first.setId):cluster.key;
+  if(kind==='stronghold')return 100;
+  if(kind==='settlement')return 70;
+  if(kind==='landmark')return 60;
+  if(kind==='ocean')return 50;
+  if(kind==='underground')return 40;
+  if(kind==='portal')return 30;
+  if(kind==='treasure')return 20;
+  return 10;
+}
+
+function structureCandidatePriority(candidate){
+  const id=candidate?.setId||'';
+  if(id==='minecraft:strongholds')return 1000;
+  if(id==='minecraft:woodland_mansions')return 950;
+  if(id==='minecraft:villages')return 900;
+  if(id==='minecraft:ocean_monuments')return 860;
+  if(id==='minecraft:ancient_cities'||id==='minecraft:trial_chambers')return 820;
+  if(id==='minecraft:mineshafts')return 120;
+  if(id==='minecraft:buried_treasures')return 80;
+  return 500+structureClusterPriority({first:candidate,count:1});
+}
+
+function appendStructureSingleMarker(group,candidate){
+  const ns='http://www.w3.org/2000/svg';
+  const p=worldToOverlay(candidate.x,candidate.z);
+  if(p.x<0||p.x>1000||p.y<0||p.y>1000)return false;
+  const kind=structureMarkerKind(candidate.setId);
+  const scale=overlayUnitScale();
+  const radiusPx=8.5;
+  const mark=document.createElementNS(ns,'g');
+  mark.setAttribute('class','structure-icon structure-'+kind);
+  mark.setAttribute('transform',`translate(${p.x} ${p.y})`);
+  mark.dataset.x=candidate.x;
+  mark.dataset.z=candidate.z;
+
+  const bubble=document.createElementNS(ns,'ellipse');
+  bubble.setAttribute('rx',String(radiusPx*scale.x));
+  bubble.setAttribute('ry',String(radiusPx*scale.y));
+  bubble.setAttribute('class','structure-icon-bg');
+  mark.appendChild(bubble);
+  appendStructureGlyph(mark,candidate.setId,scale.x*.82,scale.y*.82);
+
+  if(kind==='stronghold'){
+    const ring=document.createElementNS(ns,'ellipse');
+    ring.setAttribute('rx',String((radiusPx+2.5)*scale.x));
+    ring.setAttribute('ry',String((radiusPx+2.5)*scale.y));
+    ring.setAttribute('class','structure-icon-ring');
+    mark.insertBefore(ring,bubble);
+  }
+
+  const title=document.createElementNS(ns,'title');
+  title.textContent=
+    structureSetName(candidate.setId)+' · '+candidate.x+', '+candidate.z+
+    ' · Chunk '+candidate.chunkX+', '+candidate.chunkZ+
+    (candidate.setId==='minecraft:strongholds'
+      ? ' · 精确强要塞位置'
+      : ' · 原版 placement 候选');
+  mark.appendChild(title);
+  mark.addEventListener('click',e=>{
+    e.stopPropagation();
+    showStructureDetail(candidate);
+    void focusWorldPoint(candidate.x,candidate.z);
+  });
+  group.appendChild(mark);
+  return true;
 }
 
 function mineralClusterZoom(){
@@ -1544,20 +1941,18 @@ function renderFeatureOverlay(){
   if(enabled.has('minerals')&&mineralBodies){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-minerals');
-    if(mapZoom<10){
-      const cellPx=mapZoom<7?(window.innerWidth<=900?58:50):(window.innerWidth<=900?46:38);
-      const clusters=clusterOverlayItems(mineralBodies.bodies||[],{
+    if(mapZoom<15.999){
+      const clusters=aggregateOverlayItemsByKey(mineralBodies.bodies||[],{
         point:body=>worldToOverlay(body.x,body.z),
-        key:body=>String(body.mineral||'UNKNOWN'),
-        cellPx
+        key:body=>String(body.mineral||'UNKNOWN')
       });
       for(const cluster of clusters){
         cluster.approx=Boolean(mineralBodies.truncated);
         const mineral=String(cluster.key||'unknown').toLowerCase();
         appendClusterMarker(group,cluster,{
           className:'mineral-cluster mineral-'+mineral,
-          title:c=>mineralName(c.key)+' · '+c.count+' 个矿体 · 点击放大',
-          targetZoom:()=>mineralClusterZoom()
+          title:c=>mineralName(c.key)+' · 当前视野 '+c.count+' 个矿体 · 最大缩放后全部展开',
+          targetZoom:()=>Math.min(16,Math.max(mapZoom*1.8,mapZoom+2))
         });
       }
     }else{
@@ -1593,53 +1988,31 @@ function renderFeatureOverlay(){
   if(enabled.has('structures')&&structureCandidates){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-structures');
-    if(mapZoom<8){
-      const broad=mapZoom<4;
-      const cellPx=broad?(window.innerWidth<=900?56:48):(window.innerWidth<=900?44:36);
-      const clusters=clusterOverlayItems(structureCandidates.candidates||[],{
+    const visibleCandidates=(structureCandidates.candidates||[]).filter(candidate=>
+      overlayPointVisible(worldToOverlay(candidate.x,candidate.z),24)
+    );
+    if(mapZoom<15.999){
+      const perType=structurePrecisionPerType();
+      const clusters=clusterOverlayItemsByKeyPrecision(visibleCandidates,{
         point:candidate=>worldToOverlay(candidate.x,candidate.z),
-        key:candidate=>broad?structureMarkerKind(candidate.setId):candidate.setId,
-        cellPx
-      });
+        key:candidate=>candidate.setId,
+        perKey:perType
+      }).sort((a,b)=>structureCandidatePriority(b.first)-structureCandidatePriority(a.first));
       for(const cluster of clusters){
         cluster.approx=Boolean(structureCandidates.truncated);
-        const markerKind=broad?cluster.key:structureMarkerKind(cluster.first.setId);
+        const markerKind=structureMarkerKind(cluster.first.setId);
         appendClusterMarker(group,cluster,{
           className:'structure-cluster structure-'+markerKind,
-          title:c=>{
-            const name=broad
-              ? ({settlement:'聚落/据点',ocean:'海洋结构',underground:'地下结构',landmark:'地标结构',portal:'传送门',treasure:'宝藏',stronghold:'强要塞'})[c.key]||'结构'
-              : structureSetName(c.key);
-            return name+' · '+c.count+' 个候选 · 点击放大';
-          },
-          targetZoom:()=>structureClusterZoom()
+          title:c=>structureSetName(c.key)+' · 该区域约 '+c.count+' 个候选 · 放大后继续拆分',
+          targetZoom:()=>Math.min(16,Math.max(mapZoom*1.65,mapZoom+1.5)),
+          radiusScale:markerKind==='stronghold'?1.05:1,
+          glyphId:cluster.first.setId,
+          onClick:showStructureClusterDetail
         });
       }
     }else{
-      for(const candidate of structureCandidates.candidates||[]){
-        const p=worldToOverlay(candidate.x,candidate.z);
-        if(p.x<0||p.x>1000||p.y<0||p.y>1000)continue;
-        const mark=document.createElementNS(ns,'circle');
-        mark.setAttribute('cx',p.x);
-        mark.setAttribute('cy',p.y);
-        mark.setAttribute('r',Math.max(.8,4/mapZoom));
-        mark.setAttribute('class','structure-mark structure-'+structureMarkerKind(candidate.setId));
-        mark.dataset.x=candidate.x;
-        mark.dataset.z=candidate.z;
-        const title=document.createElementNS(ns,'title');
-        title.textContent=
-          structureSetName(candidate.setId)+' · '+candidate.x+', '+candidate.z+
-          ' · Chunk '+candidate.chunkX+', '+candidate.chunkZ+
-          (candidate.setId==='minecraft:strongholds'
-            ? ' · 精确强要塞位置'
-            : ' · 原版 placement 候选');
-        mark.appendChild(title);
-        mark.addEventListener('click',e=>{
-          e.stopPropagation();
-          showStructureDetail(candidate);
-          void focusWorldPoint(candidate.x,candidate.z);
-        });
-        group.appendChild(mark);
+      for(const candidate of visibleCandidates){
+        appendStructureSingleMarker(group,candidate);
       }
     }
     svg.appendChild(group);
@@ -1648,25 +2021,32 @@ function renderFeatureOverlay(){
   if(enabled.has('peaks')){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-peaks');
-    if(mapZoom<3){
-      const clusters=clusterOverlayItems(previewFeatures.peaks||[],{
+    if(mapZoom<15.999){
+      const bounds=mineralViewportBounds();
+      const visiblePeaks=(previewFeatures.peaks||[]).filter(peak=>
+        !bounds||(peak.x>=bounds.minX&&peak.x<=bounds.maxX&&peak.z>=bounds.minZ&&peak.z<=bounds.maxZ)
+      );
+      const clusters=aggregateOverlayItemsByKey(visiblePeaks,{
         point:peak=>worldToOverlay(peak.x,peak.z),
-        key:()=> 'peak',
-        cellPx:window.innerWidth<=900?52:44
+        key:()=> 'peak'
       });
       for(const cluster of clusters){
         appendClusterMarker(group,cluster,{
           className:'peak-cluster',
-          title:c=>'山峰 · '+c.count+' 个 · 点击放大',
-          targetZoom:()=>Math.max(3.5,mapZoom*1.8)
+          title:c=>'山峰 · 当前视野 '+c.count+' 个 · 最大缩放后全部展开',
+          targetZoom:()=>Math.min(16,Math.max(mapZoom*1.8,mapZoom+2)),
+          radiusScale:.9
         });
       }
     }else{
+      const markerScale=overlayUnitScale();
       for(const peak of previewFeatures.peaks||[]){
         const p=worldToOverlay(peak.x,peak.z);
         if(p.x<0||p.x>1000||p.y<0||p.y>1000)continue;
+        const sx=4*markerScale.x;
+        const sy=4*markerScale.y;
         const mark=document.createElementNS(ns,'path');
-        mark.setAttribute('d',`M ${p.x} ${p.y-4} L ${p.x-4} ${p.y+3} L ${p.x+4} ${p.y+3} Z`);
+        mark.setAttribute('d',`M ${p.x} ${p.y-sy} L ${p.x-sx} ${p.y+sy*.75} L ${p.x+sx} ${p.y+sy*.75} Z`);
         mark.setAttribute('class','peak-mark');
         mark.dataset.x=peak.x; mark.dataset.z=peak.z;
         const title=document.createElementNS(ns,'title');
