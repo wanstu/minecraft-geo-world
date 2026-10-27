@@ -1,0 +1,1186 @@
+{
+  "minecraftVersion": "26.3",
+  "structureSets": {
+    "minecraft:abandoned_camp": {
+      "structures": [
+        {
+          "structure": "minecraft:abandoned_camp_bamboo_jungle",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_birch_forest",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_cherry_grove",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_dappled_forest",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_flower_forest",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_forest",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_meadow",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_old_growth_pine_taiga",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_old_growth_birch_forest",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_old_growth_spruce_taiga",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_pale_garden",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_savanna",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_snowy_taiga",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_sparse_jungle",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_swamp",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_taiga",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_windswept_forest",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:abandoned_camp_wooded_badlands",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 91231127,
+        "spacing": 37,
+        "separation": 8,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:ancient_cities": {
+      "structures": [
+        {
+          "structure": "minecraft:ancient_city",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 20083232,
+        "spacing": 24,
+        "separation": 8,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:buried_treasures": {
+      "structures": [
+        {
+          "structure": "minecraft:buried_treasure",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "locate_offset": [
+          9,
+          0,
+          9
+        ],
+        "frequency_reduction_method": "legacy_type_2",
+        "frequency": 0.01,
+        "salt": 0,
+        "spacing": 1,
+        "separation": 0,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:desert_pyramids": {
+      "structures": [
+        {
+          "structure": "minecraft:desert_pyramid",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 14357617,
+        "spacing": 32,
+        "separation": 8,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:end_cities": {
+      "structures": [
+        {
+          "structure": "minecraft:end_city",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 10387313,
+        "spacing": 20,
+        "separation": 11,
+        "spread_type": "triangular",
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:igloos": {
+      "structures": [
+        {
+          "structure": "minecraft:igloo",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 14357618,
+        "spacing": 32,
+        "separation": 8,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:jungle_temples": {
+      "structures": [
+        {
+          "structure": "minecraft:jungle_pyramid",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 14357619,
+        "spacing": 32,
+        "separation": 8,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:mineshafts": {
+      "structures": [
+        {
+          "structure": "minecraft:mineshaft",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:mineshaft_mesa",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "frequency_reduction_method": "legacy_type_3",
+        "frequency": 0.004,
+        "salt": 0,
+        "spacing": 1,
+        "separation": 0,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:nether_complexes": {
+      "structures": [
+        {
+          "structure": "minecraft:fortress",
+          "weight": 2
+        },
+        {
+          "structure": "minecraft:bastion_remnant",
+          "weight": 3
+        }
+      ],
+      "placement": {
+        "salt": 30084232,
+        "spacing": 27,
+        "separation": 4,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:nether_fossils": {
+      "structures": [
+        {
+          "structure": "minecraft:nether_fossil",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 14357921,
+        "spacing": 2,
+        "separation": 1,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:ocean_monuments": {
+      "structures": [
+        {
+          "structure": "minecraft:monument",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 10387313,
+        "spacing": 32,
+        "separation": 5,
+        "spread_type": "triangular",
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:ocean_ruins": {
+      "structures": [
+        {
+          "structure": "minecraft:ocean_ruin_cold",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:ocean_ruin_warm",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 14357621,
+        "spacing": 20,
+        "separation": 8,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:pillager_outposts": {
+      "structures": [
+        {
+          "structure": "minecraft:pillager_outpost",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "frequency_reduction_method": "legacy_type_1",
+        "frequency": 0.2,
+        "salt": 165745296,
+        "exclusion_zone": {
+          "other_set": "minecraft:villages",
+          "chunk_count": 10
+        },
+        "spacing": 32,
+        "separation": 8,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:ruined_portals": {
+      "structures": [
+        {
+          "structure": "minecraft:ruined_portal",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:ruined_portal_desert",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:ruined_portal_jungle",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:ruined_portal_swamp",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:ruined_portal_mountain",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:ruined_portal_ocean",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:ruined_portal_nether",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 34222645,
+        "spacing": 40,
+        "separation": 15,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:shipwrecks": {
+      "structures": [
+        {
+          "structure": "minecraft:shipwreck",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:shipwreck_beached",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 165745295,
+        "spacing": 24,
+        "separation": 4,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:strongholds": {
+      "structures": [
+        {
+          "structure": "minecraft:stronghold",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 0,
+        "distance": 32,
+        "spread": 3,
+        "count": 128,
+        "preferred_biomes": "#minecraft:stronghold_biased_to",
+        "type": "minecraft:concentric_rings"
+      }
+    },
+    "minecraft:swamp_huts": {
+      "structures": [
+        {
+          "structure": "minecraft:swamp_hut",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 14357620,
+        "spacing": 32,
+        "separation": 8,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:trail_ruins": {
+      "structures": [
+        {
+          "structure": "minecraft:trail_ruins",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 83469867,
+        "spacing": 34,
+        "separation": 8,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:trial_chambers": {
+      "structures": [
+        {
+          "structure": "minecraft:trial_chambers",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 94251327,
+        "spacing": 34,
+        "separation": 12,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:villages": {
+      "structures": [
+        {
+          "structure": "minecraft:village_plains",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:village_desert",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:village_savanna",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:village_snowy",
+          "weight": 1
+        },
+        {
+          "structure": "minecraft:village_taiga",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 10387312,
+        "spacing": 34,
+        "separation": 8,
+        "type": "minecraft:random_spread"
+      }
+    },
+    "minecraft:woodland_mansions": {
+      "structures": [
+        {
+          "structure": "minecraft:mansion",
+          "weight": 1
+        }
+      ],
+      "placement": {
+        "salt": 10387319,
+        "spacing": 80,
+        "separation": 20,
+        "spread_type": "triangular",
+        "type": "minecraft:random_spread"
+      }
+    }
+  },
+  "vectorSeed": 123456,
+  "randomSpreadVectors": {
+    "minecraft:abandoned_camp": [
+      {
+        "queryChunkX": -111,
+        "queryChunkZ": -74,
+        "candidateChunkX": -97,
+        "candidateChunkZ": -71,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -37,
+        "queryChunkZ": 148,
+        "candidateChunkX": -10,
+        "candidateChunkZ": 157,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 4,
+        "candidateChunkZ": 13,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 74,
+        "queryChunkZ": 37,
+        "candidateChunkX": 101,
+        "candidateChunkZ": 49,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 185,
+        "queryChunkZ": -148,
+        "candidateChunkX": 210,
+        "candidateChunkZ": -139,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:ancient_cities": [
+      {
+        "queryChunkX": -72,
+        "queryChunkZ": -48,
+        "candidateChunkX": -63,
+        "candidateChunkZ": -33,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -24,
+        "queryChunkZ": 96,
+        "candidateChunkX": -24,
+        "candidateChunkZ": 105,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 0,
+        "candidateChunkZ": 4,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 48,
+        "queryChunkZ": 24,
+        "candidateChunkX": 51,
+        "candidateChunkZ": 26,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 120,
+        "queryChunkZ": -96,
+        "candidateChunkX": 127,
+        "candidateChunkZ": -88,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:buried_treasures": [
+      {
+        "queryChunkX": -3,
+        "queryChunkZ": -2,
+        "candidateChunkX": -3,
+        "candidateChunkZ": -2,
+        "frequencyAllowed": false
+      },
+      {
+        "queryChunkX": -1,
+        "queryChunkZ": 4,
+        "candidateChunkX": -1,
+        "candidateChunkZ": 4,
+        "frequencyAllowed": false
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 0,
+        "candidateChunkZ": 0,
+        "frequencyAllowed": false
+      },
+      {
+        "queryChunkX": 2,
+        "queryChunkZ": 1,
+        "candidateChunkX": 2,
+        "candidateChunkZ": 1,
+        "frequencyAllowed": false
+      },
+      {
+        "queryChunkX": 5,
+        "queryChunkZ": -4,
+        "candidateChunkX": 5,
+        "candidateChunkZ": -4,
+        "frequencyAllowed": false
+      }
+    ],
+    "minecraft:desert_pyramids": [
+      {
+        "queryChunkX": -96,
+        "queryChunkZ": -64,
+        "candidateChunkX": -77,
+        "candidateChunkZ": -61,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -32,
+        "queryChunkZ": 128,
+        "candidateChunkX": -30,
+        "candidateChunkZ": 150,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 14,
+        "candidateChunkZ": 6,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 64,
+        "queryChunkZ": 32,
+        "candidateChunkX": 86,
+        "candidateChunkZ": 44,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 160,
+        "queryChunkZ": -128,
+        "candidateChunkX": 179,
+        "candidateChunkZ": -113,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:end_cities": [
+      {
+        "queryChunkX": -60,
+        "queryChunkZ": -40,
+        "candidateChunkX": -54,
+        "candidateChunkZ": -35,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -20,
+        "queryChunkZ": 80,
+        "candidateChunkX": -17,
+        "candidateChunkZ": 81,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 7,
+        "candidateChunkZ": 4,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 40,
+        "queryChunkZ": 20,
+        "candidateChunkX": 42,
+        "candidateChunkZ": 21,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 100,
+        "queryChunkZ": -80,
+        "candidateChunkX": 103,
+        "candidateChunkZ": -75,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:igloos": [
+      {
+        "queryChunkX": -96,
+        "queryChunkZ": -64,
+        "candidateChunkX": -94,
+        "candidateChunkZ": -52,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -32,
+        "queryChunkZ": 128,
+        "candidateChunkX": -10,
+        "candidateChunkZ": 134,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 9,
+        "candidateChunkZ": 14,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 64,
+        "queryChunkZ": 32,
+        "candidateChunkX": 72,
+        "candidateChunkZ": 52,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 160,
+        "queryChunkZ": -128,
+        "candidateChunkX": 175,
+        "candidateChunkZ": -105,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:jungle_temples": [
+      {
+        "queryChunkX": -96,
+        "queryChunkZ": -64,
+        "candidateChunkX": -85,
+        "candidateChunkZ": -44,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -32,
+        "queryChunkZ": 128,
+        "candidateChunkX": -25,
+        "candidateChunkZ": 142,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 19,
+        "candidateChunkZ": 22,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 64,
+        "queryChunkZ": 32,
+        "candidateChunkX": 72,
+        "candidateChunkZ": 52,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 160,
+        "queryChunkZ": -128,
+        "candidateChunkX": 160,
+        "candidateChunkZ": -121,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:mineshafts": [
+      {
+        "queryChunkX": -3,
+        "queryChunkZ": -2,
+        "candidateChunkX": -3,
+        "candidateChunkZ": -2,
+        "frequencyAllowed": false
+      },
+      {
+        "queryChunkX": -1,
+        "queryChunkZ": 4,
+        "candidateChunkX": -1,
+        "candidateChunkZ": 4,
+        "frequencyAllowed": false
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 0,
+        "candidateChunkZ": 0,
+        "frequencyAllowed": false
+      },
+      {
+        "queryChunkX": 2,
+        "queryChunkZ": 1,
+        "candidateChunkX": 2,
+        "candidateChunkZ": 1,
+        "frequencyAllowed": false
+      },
+      {
+        "queryChunkX": 5,
+        "queryChunkZ": -4,
+        "candidateChunkX": 5,
+        "candidateChunkZ": -4,
+        "frequencyAllowed": false
+      }
+    ],
+    "minecraft:nether_complexes": [
+      {
+        "queryChunkX": -81,
+        "queryChunkZ": -54,
+        "candidateChunkX": -62,
+        "candidateChunkZ": -53,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -27,
+        "queryChunkZ": 108,
+        "candidateChunkX": -6,
+        "candidateChunkZ": 108,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 22,
+        "candidateChunkZ": 21,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 54,
+        "queryChunkZ": 27,
+        "candidateChunkX": 56,
+        "candidateChunkZ": 43,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 135,
+        "queryChunkZ": -108,
+        "candidateChunkX": 147,
+        "candidateChunkZ": -108,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:nether_fossils": [
+      {
+        "queryChunkX": -6,
+        "queryChunkZ": -4,
+        "candidateChunkX": -6,
+        "candidateChunkZ": -4,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -2,
+        "queryChunkZ": 8,
+        "candidateChunkX": -2,
+        "candidateChunkZ": 8,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 0,
+        "candidateChunkZ": 0,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 4,
+        "queryChunkZ": 2,
+        "candidateChunkX": 4,
+        "candidateChunkZ": 2,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 10,
+        "queryChunkZ": -8,
+        "candidateChunkX": 10,
+        "candidateChunkZ": -8,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:ocean_monuments": [
+      {
+        "queryChunkX": -96,
+        "queryChunkZ": -64,
+        "candidateChunkX": -77,
+        "candidateChunkZ": -59,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -32,
+        "queryChunkZ": 128,
+        "candidateChunkX": -20,
+        "candidateChunkZ": 134,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 21,
+        "candidateChunkZ": 9,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 64,
+        "queryChunkZ": 32,
+        "candidateChunkX": 70,
+        "candidateChunkZ": 51,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 160,
+        "queryChunkZ": -128,
+        "candidateChunkX": 177,
+        "candidateChunkZ": -109,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:ocean_ruins": [
+      {
+        "queryChunkX": -60,
+        "queryChunkZ": -40,
+        "candidateChunkX": -56,
+        "candidateChunkZ": -36,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -20,
+        "queryChunkZ": 80,
+        "candidateChunkX": -19,
+        "candidateChunkZ": 87,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 4,
+        "candidateChunkZ": 6,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 40,
+        "queryChunkZ": 20,
+        "candidateChunkX": 41,
+        "candidateChunkZ": 20,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 100,
+        "queryChunkZ": -80,
+        "candidateChunkX": 109,
+        "candidateChunkZ": -77,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:pillager_outposts": [
+      {
+        "queryChunkX": -96,
+        "queryChunkZ": -64,
+        "candidateChunkX": -89,
+        "candidateChunkZ": -56,
+        "frequencyAllowed": false
+      },
+      {
+        "queryChunkX": -32,
+        "queryChunkZ": 128,
+        "candidateChunkX": -28,
+        "candidateChunkZ": 129,
+        "frequencyAllowed": false
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 23,
+        "candidateChunkZ": 7,
+        "frequencyAllowed": false
+      },
+      {
+        "queryChunkX": 64,
+        "queryChunkZ": 32,
+        "candidateChunkX": 74,
+        "candidateChunkZ": 40,
+        "frequencyAllowed": false
+      },
+      {
+        "queryChunkX": 160,
+        "queryChunkZ": -128,
+        "candidateChunkX": 177,
+        "candidateChunkZ": -124,
+        "frequencyAllowed": false
+      }
+    ],
+    "minecraft:ruined_portals": [
+      {
+        "queryChunkX": -120,
+        "queryChunkZ": -80,
+        "candidateChunkX": -118,
+        "candidateChunkZ": -65,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -40,
+        "queryChunkZ": 160,
+        "candidateChunkX": -20,
+        "candidateChunkZ": 184,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 11,
+        "candidateChunkZ": 22,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 80,
+        "queryChunkZ": 40,
+        "candidateChunkX": 93,
+        "candidateChunkZ": 49,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 200,
+        "queryChunkZ": -160,
+        "candidateChunkX": 220,
+        "candidateChunkZ": -142,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:shipwrecks": [
+      {
+        "queryChunkX": -72,
+        "queryChunkZ": -48,
+        "candidateChunkX": -64,
+        "candidateChunkZ": -48,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -24,
+        "queryChunkZ": 96,
+        "candidateChunkX": -20,
+        "candidateChunkZ": 113,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 17,
+        "candidateChunkZ": 6,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 48,
+        "queryChunkZ": 24,
+        "candidateChunkX": 64,
+        "candidateChunkZ": 40,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 120,
+        "queryChunkZ": -96,
+        "candidateChunkX": 137,
+        "candidateChunkZ": -91,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:swamp_huts": [
+      {
+        "queryChunkX": -96,
+        "queryChunkZ": -64,
+        "candidateChunkX": -90,
+        "candidateChunkZ": -60,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -32,
+        "queryChunkZ": 128,
+        "candidateChunkX": -28,
+        "candidateChunkZ": 139,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 19,
+        "candidateChunkZ": 6,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 64,
+        "queryChunkZ": 32,
+        "candidateChunkX": 81,
+        "candidateChunkZ": 36,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 160,
+        "queryChunkZ": -128,
+        "candidateChunkX": 160,
+        "candidateChunkZ": -121,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:trail_ruins": [
+      {
+        "queryChunkX": -102,
+        "queryChunkZ": -68,
+        "candidateChunkX": -92,
+        "candidateChunkZ": -64,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -34,
+        "queryChunkZ": 136,
+        "candidateChunkX": -30,
+        "candidateChunkZ": 137,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 19,
+        "candidateChunkZ": 5,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 68,
+        "queryChunkZ": 34,
+        "candidateChunkX": 74,
+        "candidateChunkZ": 38,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 170,
+        "queryChunkZ": -136,
+        "candidateChunkX": 173,
+        "candidateChunkZ": -118,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:trial_chambers": [
+      {
+        "queryChunkX": -102,
+        "queryChunkZ": -68,
+        "candidateChunkX": -99,
+        "candidateChunkZ": -49,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -34,
+        "queryChunkZ": 136,
+        "candidateChunkX": -24,
+        "candidateChunkZ": 149,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 11,
+        "candidateChunkZ": 12,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 68,
+        "queryChunkZ": 34,
+        "candidateChunkX": 85,
+        "candidateChunkZ": 40,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 170,
+        "queryChunkZ": -136,
+        "candidateChunkX": 190,
+        "candidateChunkZ": -126,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:villages": [
+      {
+        "queryChunkX": -102,
+        "queryChunkZ": -68,
+        "candidateChunkX": -80,
+        "candidateChunkZ": -53,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -34,
+        "queryChunkZ": 136,
+        "candidateChunkX": -28,
+        "candidateChunkZ": 142,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 17,
+        "candidateChunkZ": 14,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 68,
+        "queryChunkZ": 34,
+        "candidateChunkX": 89,
+        "candidateChunkZ": 53,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 170,
+        "queryChunkZ": -136,
+        "candidateChunkX": 193,
+        "candidateChunkZ": -119,
+        "frequencyAllowed": true
+      }
+    ],
+    "minecraft:woodland_mansions": [
+      {
+        "queryChunkX": -240,
+        "queryChunkZ": -160,
+        "candidateChunkX": -219,
+        "candidateChunkZ": -128,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": -80,
+        "queryChunkZ": 320,
+        "candidateChunkX": -47,
+        "candidateChunkZ": 354,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 0,
+        "queryChunkZ": 0,
+        "candidateChunkX": 26,
+        "candidateChunkZ": 32,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 160,
+        "queryChunkZ": 80,
+        "candidateChunkX": 203,
+        "candidateChunkZ": 104,
+        "frequencyAllowed": true
+      },
+      {
+        "queryChunkX": 400,
+        "queryChunkZ": -320,
+        "candidateChunkX": 418,
+        "candidateChunkZ": -300,
+        "frequencyAllowed": true
+      }
+    ]
+  }
+}

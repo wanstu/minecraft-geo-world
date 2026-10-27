@@ -100,3 +100,15 @@ label{display:block;color:#58677c;font-size:12px;margin-bottom:10px}input,select
 
 
 .mineral-caveat{margin:0 14px 8px;line-height:1.45}
+
+.marker-sample.structure{background:#b76bce}
+.structure-status,.structure-caveat{margin:2px 14px 8px;line-height:1.45}
+.structure-detail{margin:0 14px 10px;padding:9px 10px;border:1px solid #dce4ed;border-radius:8px;background:#f8fafc;color:#425269;font-size:12px;line-height:1.5}
+.structure-mark{stroke:#fff;stroke-width:.65;opacity:.9;pointer-events:all;cursor:pointer;filter:drop-shadow(0 1px 1px #0007)}
+.structure-mark:hover{opacity:1;stroke-width:1}
+.structure-settlement{fill:#d78b3d}
+.structure-ocean{fill:#3c91c8}
+.structure-underground{fill:#7666b8}
+.structure-landmark{fill:#5da45d}
+.structure-portal{fill:#a65ac7}
+.structure-treasure{fill:#d4b23f}

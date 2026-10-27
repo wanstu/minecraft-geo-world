@@ -222,6 +222,46 @@ tasks.register('verifyGeoWorldSurfaceBiome', JavaExec) {
     systemProperty 'geoworld.engine.embeddedOnly', 'true'
 }
 
+tasks.register('exportGeoWorldStructureSnapshot', JavaExec) {
+    group = 'geoworld'
+    description = 'Exports the Minecraft 26.3 vanilla StructureSet registry for the standalone Web preview.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.minecraft.v26_3common.worldgen.GeoWorldV26StructureSnapshotExporter'
+    args file('../../../cmd/geoworld-tester/structure_data/minecraft-26.3.json').absolutePath
+    workingDir layout.buildDirectory.dir('structure-snapshot/export-work').get().asFile
+    doFirst {
+        mkdir workingDir
+    }
+}
+
+tasks.register('verifyGeoWorldStructureSnapshot', JavaExec) {
+    group = 'verification'
+    description = 'Regenerates the Minecraft 26.3 vanilla StructureSet snapshot and fails if the committed Web preview snapshot is stale.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.minecraft.v26_3common.worldgen.GeoWorldV26StructureSnapshotExporter'
+
+    def generated = layout.buildDirectory.file('structure-snapshot/minecraft-26.3.json')
+    def committed = file('../../../cmd/geoworld-tester/structure_data/minecraft-26.3.json')
+    args generated.get().asFile.absolutePath
+    workingDir layout.buildDirectory.dir('structure-snapshot/work').get().asFile
+
+    doFirst {
+        mkdir workingDir
+        delete generated
+    }
+    doLast {
+        def actual = generated.get().asFile.getText('UTF-8').replace('\r\n', '\n')
+        def expected = committed.getText('UTF-8').replace('\r\n', '\n')
+        if (actual != expected) {
+            throw new GradleException(
+                'GeoWorld structure snapshot is stale. Run exportGeoWorldStructureSnapshot and commit cmd/geoworld-tester/structure_data/minecraft-26.3.json.'
+            )
+        }
+    }
+}
+
 tasks.register('verifyGeoWorldSurfaceOutcrops', JavaExec) {
     group = 'verification'
     description = 'Checks rare high mountain ore outcrops in exposed vanilla stone and seam continuity.'
@@ -272,6 +312,7 @@ tasks.named('check') {
     dependsOn tasks.named('verifyGeoWorldSpawn')
     dependsOn tasks.named('verifyGeoWorldShoreline')
     dependsOn tasks.named('verifyGeoWorldSurfaceBiome')
+    dependsOn tasks.named('verifyGeoWorldStructureSnapshot')
     dependsOn tasks.named('verifyGeoWorldSurfaceOutcrops')
     dependsOn tasks.named('verifyGeoWorldMineralBodies')
     dependsOn tasks.named('verifyGeoWorldMinerals')

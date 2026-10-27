@@ -206,6 +206,7 @@ func main() {
 	mux.HandleFunc("/api/acceptance", state.handleAcceptance)
 	mux.HandleFunc("/api/features", state.handlePreviewFeatures)
 	mux.HandleFunc("/api/minerals", state.handleMineralBodies)
+	mux.HandleFunc("/api/structures", state.handleStructureCandidates)
 	mux.HandleFunc("/api/layer", state.handleLayer)
 	mux.HandleFunc("/api/save", func(w http.ResponseWriter, r *http.Request) { state.handleSave(w, r, *modelDir) })
 	mux.HandleFunc("/api/load", func(w http.ResponseWriter, r *http.Request) { state.handleLoad(w, r, *modelDir) })

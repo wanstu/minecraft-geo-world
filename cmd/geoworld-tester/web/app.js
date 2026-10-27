@@ -27,6 +27,9 @@ let mineralBodies=null;
 let mineralLoadToken=0;
 let mineralRefreshTimer=null;
 let mineralBridgeUnavailable=false;
+let structureCandidates=null;
+let structureLoadToken=0;
+let structureRefreshTimer=null;
 let touchPoints=new Map();
 let pinchStartDistance=0;
 let pinchStartZoom=1;
@@ -117,6 +120,7 @@ function updateBackend(online){
     active=null;
     previewFeatures=null;
     resetMineralPreview();
+    resetStructurePreview();
     clearSample();
     clearExportResult();
     clearAcceptanceView();
@@ -165,6 +169,7 @@ function applyMapTransform(){
     renderCursorOverlay();
     positionFeatureOverlay();
     scheduleMineralRefresh();
+    scheduleStructureRefresh();
   });
 }
 
@@ -458,6 +463,7 @@ $('generate').onclick=async()=>{
     acceptanceData=null;
     previewFeatures=null;
     resetMineralPreview();
+    resetStructurePreview();
     clearAcceptanceView();
     resetMapView();
     $('progressBar').style.width='100%';
@@ -754,6 +760,7 @@ $('load').onclick=async()=>{
     acceptanceData=null;
     previewFeatures=null;
     resetMineralPreview();
+    resetStructurePreview();
     clearAcceptanceView();
     resetMapView();
     $('seed').value=active.seed;
@@ -1221,6 +1228,79 @@ async function refreshMineralBodies(){
   }
 }
 
+function resetStructurePreview(){
+  structureCandidates=null;
+  structureLoadToken++;
+  if(structureRefreshTimer){
+    clearTimeout(structureRefreshTimer);
+    structureRefreshTimer=null;
+  }
+  const detail=$('structureDetail');
+  if(detail){detail.hidden=true;detail.textContent='';}
+  const status=$('structureStatus');
+  if(status)status.textContent='放大到 2× 后加载当前视野的原版 StructureSet 候选；8× 后加入矿井与埋藏宝藏。';
+}
+
+function scheduleStructureRefresh(delay=300){
+  if(structureRefreshTimer)clearTimeout(structureRefreshTimer);
+  structureRefreshTimer=setTimeout(()=>{
+    structureRefreshTimer=null;
+    void refreshStructureCandidates();
+  },delay);
+}
+
+async function refreshStructureCandidates(){
+  const enabled=enabledFeatureKinds().has('structures');
+  if(!active||!enabled){
+    structureCandidates=null;
+    renderFeatureOverlay();
+    return;
+  }
+  if(mapZoom<2){
+    structureCandidates=null;
+    $('structureStatus').textContent='继续放大到 2× 后显示原版结构候选。';
+    renderFeatureOverlay();
+    return;
+  }
+  if(mapDragging||touchPoints.size>0){
+    scheduleStructureRefresh(240);
+    return;
+  }
+  const bounds=mineralViewportBounds();
+  if(!bounds)return;
+  const mode=mapZoom>=8?'all':'major';
+  const limit=window.innerWidth<=900?1000:2200;
+  const token=++structureLoadToken;
+  $('structureStatus').textContent=mode==='all'
+    ? '正在加载当前视野的详细结构候选…'
+    : '正在加载当前视野的主要结构候选…';
+  try{
+    const q=new URLSearchParams({
+      minX:String(bounds.minX),maxX:String(bounds.maxX),
+      minZ:String(bounds.minZ),maxZ:String(bounds.maxZ),
+      mode,limit:String(limit)
+    });
+    const data=await api('/api/structures?'+q.toString());
+    if(token!==structureLoadToken)return;
+    structureCandidates=data;
+    const structureSuffix=data.truncated
+      ? '（共 '+Number(data.total||0).toLocaleString()+' 个，已按结构类别与视野位置均匀显示 '+Number(data.returned||0).toLocaleString()+' 个）'
+      : Number(data.total||0).toLocaleString()+' 个';
+    $('structureStatus').textContent=
+      (mode==='all'?'详细结构候选 ':'主要结构候选 ')+
+      structureSuffix+
+      (data.skippedStronghold?' · 强要塞暂不显示':'');
+    renderFeatureOverlay();
+  }catch(e){
+    if(token!==structureLoadToken)return;
+    structureCandidates=null;
+    $('structureStatus').textContent=e.status===413
+      ? '当前视野仍太大，请继续放大后查看结构候选。'
+      : '结构候选加载失败：'+e.message;
+    renderFeatureOverlay();
+  }
+}
+
 async function refreshFeatures(){
   if(!active){
     previewFeatures=null;
@@ -1282,6 +1362,50 @@ function showMineralDetail(body){
     (body.outcrop?' · 可形成露头':'')+
     ' · 中心 '+Math.round(body.x)+', Y '+Math.round(body.y)+', '+Math.round(body.z)+
     ' · 长约 '+body.length.toFixed(1)+' · 半径约 '+body.radius.toFixed(1);
+}
+
+function structureSetName(id){
+  return ({
+    'minecraft:abandoned_camp':'废弃营地',
+    'minecraft:ancient_cities':'远古城市',
+    'minecraft:buried_treasures':'埋藏宝藏',
+    'minecraft:desert_pyramids':'沙漠神殿',
+    'minecraft:igloos':'雪屋',
+    'minecraft:jungle_temples':'丛林神庙',
+    'minecraft:mineshafts':'废弃矿井',
+    'minecraft:ocean_monuments':'海底神殿',
+    'minecraft:ocean_ruins':'海底废墟',
+    'minecraft:pillager_outposts':'掠夺者前哨站',
+    'minecraft:ruined_portals':'废弃传送门',
+    'minecraft:shipwrecks':'沉船',
+    'minecraft:swamp_huts':'沼泽小屋',
+    'minecraft:trail_ruins':'古迹废墟',
+    'minecraft:trial_chambers':'试炼密室',
+    'minecraft:villages':'村庄',
+    'minecraft:woodland_mansions':'林地府邸'
+  })[id]||id;
+}
+
+function structureMarkerKind(id){
+  if(['minecraft:villages','minecraft:abandoned_camp','minecraft:pillager_outposts','minecraft:woodland_mansions'].includes(id))return 'settlement';
+  if(['minecraft:ocean_monuments','minecraft:ocean_ruins','minecraft:shipwrecks'].includes(id))return 'ocean';
+  if(['minecraft:ancient_cities','minecraft:mineshafts','minecraft:trial_chambers'].includes(id))return 'underground';
+  if(id==='minecraft:ruined_portals')return 'portal';
+  if(id==='minecraft:buried_treasures')return 'treasure';
+  return 'landmark';
+}
+
+function showStructureDetail(candidate){
+  const el=$('structureDetail');
+  el.hidden=false;
+  const meta=structureCandidates?.sets?.[candidate.setId]||{};
+  const variants=(meta.structures||[]).map(v=>String(v).replace('minecraft:','')).join(' / ');
+  el.textContent=
+    structureSetName(candidate.setId)+
+    ' · X '+candidate.x+', Z '+candidate.z+
+    ' · Chunk '+candidate.chunkX+', '+candidate.chunkZ+
+    (variants?' · 候选结构 '+variants:'')+
+    ' · 这是 Minecraft 26.3 原版 placement 候选，不代表 StructureStart 已确认生成。';
 }
 
 function renderFeatureOverlay(){
@@ -1363,6 +1487,35 @@ function renderFeatureOverlay(){
     svg.appendChild(group);
   }
 
+  if(enabled.has('structures')&&structureCandidates){
+    const group=document.createElementNS(ns,'g');
+    group.setAttribute('class','feature-structures');
+    for(const candidate of structureCandidates.candidates||[]){
+      const p=worldToOverlay(candidate.x,candidate.z);
+      if(p.x<0||p.x>1000||p.y<0||p.y>1000)continue;
+      const mark=document.createElementNS(ns,'circle');
+      mark.setAttribute('cx',p.x);
+      mark.setAttribute('cy',p.y);
+      mark.setAttribute('r',Math.max(.8,4/mapZoom));
+      mark.setAttribute('class','structure-mark structure-'+structureMarkerKind(candidate.setId));
+      mark.dataset.x=candidate.x;
+      mark.dataset.z=candidate.z;
+      const title=document.createElementNS(ns,'title');
+      title.textContent=
+        structureSetName(candidate.setId)+' · '+candidate.x+', '+candidate.z+
+        ' · Chunk '+candidate.chunkX+', '+candidate.chunkZ+
+        ' · 原版 placement 候选';
+      mark.appendChild(title);
+      mark.addEventListener('click',e=>{
+        e.stopPropagation();
+        showStructureDetail(candidate);
+        void focusWorldPoint(candidate.x,candidate.z);
+      });
+      group.appendChild(mark);
+    }
+    svg.appendChild(group);
+  }
+
   if(enabled.has('peaks')){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-peaks');
@@ -1440,6 +1593,16 @@ document.querySelectorAll('.feature-toggle').forEach(input=>input.onchange=()=>{
       mineralLoadToken++;
       $('mineralStatus').textContent='真实规划矿体已隐藏。';
       $('mineralDetail').hidden=true;
+    }
+  }
+  if(input.dataset.feature==='structures'){
+    if(input.checked){
+      scheduleStructureRefresh(0);
+    }else{
+      structureCandidates=null;
+      structureLoadToken++;
+      $('structureStatus').textContent='原版结构候选已隐藏。';
+      $('structureDetail').hidden=true;
     }
   }
   renderFeatureOverlay();
