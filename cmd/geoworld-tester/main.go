@@ -10,6 +10,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"io/fs"
 	"log"
 	"math"
@@ -25,6 +26,7 @@ import (
 	"sync"
 	"time"
 
+	"geoworld/acceptance"
 	"geoworld/internal/generator"
 	"geoworld/internal/mcprofile"
 	"geoworld/internal/phase1"
@@ -175,7 +177,8 @@ func main() {
 
 	repoRoot, err := findRepoRoot()
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("repository integration unavailable: %v", err)
+		repoRoot = ""
 	}
 
 	state := &appState{}
@@ -197,6 +200,8 @@ func main() {
 	mux.HandleFunc("/api/generate", state.handleGenerate)
 	mux.HandleFunc("/api/sample", state.handleSample)
 	mux.HandleFunc("/api/anomalies", state.handleAnomalies)
+	mux.HandleFunc("/api/acceptance", state.handleAcceptance)
+	mux.HandleFunc("/api/markers", state.handleMarkers)
 	mux.HandleFunc("/api/layer", state.handleLayer)
 	mux.HandleFunc("/api/save", func(w http.ResponseWriter, r *http.Request) { state.handleSave(w, r, *modelDir) })
 	mux.HandleFunc("/api/load", func(w http.ResponseWriter, r *http.Request) { state.handleLoad(w, r, *modelDir) })
@@ -445,6 +450,234 @@ func (s *appState) handleAnomalies(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, active.anomalies)
 }
 
+type previewMarker struct {
+	ID               string `json:"id"`
+	Kind             string `json:"kind"`
+	BigCategory      string `json:"bigCategory"`
+	SmallCategory    string `json:"smallCategory"`
+	Name             string `json:"name"`
+	X                int    `json:"x"`
+	Y                int    `json:"y"`
+	Z                int    `json:"z"`
+	TP               string `json:"tp"`
+	Expected         string `json:"expected"`
+	AcceptanceMarker bool   `json:"acceptanceMarker"`
+}
+
+func (s *appState) currentAcceptanceReport() (acceptance.Report, error) {
+	s.mu.RLock()
+	active := s.active
+	s.mu.RUnlock()
+	if active == nil {
+		return acceptance.Report{}, errors.New("generate or load a world first")
+	}
+	if active.reopened != nil {
+		return acceptance.Plan(active.reopened)
+	}
+	if active.model == nil {
+		return acceptance.Report{}, errors.New("active world has no acceptance model")
+	}
+
+	tempDir, err := os.MkdirTemp("", "geoworld-acceptance-*")
+	if err != nil {
+		return acceptance.Report{}, err
+	}
+	defer os.RemoveAll(tempDir)
+	path := filepath.Join(tempDir, "active.geoworld")
+	if err := worldmodelio.Save(path, active.model); err != nil {
+		return acceptance.Report{}, err
+	}
+	reopened, err := worldmodelio.Load(path)
+	if err != nil {
+		return acceptance.Report{}, err
+	}
+	return acceptance.Plan(reopened)
+}
+
+func (s *appState) handleAcceptance(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+	report, err := s.currentAcceptanceReport()
+	if err != nil {
+		writeError(w, http.StatusConflict, err)
+		return
+	}
+	full, err := acceptance.BuildManualTable(report)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	tableType := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("type")))
+	if tableType == "" {
+		tableType = "spot"
+	}
+	format := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("format")))
+	if format == "" {
+		format = "json"
+	}
+	download := r.URL.Query().Get("download") == "1"
+
+	if tableType == "full" {
+		if download {
+			w.Header().Set(
+				"Content-Disposition",
+				fmt.Sprintf("attachment; filename=geoworld-full-acceptance-seed-%d.%s", report.Seed, acceptanceExtension(format)),
+			)
+		}
+		switch format {
+		case "json":
+			data, marshalErr := acceptance.ManualTableJSON(full)
+			if marshalErr != nil {
+				writeError(w, http.StatusInternalServerError, marshalErr)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			_, _ = w.Write(data)
+		case "markdown", "md":
+			w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+			_, _ = io.WriteString(w, acceptance.ManualTableMarkdown(full))
+		case "csv":
+			w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+			_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
+			if err := acceptance.WriteManualTableCSV(w, full); err != nil {
+				log.Printf("write full acceptance csv: %v", err)
+			}
+		default:
+			writeError(w, http.StatusBadRequest, fmt.Errorf("unsupported acceptance format %q", format))
+		}
+		return
+	}
+
+	if tableType != "spot" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("unsupported acceptance type %q", tableType))
+		return
+	}
+	perBig := parseBoundedInt(r.URL.Query().Get("perBig"), 2, 1, 12)
+	spot, err := acceptance.BuildSpotTable(full, perBig)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if download {
+		w.Header().Set(
+			"Content-Disposition",
+			fmt.Sprintf("attachment; filename=geoworld-spot-acceptance-seed-%d.%s", report.Seed, acceptanceExtension(format)),
+		)
+	}
+	switch format {
+	case "json":
+		data, marshalErr := acceptance.SpotTableJSON(spot)
+		if marshalErr != nil {
+			writeError(w, http.StatusInternalServerError, marshalErr)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_, _ = w.Write(data)
+	case "markdown", "md":
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		_, _ = io.WriteString(w, acceptance.SpotTableMarkdown(spot))
+	case "csv":
+		w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+		_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
+		if err := acceptance.WriteSpotTableCSV(w, spot); err != nil {
+			log.Printf("write spot acceptance csv: %v", err)
+		}
+	default:
+		writeError(w, http.StatusBadRequest, fmt.Errorf("unsupported acceptance format %q", format))
+	}
+}
+
+func acceptanceExtension(format string) string {
+	switch strings.ToLower(strings.TrimSpace(format)) {
+	case "markdown", "md":
+		return "md"
+	case "csv":
+		return "csv"
+	default:
+		return "json"
+	}
+}
+
+func (s *appState) handleMarkers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+	report, err := s.currentAcceptanceReport()
+	if err != nil {
+		writeError(w, http.StatusConflict, err)
+		return
+	}
+	full, err := acceptance.BuildManualTable(report)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	markers := make([]previewMarker, 0, 96)
+	seen := make(map[string]struct{}, 96)
+	for _, big := range full.BigCategories {
+		for _, small := range big.SmallCategories {
+			added := 0
+			for _, item := range small.Items {
+				for _, point := range item.Points {
+					key := fmt.Sprintf("%s:%d:%d", small.ID, point.X, point.Z)
+					if _, exists := seen[key]; exists {
+						continue
+					}
+					seen[key] = struct{}{}
+					markers = append(markers, previewMarker{
+						ID:               item.ID,
+						Kind:             previewMarkerKind(small.ID),
+						BigCategory:      big.Name,
+						SmallCategory:    small.Name,
+						Name:             item.Name,
+						X:                point.X,
+						Y:                point.Y,
+						Z:                point.Z,
+						TP:               point.TP,
+						Expected:         item.Expected,
+						AcceptanceMarker: true,
+					})
+					added++
+					break
+				}
+				if added >= 2 {
+					break
+				}
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"seed":    report.Seed,
+		"rules":   report.GenerationRulesVersion,
+		"markers": markers,
+		"note":    "结构类标记表示原版结构兼容验收候选点，不表示 GeoWorld 接管或预测 Vanilla Structure Placement。",
+	})
+}
+
+func previewMarkerKind(prefix string) string {
+	switch prefix {
+	case "ORE":
+		return "ore"
+	case "MTN", "HILL", "PLATEAU", "BASIN", "PLAIN", "RARE", "CORRIDOR":
+		return "terrain"
+	case "RIVER", "FLOOD", "LAKE", "WET", "EST", "COAST", "SEA", "NODE":
+		return "water"
+	case "BIOME", "FOREST", "CLIMATE", "POLAR", "SURFACE":
+		return "biome"
+	case "VSTRUCT":
+		return "structure"
+	case "SPAWN":
+		return "spawn"
+	default:
+		return "acceptance"
+	}
+}
+
 func (s *appState) handleLayer(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w)
@@ -663,6 +896,12 @@ func handleModels(w http.ResponseWriter, r *http.Request, modelDir string) {
 func (s *appState) handleExportMinecraft(w http.ResponseWriter, r *http.Request, repoRoot string) {
 	if r.Method != http.MethodPost {
 		methodNotAllowed(w)
+		return
+	}
+	if strings.TrimSpace(repoRoot) == "" {
+		writeError(w, http.StatusNotImplemented, errors.New(
+			"Minecraft QA export is only available when the GeoWorld source repository is present; preview and acceptance remain fully available in standalone mode",
+		))
 		return
 	}
 

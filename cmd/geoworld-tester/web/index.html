@@ -3,160 +3,189 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>GeoWorld Tester</title>
+<title>GeoWorld 工具台</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header>
-  <div>
-    <strong>GeoWorld Tester</strong>
-    <span class="muted">真实 Generator / Runtime 测试工具</span>
-  </div>
+<header class="topbar">
+  <div class="brand"><div class="brand-mark">⛰</div><div><strong>GeoWorld 工具台</strong><span>World Model / Preview / Acceptance</span></div></div>
+  <nav class="main-nav">
+    <button data-page="home" class="nav-item">首页</button>
+    <button data-page="world" class="nav-item active">世界预览</button>
+    <button data-page="acceptance" class="nav-item">验收工具</button>
+    <button data-page="models" class="nav-item">模型管理</button>
+    <button data-page="params" class="nav-item">参数与预设</button>
+    <button data-page="about" class="nav-item">版本信息</button>
+  </nav>
   <div class="header-status">
     <div id="backendStatus" class="pill">后端检查中</div>
     <div id="topStatus" class="pill">未生成</div>
   </div>
 </header>
-<div class="layout">
-  <aside class="panel controls">
-    <h2>世界参数</h2>
-    <label>Seed
-      <div class="seed-control">
-        <input id="seed" type="number" value="731894205">
-        <button id="randomSeed" type="button">随机</button>
+
+<div class="app-shell">
+  <section id="page-home" class="page">
+    <div class="page-head"><div><h1>GeoWorld 世界工具台</h1><p>统一使用同一份 World Model 完成预览、验收、保存与游戏侧验证。</p></div></div>
+    <div class="home-grid">
+      <article class="feature-card primary-card"><div class="feature-icon">🗺</div><h2>世界预览</h2><p>输入 Seed 生成 World Model，查看最终地形、河网、湖泊、群系、地貌、地表以及验收候选标记。</p><button class="primary route-button" data-page="world">进入世界预览</button></article>
+      <article class="feature-card"><div class="feature-icon">✓</div><h2>验收工具</h2><p>从 177 项完整验收 Registry 生成完整验收表，并按每个大类 2 条自动生成抽检表。</p><button class="route-button" data-page="acceptance">进入验收工具</button></article>
+      <article class="feature-card"><div class="feature-icon">◫</div><h2>模型管理</h2><p>保存、重新打开 .geoworld 世界模型，并执行 Minecraft QA 世界导出。</p><button class="route-button" data-page="models">管理模型</button></article>
+      <article class="feature-card"><div class="feature-icon">⚙</div><h2>参数与预设</h2><p>查看 Standard / Natural / Civilization / Epic 等预设与 25 项语义参数的关系。</p><button class="route-button" data-page="params">查看参数</button></article>
+    </div>
+    <div class="dashboard-row">
+      <div class="panel dashboard-card"><div class="panel-title">当前世界</div><div id="homeCurrentWorld" class="empty-card">尚未生成或打开世界模型。</div></div>
+      <div class="panel dashboard-card"><div class="panel-title">工作流</div><ol class="workflow"><li>选择 Seed 与参数生成 World Model</li><li>在地图图层和标记中检查关键区域</li><li>生成完整验收表 / 抽检表</li><li>保存模型或导出 Minecraft QA 世界</li></ol></div>
+    </div>
+  </section>
+
+  <section id="page-world" class="page active">
+    <div class="world-layout">
+      <aside class="panel controls">
+        <div class="panel-title">世界参数</div>
+        <div class="panel-body">
+          <label>Seed<div class="seed-control"><input id="seed" type="number" value="123456"><button id="randomSeed" type="button">随机</button></div></label>
+          <div class="two"><label>网格宽<input id="width" type="number" value="320" min="16" max="1024"></label><label>网格高<input id="height" type="number" value="200" min="16" max="1024"></label></div>
+          <label>采样间距<select id="cellSize"><option value="128">128 方块 / 点</option><option value="64">64 方块 / 点</option></select></label>
+          <div id="rangePreview" class="hint-box"></div>
+          <label>世界预设<select id="worldPreset"><option value="standard">Standard · 标准</option><option value="natural">Natural · 自然</option><option value="civilization">Civilization · 文明地理</option><option value="expansive">Expansive · 辽阔大陆</option><option value="epic">Epic · 史诗</option><option value="near_vanilla">Near Vanilla · 接近原版</option><option value="custom">Custom · 自定义</option><option value="legacy" disabled>Legacy · 旧规则（只读）</option></select></label>
+          <label id="parameterCsvLabel" hidden>25 参数快照 CSV<input id="parameterCsv" placeholder="25 个逗号分隔参数"></label>
+          <div id="profileHelp" class="muted small"></div>
+          <div class="two"><label>板块数<input id="plates" type="number" value="18" min="2"></label><label>洋壳比例<input id="ocean" type="number" value="0.68" min="0.1" max="0.9" step="0.01"></label></div>
+          <label>大陆预设<select id="continentPreset"><option value="default">默认世界</option><option value="super">超级大陆</option><option value="multi">多大陆</option><option value="broken">破碎大陆</option><option value="archipelago">群岛世界</option><option value="custom">自定义</option></select></label>
+          <div id="presetHelp" class="hint-box small"></div>
+          <label class="range-label">大陆破碎度 <b id="fragmentationValue">0.35</b><input id="fragmentation" type="range" min="0.05" max="1" step="0.05" value="0.35"></label>
+          <label class="range-label">大陆平均分离度 <b id="separationValue">0.65</b><input id="separation" type="range" min="0.05" max="1" step="0.05" value="0.65"></label>
+          <button id="generate" class="primary wide">生成世界模型</button>
+          <div class="progress"><i id="progressBar"></i></div>
+          <div id="progressText" class="muted small">等待生成</div>
+        </div>
+      </aside>
+
+      <main class="map-area panel">
+        <div class="map-head">
+          <div class="layer-tabs">
+            <button class="layer active" data-layer="final">最终地形</button>
+            <button class="layer debug-layer" data-layer="raw" disabled>Raw</button>
+            <button class="layer" data-layer="skeleton">海陆骨架</button>
+            <button class="layer debug-layer" data-layer="coast" disabled>海岸约束</button>
+            <button class="layer" data-layer="rivers">河网</button>
+            <button class="layer" data-layer="lakes">湖泊</button>
+            <button class="layer" data-layer="water">最终水体</button>
+            <button class="layer" data-layer="biome">群系</button>
+            <button class="layer" data-layer="landform">地貌</button>
+            <button class="layer" data-layer="surface">地表</button>
+            <button class="layer" data-layer="profile">置信度</button>
+            <button class="layer anomaly-layer" data-layer="anomalies">异常</button>
+          </div>
+          <div class="map-zoom-controls"><button id="mapZoomOut">−</button><span id="mapZoomLabel">1.0×</span><button id="mapZoomIn">+</button><button id="mapZoomReset">复位</button></div>
+        </div>
+        <div id="mapWrap" class="map-wrap empty">
+          <img id="map" alt="GeoWorld map">
+          <div id="emptyHint"><b>尚未生成世界</b><span>设置左侧 Seed 与参数后生成 World Model。</span></div>
+          <div id="mapNotice" class="map-notice" hidden></div>
+          <div id="mapMarkers" class="map-markers"></div>
+          <div id="exportBounds" class="export-bounds" hidden></div>
+          <div id="spawnMarker" class="spawn-marker" hidden title="Minecraft 出生点"></div>
+          <div id="cursor"></div>
+        </div>
+        <div id="layerHelp" class="footnote"></div>
+      </main>
+
+      <aside class="panel inspector">
+        <div class="panel-title">地图标记</div>
+        <div class="marker-filter-list">
+          <label><input class="marker-toggle" type="checkbox" data-kind="ore" checked><span class="marker-sample ore"></span>矿产 / 矿山候选</label>
+          <label><input class="marker-toggle" type="checkbox" data-kind="terrain" checked><span class="marker-sample terrain"></span>山脉 / 地貌</label>
+          <label><input class="marker-toggle" type="checkbox" data-kind="water" checked><span class="marker-sample water"></span>水系 / 海岸</label>
+          <label><input class="marker-toggle" type="checkbox" data-kind="biome"><span class="marker-sample biome"></span>群系 / 气候</label>
+          <label><input class="marker-toggle" type="checkbox" data-kind="structure"><span class="marker-sample structure"></span>结构兼容验收点</label>
+          <label><input class="marker-toggle" type="checkbox" data-kind="spawn" checked><span class="marker-sample spawn"></span>出生点验收</label>
+          <label><input class="marker-toggle" type="checkbox" data-kind="acceptance"><span class="marker-sample acceptance"></span>其他验收点</label>
+        </div>
+        <div id="markerNote" class="muted small marker-note">生成世界后加载模型标记。</div>
+        <hr>
+        <h2>坐标检查</h2>
+        <div id="sampleEmpty" class="muted">点击地图中的任意位置。</div>
+        <div id="sample" hidden></div>
+        <hr>
+        <h2>最终异常</h2>
+        <div id="anomalySummary" class="muted small">生成或重开模型后显示最终异常。</div>
+        <div id="anomalyList" class="anomaly-list"></div>
+      </aside>
+    </div>
+  </section>
+
+  <section id="page-acceptance" class="page">
+    <div class="page-head">
+      <div><h1>验收工具</h1><p>完整验收表来自 177 项 Acceptance Registry；抽检表只从完整表中按大类抽取。</p></div>
+      <div class="page-actions"><button id="acceptanceGenerate" class="primary">生成验收表</button></div>
+    </div>
+    <div class="acceptance-toolbar panel">
+      <div class="field-group"><b>表格类型</b><label><input type="radio" name="acceptanceType" value="spot" checked> 抽检表 · 每个大类 2 条</label><label><input type="radio" name="acceptanceType" value="full"> 完整验收表 · 177 项</label></div>
+      <div class="field-group"><b>筛选大类</b><select id="acceptanceBigFilter"><option value="">全部大类</option></select></div>
+      <div class="field-group download-group"><b>下载</b><button class="acceptance-download" data-format="md">Markdown</button><button class="acceptance-download" data-format="csv">CSV</button><button class="acceptance-download" data-format="json">JSON</button></div>
+    </div>
+    <div id="acceptanceSummary" class="summary-grid">
+      <div class="summary-card"><span>当前模型</span><b>未加载</b></div>
+      <div class="summary-card"><span>表格类型</span><b>抽检表</b></div>
+      <div class="summary-card"><span>大类</span><b>—</b></div>
+      <div class="summary-card"><span>具体条目</span><b>—</b></div>
+    </div>
+    <div class="panel acceptance-panel">
+      <div class="panel-title">验收表预览 <small id="acceptanceMessage">请先生成或打开一个 World Model。</small></div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>大类</th><th>小类</th><th>ID</th><th>具体条目</th><th>Seed / TP</th><th>通过标准</th><th>状态</th></tr></thead>
+          <tbody id="acceptanceTableBody"><tr><td colspan="7" class="empty-cell">暂无验收表</td></tr></tbody>
+        </table>
       </div>
-    </label>
-    <div class="two">
-      <label>网格宽<input id="width" type="number" value="320" min="16" max="1024"></label>
-      <label>网格高<input id="height" type="number" value="200" min="16" max="1024"></label>
     </div>
-    <label>采样间距
-      <select id="cellSize">
-        <option value="128">128 方块 / 点（标准，范围更大）</option>
-        <option value="64">64 方块 / 点（更细，范围减半）</option>
-      </select>
-    </label>
-    <div id="rangePreview" class="muted small"></div>
-    <label>世界预设
-      <select id="worldPreset">
-        <option value="standard">Standard · 标准</option>
-        <option value="natural">Natural · 自然</option>
-        <option value="civilization">Civilization · 文明地理</option>
-        <option value="expansive">Expansive · 辽阔大陆</option>
-        <option value="epic">Epic · 史诗</option>
-        <option value="near_vanilla">Near Vanilla · 接近原版</option>
-        <option value="custom">Custom · 自定义</option>
-        <option value="legacy" disabled>Legacy rc.1 · 旧规则（只读）</option>
-      </select>
-    </label>
-    <label id="parameterCsvLabel" hidden>25 参数快照 CSV
-      <input id="parameterCsv" placeholder="25 个逗号分隔参数；留空则使用所选预设默认值">
-    </label>
-    <div id="profileHelp" class="muted small parameter-help">验收工具与 Minecraft 使用同一 World Profile；Custom 可粘贴完整参数快照。</div>
-    <div class="two">
-      <label>板块数<input id="plates" type="number" value="18" min="2"></label>
-      <label>洋壳比例<input id="ocean" type="number" value="0.68" min="0.1" max="0.9" step="0.01"></label>
+  </section>
+
+  <section id="page-models" class="page">
+    <div class="page-head"><div><h1>模型管理</h1><p>管理 .geoworld 锁定模型，以及 Minecraft QA 世界导出。</p></div></div>
+    <div class="models-grid">
+      <section class="panel"><div class="panel-title">保存 / 打开模型</div><div class="panel-body">
+        <label>保存名称<input id="modelName" placeholder="生成后自动填写"></label>
+        <button id="save" class="primary wide" disabled>保存 / 更新模型</button>
+        <label>已保存模型<select id="models"><option value="">暂无</option></select></label>
+        <button id="load" class="wide" disabled>重新打开模型</button>
+        <div id="modelMessage" class="muted small message-box"></div>
+      </div></section>
+      <section class="panel"><div class="panel-title">Minecraft QA 导出</div><div class="panel-body">
+        <label>世界名称<input id="exportName" placeholder="例如 GeoWorld QA"></label>
+        <label>导出到<input id="exportDir" value="output/minecraft-exports"></label>
+        <label>预生成半径（Chunk）<input id="exportRadius" type="number" value="8" min="0" max="31"></label>
+        <label class="check-row"><input id="exportQA" type="checkbox" checked><span>创造模式 + 开启作弊</span></label>
+        <label class="check-row"><input id="exportOverwrite" type="checkbox"><span>覆盖同名导出目录</span></label>
+        <button id="exportMinecraft" class="primary wide" disabled>导出 Minecraft 26.3 存档</button>
+        <button id="openExport" class="wide" type="button" hidden>打开导出目录</button>
+        <div id="exportMessage" class="muted small message-box">生成或重开模型后即可导出。</div>
+      </div></section>
+      <section class="panel model-stats"><div class="panel-title">当前世界身份</div><div id="stats" class="stats-list"><span>Seed</span><b>—</b></div></section>
     </div>
-    <div class="muted small parameter-help">洋壳比例控制地壳分类，不等于最终海水覆盖率。</div>
-    <label>大陆预设
-      <select id="continentPreset">
-        <option value="default">默认世界</option>
-        <option value="super">超级大陆</option>
-        <option value="multi">多大陆</option>
-        <option value="broken">破碎大陆</option>
-        <option value="archipelago">群岛世界</option>
-        <option value="custom">自定义</option>
-      </select>
-    </label>
-    <div id="presetHelp" class="muted small parameter-help preset-help"></div>
-    <label class="range-label">大陆破碎度 <b id="fragmentationValue">0.35</b>
-      <input id="fragmentation" type="range" min="0.05" max="1" step="0.05" value="0.35">
-    </label>
-    <div class="muted small parameter-help">低值偏完整大陆；高值会增加半岛、海峡、岛链和次级陆块。</div>
-    <label class="range-label">大陆平均分离度 <b id="separationValue">0.65</b>
-      <input id="separation" type="range" min="0.05" max="1" step="0.05" value="0.65">
-    </label>
-    <div class="muted small parameter-help">低值更容易形成超级大陆；高值会让各大陆核保持更大间距。</div>
-    <button id="generate" class="primary">生成世界</button>
-    <div class="progress"><i id="progressBar"></i></div>
-    <div id="progressText" class="muted small">默认参数适合快速检查世界结构</div>
+  </section>
 
-    <hr>
-    <h2>模型</h2>
-    <label>保存名称<input id="modelName" placeholder="生成后自动填写"></label>
-    <button id="save" disabled>保存 / 更新模型</button>
-    <label>已保存模型<select id="models"><option value="">暂无</option></select></label>
-    <button id="load" disabled>重新打开模型</button>
-    <div id="modelMessage" class="muted small"></div>
-
-    <hr>
-    <h2>Minecraft 导出</h2>
-    <label>世界名称<input id="exportName" placeholder="例如 GeoWorld QA"></label>
-    <label>导出到<input id="exportDir" value="output/minecraft-exports" placeholder="目录路径"></label>
-    <label>预生成半径（Chunk）
-      <input id="exportRadius" type="number" value="8" min="0" max="31">
-    </label>
-    <label class="check-row">
-      <input id="exportQA" type="checkbox" checked>
-      <span>QA 模式：创造模式 + 开启作弊</span>
-    </label>
-    <label class="check-row">
-      <input id="exportOverwrite" type="checkbox">
-      <span>覆盖同名导出目录</span>
-    </label>
-    <button id="exportMinecraft" class="primary" disabled>导出 Minecraft 26.3 存档</button>
-    <button id="openExport" type="button" hidden>打开导出目录</button>
-    <div id="exportMessage" class="muted small export-message">生成或重开模型后即可导出。</div>
-
-    <hr>
-    <h2>当前世界</h2>
-    <div id="stats" class="kv"><span>Seed</span><b>—</b></div>
-  </aside>
-
-  <main class="map-area">
-    <div class="toolbar">
-      <button class="layer active" data-layer="final">最终地形</button>
-      <button class="layer debug-layer" data-layer="raw" disabled>Raw 地形</button>
-      <button class="layer" data-layer="skeleton">海陆骨架</button>
-      <button class="layer debug-layer" data-layer="coast" disabled>海岸约束</button>
-      <button class="layer" data-layer="rivers">河网</button>
-      <button class="layer" data-layer="lakes">湖泊</button>
-      <button class="layer" data-layer="water">最终水体</button>
-      <button class="layer" data-layer="biome">群系</button>
-      <button class="layer" data-layer="landform">地貌类型</button>
-      <button class="layer" data-layer="surface">地表方案</button>
-      <button class="layer" data-layer="profile">配置置信度</button>
-      <button class="layer anomaly-layer" data-layer="anomalies">最终异常</button>
-      <div class="map-zoom-controls" aria-label="地图缩放">
-        <button id="mapZoomOut" type="button" title="缩小">−</button>
-        <span id="mapZoomLabel">1.0×</span>
-        <button id="mapZoomIn" type="button" title="放大">+</button>
-        <button id="mapZoomReset" type="button" title="复位地图">复位</button>
-      </div>
-      <span class="muted small">滚轮缩放 · 放大后拖拽 · 点击查看坐标</span>
+  <section id="page-params" class="page">
+    <div class="page-head"><div><h1>参数与预设</h1><p>GeoWorld 预设只是参数集合，所有预设共享同一套世界模型与生成器。</p></div><button class="route-button primary" data-page="world">到世界预览中调整</button></div>
+    <div class="preset-grid">
+      <article class="panel preset-card"><h2>Standard</h2><p>默认质量基线，平衡大陆、水系、山体、生态与可建设性。</p></article>
+      <article class="panel preset-card"><h2>Natural</h2><p>自然地理影响更强，强调连续地貌、水文与生态因果。</p></article>
+      <article class="panel preset-card"><h2>Civilization</h2><p>保留自然骨架，同时提高可利用平原、交通走廊等文明友好条件。</p></article>
+      <article class="panel preset-card"><h2>Epic</h2><p>放大宏观山系、高原、河谷和区域尺度，保持同一因果模型。</p></article>
     </div>
-    <div id="mapWrap" class="map-wrap empty">
-      <img id="map" alt="GeoWorld map">
-      <div id="emptyHint">设置参数后点击“生成世界”</div>
-      <div id="mapNotice" class="map-notice" hidden></div>
-      <div id="exportBounds" class="export-bounds" hidden></div>
-      <div id="spawnMarker" class="spawn-marker" hidden title="Minecraft 出生点"></div>
-      <div id="cursor"></div>
+    <div class="panel param-info"><div class="panel-title">世界版本锁定</div><div class="panel-body"><p>创建世界时保存 Seed、完整参数快照、World Profile Version、Generation Rules Version 与 World Model Version。升级 GeoWorld 后，旧世界继续使用创建时锁定的规则。</p></div></div>
+  </section>
+
+  <section id="page-about" class="page">
+    <div class="page-head"><div><h1>版本信息</h1><p>GeoWorld 工具台与 Minecraft 模组共享同一 World Model 契约。</p></div></div>
+    <div class="about-grid">
+      <section class="panel"><div class="panel-title">当前工具</div><div class="panel-body about-kv"><span>工具</span><b>GeoWorld Web Tool</b><span>Generation Rules</span><b id="aboutRules">v1.1.10</b><span>World Model</span><b>v1</b><span>默认地址</span><b>127.0.0.1:8788</b></div></section>
+      <section class="panel"><div class="panel-title">设计原则</div><div class="panel-body"><p>预览、Minecraft 生成、World Model Query 与验收都读取同一个锁定模型；任何自然世界结果变化必须通过 Generation Rules Version 显式版本化。</p></div></section>
     </div>
-    <div id="layerHelp" class="footnote">最终地形：显示 Runtime 的最终地面和水体；生成失败时不会把旧地图冒充成新结果。</div>
-  </main>
-
-  <aside class="panel inspector">
-    <h2>坐标检查</h2>
-    <div id="sampleEmpty" class="muted">点击地图中的任意位置。</div>
-    <div id="sample" hidden></div>
-
-    <hr>
-    <h2>最终异常</h2>
-    <div id="anomalySummary" class="muted small">生成或重开模型后显示最终异常。</div>
-    <div id="anomalyList" class="anomaly-list"></div>
-  </aside>
+  </section>
 </div>
+
 <script src="/app.js"></script>
 </body>
 </html>

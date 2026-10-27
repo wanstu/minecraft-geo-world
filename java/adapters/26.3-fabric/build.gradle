@@ -80,6 +80,54 @@ tasks.named('processResources').configure {
     dependsOn geoWorldEngineBuilds
 }
 
+def geoWorldToolResources = layout.buildDirectory.dir('generated/geoworldToolResources')
+def geoWorldToolPlatforms = [
+    'windows-x64'  : ['windows', 'amd64', 'geoworld-tool.exe'],
+    'windows-arm64': ['windows', 'arm64', 'geoworld-tool.exe'],
+    'linux-x64'    : ['linux', 'amd64', 'geoworld-tool'],
+    'linux-arm64'  : ['linux', 'arm64', 'geoworld-tool'],
+    'macos-x64'    : ['darwin', 'amd64', 'geoworld-tool'],
+    'macos-arm64'  : ['darwin', 'arm64', 'geoworld-tool']
+]
+def geoWorldToolBuilds = geoWorldToolPlatforms.collect { target, spec ->
+    tasks.register('buildGeoWorldTool_' + target.replace('-', '_'), Exec) {
+        group = 'build'
+        description = "Cross-compiles GeoWorld Web Tool for ${target}."
+        workingDir file('../../..')
+        inputs.files(fileTree('../../..') {
+            include 'go.mod'
+            include 'go.sum'
+            include 'acceptance/**/*.go'
+            include 'acceptance/resources/**'
+            include 'cmd/geoworld-tester/**/*.go'
+            include 'cmd/geoworld-tester/web/**'
+            include 'internal/**/*.go'
+        })
+        def output = geoWorldToolResources.map {
+            it.file("geoworld/tool/native/${target}/${spec[2]}")
+        }
+        outputs.file output
+        environment 'GOOS', spec[0]
+        environment 'GOARCH', spec[1]
+        environment 'CGO_ENABLED', '0'
+        doFirst {
+            output.get().asFile.parentFile.mkdirs()
+            commandLine 'go', 'build', '-trimpath', '-ldflags=-s -w',
+                '-o', output.get().asFile.absolutePath,
+                './cmd/geoworld-tester'
+        }
+    }
+}
+sourceSets.main.resources.srcDir geoWorldToolResources
+tasks.named('processResources').configure {
+    dependsOn geoWorldToolBuilds
+}
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes('Main-Class': 'geoworld.minecraft.common.tool.GeoWorldToolLauncher')
+    }
+}
+
 tasks.register('verifyGeoWorldAdapter') {
     group = 'verification'
     dependsOn tasks.named('classes')

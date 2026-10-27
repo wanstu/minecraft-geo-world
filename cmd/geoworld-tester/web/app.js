@@ -22,6 +22,9 @@ let mapPanStartX=0;
 let mapPanStartY=0;
 let suppressMapClick=false;
 let lastFocusPoint=null;
+let previewMarkers=[];
+let acceptanceData=null;
+let currentPage='world';
 
 const stageNames={
   phase1:'地壳与大尺度地形',
@@ -105,8 +108,12 @@ function updateBackend(online){
   }else if(!wasOnline){
     const staleSeed=renderedSeed;
     active=null;
+    previewMarkers=[];
     clearSample();
     clearExportResult();
+    clearAcceptanceView();
+    renderMarkers();
+    renderHomeCurrentWorld();
     renderEmptyStats();
     renderEmptyAnomalies();
     $('topStatus').textContent='需重新加载';
@@ -149,6 +156,7 @@ function applyMapTransform(){
   requestAnimationFrame(()=>{
     renderExportOverlay();
     renderCursorOverlay();
+    renderMarkers();
   });
 }
 
@@ -279,6 +287,8 @@ function updateActionState(){
   $('mapZoomReset').disabled=mapDisabled||(mapZoom<=1.001&&Math.abs(mapPanX)<0.5&&Math.abs(mapPanY)<0.5);
   const debugDisabled=busy||!serviceOnline||!active||!active.intermediateDiagnostics;
   document.querySelectorAll('.debug-layer').forEach(btn=>{btn.disabled=debugDisabled});
+  $('acceptanceGenerate').disabled=busy||!serviceOnline||!active;
+  document.querySelectorAll('.acceptance-download').forEach(btn=>{btn.disabled=busy||!serviceOnline||!active});
 }
 
 function setMapNotice(text='',kind=''){
@@ -436,6 +446,9 @@ $('generate').onclick=async()=>{
       parameters:$('worldPreset').value==='custom' ? $('parameterCsv').value.trim() : ''
     })});
     active=next;
+    acceptanceData=null;
+    previewMarkers=[];
+    clearAcceptanceView();
     resetMapView();
     $('progressBar').style.width='100%';
     $('progressText').textContent=`生成完成 · ${(active.durationMs/1000).toFixed(2)}s`;
@@ -452,6 +465,8 @@ $('generate').onclick=async()=>{
     renderStats();
     await refreshAnomalies();
     await loadMap();
+    await refreshMarkers();
+    renderHomeCurrentWorld();
     await refreshModels();
   }catch(e){
     $('progressText').innerHTML='<span class="error">'+escapeHtml(e.message)+'</span>';
@@ -632,6 +647,9 @@ $('load').onclick=async()=>{
   $('modelMessage').textContent='';
   try{
     active=await api('/api/load',{method:'POST',body:JSON.stringify({name})});
+    acceptanceData=null;
+    previewMarkers=[];
+    clearAcceptanceView();
     resetMapView();
     $('seed').value=active.seed;
     $('width').value=active.geometry.Width;
@@ -667,6 +685,8 @@ $('load').onclick=async()=>{
     renderStats();
     await refreshAnomalies();
     await loadMap();
+    await refreshMarkers();
+    renderHomeCurrentWorld();
   }catch(e){
     $('modelMessage').innerHTML='<span class="error">'+escapeHtml(e.message)+'</span>';
   }finally{
@@ -891,14 +911,223 @@ function formatBytes(n){return n<1048576?(n/1024).toFixed(1)+' KB':(n/1048576).t
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function escapeAttr(s){return escapeHtml(s)}
 
+
+function navigatePage(page){
+  currentPage=page;
+  document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+page));
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.page===page));
+  if(page==='world')requestAnimationFrame(()=>{renderExportOverlay();renderCursorOverlay();renderMarkers()});
+  if(page==='acceptance'&&active&&!acceptanceData)void generateAcceptanceTable();
+  if(page==='home')renderHomeCurrentWorld();
+  history.replaceState(null,'','#'+page);
+}
+
+function renderHomeCurrentWorld(){
+  const el=$('homeCurrentWorld');
+  if(!active){
+    el.className='empty-card';
+    el.textContent='尚未生成或打开世界模型。';
+    return;
+  }
+  el.className='panel-body';
+  el.innerHTML=`
+    <div class="about-kv">
+      <span>Seed</span><b>${active.seed}</b>
+      <span>预设</span><b>${escapeHtml(active.worldPreset||'standard')}</b>
+      <span>Generation Rules</span><b>${escapeHtml(active.generationRulesVersion||'—')}</b>
+      <span>河流 / 湖泊</span><b>${active.riverCount||0} / ${active.lakeCount||0}</b>
+      <span>来源</span><b>${active.source==='generated'?'当前生成':'已保存模型'}</b>
+    </div>`;
+}
+
+function clearAcceptanceView(){
+  acceptanceData=null;
+  $('acceptanceTableBody').innerHTML='<tr><td colspan="7" class="empty-cell">暂无验收表</td></tr>';
+  $('acceptanceBigFilter').innerHTML='<option value="">全部大类</option>';
+  $('acceptanceMessage').textContent=active?'点击“生成验收表”生成当前模型的验收清单。':'请先生成或打开一个 World Model。';
+  renderAcceptanceSummary();
+}
+
+function acceptanceType(){
+  return document.querySelector('input[name="acceptanceType"]:checked')?.value||'spot';
+}
+
+async function generateAcceptanceTable(){
+  if(!active)return;
+  const type=acceptanceType();
+  $('acceptanceMessage').textContent='正在从当前 World Model 生成验收表…';
+  $('acceptanceGenerate').disabled=true;
+  try{
+    acceptanceData=await api('/api/acceptance?type='+encodeURIComponent(type)+'&format=json');
+    populateAcceptanceFilter();
+    renderAcceptanceTable();
+    $('acceptanceMessage').textContent=type==='full'
+      ?'完整验收表来自 Acceptance Registry。'
+      :'抽检表严格从完整验收表中按每个大类抽取 2 条。';
+  }catch(e){
+    acceptanceData=null;
+    $('acceptanceMessage').innerHTML='<span class="error">'+escapeHtml(e.message)+'</span>';
+    $('acceptanceTableBody').innerHTML='<tr><td colspan="7" class="empty-cell">生成失败</td></tr>';
+  }finally{
+    updateActionState();
+  }
+}
+
+function normalizeAcceptanceRows(){
+  if(!acceptanceData)return [];
+  const rows=[];
+  if(acceptanceData.format==='geoworld-spot-acceptance-table'){
+    for(const big of acceptanceData.bigCategories||[]){
+      for(const selected of big.items||[]){
+        rows.push({bigId:big.id,bigName:big.name,smallId:selected.smallCategoryId,smallName:selected.smallCategoryName,item:selected.item});
+      }
+    }
+    return rows;
+  }
+  for(const big of acceptanceData.bigCategories||[]){
+    for(const small of big.smallCategories||[]){
+      for(const item of small.items||[])rows.push({bigId:big.id,bigName:big.name,smallId:small.id,smallName:small.name,item});
+    }
+  }
+  return rows;
+}
+
+function populateAcceptanceFilter(){
+  const select=$('acceptanceBigFilter');
+  const previous=select.value;
+  select.innerHTML='<option value="">全部大类</option>';
+  for(const big of acceptanceData?.bigCategories||[]){
+    const option=document.createElement('option');
+    option.value=big.id;
+    option.textContent=big.name;
+    select.appendChild(option);
+  }
+  if([...select.options].some(o=>o.value===previous))select.value=previous;
+}
+
+function acceptanceTP(item){
+  if(!item.points||item.points.length===0)return '无 TP；按验收方式执行';
+  return item.points.map(p=>p.tp).join(' · ');
+}
+
+function acceptanceStatusClass(status){
+  if(status==='PASS')return 'pass';
+  if(status==='FAIL')return 'fail';
+  return 'manual';
+}
+
+function renderAcceptanceTable(){
+  if(!acceptanceData){clearAcceptanceView();return}
+  const filter=$('acceptanceBigFilter').value;
+  const rows=normalizeAcceptanceRows().filter(row=>!filter||row.bigId===filter);
+  $('acceptanceTableBody').innerHTML=rows.length?rows.map(row=>`
+    <tr>
+      <td>${escapeHtml(row.bigName)}</td>
+      <td>${escapeHtml(row.smallName)}</td>
+      <td><b>${escapeHtml(row.item.id)}</b></td>
+      <td>${escapeHtml(row.item.name)}</td>
+      <td>${escapeHtml('Seed '+acceptanceData.seed+'；'+acceptanceTP(row.item))}</td>
+      <td>${escapeHtml(row.item.expected)}</td>
+      <td><span class="status-badge ${acceptanceStatusClass(row.item.status)}">${escapeHtml(row.item.status)}</span></td>
+    </tr>`).join(''):'<tr><td colspan="7" class="empty-cell">当前筛选下没有条目</td></tr>';
+  renderAcceptanceSummary(rows);
+}
+
+function renderAcceptanceSummary(rows=null){
+  const cards=$('acceptanceSummary').querySelectorAll('.summary-card b');
+  if(!active){
+    cards[0].textContent='未加载';cards[1].textContent=acceptanceType()==='full'?'完整表':'抽检表';cards[2].textContent='—';cards[3].textContent='—';
+    return;
+  }
+  const allRows=acceptanceData?normalizeAcceptanceRows():[];
+  cards[0].textContent='Seed '+active.seed;
+  cards[1].textContent=acceptanceType()==='full'?'完整验收表':'抽检表';
+  cards[2].textContent=acceptanceData?(acceptanceData.bigCategories||[]).length:'—';
+  cards[3].textContent=acceptanceData?(rows||allRows).length:'—';
+}
+
+function downloadAcceptance(format){
+  if(!active)return;
+  const type=acceptanceType();
+  const href='/api/acceptance?type='+encodeURIComponent(type)+'&format='+encodeURIComponent(format)+'&download=1';
+  const a=document.createElement('a');
+  a.href=href;
+  a.download='';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function refreshMarkers(){
+  if(!active){
+    previewMarkers=[];
+    renderMarkers();
+    return;
+  }
+  try{
+    const data=await api('/api/markers');
+    previewMarkers=data.markers||[];
+    $('markerNote').textContent=(data.note||'')+' · '+previewMarkers.length+' 个候选标记';
+    renderMarkers();
+  }catch(e){
+    previewMarkers=[];
+    $('markerNote').textContent='标记加载失败：'+e.message;
+    renderMarkers();
+  }
+}
+
+function enabledMarkerKinds(){
+  return new Set([...document.querySelectorAll('.marker-toggle:checked')].map(el=>el.dataset.kind));
+}
+
+function renderMarkers(){
+  const root=$('mapMarkers');
+  if(!root)return;
+  root.innerHTML='';
+  if(!active||!previewMarkers.length||$('mapWrap').classList.contains('empty'))return;
+  const enabled=enabledMarkerKinds();
+  const imgRect=$('map').getBoundingClientRect();
+  const wrapRect=$('mapWrap').getBoundingClientRect();
+  if(imgRect.width<=0||imgRect.height<=0)return;
+  const g=active.geometry;
+  for(const marker of previewMarkers){
+    if(!enabled.has(marker.kind))continue;
+    const fx=(marker.x-g.OriginX)/g.SpanXBlocks;
+    const fz=(marker.z-g.OriginZ)/g.SpanZBlocks;
+    if(fx<0||fx>1||fz<0||fz>1)continue;
+    const el=document.createElement('button');
+    el.type='button';
+    el.className='map-marker '+marker.kind;
+    el.style.left=(imgRect.left-wrapRect.left+fx*imgRect.width)+'px';
+    el.style.top=(imgRect.top-wrapRect.top+fz*imgRect.height)+'px';
+    el.title=marker.smallCategory+' · '+marker.name+'\n'+marker.tp+'\n'+marker.expected;
+    el.onclick=e=>{e.stopPropagation();void focusWorldPoint(marker.x,marker.z)};
+    root.appendChild(el);
+  }
+}
+
+document.querySelectorAll('.nav-item,.route-button').forEach(btn=>btn.addEventListener('click',()=>navigatePage(btn.dataset.page)));
+document.querySelectorAll('input[name="acceptanceType"]').forEach(radio=>radio.addEventListener('change',()=>{
+  acceptanceData=null;
+  clearAcceptanceView();
+  renderAcceptanceSummary();
+  if(active)void generateAcceptanceTable();
+}));
+$('acceptanceGenerate').onclick=generateAcceptanceTable;
+$('acceptanceBigFilter').onchange=renderAcceptanceTable;
+document.querySelectorAll('.acceptance-download').forEach(btn=>btn.onclick=()=>downloadAcceptance(btn.dataset.format));
+document.querySelectorAll('.marker-toggle').forEach(input=>input.onchange=renderMarkers);
+
 $('map').addEventListener('load',()=>{
   renderExportOverlay();
   renderCursorOverlay();
+  renderMarkers();
   updateActionState();
 });
 window.addEventListener('resize',()=>{
   renderExportOverlay();
   renderCursorOverlay();
+  renderMarkers();
 });
 window.addEventListener('beforeunload',()=>{if(mapObjectURL)URL.revokeObjectURL(mapObjectURL)});
 
@@ -909,6 +1138,10 @@ updateWorldProfileControls();
 updateLayerHelp();
 updateActionState();
 renderEmptyAnomalies();
+clearAcceptanceView();
+renderHomeCurrentWorld();
+const initialPage=['home','world','acceptance','models','params','about'].includes(location.hash.slice(1))?location.hash.slice(1):'world';
+navigatePage(initialPage);
 refreshModels();
 refreshStatus();
 setInterval(()=>{if(!poll)void refreshStatus()},2000);
