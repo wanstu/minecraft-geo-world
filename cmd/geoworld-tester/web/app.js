@@ -22,7 +22,10 @@ let mapPanStartX=0;
 let mapPanStartY=0;
 let suppressMapClick=false;
 let lastFocusPoint=null;
-let previewMarkers=[];
+let previewFeatures=null;
+let touchPoints=new Map();
+let pinchStartDistance=0;
+let pinchStartZoom=1;
 let acceptanceData=null;
 let currentPage='world';
 
@@ -108,14 +111,13 @@ function updateBackend(online){
   }else if(!wasOnline){
     const staleSeed=renderedSeed;
     active=null;
-    previewMarkers=[];
+    previewFeatures=null;
     clearSample();
     clearExportResult();
     clearAcceptanceView();
-    renderMarkers();
+    renderFeatureOverlay();
     renderHomeCurrentWorld();
     renderEmptyStats();
-    renderEmptyAnomalies();
     $('topStatus').textContent='需重新加载';
     $('progressText').textContent='后端已恢复，请重新生成世界或重新打开已保存模型';
     if(staleSeed!==null){
@@ -143,7 +145,7 @@ function clearExportResult({message=true}={}){
 }
 
 function clampMapZoom(v){
-  return Math.max(1,Math.min(8,v));
+  return Math.max(1,Math.min(16,v));
 }
 
 function applyMapTransform(){
@@ -156,7 +158,7 @@ function applyMapTransform(){
   requestAnimationFrame(()=>{
     renderExportOverlay();
     renderCursorOverlay();
-    renderMarkers();
+    positionFeatureOverlay();
   });
 }
 
@@ -282,11 +284,12 @@ function updateActionState(){
   $('exportMinecraft').disabled=busy||!serviceOnline||!active;
   $('openExport').disabled=busy||!serviceOnline||!lastExport;
   const mapDisabled=busy||!serviceOnline||!active||$('mapWrap').classList.contains('empty');
-  $('mapZoomIn').disabled=mapDisabled||mapZoom>=7.999;
+  $('mapZoomIn').disabled=mapDisabled||mapZoom>=15.999;
   $('mapZoomOut').disabled=mapDisabled||mapZoom<=1.001;
   $('mapZoomReset').disabled=mapDisabled||(mapZoom<=1.001&&Math.abs(mapPanX)<0.5&&Math.abs(mapPanY)<0.5);
-  const debugDisabled=busy||!serviceOnline||!active||!active.intermediateDiagnostics;
-  document.querySelectorAll('.debug-layer').forEach(btn=>{btn.disabled=debugDisabled});
+  $('mobileZoomIn').disabled=mapDisabled||mapZoom>=15.999;
+  $('mobileZoomOut').disabled=mapDisabled||mapZoom<=1.001;
+  $('jumpToCoord').disabled=mapDisabled;
   $('acceptanceGenerate').disabled=busy||!serviceOnline||!active;
   document.querySelectorAll('.acceptance-download').forEach(btn=>{btn.disabled=busy||!serviceOnline||!active});
 }
@@ -447,7 +450,7 @@ $('generate').onclick=async()=>{
     })});
     active=next;
     acceptanceData=null;
-    previewMarkers=[];
+    previewFeatures=null;
     clearAcceptanceView();
     resetMapView();
     $('progressBar').style.width='100%';
@@ -463,9 +466,8 @@ $('generate').onclick=async()=>{
     }
     clearSample();
     renderStats();
-    await refreshAnomalies();
     await loadMap();
-    await refreshMarkers();
+    await refreshFeatures();
     renderHomeCurrentWorld();
     await refreshModels();
   }catch(e){
@@ -495,6 +497,18 @@ document.querySelectorAll('.layer').forEach(btn=>btn.onclick=()=>{
   selectLayer(btn.dataset.layer);
 });
 
+function mapRenderSize(){
+  const wrap=$('mapWrap').getBoundingClientRect();
+  const aspect=Math.max(.2,active.geometry.SpanXBlocks/active.geometry.SpanZBlocks);
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  let width=Math.round(Math.max(1200,wrap.width*dpr*1.7));
+  width=Math.min(2400,width);
+  let height=Math.round(width/aspect);
+  if(height>1600){height=1600;width=Math.min(2400,Math.round(height*aspect));}
+  if(height<600){height=600;width=Math.min(2400,Math.round(height*aspect));}
+  return {width,height};
+}
+
 async function loadMap(){
   if(!active)return;
   const token=++mapLoadToken;
@@ -503,7 +517,8 @@ async function loadMap(){
   setMapNotice(`正在渲染 ${layerName(layer)}…`,'warn');
   let r;
   try{
-    r=await fetch(`/api/layer?name=${encodeURIComponent(layer)}&width=720&height=450&t=${Date.now()}`);
+    const size=mapRenderSize();
+    r=await fetch(`/api/layer?name=${encodeURIComponent(layer)}&width=${size.width}&height=${size.height}&t=${Date.now()}`);
   }catch(err){
     updateBackend(false);
     setMapNotice(oldSeed===null?'地图加载失败：后端已断开。':`地图加载失败；当前仍显示 Seed ${oldSeed} 的旧地图。`,'error');
@@ -528,35 +543,25 @@ async function loadMap(){
 
 function layerName(v){
   return ({
-    final:'最终地形',
-    raw:'Raw 地形',
-    skeleton:'海陆骨架',
-    coast:'海岸约束',
-    rivers:'河网',
-    lakes:'湖泊',
-    water:'最终水体',
+    final:'地形',
     biome:'群系',
-    landform:'地貌类型',
-    surface:'地表方案',
-    profile:'配置置信度',
-    anomalies:'最终异常'
+    landform:'地貌',
+    water:'水体',
+    surface:'地表',
+    minerals:'矿产分区',
+    tectonic:'地质构造'
   })[v]||v;
 }
 
 function updateLayerHelp(){
   const help={
-    final:'最终地形：显示 Runtime 的最终地面和水体；生成失败时不会把旧地图冒充成新结果。',
-    raw:'Raw 地形：海岸校正前的正式连续高度场，不叠加海洋、河流或湖泊水体。仅刚生成世界保留这份中间模型，用来和最终结果对照。',
-    skeleton:'海陆骨架：绿=陆地，深蓝=海洋，浅色边线=海岸，棕=封闭且低于海平面的陆地洼地。',
-    coast:'海岸约束：橙=Raw 海陆冲突，黄=需要抬升，蓝=需要削低，粉=应用校正后仍有冲突（理想应为 0）。仅刚生成世界可用。',
-    rivers:'河网：直接绘制正式 Waterbed 河段；线宽为验收可视化宽度，不代表地图像素就是实际河宽。',
-    lakes:'湖泊：直接绘制正式 Waterbed 湖泊节点和影响半径，便于检查湖泊分布与聚集区域。',
-    water:'最终水体：按 Runtime 逐点显示海洋、湖泊和河流的最终水体判定。',
-    biome:'群系：显示最终 Minecraft 生物群系家族；用于检查气候/生态区域是否出现不自然的直线或矩形切割。',
-    landform:'地貌类型：直接显示 Runtime 的 Plain / Hills / Foothills / Mountain / Plateau / Floodplain 等地貌分类，用来检查平原、丘陵、山麓和山地是否形成合理连续区域。',
-    surface:'地表方案：显示最终 SurfaceProfile。沙漠沙地、森林土壤、湿地、Alpine Rock / Alpine Snow 等会分别着色，便于不进游戏就检查大片沙砾和山顶雪线。',
-    profile:'配置置信度：颜色越异常越需要检查；语义 fallback / mismatch 会高亮。',
-    anomalies:'最终异常：红=海岸冲突，橙=河床逆坡，青=湖床违规，黄=Runtime 回退，紫=Runtime 语义冲突。没有标记表示当前最终审计为 0。'
+    final:'地形：按最终 Runtime 高度、水体和海岸渲染整个 World Model。',
+    biome:'群系：连续显示 GeoWorld 最终 Minecraft 群系家族，不是抽样点。',
+    landform:'地貌：显示平原、丘陵、山麓、山地、高原、洪泛平原、峡谷等连续分区。',
+    water:'水体：显示海洋、湖泊与河流的最终 Runtime 判定；河流/湖泊几何还会作为独立要素覆盖在地图上。',
+    surface:'地表：显示森林土壤、草地、沙漠、湿地、裸岩、雪地等最终地表方案。',
+    minerals:'矿产分区：按地形和生态条件显示各区域的主要矿产倾向；这是地质分区，不伪装成单个矿脉坐标。',
+    tectonic:'地质构造：显示 GeoWorld 自身的造山带、裂谷、岛弧、海沟、洋中脊等构造场。'
   };
   $('layerHelp').textContent=help[layer]||'';
 }
@@ -564,31 +569,113 @@ function updateLayerHelp(){
 $('mapZoomIn').onclick=()=>zoomMapCentered(1.25);
 $('mapZoomOut').onclick=()=>zoomMapCentered(0.8);
 $('mapZoomReset').onclick=resetMapView;
+$('mobileZoomIn').onclick=()=>zoomMapCentered(1.3);
+$('mobileZoomOut').onclick=()=>zoomMapCentered(0.77);
+
+function worldPointFromClient(clientX,clientY){
+  if(!active)return null;
+  const rect=$('map').getBoundingClientRect();
+  if(rect.width<=0||rect.height<=0)return null;
+  const fx=(clientX-rect.left)/rect.width;
+  const fz=(clientY-rect.top)/rect.height;
+  if(fx<0||fx>1||fz<0||fz>1)return null;
+  const g=active.geometry;
+  return {x:g.OriginX+fx*g.SpanXBlocks,z:g.OriginZ+fz*g.SpanZBlocks};
+}
+
+function centerMapOnWorld(x,z,targetZoom=Math.max(4,mapZoom)){
+  if(!active)return;
+  const g=active.geometry;
+  const fx=(x-g.OriginX)/g.SpanXBlocks;
+  const fz=(z-g.OriginZ)/g.SpanZBlocks;
+  if(fx<0||fx>1||fz<0||fz>1)return;
+  resetMapView();
+  const rect=$('map').getBoundingClientRect();
+  const pointX=rect.left+fx*rect.width;
+  const pointY=rect.top+fz*rect.height;
+  zoomMapAt(pointX,pointY,targetZoom);
+  const zoomed=$('map').getBoundingClientRect();
+  const wrap=$('mapWrap').getBoundingClientRect();
+  const nowX=zoomed.left+fx*zoomed.width;
+  const nowY=zoomed.top+fz*zoomed.height;
+  mapPanX+=wrap.left+wrap.width/2-nowX;
+  mapPanY+=wrap.top+wrap.height/2-nowY;
+  applyMapTransform();
+}
+
+$('jumpToCoord').onclick=async()=>{
+  if(!active)return;
+  const x=Number($('jumpX').value);
+  const z=Number($('jumpZ').value);
+  if(!Number.isFinite(x)||!Number.isFinite(z))return;
+  centerMapOnWorld(x,z);
+  await focusWorldPoint(x,z);
+};
+['jumpX','jumpZ'].forEach(id=>$(id).addEventListener('keydown',e=>{
+  if(e.key==='Enter')$('jumpToCoord').click();
+}));
 
 $('mapWrap').addEventListener('wheel',e=>{
   if(!active||$('mapWrap').classList.contains('empty'))return;
   e.preventDefault();
-  zoomMapAt(
-    e.clientX,
-    e.clientY,
-    mapZoom*(e.deltaY<0?1.25:0.8)
-  );
+  zoomMapAt(e.clientX,e.clientY,mapZoom*(e.deltaY<0?1.22:0.82));
 },{passive:false});
 
-$('map').addEventListener('pointerdown',e=>{
-  if(mapZoom<=1.001||e.button!==0)return;
-  mapDragging=true;
-  mapDragMoved=false;
-  mapDragStartX=e.clientX;
-  mapDragStartY=e.clientY;
-  mapPanStartX=mapPanX;
-  mapPanStartY=mapPanY;
-  $('mapWrap').classList.add('dragging');
-  $('map').setPointerCapture(e.pointerId);
+$('mapWrap').addEventListener('dblclick',e=>{
+  if(!active||$('mapWrap').classList.contains('empty'))return;
   e.preventDefault();
+  zoomMapAt(e.clientX,e.clientY,mapZoom*1.7);
 });
 
-$('map').addEventListener('pointermove',e=>{
+function pointerDistance(){
+  const pts=[...touchPoints.values()];
+  if(pts.length<2)return 0;
+  return Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);
+}
+function pointerMidpoint(){
+  const pts=[...touchPoints.values()];
+  if(pts.length<2)return null;
+  return {x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+}
+
+$('mapWrap').addEventListener('pointerdown',e=>{
+  if(!active||$('mapWrap').classList.contains('empty'))return;
+  if(e.pointerType==='mouse'&&e.button!==0)return;
+  if(e.target.closest?.('.mobile-map-actions'))return;
+  touchPoints.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  try{$('mapWrap').setPointerCapture(e.pointerId)}catch(_){}
+  if(touchPoints.size>=2){
+    pinchStartDistance=pointerDistance();
+    pinchStartZoom=mapZoom;
+    mapDragging=false;
+    $('mapWrap').classList.add('dragging');
+    e.preventDefault();
+    return;
+  }
+  if(mapZoom>1.001){
+    mapDragging=true;
+    mapDragMoved=false;
+    mapDragStartX=e.clientX;
+    mapDragStartY=e.clientY;
+    mapPanStartX=mapPanX;
+    mapPanStartY=mapPanY;
+    $('mapWrap').classList.add('dragging');
+    e.preventDefault();
+  }
+});
+
+$('mapWrap').addEventListener('pointermove',e=>{
+  if(touchPoints.has(e.pointerId))touchPoints.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(touchPoints.size>=2&&pinchStartDistance>0){
+    const distance=pointerDistance();
+    const mid=pointerMidpoint();
+    if(mid&&distance>0){
+      zoomMapAt(mid.x,mid.y,pinchStartZoom*(distance/pinchStartDistance));
+      mapDragMoved=true;
+    }
+    e.preventDefault();
+    return;
+  }
   if(!mapDragging)return;
   const dx=e.clientX-mapDragStartX;
   const dy=e.clientY-mapDragStartY;
@@ -596,38 +683,48 @@ $('map').addEventListener('pointermove',e=>{
   mapPanX=mapPanStartX+dx;
   mapPanY=mapPanStartY+dy;
   applyMapTransform();
+  e.preventDefault();
 });
 
-function finishMapDrag(e){
-  if(!mapDragging)return;
+function finishMapPointer(e){
+  touchPoints.delete(e.pointerId);
+  try{$('mapWrap').releasePointerCapture(e.pointerId)}catch(_){}
+  if(touchPoints.size>=2){
+    pinchStartDistance=pointerDistance();
+    pinchStartZoom=mapZoom;
+    return;
+  }
+  if(touchPoints.size===1&&mapZoom>1.001){
+    const p=[...touchPoints.values()][0];
+    mapDragging=true;
+    mapDragStartX=p.x;
+    mapDragStartY=p.y;
+    mapPanStartX=mapPanX;
+    mapPanStartY=mapPanY;
+    return;
+  }
   mapDragging=false;
+  pinchStartDistance=0;
   $('mapWrap').classList.remove('dragging');
-  try{$('map').releasePointerCapture(e.pointerId)}catch(_){}
   if(mapDragMoved){
     suppressMapClick=true;
     setTimeout(()=>{suppressMapClick=false},0);
   }
   updateActionState();
 }
+$('mapWrap').addEventListener('pointerup',finishMapPointer);
+$('mapWrap').addEventListener('pointercancel',finishMapPointer);
 
-$('map').addEventListener('pointerup',finishMapDrag);
-$('map').addEventListener('pointercancel',finishMapDrag);
-
-$('map').onclick=async e=>{
+$('mapWrap').addEventListener('click',async e=>{
+  if(e.target.closest?.('.mobile-map-actions'))return;
   if(suppressMapClick){
     suppressMapClick=false;
     return;
   }
-  if(!active)return;
-  const rect=$('map').getBoundingClientRect();
-  const fx=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
-  const fz=Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height));
-  const g=active.geometry;
-  const x=g.OriginX+fx*g.SpanXBlocks;
-  const z=g.OriginZ+fz*g.SpanZBlocks;
-  await focusWorldPoint(x,z);
-};
-
+  const p=worldPointFromClient(e.clientX,e.clientY);
+  if(!p)return;
+  await focusWorldPoint(p.x,p.z);
+});
 $('save').onclick=async()=>{
   $('modelMessage').textContent='';
   try{
@@ -648,7 +745,7 @@ $('load').onclick=async()=>{
   try{
     active=await api('/api/load',{method:'POST',body:JSON.stringify({name})});
     acceptanceData=null;
-    previewMarkers=[];
+    previewFeatures=null;
     clearAcceptanceView();
     resetMapView();
     $('seed').value=active.seed;
@@ -683,9 +780,8 @@ $('load').onclick=async()=>{
     $('modelMessage').innerHTML='<span class="warn">当前是已保存模型的只读重开结果；如需再次保存，请重新生成世界。</span>';
     clearSample();
     renderStats();
-    await refreshAnomalies();
     await loadMap();
-    await refreshMarkers();
+    await refreshFeatures();
     renderHomeCurrentWorld();
   }catch(e){
     $('modelMessage').innerHTML='<span class="error">'+escapeHtml(e.message)+'</span>';
@@ -761,49 +857,6 @@ async function refreshModels(selectName=''){
   updateActionState();
 }
 
-
-function renderEmptyAnomalies(){
-  $('anomalySummary').textContent='生成或重开模型后显示最终异常。';
-  $('anomalyList').innerHTML='';
-}
-
-async function refreshAnomalies(){
-  if(!active){
-    renderEmptyAnomalies();
-    return;
-  }
-  try{
-    const report=await api('/api/anomalies');
-    const counts=report.counts||{};
-    $('anomalySummary').innerHTML=
-      '共 <b>'+Number(report.total||0)+'</b> 个最终异常 · 海岸 '+Number(counts.coast_mismatch||0)+
-      ' · 河床 '+Number(counts.river_upslope||0)+
-      ' · 湖床 '+Number(counts.lake_bed||0)+
-      ' · Runtime 回退 '+Number(counts.runtime_fallback||0)+
-      ' · Runtime 冲突 '+Number(counts.runtime_mismatch||0);
-    if(!report.points||report.points.length===0){
-      $('anomalyList').innerHTML='<div class="anomaly-empty">当前最终异常为 0</div>';
-      return;
-    }
-    $('anomalyList').innerHTML=report.points.map((p,i)=>
-      '<button type="button" class="anomaly-item" data-anomaly-index="'+i+'">'+
-        '<strong>'+escapeHtml(p.label)+'</strong>'+
-        '<span>坐标 '+Math.round(p.x)+', '+Math.round(p.z)+(p.detail?' · '+escapeHtml(p.detail):'')+'</span>'+
-      '</button>'
-    ).join('')+(report.truncated?'<div class="anomaly-truncated">异常过多，只显示前 '+report.points.length+' 个位置；总数仍按完整审计统计。</div>':'');
-    document.querySelectorAll('.anomaly-item').forEach((btn)=>{
-      btn.onclick=async()=>{
-        const p=report.points[Number(btn.dataset.anomalyIndex)];
-        if(!p)return;
-        selectLayer('anomalies');
-        await focusWorldPoint(p.x,p.z);
-      };
-    });
-  }catch(e){
-    $('anomalySummary').innerHTML='<span class="error">'+escapeHtml(e.message)+'</span>';
-    $('anomalyList').innerHTML='';
-  }
-}
 
 async function focusWorldPoint(x,z){
   if(!active)return;
@@ -916,7 +969,7 @@ function navigatePage(page){
   currentPage=page;
   document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+page));
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.page===page));
-  if(page==='world')requestAnimationFrame(()=>{renderExportOverlay();renderCursorOverlay();renderMarkers()});
+  if(page==='world')requestAnimationFrame(()=>{renderExportOverlay();renderCursorOverlay();positionFeatureOverlay()});
   if(page==='acceptance'&&active&&!acceptanceData)void generateAcceptanceTable();
   if(page==='home')renderHomeCurrentWorld();
   history.replaceState(null,'','#'+page);
@@ -1058,53 +1111,149 @@ function downloadAcceptance(format){
   a.remove();
 }
 
-async function refreshMarkers(){
+async function refreshFeatures(){
   if(!active){
-    previewMarkers=[];
-    renderMarkers();
+    previewFeatures=null;
+    renderFeatureOverlay();
     return;
   }
   try{
-    const data=await api('/api/markers');
-    previewMarkers=data.markers||[];
-    $('markerNote').textContent=(data.note||'')+' · '+previewMarkers.length+' 个候选标记';
-    renderMarkers();
+    previewFeatures=await api('/api/features');
+    const c=previewFeatures.counts||{};
+    $('featureNote').textContent=(previewFeatures.note||'')+
+      ' 河流 '+Number(c.rivers||0).toLocaleString()+
+      ' · 湖泊 '+Number(c.lakes||0).toLocaleString()+
+      ' · 山峰 '+Number(c.peaks||0).toLocaleString();
+    $('mapFeatureSummary').textContent=
+      '河流 '+Number(c.rivers||0).toLocaleString()+
+      ' · 湖泊 '+Number(c.lakes||0).toLocaleString()+
+      ' · 山峰 '+Number(c.peaks||0).toLocaleString();
+    renderFeatureOverlay();
   }catch(e){
-    previewMarkers=[];
-    $('markerNote').textContent='标记加载失败：'+e.message;
-    renderMarkers();
+    previewFeatures=null;
+    $('featureNote').textContent='模型要素加载失败：'+e.message;
+    $('mapFeatureSummary').textContent='模型要素加载失败';
+    renderFeatureOverlay();
   }
 }
 
-function enabledMarkerKinds(){
-  return new Set([...document.querySelectorAll('.marker-toggle:checked')].map(el=>el.dataset.kind));
+function enabledFeatureKinds(){
+  return new Set([...document.querySelectorAll('.feature-toggle:checked')].map(el=>el.dataset.feature));
 }
 
-function renderMarkers(){
-  const root=$('mapMarkers');
-  if(!root)return;
-  root.innerHTML='';
-  if(!active||!previewMarkers.length||$('mapWrap').classList.contains('empty'))return;
-  const enabled=enabledMarkerKinds();
-  const imgRect=$('map').getBoundingClientRect();
-  const wrapRect=$('mapWrap').getBoundingClientRect();
-  if(imgRect.width<=0||imgRect.height<=0)return;
+function worldToOverlay(x,z){
   const g=active.geometry;
-  for(const marker of previewMarkers){
-    if(!enabled.has(marker.kind))continue;
-    const fx=(marker.x-g.OriginX)/g.SpanXBlocks;
-    const fz=(marker.z-g.OriginZ)/g.SpanZBlocks;
-    if(fx<0||fx>1||fz<0||fz>1)continue;
-    const el=document.createElement('button');
-    el.type='button';
-    el.className='map-marker '+marker.kind;
-    el.style.left=(imgRect.left-wrapRect.left+fx*imgRect.width)+'px';
-    el.style.top=(imgRect.top-wrapRect.top+fz*imgRect.height)+'px';
-    el.title=marker.smallCategory+' · '+marker.name+'\n'+marker.tp+'\n'+marker.expected;
-    el.onclick=e=>{e.stopPropagation();void focusWorldPoint(marker.x,marker.z)};
-    root.appendChild(el);
-  }
+  return {
+    x:(x-g.OriginX)/g.SpanXBlocks*1000,
+    y:(z-g.OriginZ)/g.SpanZBlocks*1000
+  };
 }
+
+function renderFeatureOverlay(){
+  const svg=$('featureOverlay');
+  if(!svg)return;
+  svg.innerHTML='';
+  if(!active||!previewFeatures||$('mapWrap').classList.contains('empty')){
+    positionFeatureOverlay();
+    return;
+  }
+  const enabled=enabledFeatureKinds();
+  const ns='http://www.w3.org/2000/svg';
+
+  if(enabled.has('rivers')){
+    const group=document.createElementNS(ns,'g');
+    group.setAttribute('class','feature-rivers');
+    for(const river of previewFeatures.rivers||[]){
+      const a=worldToOverlay(river.x0,river.z0);
+      const b=worldToOverlay(river.x1,river.z1);
+      if((a.x<0&&b.x<0)||(a.x>1000&&b.x>1000)||(a.y<0&&b.y<0)||(a.y>1000&&b.y>1000))continue;
+      const line=document.createElementNS(ns,'line');
+      line.setAttribute('x1',a.x); line.setAttribute('y1',a.y);
+      line.setAttribute('x2',b.x); line.setAttribute('y2',b.y);
+      const worldScale=(active.geometry.SpanXBlocks+active.geometry.SpanZBlocks)/2;
+      line.setAttribute('stroke-width',Math.max(.7,river.halfWidth/worldScale*1800));
+      line.setAttribute('class',river.oceanMouth?'river-line ocean-mouth':river.lakeMouth?'river-line lake-mouth':'river-line');
+      group.appendChild(line);
+    }
+    svg.appendChild(group);
+  }
+
+  if(enabled.has('lakes')){
+    const group=document.createElementNS(ns,'g');
+    group.setAttribute('class','feature-lakes');
+    const worldScale=(active.geometry.SpanXBlocks+active.geometry.SpanZBlocks)/2;
+    for(const lake of previewFeatures.lakes||[]){
+      const p=worldToOverlay(lake.x,lake.z);
+      if(p.x<0||p.x>1000||p.y<0||p.y>1000)continue;
+      const circle=document.createElementNS(ns,'circle');
+      circle.setAttribute('cx',p.x); circle.setAttribute('cy',p.y);
+      circle.setAttribute('r',Math.max(1.2,lake.outerRadius/worldScale*1800));
+      circle.setAttribute('class','lake-shape');
+      const title=document.createElementNS(ns,'title');
+      title.textContent='湖泊 #'+lake.lakeId+' · '+Math.round(lake.x)+', '+Math.round(lake.z);
+      circle.appendChild(title);
+      group.appendChild(circle);
+    }
+    svg.appendChild(group);
+  }
+
+  if(enabled.has('peaks')){
+    const group=document.createElementNS(ns,'g');
+    group.setAttribute('class','feature-peaks');
+    for(const peak of previewFeatures.peaks||[]){
+      const p=worldToOverlay(peak.x,peak.z);
+      if(p.x<0||p.x>1000||p.y<0||p.y>1000)continue;
+      const mark=document.createElementNS(ns,'path');
+      mark.setAttribute('d',`M ${p.x} ${p.y-4} L ${p.x-4} ${p.y+3} L ${p.x+4} ${p.y+3} Z`);
+      mark.setAttribute('class','peak-mark');
+      mark.dataset.x=peak.x; mark.dataset.z=peak.z;
+      const title=document.createElementNS(ns,'title');
+      title.textContent=(peak.name||'山峰')+' · '+Math.round(peak.x)+', '+Math.round(peak.z)+' · '+(peak.detail||'');
+      mark.appendChild(title);
+      mark.addEventListener('click',e=>{e.stopPropagation();void focusWorldPoint(peak.x,peak.z)});
+      group.appendChild(mark);
+    }
+    svg.appendChild(group);
+  }
+  positionFeatureOverlay();
+}
+
+function positionFeatureOverlay(){
+  const svg=$('featureOverlay');
+  const img=$('map');
+  if(!svg||!img)return;
+  const imgRect=img.getBoundingClientRect();
+  const wrapRect=$('mapWrap').getBoundingClientRect();
+  if(imgRect.width<=0||imgRect.height<=0){
+    svg.style.display='none';
+    return;
+  }
+  svg.style.display='block';
+  svg.style.left=(imgRect.left-wrapRect.left)+'px';
+  svg.style.top=(imgRect.top-wrapRect.top)+'px';
+  svg.style.width=imgRect.width+'px';
+  svg.style.height=imgRect.height+'px';
+}
+
+function setMobileSheet(which,open){
+  const controls=document.querySelector('.controls');
+  const inspector=document.querySelector('.inspector');
+  if(which==='settings'){
+    controls.classList.toggle('mobile-open',open);
+    if(open)inspector.classList.remove('mobile-open');
+  }else{
+    inspector.classList.toggle('mobile-open',open);
+    if(open)controls.classList.remove('mobile-open');
+  }
+  document.body.classList.toggle(
+    'mobile-sheet-visible',
+    controls.classList.contains('mobile-open')||inspector.classList.contains('mobile-open')
+  );
+}
+$('mobileOpenSettings').onclick=()=>setMobileSheet('settings',true);
+$('mobileOpenFeatures').onclick=()=>setMobileSheet('features',true);
+$('mobileCloseSettings').onclick=()=>setMobileSheet('settings',false);
+$('mobileCloseFeatures').onclick=()=>setMobileSheet('features',false);
 
 document.querySelectorAll('.nav-item,.route-button').forEach(btn=>btn.addEventListener('click',()=>navigatePage(btn.dataset.page)));
 document.querySelectorAll('input[name="acceptanceType"]').forEach(radio=>radio.addEventListener('change',()=>{
@@ -1116,18 +1265,18 @@ document.querySelectorAll('input[name="acceptanceType"]').forEach(radio=>radio.a
 $('acceptanceGenerate').onclick=generateAcceptanceTable;
 $('acceptanceBigFilter').onchange=renderAcceptanceTable;
 document.querySelectorAll('.acceptance-download').forEach(btn=>btn.onclick=()=>downloadAcceptance(btn.dataset.format));
-document.querySelectorAll('.marker-toggle').forEach(input=>input.onchange=renderMarkers);
+document.querySelectorAll('.feature-toggle').forEach(input=>input.onchange=renderFeatureOverlay);
 
 $('map').addEventListener('load',()=>{
   renderExportOverlay();
   renderCursorOverlay();
-  renderMarkers();
+  renderFeatureOverlay();
   updateActionState();
 });
 window.addEventListener('resize',()=>{
   renderExportOverlay();
   renderCursorOverlay();
-  renderMarkers();
+  positionFeatureOverlay();
 });
 window.addEventListener('beforeunload',()=>{if(mapObjectURL)URL.revokeObjectURL(mapObjectURL)});
 
@@ -1137,7 +1286,6 @@ syncContinentPreset();
 updateWorldProfileControls();
 updateLayerHelp();
 updateActionState();
-renderEmptyAnomalies();
 clearAcceptanceView();
 renderHomeCurrentWorld();
 const initialPage=['home','world','acceptance','models','params','about'].includes(location.hash.slice(1))?location.hash.slice(1):'world';

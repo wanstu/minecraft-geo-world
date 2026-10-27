@@ -47,6 +47,7 @@ type activeWorld struct {
 	seed                    int64
 	geometry                world.GridGeometry
 	sample                  func(float64, float64) runtimeprofile.Sample
+	previewGrid             []runtimeprofile.Sample
 	riverCount              int
 	lakeCount               int
 	plateCount              int
@@ -202,7 +203,7 @@ func main() {
 	mux.HandleFunc("/api/sample", state.handleSample)
 	mux.HandleFunc("/api/anomalies", state.handleAnomalies)
 	mux.HandleFunc("/api/acceptance", state.handleAcceptance)
-	mux.HandleFunc("/api/markers", state.handleMarkers)
+	mux.HandleFunc("/api/features", state.handlePreviewFeatures)
 	mux.HandleFunc("/api/layer", state.handleLayer)
 	mux.HandleFunc("/api/save", func(w http.ResponseWriter, r *http.Request) { state.handleSave(w, r, *modelDir) })
 	mux.HandleFunc("/api/load", func(w http.ResponseWriter, r *http.Request) { state.handleLoad(w, r, *modelDir) })
@@ -402,6 +403,7 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		generatedAt:             time.Now(),
 		duration:                duration,
 	}
+	active.previewGrid = buildPreviewGrid(active)
 	applyAnomalyReport(active, buildAnomalyReport(active))
 	s.mu.Lock()
 	s.generating = false
@@ -450,20 +452,6 @@ func (s *appState) handleAnomalies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, active.anomalies)
-}
-
-type previewMarker struct {
-	ID               string `json:"id"`
-	Kind             string `json:"kind"`
-	BigCategory      string `json:"bigCategory"`
-	SmallCategory    string `json:"smallCategory"`
-	Name             string `json:"name"`
-	X                int    `json:"x"`
-	Y                int    `json:"y"`
-	Z                int    `json:"z"`
-	TP               string `json:"tp"`
-	Expected         string `json:"expected"`
-	AcceptanceMarker bool   `json:"acceptanceMarker"`
 }
 
 func (s *appState) currentAcceptanceReport() (acceptance.Report, error) {
@@ -603,83 +591,6 @@ func acceptanceExtension(format string) string {
 	}
 }
 
-func (s *appState) handleMarkers(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		methodNotAllowed(w)
-		return
-	}
-	report, err := s.currentAcceptanceReport()
-	if err != nil {
-		writeError(w, http.StatusConflict, err)
-		return
-	}
-	full, err := acceptance.BuildManualTable(report)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
-	}
-
-	markers := make([]previewMarker, 0, 96)
-	seen := make(map[string]struct{}, 96)
-	for _, big := range full.BigCategories {
-		for _, small := range big.SmallCategories {
-			added := 0
-			for _, item := range small.Items {
-				for _, point := range item.Points {
-					key := fmt.Sprintf("%s:%d:%d", small.ID, point.X, point.Z)
-					if _, exists := seen[key]; exists {
-						continue
-					}
-					seen[key] = struct{}{}
-					markers = append(markers, previewMarker{
-						ID:               item.ID,
-						Kind:             previewMarkerKind(small.ID),
-						BigCategory:      big.Name,
-						SmallCategory:    small.Name,
-						Name:             item.Name,
-						X:                point.X,
-						Y:                point.Y,
-						Z:                point.Z,
-						TP:               point.TP,
-						Expected:         item.Expected,
-						AcceptanceMarker: true,
-					})
-					added++
-					break
-				}
-				if added >= 2 {
-					break
-				}
-			}
-		}
-	}
-	writeJSON(w, http.StatusOK, map[string]any{
-		"seed":    report.Seed,
-		"rules":   report.GenerationRulesVersion,
-		"markers": markers,
-		"note":    "结构类标记表示原版结构兼容验收候选点，不表示 GeoWorld 接管或预测 Vanilla Structure Placement。",
-	})
-}
-
-func previewMarkerKind(prefix string) string {
-	switch prefix {
-	case "ORE":
-		return "ore"
-	case "MTN", "HILL", "PLATEAU", "BASIN", "PLAIN", "RARE", "CORRIDOR":
-		return "terrain"
-	case "RIVER", "FLOOD", "LAKE", "WET", "EST", "COAST", "SEA", "NODE":
-		return "water"
-	case "BIOME", "FOREST", "CLIMATE", "POLAR", "SURFACE":
-		return "biome"
-	case "VSTRUCT":
-		return "structure"
-	case "SPAWN":
-		return "spawn"
-	default:
-		return "acceptance"
-	}
-}
-
 func (s *appState) handleLayer(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w)
@@ -689,8 +600,8 @@ func (s *appState) handleLayer(w http.ResponseWriter, r *http.Request) {
 	if layer == "" {
 		layer = "final"
 	}
-	width := parseBoundedInt(r.URL.Query().Get("width"), 720, 160, 1200)
-	height := parseBoundedInt(r.URL.Query().Get("height"), 450, 100, 800)
+	width := parseBoundedInt(r.URL.Query().Get("width"), 1200, 160, 2400)
+	height := parseBoundedInt(r.URL.Query().Get("height"), 750, 100, 1600)
 
 	s.mu.RLock()
 	active := s.active
@@ -701,7 +612,9 @@ func (s *appState) handleLayer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	if layer == "skeleton" || layer == "rivers" || layer == "lakes" || layer == "anomalies" {
+	if layer == "tectonic" {
+		renderTectonicPreviewLayer(img, active)
+	} else if layer == "skeleton" || layer == "rivers" || layer == "lakes" || layer == "anomalies" {
 		if err := renderDiagnosticLayer(img, active, layer); err != nil {
 			writeError(w, http.StatusConflict, err)
 			return
@@ -717,7 +630,7 @@ func (s *appState) handleLayer(w http.ResponseWriter, r *http.Request) {
 			z := g.OriginZ + float64(py)/float64(maxInt(height-1, 1))*g.SpanZBlocks
 			for px := 0; px < width; px++ {
 				x := g.OriginX + float64(px)/float64(maxInt(width-1, 1))*g.SpanXBlocks
-				sm := active.sample(x, z)
+				sm := previewSampleAt(active, x, z)
 				img.SetRGBA(px, py, layerColor(layer, sm))
 			}
 		}
@@ -853,6 +766,7 @@ func (s *appState) handleLoad(w http.ResponseWriter, r *http.Request, modelDir s
 		generatedAt:             time.Now(),
 		duration:                time.Since(start),
 	}
+	active.previewGrid = buildPreviewGrid(active)
 	applyAnomalyReport(active, buildAnomalyReport(active))
 	active.duration = time.Since(start)
 	s.mu.Lock()
@@ -1799,6 +1713,8 @@ func layerColor(layer string, s runtimeprofile.Sample) color.RGBA {
 		return landformColor(s)
 	case "surface":
 		return surfaceColor(s)
+	case "minerals":
+		return mineralProvinceColor(s)
 	case "profile":
 		return profileColor(s)
 	default:

@@ -27,21 +27,21 @@
   <section id="page-home" class="page">
     <div class="page-head"><div><h1>GeoWorld 世界工具台</h1><p>统一使用同一份 World Model 完成预览、验收、保存与游戏侧验证。</p></div></div>
     <div class="home-grid">
-      <article class="feature-card primary-card"><div class="feature-icon">🗺</div><h2>世界预览</h2><p>输入 Seed 生成 World Model，查看最终地形、河网、湖泊、群系、地貌、地表以及验收候选标记。</p><button class="primary route-button" data-page="world">进入世界预览</button></article>
+      <article class="feature-card primary-card"><div class="feature-icon">🗺</div><h2>世界预览</h2><p>输入 Seed 生成 World Model，像地图网站一样拖动、缩放并浏览地形、群系、水系、矿产分区和地质构造。</p><button class="primary route-button" data-page="world">进入世界预览</button></article>
       <article class="feature-card"><div class="feature-icon">✓</div><h2>验收工具</h2><p>从 177 项完整验收 Registry 生成完整验收表，并按每个大类 2 条自动生成抽检表。</p><button class="route-button" data-page="acceptance">进入验收工具</button></article>
       <article class="feature-card"><div class="feature-icon">◫</div><h2>模型管理</h2><p>保存、重新打开 .geoworld 世界模型，并执行 Minecraft QA 世界导出。</p><button class="route-button" data-page="models">管理模型</button></article>
       <article class="feature-card"><div class="feature-icon">⚙</div><h2>参数与预设</h2><p>查看 Standard / Natural / Civilization / Epic 等预设与 25 项语义参数的关系。</p><button class="route-button" data-page="params">查看参数</button></article>
     </div>
     <div class="dashboard-row">
       <div class="panel dashboard-card"><div class="panel-title">当前世界</div><div id="homeCurrentWorld" class="empty-card">尚未生成或打开世界模型。</div></div>
-      <div class="panel dashboard-card"><div class="panel-title">工作流</div><ol class="workflow"><li>选择 Seed 与参数生成 World Model</li><li>在地图图层和标记中检查关键区域</li><li>生成完整验收表 / 抽检表</li><li>保存模型或导出 Minecraft QA 世界</li></ol></div>
+      <div class="panel dashboard-card"><div class="panel-title">工作流</div><ol class="workflow"><li>选择 Seed 与参数生成 World Model</li><li>在世界预览中自由浏览整个模型</li><li>需要质量检查时再进入验收工具生成验收表</li><li>保存模型或导出 Minecraft QA 世界</li></ol></div>
     </div>
   </section>
 
   <section id="page-world" class="page active">
     <div class="world-layout">
       <aside class="panel controls">
-        <div class="panel-title">世界参数</div>
+        <div class="panel-title">世界参数 <button class="mobile-close" id="mobileCloseSettings" type="button">关闭</button></div>
         <div class="panel-body">
           <label>Seed<div class="seed-control"><input id="seed" type="number" value="123456"><button id="randomSeed" type="button">随机</button></div></label>
           <div class="two"><label>网格宽<input id="width" type="number" value="320" min="16" max="1024"></label><label>网格高<input id="height" type="number" value="200" min="16" max="1024"></label></div>
@@ -63,54 +63,52 @@
 
       <main class="map-area panel">
         <div class="map-head">
-          <div class="layer-tabs">
-            <button class="layer active" data-layer="final">最终地形</button>
-            <button class="layer debug-layer" data-layer="raw" disabled>Raw</button>
-            <button class="layer" data-layer="skeleton">海陆骨架</button>
-            <button class="layer debug-layer" data-layer="coast" disabled>海岸约束</button>
-            <button class="layer" data-layer="rivers">河网</button>
-            <button class="layer" data-layer="lakes">湖泊</button>
-            <button class="layer" data-layer="water">最终水体</button>
+          <div class="layer-tabs" aria-label="地图底图">
+            <button class="layer active" data-layer="final">地形</button>
             <button class="layer" data-layer="biome">群系</button>
             <button class="layer" data-layer="landform">地貌</button>
+            <button class="layer" data-layer="water">水体</button>
             <button class="layer" data-layer="surface">地表</button>
-            <button class="layer" data-layer="profile">置信度</button>
-            <button class="layer anomaly-layer" data-layer="anomalies">异常</button>
+            <button class="layer" data-layer="minerals">矿产分区</button>
+            <button class="layer" data-layer="tectonic">地质构造</button>
           </div>
-          <div class="map-zoom-controls"><button id="mapZoomOut">−</button><span id="mapZoomLabel">1.0×</span><button id="mapZoomIn">+</button><button id="mapZoomReset">复位</button></div>
+          <div class="map-zoom-controls"><button id="mapZoomOut" aria-label="缩小">−</button><span id="mapZoomLabel">1.0×</span><button id="mapZoomIn" aria-label="放大">+</button><button id="mapZoomReset">复位</button></div>
+        </div>
+        <div class="map-location-bar">
+          <div class="coord-inputs"><input id="jumpX" type="number" placeholder="X"><input id="jumpZ" type="number" placeholder="Z"><button id="jumpToCoord">定位</button></div>
+          <div id="mapFeatureSummary" class="map-feature-summary">生成世界后显示完整模型要素</div>
         </div>
         <div id="mapWrap" class="map-wrap empty">
-          <img id="map" alt="GeoWorld map">
-          <div id="emptyHint"><b>尚未生成世界</b><span>设置左侧 Seed 与参数后生成 World Model。</span></div>
+          <img id="map" alt="GeoWorld 世界模型地图">
+          <svg id="featureOverlay" class="feature-overlay" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label="模型要素覆盖层"></svg>
+          <div id="emptyHint"><b>尚未生成世界</b><span>设置 Seed 后生成 World Model，即可像地图网站一样浏览。</span></div>
           <div id="mapNotice" class="map-notice" hidden></div>
-          <div id="mapMarkers" class="map-markers"></div>
           <div id="exportBounds" class="export-bounds" hidden></div>
           <div id="spawnMarker" class="spawn-marker" hidden title="Minecraft 出生点"></div>
           <div id="cursor"></div>
+          <div class="mobile-map-actions">
+            <button id="mobileOpenSettings" type="button">参数</button>
+            <button id="mobileOpenFeatures" type="button">要素</button>
+            <button id="mobileZoomOut" type="button">−</button>
+            <button id="mobileZoomIn" type="button">＋</button>
+          </div>
         </div>
         <div id="layerHelp" class="footnote"></div>
       </main>
 
       <aside class="panel inspector">
-        <div class="panel-title">地图标记</div>
+        <div class="panel-title">地图要素 <button class="mobile-close" id="mobileCloseFeatures" type="button">关闭</button></div>
         <div class="marker-filter-list">
-          <label><input class="marker-toggle" type="checkbox" data-kind="ore" checked><span class="marker-sample ore"></span>矿产 / 矿山候选</label>
-          <label><input class="marker-toggle" type="checkbox" data-kind="terrain" checked><span class="marker-sample terrain"></span>山脉 / 地貌</label>
-          <label><input class="marker-toggle" type="checkbox" data-kind="water" checked><span class="marker-sample water"></span>水系 / 海岸</label>
-          <label><input class="marker-toggle" type="checkbox" data-kind="biome"><span class="marker-sample biome"></span>群系 / 气候</label>
-          <label><input class="marker-toggle" type="checkbox" data-kind="structure"><span class="marker-sample structure"></span>结构兼容验收点</label>
-          <label><input class="marker-toggle" type="checkbox" data-kind="spawn" checked><span class="marker-sample spawn"></span>出生点验收</label>
-          <label><input class="marker-toggle" type="checkbox" data-kind="acceptance"><span class="marker-sample acceptance"></span>其他验收点</label>
+          <label><input class="feature-toggle" type="checkbox" data-feature="rivers" checked><span class="marker-sample river"></span>全部河流</label>
+          <label><input class="feature-toggle" type="checkbox" data-feature="lakes" checked><span class="marker-sample lake"></span>全部湖泊</label>
+          <label><input class="feature-toggle" type="checkbox" data-feature="peaks" checked><span class="marker-sample peak"></span>全部山峰</label>
         </div>
-        <div id="markerNote" class="muted small marker-note">生成世界后加载模型标记。</div>
+        <div id="featureNote" class="muted small marker-note">这些要素直接来自 World Model，不来自验收表。</div>
+        <div class="not-ready-feature"><span class="marker-sample structure"></span><div><b>原版建筑结构</b><small>需要独立接入 Minecraft Structure Placement 预测器；当前不伪造位置。</small></div></div>
         <hr>
-        <h2>坐标检查</h2>
-        <div id="sampleEmpty" class="muted">点击地图中的任意位置。</div>
+        <h2>坐标信息</h2>
+        <div id="sampleEmpty" class="muted">点击地图任意位置查看该坐标的地形、群系、水体和地表信息。</div>
         <div id="sample" hidden></div>
-        <hr>
-        <h2>最终异常</h2>
-        <div id="anomalySummary" class="muted small">生成或重开模型后显示最终异常。</div>
-        <div id="anomalyList" class="anomaly-list"></div>
       </aside>
     </div>
   </section>
