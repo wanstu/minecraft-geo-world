@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>GeoWorld 世界预览与验收工具 · HTML 原型</title>
+<style>
+:root{
+  --bg:#f4f7fb;--panel:#fff;--line:#dbe3ef;--text:#162033;--muted:#68758b;
+  --primary:#246bfe;--primary-2:#1557d5;--good:#19a974;--warn:#f59f00;--bad:#e5484d;
+  --header:#102033;--shadow:0 8px 24px rgba(16,32,51,.08);--radius:14px
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:Inter,"Microsoft YaHei","PingFang SC",system-ui,sans-serif;background:var(--bg);color:var(--text)}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.topbar{height:58px;background:var(--header);color:#fff;display:flex;align-items:center;padding:0 18px;gap:22px;position:sticky;top:0;z-index:30}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px;white-space:nowrap}
+.logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(145deg,#0dd3d0,#246bfe);display:grid;place-items:center;font-size:18px}
+.version{font-size:12px;color:#b9c5d7;font-weight:500}
+.tabs{display:flex;height:100%;align-items:center;gap:4px}
+.tab{height:100%;padding:0 18px;border:0;background:transparent;color:#c9d5e5;border-bottom:3px solid transparent}
+.tab.active{color:#fff;border-color:#4b8dff;background:rgba(255,255,255,.05)}
+.top-actions{margin-left:auto;display:flex;gap:10px;align-items:center}
+.ghost{border:1px solid #42536a;background:#192c43;color:#dbe6f4;padding:8px 12px;border-radius:9px}
+.layout{display:grid;grid-template-columns:280px minmax(680px,1fr) 320px;gap:12px;padding:12px;min-height:calc(100vh - 58px)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+.panel-title{font-size:15px;font-weight:800;padding:14px 16px 10px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #edf1f6}
+.panel-title small{color:var(--muted);font-weight:500}
+.side{display:flex;flex-direction:column;gap:12px}
+.form{padding:14px;display:grid;gap:12px}
+.field{display:grid;gap:6px}
+.field label{font-size:12px;color:#56657b;font-weight:700}
+.control{width:100%;border:1px solid #d7e0eb;border-radius:9px;background:#fff;padding:10px 11px;color:#26344a}
+.inline{display:grid;grid-template-columns:1fr 38px;gap:7px}
+.icon-btn{border:1px solid #d7e0eb;background:#fff;border-radius:9px}
+.primary{border:0;background:var(--primary);color:#fff;border-radius:10px;padding:11px 14px;font-weight:800}
+.primary:hover{background:var(--primary-2)}
+.secondary{border:1px solid #d7e0eb;background:#fff;border-radius:10px;padding:10px 12px;font-weight:700}
+.progress{height:8px;border-radius:999px;background:#e8edf5;overflow:hidden}.progress>i{display:block;height:100%;width:68%;background:var(--primary)}
+.progress-row{display:flex;justify-content:space-between;font-size:12px}.progress-row strong{color:var(--primary)}
+.note{font-size:12px;color:var(--muted);line-height:1.65}
+.main{display:flex;flex-direction:column;gap:12px;min-width:0}
+.preview-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #edf1f6}
+.segmented{display:flex;gap:3px;background:#eef3fa;padding:3px;border-radius:9px}
+.segmented button{border:0;background:transparent;padding:7px 11px;border-radius:7px;color:#5b6880}
+.segmented .active{background:#fff;color:var(--primary);font-weight:800;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.coord-jump{margin-left:auto;display:flex;gap:6px}
+.coord-jump input{width:150px;border:1px solid #d8e0eb;border-radius:8px;padding:8px 9px}
+.map-wrap{position:relative;height:530px;overflow:hidden;border-radius:0 0 var(--radius) var(--radius);background:#0e365a}
+.map{
+ position:absolute;inset:0;
+ background:
+ radial-gradient(circle at 18% 36%,rgba(239,218,149,.85) 0 5%,transparent 5.5%),
+ radial-gradient(circle at 64% 44%,rgba(103,153,72,.95) 0 14%,transparent 14.7%),
+ radial-gradient(circle at 73% 25%,rgba(211,223,229,.9) 0 8%,transparent 8.7%),
+ radial-gradient(circle at 48% 58%,rgba(56,123,58,.96) 0 19%,transparent 19.7%),
+ radial-gradient(circle at 30% 63%,rgba(195,176,109,.95) 0 10%,transparent 10.7%),
+ radial-gradient(circle at 78% 68%,rgba(82,139,74,.96) 0 13%,transparent 13.7%),
+ radial-gradient(circle at 50% 50%,rgba(72,137,69,.92) 0 38%,transparent 38.7%),
+ radial-gradient(circle at 51% 49%,#4e8f69 0 44%,#d6c081 44.3% 47%,#2476ac 47.3% 100%);
+ filter:saturate(1.05)
+}
+.river{position:absolute;background:#48a7e7;border-radius:999px;box-shadow:0 0 0 1px rgba(17,84,133,.5)}
+.r1{width:440px;height:10px;left:18%;top:49%;transform:rotate(11deg)}
+.r2{width:300px;height:8px;left:40%;top:38%;transform:rotate(74deg)}
+.r3{width:250px;height:7px;left:56%;top:55%;transform:rotate(-43deg)}
+.marker{position:absolute;width:28px;height:28px;border-radius:50% 50% 50% 6px;transform:rotate(-45deg);display:grid;place-items:center;color:#fff;border:2px solid rgba(255,255,255,.9);box-shadow:0 4px 10px rgba(0,0,0,.28)}
+.marker span{transform:rotate(45deg);font-size:13px;font-weight:900}
+.mountain{background:#e5484d}.ore{background:#f59f00}.lake{background:#2d9cdb}.structure{background:#7b61ff}.spawn{background:#19a974}.biome{background:#2f855a}
+.map-tools{position:absolute;left:12px;top:12px;display:grid;gap:6px}.map-tools button{width:38px;height:38px;border:1px solid rgba(255,255,255,.28);background:rgba(12,29,48,.75);color:#fff;border-radius:9px;font-size:18px}
+.map-info{position:absolute;right:12px;bottom:12px;background:rgba(9,23,38,.78);color:#fff;padding:8px 10px;border-radius:8px;font-size:12px}
+.scale{position:absolute;left:16px;bottom:16px;color:#fff;font-size:12px;background:rgba(0,0,0,.25);padding:6px 8px;border-radius:6px}
+.tooltip{position:absolute;left:53%;top:42%;background:rgba(8,21,35,.9);color:#fff;border:1px solid rgba(255,255,255,.15);border-radius:9px;padding:10px 12px;font-size:12px;line-height:1.55;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+.summary{padding:12px}.world-card{display:grid;grid-template-columns:92px 1fr;gap:12px}.mini-map{height:92px;border-radius:9px;background:radial-gradient(circle at 48% 48%,#54945d 0 42%,#ddc789 43% 48%,#2476ad 49% 100%)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:7px 12px;font-size:12px}.kv dt{color:#68758b}.kv dd{margin:0;font-weight:700}
+.legend{padding:12px;display:grid;grid-template-columns:1fr 1fr;gap:9px 12px}
+.legend label{display:flex;gap:8px;align-items:center;font-size:12px}.swatch{width:14px;height:14px;border-radius:3px;background:#3d8fd1}.legend input{accent-color:var(--primary)}
+.bottom{grid-column:1/-1;display:grid;grid-template-columns:1.15fr .62fr 1.55fr;gap:12px}
+.cards{padding:12px;display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.thumb{border:1px solid #dfe6ef;border-radius:10px;overflow:hidden;background:#fff}
+.thumb-img{height:88px;background:linear-gradient(145deg,#334b2f,#8f895b 45%,#6d7275 46% 58%,#4b7f45 59% 100%);position:relative}
+.thumb-img:after{content:"⛰";position:absolute;right:10px;top:8px;font-size:28px}
+.thumb-body{padding:8px;font-size:11px}.thumb-body strong{display:block;margin-bottom:4px}
+.accept-form{padding:13px;display:grid;gap:12px}.radio-row{display:grid;gap:7px;font-size:12px}
+.checks{display:flex;gap:12px;flex-wrap:wrap;font-size:12px}.history{border-top:1px solid #edf1f6;padding-top:10px;font-size:12px}.history div{display:flex;justify-content:space-between;padding:5px 0;color:#5e6c82}
+.table-wrap{overflow:auto;padding:0 10px 10px}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:760px}th,td{border-bottom:1px solid #e7edf5;padding:9px 8px;text-align:left;vertical-align:top}th{background:#f7f9fc;position:sticky;top:0}.badge{display:inline-block;padding:3px 7px;border-radius:999px;background:#eef3fa;color:#52647c}.badge.good{background:#e8f7f0;color:#16845e}
+.section-tabs{display:flex;gap:7px;padding:10px 12px;border-bottom:1px solid #edf1f6}.section-tabs button{border:1px solid #dbe3ed;background:#fff;padding:7px 10px;border-radius:8px}.section-tabs .active{background:#eaf1ff;color:var(--primary);border-color:#bdd1ff;font-weight:800}
+@media(max-width:1180px){.layout{grid-template-columns:250px 1fr}.side.right{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr}.bottom{grid-template-columns:1fr}.map-wrap{height:480px}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><div class="logo">⛰</div>GeoWorld 世界预览与验收工具 <span class="version">v0.1.0 prototype</span></div>
+  <nav class="tabs">
+    <button class="tab active">世界预览</button>
+    <button class="tab">验收工具</button>
+    <button class="tab">参数设置</button>
+    <button class="tab">版本信息</button>
+  </nav>
+  <div class="top-actions"><button class="ghost">简体中文 ▾</button></div>
+</header>
+
+<main class="layout">
+  <aside class="side left">
+    <section class="panel">
+      <div class="panel-title">1. 世界参数 <small>生成模型</small></div>
+      <div class="form">
+        <div class="field"><label>世界种子 Seed</label><div class="inline"><input id="seed" class="control" value="123456"><button class="icon-btn" id="randomSeed">↻</button></div></div>
+        <div class="field"><label>世界预设</label><select class="control"><option>Standard</option><option>Natural</option><option>Civilization</option><option>Epic</option></select></div>
+        <div class="field"><label>预览范围</label><select class="control"><option>8192 × 8192（推荐）</option><option>16384 × 16384</option><option>完整主大陆</option></select></div>
+        <button class="secondary">高级参数（可选） ▾</button>
+        <button class="primary" id="generate">生成模型预览</button>
+        <div class="progress-row"><strong id="progressText">等待生成</strong><span id="progressPct">0%</span></div>
+        <div class="progress"><i id="progressBar" style="width:0"></i></div>
+        <div class="note" id="progressNote">根据 Seed 生成统一 World Model；预览、验收和 Minecraft 生成使用相同规则。</div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-title">快速操作</div>
+      <div class="form">
+        <button class="secondary">打开已有 .geoworld 模型</button>
+        <button class="secondary">保存当前模型</button>
+        <button class="secondary">复制当前世界身份</button>
+      </div>
+    </section>
+  </aside>
+
+  <section class="main">
+    <section class="panel">
+      <div class="preview-head">
+        <strong>2. 世界预览</strong>
+        <div class="segmented"><button>高度图</button><button>群系图</button><button class="active">综合视图</button><button>水文</button><button>矿产</button></div>
+        <div class="coord-jump"><input placeholder="输入 X, Z"><button class="primary">传送</button></div>
+      </div>
+      <div class="map-wrap">
+        <div class="map"></div>
+        <i class="river r1"></i><i class="river r2"></i><i class="river r3"></i>
+        <div class="marker mountain" style="left:21%;top:21%"><span>▲</span></div>
+        <div class="marker ore" style="left:35%;top:34%"><span>◆</span></div>
+        <div class="marker structure" style="left:57%;top:30%"><span>⌂</span></div>
+        <div class="marker lake" style="left:67%;top:48%"><span>●</span></div>
+        <div class="marker spawn" style="left:49%;top:56%"><span>★</span></div>
+        <div class="marker ore" style="left:78%;top:60%"><span>◆</span></div>
+        <div class="map-tools"><button>✋</button><button>＋</button><button>－</button><button>⌖</button><button>⛶</button></div>
+        <div class="tooltip"><b>X: 1157　Z: -3027</b><br>群系：平原<br>地形：河谷/冲积平原<br>附近：铁矿产省候选<br>水系：主河下游</div>
+        <div class="scale">N ↑　0 ━ 1K ━ 2K ━ 4K Blocks</div>
+        <div class="map-info">X: 1157　Z: -3027　缩放 63%</div>
+      </div>
+    </section>
+  </section>
+
+  <aside class="side right">
+    <section class="panel">
+      <div class="panel-title">3. 世界信息</div>
+      <div class="summary">
+        <div class="world-card">
+          <div class="mini-map"></div>
+          <dl class="kv">
+            <dt>Seed</dt><dd>123456</dd><dt>规则</dt><dd>v1.1.10</dd><dt>World Model</dt><dd>v1</dd>
+            <dt>主大陆</dt><dd>有限</dd><dt>河流</dt><dd>42</dd><dt>湖泊</dt><dd>17</dd><dt>预览范围</dt><dd>8192²</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-title">4. 图层与标记 <small>显示 / 隐藏</small></div>
+      <div class="legend">
+        <label><input type="checkbox" checked><span class="swatch" style="background:#2476ad"></span>海洋</label>
+        <label><input type="checkbox" checked><span class="swatch" style="background:#e5484d"></span>山峰</label>
+        <label><input type="checkbox" checked><span class="swatch" style="background:#48a7e7"></span>河流 / 湖泊</label>
+        <label><input type="checkbox" checked><span class="swatch" style="background:#f59f00"></span>矿山候选</label>
+        <label><input type="checkbox" checked><span class="swatch" style="background:#6aa465"></span>群系</label>
+        <label><input type="checkbox" checked><span class="swatch" style="background:#7b61ff"></span>结构</label>
+        <label><input type="checkbox" checked><span class="swatch" style="background:#aab4c0"></span>海岸线</label>
+        <label><input type="checkbox" checked><span class="swatch" style="background:#19a974"></span>出生点</label>
+        <label><input type="checkbox"><span class="swatch" style="background:#e79b43"></span>稀有地貌</label>
+        <label><input type="checkbox"><span class="swatch" style="background:#8d6e63"></span>验收点</label>
+      </div>
+    </section>
+  </aside>
+
+  <section class="bottom">
+    <section class="panel">
+      <div class="panel-title">5. 关键区域预览 <small>由模型自动挑选</small></div>
+      <div class="section-tabs"><button>海岸线</button><button>河流/河口</button><button>山脉</button><button>大型湖泊</button><button class="active">矿山群区</button><button>特殊结构</button></div>
+      <div class="cards">
+        <div class="thumb"><div class="thumb-img"></div><div class="thumb-body"><strong>铁 / 铜矿产省 #1</strong>X -1240　Z 850</div></div>
+        <div class="thumb"><div class="thumb-img" style="filter:hue-rotate(30deg)"></div><div class="thumb-body"><strong>煤矿盆地 #2</strong>X 3200　Z -1800</div></div>
+        <div class="thumb"><div class="thumb-img" style="filter:brightness(.85)"></div><div class="thumb-body"><strong>高山绿宝石区 #3</strong>X -4050　Z 2600</div></div>
+        <div class="thumb"><div class="thumb-img" style="filter:hue-rotate(-25deg)"></div><div class="thumb-body"><strong>金矿候选区 #4</strong>X 1890　Z -3220</div></div>
+        <div class="thumb"><div class="thumb-img" style="filter:saturate(.7)"></div><div class="thumb-body"><strong>大型矿脉 #5</strong>X -2870　Z -4100</div></div>
+        <div class="thumb"><div class="thumb-img" style="filter:contrast(1.2)"></div><div class="thumb-body"><strong>露天矿体 #6</strong>X 5200　Z 3700</div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title">6. 验收表生成</div>
+      <div class="accept-form">
+        <div class="field"><label>表格类型</label>
+          <div class="radio-row">
+            <label><input type="radio" name="tableType" value="full"> 完整验收表（177 项）</label>
+            <label><input type="radio" name="tableType" value="spot" checked> 抽检表（每个大类 2 条）</label>
+          </div>
+        </div>
+        <div class="field"><label>输出格式</label><div class="checks"><label><input type="checkbox" checked> Markdown</label><label><input type="checkbox" checked> CSV</label><label><input type="checkbox" checked> JSON</label></div></div>
+        <button class="primary" id="makeTable">生成验收表</button>
+        <div class="history"><b>最近生成记录</b><div><span>抽检表 · 16 项</span><a href="#">查看</a></div><div><span>完整验收表 · 177 项</span><a href="#">查看</a></div></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title">7. 验收表预览 <button class="secondary" id="switchTable">查看完整表</button></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>大类</th><th>小类</th><th>具体条目</th><th>测试重点</th><th>建议坐标 / TP</th><th>状态</th></tr></thead>
+          <tbody id="acceptRows">
+            <tr><td>1</td><td>水系与海岸</td><td>河口</td><td>主河连续入海</td><td>河口无截断、无抬升</td><td>/tp @s 832 71 -3136</td><td><span class="badge">待验收</span></td></tr>
+            <tr><td>2</td><td>陆地地形与交通</td><td>山脉</td><td>峰感</td><td>有峰谷关系，不是平台山</td><td>/tp @s -7232 165 -10304</td><td><span class="badge">待验收</span></td></tr>
+            <tr><td>3</td><td>地下、洞穴与矿产</td><td>矿产</td><td>大型矿床</td><td>矿脉有长期矿山价值</td><td>/tp @s -18014 27 2330</td><td><span class="badge">待验收</span></td></tr>
+            <tr><td>4</td><td>地下、洞穴与矿产</td><td>洞穴</td><td>洞穴总体减少</td><td>地下完整岩体比例提高</td><td>/tp @s 832 30 320</td><td><span class="badge">待验收</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+</main>
+
+<script>
+const generate=document.getElementById('generate');
+const progressBar=document.getElementById('progressBar');
+const progressText=document.getElementById('progressText');
+const progressPct=document.getElementById('progressPct');
+const progressNote=document.getElementById('progressNote');
+document.getElementById('randomSeed').onclick=()=>document.getElementById('seed').value=Math.floor((Math.random()-.5)*2e9);
+generate.onclick=()=>{
+  let p=0; generate.disabled=true; generate.textContent='生成中…';
+  progressText.textContent='正在生成 World Model';
+  const t=setInterval(()=>{
+    p=Math.min(100,p+Math.ceil(Math.random()*9));
+    progressBar.style.width=p+'%'; progressPct.textContent=p+'%';
+    progressNote.textContent=p<35?'构造板块与主大陆…':p<60?'计算气候、水文、侵蚀…':p<82?'生成群系与地表…':p<100?'定位矿产、结构和验收候选点…':'预览生成完成，可切换图层并生成验收表。';
+    if(p>=100){clearInterval(t);generate.disabled=false;generate.textContent='重新生成模型预览';progressText.textContent='生成完成'}
+  },140)
+};
+document.querySelectorAll('.segmented button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.segmented button').forEach(x=>x.classList.remove('active'));b.classList.add('active')});
+document.querySelectorAll('.section-tabs button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.section-tabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active')});
+document.getElementById('makeTable').onclick=()=>{
+  const type=document.querySelector('input[name=tableType]:checked').value;
+  alert(type==='full'?'原型：生成完整验收表（177 项，大类 → 小类 → 具体条目）':'原型：从完整验收表中每个大类抽取 2 条，生成 16 条抽检表');
+};
+</script>
+</body>
+</html>
