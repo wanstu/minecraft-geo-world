@@ -23,6 +23,10 @@ let mapPanStartY=0;
 let suppressMapClick=false;
 let lastFocusPoint=null;
 let previewFeatures=null;
+let mineralBodies=null;
+let mineralLoadToken=0;
+let mineralRefreshTimer=null;
+let mineralBridgeUnavailable=false;
 let touchPoints=new Map();
 let pinchStartDistance=0;
 let pinchStartZoom=1;
@@ -112,6 +116,7 @@ function updateBackend(online){
     const staleSeed=renderedSeed;
     active=null;
     previewFeatures=null;
+    resetMineralPreview();
     clearSample();
     clearExportResult();
     clearAcceptanceView();
@@ -159,6 +164,7 @@ function applyMapTransform(){
     renderExportOverlay();
     renderCursorOverlay();
     positionFeatureOverlay();
+    scheduleMineralRefresh();
   });
 }
 
@@ -451,6 +457,7 @@ $('generate').onclick=async()=>{
     active=next;
     acceptanceData=null;
     previewFeatures=null;
+    resetMineralPreview();
     clearAcceptanceView();
     resetMapView();
     $('progressBar').style.width='100%';
@@ -746,6 +753,7 @@ $('load').onclick=async()=>{
     active=await api('/api/load',{method:'POST',body:JSON.stringify({name})});
     acceptanceData=null;
     previewFeatures=null;
+    resetMineralPreview();
     clearAcceptanceView();
     resetMapView();
     $('seed').value=active.seed;
@@ -1111,6 +1119,108 @@ function downloadAcceptance(format){
   a.remove();
 }
 
+function resetMineralPreview(){
+  mineralBodies=null;
+  mineralLoadToken++;
+  mineralBridgeUnavailable=false;
+  if(mineralRefreshTimer){
+    clearTimeout(mineralRefreshTimer);
+    mineralRefreshTimer=null;
+  }
+  const detail=$('mineralDetail');
+  if(detail){detail.hidden=true;detail.textContent='';}
+  const status=$('mineralStatus');
+  if(status)status.textContent='放大到 5× 后加载主要矿体；10× 后切换详细矿体。小型散布矿体数量很大时会按当前视野上限显示。';
+}
+
+function mineralViewportBounds(){
+  if(!active||$('mapWrap').classList.contains('empty'))return null;
+  const img=$('map').getBoundingClientRect();
+  const wrap=$('mapWrap').getBoundingClientRect();
+  const left=Math.max(img.left,wrap.left);
+  const right=Math.min(img.right,wrap.right);
+  const top=Math.max(img.top,wrap.top);
+  const bottom=Math.min(img.bottom,wrap.bottom);
+  if(right<=left||bottom<=top||img.width<=0||img.height<=0)return null;
+  const fx0=Math.max(0,Math.min(1,(left-img.left)/img.width));
+  const fx1=Math.max(0,Math.min(1,(right-img.left)/img.width));
+  const fz0=Math.max(0,Math.min(1,(top-img.top)/img.height));
+  const fz1=Math.max(0,Math.min(1,(bottom-img.top)/img.height));
+  const g=active.geometry;
+  const pad=Math.max(96,Math.min(384,Math.max(
+    (fx1-fx0)*g.SpanXBlocks,
+    (fz1-fz0)*g.SpanZBlocks
+  )*.04));
+  return {
+    minX:Math.floor(g.OriginX+fx0*g.SpanXBlocks-pad),
+    maxX:Math.ceil(g.OriginX+fx1*g.SpanXBlocks+pad),
+    minZ:Math.floor(g.OriginZ+fz0*g.SpanZBlocks-pad),
+    maxZ:Math.ceil(g.OriginZ+fz1*g.SpanZBlocks+pad)
+  };
+}
+
+function scheduleMineralRefresh(delay=260){
+  if(mineralRefreshTimer)clearTimeout(mineralRefreshTimer);
+  mineralRefreshTimer=setTimeout(()=>{
+    mineralRefreshTimer=null;
+    void refreshMineralBodies();
+  },delay);
+}
+
+async function refreshMineralBodies(){
+  const enabled=enabledFeatureKinds().has('minerals');
+  if(!active||!enabled||mineralBridgeUnavailable){
+    mineralBodies=null;
+    renderFeatureOverlay();
+    return;
+  }
+  if(mapZoom<5){
+    mineralBodies=null;
+    $('mineralStatus').textContent='继续放大到 5× 后显示真实规划矿体。';
+    renderFeatureOverlay();
+    return;
+  }
+  if(mapDragging||touchPoints.size>0){
+    scheduleMineralRefresh(220);
+    return;
+  }
+  const bounds=mineralViewportBounds();
+  if(!bounds)return;
+  const mode=mapZoom>=10?'all':'major';
+  const limit=window.innerWidth<=900?900:1600;
+  const token=++mineralLoadToken;
+  $('mineralStatus').textContent=mode==='all'
+    ? '正在加载当前视野的详细矿体…'
+    : '正在加载当前视野的主要矿体…';
+  try{
+    const q=new URLSearchParams({
+      minX:String(bounds.minX),maxX:String(bounds.maxX),
+      minZ:String(bounds.minZ),maxZ:String(bounds.maxZ),
+      mode,limit:String(limit)
+    });
+    const data=await api('/api/minerals?'+q.toString());
+    if(token!==mineralLoadToken)return;
+    mineralBodies=data;
+    const suffix=data.truncated?'（数量较多，已从当前视野均匀抽样显示 '+Number(data.returned||0).toLocaleString()+' 个）':'';
+    $('mineralStatus').textContent=
+      (mode==='all'?'详细矿体 ':'主要矿体 ')+
+      Number(data.total||0).toLocaleString()+' 个'+suffix;
+    renderFeatureOverlay();
+  }catch(e){
+    if(token!==mineralLoadToken)return;
+    mineralBodies=null;
+    if(e.status===503){
+      mineralBridgeUnavailable=true;
+      $('mineralStatus').textContent='真实矿脉需要从可执行 GeoWorld JAR 启动 Web 工具。';
+    }else if(e.status===413){
+      $('mineralStatus').textContent='当前视野仍太大，请继续放大后查看真实矿脉。';
+    }else{
+      $('mineralStatus').textContent='矿脉加载失败：'+e.message;
+    }
+    renderFeatureOverlay();
+  }
+}
+
 async function refreshFeatures(){
   if(!active){
     previewFeatures=null;
@@ -1147,6 +1257,31 @@ function worldToOverlay(x,z){
     x:(x-g.OriginX)/g.SpanXBlocks*1000,
     y:(z-g.OriginZ)/g.SpanZBlocks*1000
   };
+}
+
+function mineralName(kind){
+  return ({
+    COAL:'煤矿',IRON:'铁矿',COPPER:'铜矿',GOLD:'金矿',
+    LAPIS:'青金石',REDSTONE:'红石',DIAMOND:'钻石',EMERALD:'绿宝石'
+  })[kind]||kind;
+}
+
+function mineralSourceName(source){
+  return ({
+    VEIN:'常规矿体',GUARANTEE:'保底矿体',
+    SCATTER:'散布矿体',OUTCROP:'地表露头'
+  })[source]||source;
+}
+
+function showMineralDetail(body){
+  const el=$('mineralDetail');
+  el.hidden=false;
+  el.textContent=
+    mineralName(body.mineral)+' · '+mineralSourceName(body.source)+
+    (body.large?' · 大型矿体':'')+
+    (body.outcrop?' · 可形成露头':'')+
+    ' · 中心 '+Math.round(body.x)+', Y '+Math.round(body.y)+', '+Math.round(body.z)+
+    ' · 长约 '+body.length.toFixed(1)+' · 半径约 '+body.radius.toFixed(1);
 }
 
 function renderFeatureOverlay(){
@@ -1193,6 +1328,37 @@ function renderFeatureOverlay(){
       title.textContent='湖泊 #'+lake.lakeId+' · '+Math.round(lake.x)+', '+Math.round(lake.z);
       circle.appendChild(title);
       group.appendChild(circle);
+    }
+    svg.appendChild(group);
+  }
+
+  if(enabled.has('minerals')&&mineralBodies){
+    const group=document.createElementNS(ns,'g');
+    group.setAttribute('class','feature-minerals');
+    const worldScale=(active.geometry.SpanXBlocks+active.geometry.SpanZBlocks)/2;
+    for(const body of mineralBodies.bodies||[]){
+      const a=worldToOverlay(body.startX,body.startZ);
+      const m=worldToOverlay(body.midX,body.midZ);
+      const b=worldToOverlay(body.endX,body.endZ);
+      const path=document.createElementNS(ns,'path');
+      path.setAttribute('d',`M ${a.x} ${a.y} Q ${m.x} ${m.y} ${b.x} ${b.y}`);
+      const mineral=String(body.mineral||'').toLowerCase();
+      const source=String(body.source||'').toLowerCase();
+      path.setAttribute('class',`mineral-body mineral-${mineral} source-${source}${body.large?' major':''}`);
+      path.setAttribute('stroke-width',Math.max(1.2/mapZoom,body.radius/worldScale*2000));
+      path.dataset.x=body.x;
+      path.dataset.z=body.z;
+      const title=document.createElementNS(ns,'title');
+      title.textContent=
+        mineralName(body.mineral)+' · '+mineralSourceName(body.source)+
+        ' · '+Math.round(body.x)+', Y '+Math.round(body.y)+', '+Math.round(body.z);
+      path.appendChild(title);
+      path.addEventListener('click',e=>{
+        e.stopPropagation();
+        showMineralDetail(body);
+        void focusWorldPoint(body.x,body.z);
+      });
+      group.appendChild(path);
     }
     svg.appendChild(group);
   }
@@ -1265,7 +1431,19 @@ document.querySelectorAll('input[name="acceptanceType"]').forEach(radio=>radio.a
 $('acceptanceGenerate').onclick=generateAcceptanceTable;
 $('acceptanceBigFilter').onchange=renderAcceptanceTable;
 document.querySelectorAll('.acceptance-download').forEach(btn=>btn.onclick=()=>downloadAcceptance(btn.dataset.format));
-document.querySelectorAll('.feature-toggle').forEach(input=>input.onchange=renderFeatureOverlay);
+document.querySelectorAll('.feature-toggle').forEach(input=>input.onchange=()=>{
+  if(input.dataset.feature==='minerals'){
+    if(input.checked){
+      scheduleMineralRefresh(0);
+    }else{
+      mineralBodies=null;
+      mineralLoadToken++;
+      $('mineralStatus').textContent='真实规划矿体已隐藏。';
+      $('mineralDetail').hidden=true;
+    }
+  }
+  renderFeatureOverlay();
+});
 
 $('map').addEventListener('load',()=>{
   renderExportOverlay();

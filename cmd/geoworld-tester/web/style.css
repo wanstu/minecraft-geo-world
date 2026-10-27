@@ -87,3 +87,16 @@ label{display:block;color:#58677c;font-size:12px;margin-bottom:10px}input,select
   .field-group{align-items:flex-start}.download-group{justify-content:flex-start}
   .table-scroll{max-height:none;-webkit-overflow-scrolling:touch}
 }
+
+.marker-sample.mineral{background:linear-gradient(135deg,#8b8b8b 0 22%,#bd6b34 22% 44%,#d3af37 44% 66%,#4fc3f7 66% 82%,#59d98e 82% 100%)}
+.mineral-status{margin:2px 14px 8px;line-height:1.45}
+.mineral-detail{margin:0 14px 10px;padding:9px 10px;border:1px solid #dce4ed;border-radius:8px;background:#f8fafc;color:#425269;font-size:12px;line-height:1.5}
+.mineral-body{fill:none;stroke-linecap:round;stroke-linejoin:round;opacity:.82;pointer-events:stroke;cursor:pointer}
+.mineral-body:hover{opacity:1}
+.mineral-body.major{opacity:.96;filter:drop-shadow(0 0 1px #fff)}
+.mineral-body.source-outcrop{stroke-dasharray:3 2}
+.mineral-coal{stroke:#4d4d4d}.mineral-iron{stroke:#c4a28a}.mineral-copper{stroke:#bd6b34}.mineral-gold{stroke:#d3af37}
+.mineral-lapis{stroke:#3468c0}.mineral-redstone{stroke:#c94141}.mineral-diamond{stroke:#4fc3f7}.mineral-emerald{stroke:#36b86d}
+
+
+.mineral-caveat{margin:0 14px 8px;line-height:1.45}

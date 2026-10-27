@@ -36,6 +36,32 @@ public final class GeoWorldMineralPlanner {
         GeoWorldMineralRules.Kind mineral
     ) {}
 
+    public enum BodySource {
+        VEIN,
+        GUARANTEE,
+        SCATTER,
+        OUTCROP
+    }
+
+    /**
+     * One deterministic mineral body before Minecraft host-block filtering.
+     * The game and the Web preview consume the same body geometry.
+     */
+    public record Body(
+        GeoWorldMineralRules.Kind mineral,
+        BodySource source,
+        double centerX,
+        double centerY,
+        double centerZ,
+        double length,
+        double radius,
+        double angle,
+        double tilt,
+        double bend,
+        boolean large,
+        boolean rockyOutcrop
+    ) {}
+
     private static boolean usesV117Minerals(GeoWorldV1 model) {
         String rules = model.manifest().generationRulesVersion();
         return "geoworld-rules-v1.1.7".equals(rules) ||
@@ -52,6 +78,35 @@ public final class GeoWorldMineralPlanner {
         int minZ,
         int maxZ,
         Consumer<Placement> consumer
+    ) {
+        planSurfaceOutcropsInternal(
+            model, seed, minX, maxX, minZ, maxZ, consumer, null
+        );
+    }
+
+    public void planSurfaceOutcropBodies(
+        GeoWorldV1 model,
+        long seed,
+        int minX,
+        int maxX,
+        int minZ,
+        int maxZ,
+        Consumer<Body> consumer
+    ) {
+        planSurfaceOutcropsInternal(
+            model, seed, minX, maxX, minZ, maxZ, null, consumer
+        );
+    }
+
+    private void planSurfaceOutcropsInternal(
+        GeoWorldV1 model,
+        long seed,
+        int minX,
+        int maxX,
+        int minZ,
+        int maxZ,
+        Consumer<Placement> placementConsumer,
+        Consumer<Body> bodyConsumer
     ) {
         boolean modernMinerals = usesV117Minerals(model);
         for (
@@ -142,11 +197,13 @@ public final class GeoWorldMineralPlanner {
                     maxX,
                     minZ,
                     maxZ,
-                    consumer,
+                    placementConsumer,
                     true,
                     regionalization,
                     provinceStrength,
-                    modernMinerals
+                    modernMinerals,
+                    BodySource.OUTCROP,
+                    bodyConsumer
                 );
             }
         }
@@ -198,6 +255,31 @@ public final class GeoWorldMineralPlanner {
         int minZ,
         int maxZ,
         Consumer<Placement> consumer
+    ) {
+        planScatterInternal(model, seed, minX, maxX, minZ, maxZ, consumer, null);
+    }
+
+    public void planScatterBodies(
+        GeoWorldV1 model,
+        long seed,
+        int minX,
+        int maxX,
+        int minZ,
+        int maxZ,
+        Consumer<Body> consumer
+    ) {
+        planScatterInternal(model, seed, minX, maxX, minZ, maxZ, null, consumer);
+    }
+
+    private void planScatterInternal(
+        GeoWorldV1 model,
+        long seed,
+        int minX,
+        int maxX,
+        int minZ,
+        int maxZ,
+        Consumer<Placement> placementConsumer,
+        Consumer<Body> bodyConsumer
     ) {
         if (!usesV117Minerals(model)) return;
 
@@ -273,7 +355,8 @@ public final class GeoWorldMineralPlanner {
                             maxX,
                             minZ,
                             maxZ,
-                            consumer
+                            placementConsumer,
+                            bodyConsumer
                         );
                     }
                 }
@@ -289,6 +372,31 @@ public final class GeoWorldMineralPlanner {
         int minZ,
         int maxZ,
         Consumer<Placement> consumer
+    ) {
+        planInternal(model, seed, minX, maxX, minZ, maxZ, consumer, null);
+    }
+
+    public void planBodies(
+        GeoWorldV1 model,
+        long seed,
+        int minX,
+        int maxX,
+        int minZ,
+        int maxZ,
+        Consumer<Body> consumer
+    ) {
+        planInternal(model, seed, minX, maxX, minZ, maxZ, null, consumer);
+    }
+
+    private void planInternal(
+        GeoWorldV1 model,
+        long seed,
+        int minX,
+        int maxX,
+        int minZ,
+        int maxZ,
+        Consumer<Placement> placementConsumer,
+        Consumer<Body> bodyConsumer
     ) {
         boolean modernMinerals = usesV117Minerals(model);
         int firstX = Math.floorDiv(minX - SEARCH_MARGIN, CELL_XZ);
@@ -343,11 +451,13 @@ public final class GeoWorldMineralPlanner {
                                 maxX,
                                 minZ,
                                 maxZ,
-                                consumer,
+                                placementConsumer,
                                 false,
                                 regionalization,
                                 provinceStrength,
-                                modernMinerals
+                                modernMinerals,
+                                BodySource.GUARANTEE,
+                                bodyConsumer
                             );
                         }
                     }
@@ -403,11 +513,13 @@ public final class GeoWorldMineralPlanner {
                             maxX,
                             minZ,
                             maxZ,
-                            consumer,
+                            placementConsumer,
                             false,
                             regionalization,
                             provinceStrength,
-                            modernMinerals
+                            modernMinerals,
+                            BodySource.VEIN,
+                            bodyConsumer
                         );
                     }
                 }
@@ -425,7 +537,8 @@ public final class GeoWorldMineralPlanner {
         int maxX,
         int minZ,
         int maxZ,
-        Consumer<Placement> consumer
+        Consumer<Placement> placementConsumer,
+        Consumer<Body> bodyConsumer
     ) {
         double baseLength = switch (mineral) {
             case COAL -> 9.0;
@@ -447,6 +560,13 @@ public final class GeoWorldMineralPlanner {
         double dx = Math.cos(angle);
         double dz = Math.sin(angle);
         double tilt = (random.nextDouble() - 0.5) * 0.18;
+        if (bodyConsumer != null) {
+            bodyConsumer.accept(new Body(
+                mineral, BodySource.SCATTER,
+                x, y, z, length, radius, angle, tilt, 0.0,
+                false, false
+            ));
+        }
         int steps = Math.max(3, (int)Math.ceil(length / 2.2));
         int minY = heights.minY() + 1;
         int maxY = heights.maxYExclusive() - 1;
@@ -463,6 +583,7 @@ public final class GeoWorldMineralPlanner {
                 0.10 * (random.nextDouble() - 0.5)
             );
             double verticalRadius = localRadius * 0.82;
+            if (placementConsumer == null) continue;
 
             int left = Math.max(minX, (int)Math.floor(cx - localRadius));
             int right = Math.min(maxX, (int)Math.ceil(cx + localRadius));
@@ -477,7 +598,7 @@ public final class GeoWorldMineralPlanner {
                         double hz = (bz - cz) / localRadius;
                         double vy = (by - cy) / verticalRadius;
                         if (hx * hx + hz * hz + vy * vy <= 1.0) {
-                            consumer.accept(
+                            placementConsumer.accept(
                                 new Placement(bx, by, bz, mineral)
                             );
                         }
@@ -507,7 +628,9 @@ public final class GeoWorldMineralPlanner {
             exposed,
             1.0,
             0.5,
-            true
+            true,
+            BodySource.VEIN,
+            null
         );
     }
 
@@ -521,11 +644,13 @@ public final class GeoWorldMineralPlanner {
         int maxX,
         int minZ,
         int maxZ,
-        Consumer<Placement> consumer,
+        Consumer<Placement> placementConsumer,
         boolean rockyOutcrop,
         double regionalization,
         double provinceStrength,
-        boolean modernMinerals
+        boolean modernMinerals,
+        BodySource source,
+        Consumer<Body> bodyConsumer
     ) {
         double largeChance = modernMinerals
             ? switch (mineral) {
@@ -618,6 +743,13 @@ public final class GeoWorldMineralPlanner {
             return;
         }
 
+        if (bodyConsumer != null) {
+            bodyConsumer.accept(new Body(
+                mineral, source, x, y, z, length, radius,
+                angle, tilt, bend, large, rockyOutcrop
+            ));
+        }
+
         int steps = Math.max(4, (int) Math.ceil(length / 3.7));
         int minY = heights.minY() + 1;
         int maxY = heights.maxYExclusive() - 1;
@@ -636,6 +768,7 @@ public final class GeoWorldMineralPlanner {
             double r = radius * lobe;
             double verticalRadius =
                 rockyOutcrop ? r * 1.70 : r * 1.10;
+            if (placementConsumer == null) continue;
 
             int left = Math.max(minX, (int) Math.floor(cx - r));
             int right = Math.min(maxX, (int) Math.ceil(cx + r));
@@ -687,7 +820,7 @@ public final class GeoWorldMineralPlanner {
                                 )
                             )
                         ) {
-                            consumer.accept(
+                            placementConsumer.accept(
                                 new Placement(
                                     bx,
                                     by,

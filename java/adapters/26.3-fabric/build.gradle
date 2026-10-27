@@ -222,6 +222,35 @@ tasks.register('verifyGeoWorldSurfaceBiome', JavaExec) {
     systemProperty 'geoworld.engine.embeddedOnly', 'true'
 }
 
+tasks.register('verifyGeoWorldSurfaceOutcrops', JavaExec) {
+    group = 'verification'
+    description = 'Checks rare high mountain ore outcrops in exposed vanilla stone and seam continuity.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.minecraft.v26_3common.worldgen.GeoWorldSurfaceOutcropVerifier'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+}
+
+tasks.register('verifyGeoWorldMineralBodies', JavaExec) {
+    group = 'verification'
+    description = 'Enforces minimum 3D seam volume, thickness, and connectedness for all overworld ores.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.minecraft.v26common.worldgen.GeoWorldV26MineralBodyVerifier'
+}
+
+tasks.register('verifyGeoWorldMinerals', JavaExec) {
+    group = 'verification'
+    description = 'Verifies all 8 overworld ores in stone/deepslate, geological affinity and chunk continuity.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.minecraft.v26common.worldgen.GeoWorldV26MineralVerifier'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+    if (project.hasProperty('geoWorldMineralSeed')) {
+        args project.property('geoWorldMineralSeed').toString()
+    }
+}
+
 tasks.register('fingerprintGeoWorldBiomeDecisions', JavaExec) {
     group = 'verification'
     description = 'Verifies the locked 26.3 3D biome-decision fingerprints for current generation rules.'
@@ -243,5 +272,8 @@ tasks.named('check') {
     dependsOn tasks.named('verifyGeoWorldSpawn')
     dependsOn tasks.named('verifyGeoWorldShoreline')
     dependsOn tasks.named('verifyGeoWorldSurfaceBiome')
+    dependsOn tasks.named('verifyGeoWorldSurfaceOutcrops')
+    dependsOn tasks.named('verifyGeoWorldMineralBodies')
+    dependsOn tasks.named('verifyGeoWorldMinerals')
     dependsOn tasks.named('fingerprintGeoWorldBiomeDecisions')
 }

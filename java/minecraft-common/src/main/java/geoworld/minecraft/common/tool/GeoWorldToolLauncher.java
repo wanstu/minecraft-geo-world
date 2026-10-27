@@ -31,9 +31,29 @@ public final class GeoWorldToolLauncher {
                 command.add(arg);
             }
 
-            Process process = new ProcessBuilder(command)
-                .inheritIO()
-                .start();
+            ProcessBuilder builder = new ProcessBuilder(command)
+                .inheritIO();
+            Path launcher = Path.of(
+                GeoWorldToolLauncher.class.getProtectionDomain()
+                    .getCodeSource().getLocation().toURI()
+            ).toAbsolutePath().normalize();
+            if (Files.isRegularFile(launcher)) {
+                builder.environment().put(
+                    "GEOWORLD_TOOL_JAR",
+                    launcher.toString()
+                );
+            }
+            Path javaExecutable = Path.of(
+                System.getProperty("java.home"),
+                "bin",
+                platform.windows() ? "java.exe" : "java"
+            );
+            builder.environment().put(
+                "GEOWORLD_JAVA",
+                javaExecutable.toString()
+            );
+
+            Process process = builder.start();
             int exitCode = process.waitFor();
             if (exitCode != 0) {
                 throw new IllegalStateException("GeoWorld Web Tool exited with code " + exitCode);
