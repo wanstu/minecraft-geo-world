@@ -112,3 +112,23 @@ label{display:block;color:#58677c;font-size:12px;margin-bottom:10px}input,select
 .structure-landmark{fill:#5da45d}
 .structure-portal{fill:#a65ac7}
 .structure-treasure{fill:#d4b23f}
+
+.feature-cluster{pointer-events:all;cursor:pointer}
+.feature-cluster-bubble{stroke:#fff;stroke-width:1.2;vector-effect:non-scaling-stroke;opacity:.94;filter:drop-shadow(0 1px 2px #0008)}
+.feature-cluster:hover .feature-cluster-bubble{opacity:1;stroke-width:1.8}
+.feature-cluster-count{fill:#fff!important;font-weight:800;pointer-events:none;paint-order:stroke;stroke:#0006;stroke-width:.65;vector-effect:non-scaling-stroke;user-select:none}
+.peak-cluster .feature-cluster-bubble{fill:#d85b4f}
+.mineral-cluster.mineral-coal .feature-cluster-bubble{fill:#4d4d4d}
+.mineral-cluster.mineral-iron .feature-cluster-bubble{fill:#a88772}
+.mineral-cluster.mineral-copper .feature-cluster-bubble{fill:#bd6b34}
+.mineral-cluster.mineral-gold .feature-cluster-bubble{fill:#d3af37}
+.mineral-cluster.mineral-lapis .feature-cluster-bubble{fill:#3468c0}
+.mineral-cluster.mineral-redstone .feature-cluster-bubble{fill:#c94141}
+.mineral-cluster.mineral-diamond .feature-cluster-bubble{fill:#339ebf}
+.mineral-cluster.mineral-emerald .feature-cluster-bubble{fill:#36b86d}
+.structure-cluster.structure-settlement .feature-cluster-bubble{fill:#d78b3d}
+.structure-cluster.structure-ocean .feature-cluster-bubble{fill:#3c91c8}
+.structure-cluster.structure-underground .feature-cluster-bubble{fill:#7666b8}
+.structure-cluster.structure-landmark .feature-cluster-bubble{fill:#5da45d}
+.structure-cluster.structure-portal .feature-cluster-bubble{fill:#a65ac7}
+.structure-cluster.structure-treasure .feature-cluster-bubble{fill:#d4b23f}

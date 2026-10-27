@@ -239,7 +239,7 @@ func (s *appState) handleStructureCandidates(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	limit := parseBoundedInt(r.URL.Query().Get("limit"), 2200, 100, 6000)
+	limit := parseBoundedInt(r.URL.Query().Get("limit"), 30000, 100, 50000)
 	candidates, total := predictStructureCandidates(
 		active.seed, snapshot, mode, minX, maxX, minZ, maxZ, limit,
 	)

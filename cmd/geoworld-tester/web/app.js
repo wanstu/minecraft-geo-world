@@ -168,6 +168,7 @@ function applyMapTransform(){
     renderExportOverlay();
     renderCursorOverlay();
     positionFeatureOverlay();
+    renderFeatureOverlay();
     scheduleMineralRefresh();
     scheduleStructureRefresh();
   });
@@ -1238,7 +1239,7 @@ function resetStructurePreview(){
   const detail=$('structureDetail');
   if(detail){detail.hidden=true;detail.textContent='';}
   const status=$('structureStatus');
-  if(status)status.textContent='放大到 2× 后加载当前视野的原版 StructureSet 候选；8× 后加入矿井与埋藏宝藏。';
+  if(status)status.textContent='总览时按同类结构聚合显示；4× 后按具体结构聚合；8× 后显示单个候选并加入矿井与埋藏宝藏。';
 }
 
 function scheduleStructureRefresh(delay=300){
@@ -1256,12 +1257,6 @@ async function refreshStructureCandidates(){
     renderFeatureOverlay();
     return;
   }
-  if(mapZoom<2){
-    structureCandidates=null;
-    $('structureStatus').textContent='继续放大到 2× 后显示原版结构候选。';
-    renderFeatureOverlay();
-    return;
-  }
   if(mapDragging||touchPoints.size>0){
     scheduleStructureRefresh(240);
     return;
@@ -1269,7 +1264,7 @@ async function refreshStructureCandidates(){
   const bounds=mineralViewportBounds();
   if(!bounds)return;
   const mode=mapZoom>=8?'all':'major';
-  const limit=window.innerWidth<=900?1000:2200;
+  const limit=window.innerWidth<=900?25000:50000;
   const token=++structureLoadToken;
   $('structureStatus').textContent=mode==='all'
     ? '正在加载当前视野的详细结构候选…'
@@ -1408,6 +1403,91 @@ function showStructureDetail(candidate){
     ' · 这是 Minecraft 26.3 原版 placement 候选，不代表 StructureStart 已确认生成。';
 }
 
+function overlayUnitScale(){
+  const rect=$('map').getBoundingClientRect();
+  return {
+    x:rect.width>0?1000/rect.width:1,
+    y:rect.height>0?1000/rect.height:1
+  };
+}
+
+function clusterOverlayItems(items,{point,key,cellPx}){
+  const rect=$('map').getBoundingClientRect();
+  if(rect.width<=0||rect.height<=0)return [];
+  const cellX=Math.max(.1,cellPx*1000/rect.width);
+  const cellY=Math.max(.1,cellPx*1000/rect.height);
+  const buckets=new Map();
+  for(const item of items||[]){
+    const p=point(item);
+    if(!p||p.x<0||p.x>1000||p.y<0||p.y>1000)continue;
+    const bucketKey=key(item)+'|'+Math.floor(p.x/cellX)+'|'+Math.floor(p.y/cellY);
+    let bucket=buckets.get(bucketKey);
+    if(!bucket){
+      bucket={key:key(item),count:0,sumX:0,sumY:0,sumWorldX:0,sumWorldZ:0,first:item};
+      buckets.set(bucketKey,bucket);
+    }
+    bucket.count++;
+    bucket.sumX+=p.x;
+    bucket.sumY+=p.y;
+    bucket.sumWorldX+=Number(item.x);
+    bucket.sumWorldZ+=Number(item.z);
+  }
+  return [...buckets.values()].map(bucket=>({
+    ...bucket,
+    x:bucket.sumX/bucket.count,
+    y:bucket.sumY/bucket.count,
+    worldX:bucket.sumWorldX/bucket.count,
+    worldZ:bucket.sumWorldZ/bucket.count
+  }));
+}
+
+function appendClusterMarker(group,cluster,{className,title,targetZoom}){
+  const ns='http://www.w3.org/2000/svg';
+  const scale=overlayUnitScale();
+  const radiusPx=cluster.count>=100?15:cluster.count>=10?13:11;
+  const marker=document.createElementNS(ns,'g');
+  marker.setAttribute('class','feature-cluster '+className);
+  marker.setAttribute('transform',`translate(${cluster.x} ${cluster.y})`);
+  marker.style.pointerEvents='all';
+  marker.style.cursor='pointer';
+
+  const halo=document.createElementNS(ns,'ellipse');
+  halo.setAttribute('rx',radiusPx*scale.x);
+  halo.setAttribute('ry',radiusPx*scale.y);
+  halo.setAttribute('class','feature-cluster-bubble');
+  marker.appendChild(halo);
+
+  if(cluster.count>1){
+    const text=document.createElementNS(ns,'text');
+    text.setAttribute('x','0');
+    text.setAttribute('y',String(3.8*scale.y));
+    text.setAttribute('text-anchor','middle');
+    text.setAttribute('class','feature-cluster-count');
+    text.setAttribute('font-size',String(11*scale.y));
+    text.textContent=cluster.approx
+      ? '+'
+      : (cluster.count>=1000?Math.round(cluster.count/100)/10+'k':String(cluster.count));
+    marker.appendChild(text);
+  }
+
+  const tooltip=document.createElementNS(ns,'title');
+  tooltip.textContent=title(cluster);
+  marker.appendChild(tooltip);
+  marker.addEventListener('click',e=>{
+    e.stopPropagation();
+    centerMapOnWorld(cluster.worldX,cluster.worldZ,targetZoom(cluster));
+  });
+  group.appendChild(marker);
+}
+
+function structureClusterZoom(){
+  return mapZoom<4?4.5:8.5;
+}
+
+function mineralClusterZoom(){
+  return mapZoom<7?7.25:10.5;
+}
+
 function renderFeatureOverlay(){
   const svg=$('featureOverlay');
   if(!svg)return;
@@ -1459,30 +1539,48 @@ function renderFeatureOverlay(){
   if(enabled.has('minerals')&&mineralBodies){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-minerals');
-    const worldScale=(active.geometry.SpanXBlocks+active.geometry.SpanZBlocks)/2;
-    for(const body of mineralBodies.bodies||[]){
-      const a=worldToOverlay(body.startX,body.startZ);
-      const m=worldToOverlay(body.midX,body.midZ);
-      const b=worldToOverlay(body.endX,body.endZ);
-      const path=document.createElementNS(ns,'path');
-      path.setAttribute('d',`M ${a.x} ${a.y} Q ${m.x} ${m.y} ${b.x} ${b.y}`);
-      const mineral=String(body.mineral||'').toLowerCase();
-      const source=String(body.source||'').toLowerCase();
-      path.setAttribute('class',`mineral-body mineral-${mineral} source-${source}${body.large?' major':''}`);
-      path.setAttribute('stroke-width',Math.max(1.2/mapZoom,body.radius/worldScale*2000));
-      path.dataset.x=body.x;
-      path.dataset.z=body.z;
-      const title=document.createElementNS(ns,'title');
-      title.textContent=
-        mineralName(body.mineral)+' · '+mineralSourceName(body.source)+
-        ' · '+Math.round(body.x)+', Y '+Math.round(body.y)+', '+Math.round(body.z);
-      path.appendChild(title);
-      path.addEventListener('click',e=>{
-        e.stopPropagation();
-        showMineralDetail(body);
-        void focusWorldPoint(body.x,body.z);
+    if(mapZoom<10){
+      const cellPx=mapZoom<7?(window.innerWidth<=900?58:50):(window.innerWidth<=900?46:38);
+      const clusters=clusterOverlayItems(mineralBodies.bodies||[],{
+        point:body=>worldToOverlay(body.x,body.z),
+        key:body=>String(body.mineral||'UNKNOWN'),
+        cellPx
       });
-      group.appendChild(path);
+      for(const cluster of clusters){
+        cluster.approx=Boolean(mineralBodies.truncated);
+        const mineral=String(cluster.key||'unknown').toLowerCase();
+        appendClusterMarker(group,cluster,{
+          className:'mineral-cluster mineral-'+mineral,
+          title:c=>mineralName(c.key)+' · '+c.count+' 个矿体 · 点击放大',
+          targetZoom:()=>mineralClusterZoom()
+        });
+      }
+    }else{
+      const worldScale=(active.geometry.SpanXBlocks+active.geometry.SpanZBlocks)/2;
+      for(const body of mineralBodies.bodies||[]){
+        const a=worldToOverlay(body.startX,body.startZ);
+        const m=worldToOverlay(body.midX,body.midZ);
+        const b=worldToOverlay(body.endX,body.endZ);
+        const path=document.createElementNS(ns,'path');
+        path.setAttribute('d',`M ${a.x} ${a.y} Q ${m.x} ${m.y} ${b.x} ${b.y}`);
+        const mineral=String(body.mineral||'').toLowerCase();
+        const source=String(body.source||'').toLowerCase();
+        path.setAttribute('class',`mineral-body mineral-${mineral} source-${source}${body.large?' major':''}`);
+        path.setAttribute('stroke-width',Math.max(1.2/mapZoom,body.radius/worldScale*2000));
+        path.dataset.x=body.x;
+        path.dataset.z=body.z;
+        const title=document.createElementNS(ns,'title');
+        title.textContent=
+          mineralName(body.mineral)+' · '+mineralSourceName(body.source)+
+          ' · '+Math.round(body.x)+', Y '+Math.round(body.y)+', '+Math.round(body.z);
+        path.appendChild(title);
+        path.addEventListener('click',e=>{
+          e.stopPropagation();
+          showMineralDetail(body);
+          void focusWorldPoint(body.x,body.z);
+        });
+        group.appendChild(path);
+      }
     }
     svg.appendChild(group);
   }
@@ -1490,28 +1588,52 @@ function renderFeatureOverlay(){
   if(enabled.has('structures')&&structureCandidates){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-structures');
-    for(const candidate of structureCandidates.candidates||[]){
-      const p=worldToOverlay(candidate.x,candidate.z);
-      if(p.x<0||p.x>1000||p.y<0||p.y>1000)continue;
-      const mark=document.createElementNS(ns,'circle');
-      mark.setAttribute('cx',p.x);
-      mark.setAttribute('cy',p.y);
-      mark.setAttribute('r',Math.max(.8,4/mapZoom));
-      mark.setAttribute('class','structure-mark structure-'+structureMarkerKind(candidate.setId));
-      mark.dataset.x=candidate.x;
-      mark.dataset.z=candidate.z;
-      const title=document.createElementNS(ns,'title');
-      title.textContent=
-        structureSetName(candidate.setId)+' · '+candidate.x+', '+candidate.z+
-        ' · Chunk '+candidate.chunkX+', '+candidate.chunkZ+
-        ' · 原版 placement 候选';
-      mark.appendChild(title);
-      mark.addEventListener('click',e=>{
-        e.stopPropagation();
-        showStructureDetail(candidate);
-        void focusWorldPoint(candidate.x,candidate.z);
+    if(mapZoom<8){
+      const broad=mapZoom<4;
+      const cellPx=broad?(window.innerWidth<=900?56:48):(window.innerWidth<=900?44:36);
+      const clusters=clusterOverlayItems(structureCandidates.candidates||[],{
+        point:candidate=>worldToOverlay(candidate.x,candidate.z),
+        key:candidate=>broad?structureMarkerKind(candidate.setId):candidate.setId,
+        cellPx
       });
-      group.appendChild(mark);
+      for(const cluster of clusters){
+        cluster.approx=Boolean(structureCandidates.truncated);
+        const markerKind=broad?cluster.key:structureMarkerKind(cluster.first.setId);
+        appendClusterMarker(group,cluster,{
+          className:'structure-cluster structure-'+markerKind,
+          title:c=>{
+            const name=broad
+              ? ({settlement:'聚落/据点',ocean:'海洋结构',underground:'地下结构',landmark:'地标结构',portal:'传送门',treasure:'宝藏'})[c.key]||'结构'
+              : structureSetName(c.key);
+            return name+' · '+c.count+' 个候选 · 点击放大';
+          },
+          targetZoom:()=>structureClusterZoom()
+        });
+      }
+    }else{
+      for(const candidate of structureCandidates.candidates||[]){
+        const p=worldToOverlay(candidate.x,candidate.z);
+        if(p.x<0||p.x>1000||p.y<0||p.y>1000)continue;
+        const mark=document.createElementNS(ns,'circle');
+        mark.setAttribute('cx',p.x);
+        mark.setAttribute('cy',p.y);
+        mark.setAttribute('r',Math.max(.8,4/mapZoom));
+        mark.setAttribute('class','structure-mark structure-'+structureMarkerKind(candidate.setId));
+        mark.dataset.x=candidate.x;
+        mark.dataset.z=candidate.z;
+        const title=document.createElementNS(ns,'title');
+        title.textContent=
+          structureSetName(candidate.setId)+' · '+candidate.x+', '+candidate.z+
+          ' · Chunk '+candidate.chunkX+', '+candidate.chunkZ+
+          ' · 原版 placement 候选';
+        mark.appendChild(title);
+        mark.addEventListener('click',e=>{
+          e.stopPropagation();
+          showStructureDetail(candidate);
+          void focusWorldPoint(candidate.x,candidate.z);
+        });
+        group.appendChild(mark);
+      }
     }
     svg.appendChild(group);
   }
@@ -1519,18 +1641,33 @@ function renderFeatureOverlay(){
   if(enabled.has('peaks')){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-peaks');
-    for(const peak of previewFeatures.peaks||[]){
-      const p=worldToOverlay(peak.x,peak.z);
-      if(p.x<0||p.x>1000||p.y<0||p.y>1000)continue;
-      const mark=document.createElementNS(ns,'path');
-      mark.setAttribute('d',`M ${p.x} ${p.y-4} L ${p.x-4} ${p.y+3} L ${p.x+4} ${p.y+3} Z`);
-      mark.setAttribute('class','peak-mark');
-      mark.dataset.x=peak.x; mark.dataset.z=peak.z;
-      const title=document.createElementNS(ns,'title');
-      title.textContent=(peak.name||'山峰')+' · '+Math.round(peak.x)+', '+Math.round(peak.z)+' · '+(peak.detail||'');
-      mark.appendChild(title);
-      mark.addEventListener('click',e=>{e.stopPropagation();void focusWorldPoint(peak.x,peak.z)});
-      group.appendChild(mark);
+    if(mapZoom<3){
+      const clusters=clusterOverlayItems(previewFeatures.peaks||[],{
+        point:peak=>worldToOverlay(peak.x,peak.z),
+        key:()=> 'peak',
+        cellPx:window.innerWidth<=900?52:44
+      });
+      for(const cluster of clusters){
+        appendClusterMarker(group,cluster,{
+          className:'peak-cluster',
+          title:c=>'山峰 · '+c.count+' 个 · 点击放大',
+          targetZoom:()=>Math.max(3.5,mapZoom*1.8)
+        });
+      }
+    }else{
+      for(const peak of previewFeatures.peaks||[]){
+        const p=worldToOverlay(peak.x,peak.z);
+        if(p.x<0||p.x>1000||p.y<0||p.y>1000)continue;
+        const mark=document.createElementNS(ns,'path');
+        mark.setAttribute('d',`M ${p.x} ${p.y-4} L ${p.x-4} ${p.y+3} L ${p.x+4} ${p.y+3} Z`);
+        mark.setAttribute('class','peak-mark');
+        mark.dataset.x=peak.x; mark.dataset.z=peak.z;
+        const title=document.createElementNS(ns,'title');
+        title.textContent=(peak.name||'山峰')+' · '+Math.round(peak.x)+', '+Math.round(peak.z)+' · '+(peak.detail||'');
+        mark.appendChild(title);
+        mark.addEventListener('click',e=>{e.stopPropagation();void focusWorldPoint(peak.x,peak.z)});
+        group.appendChild(mark);
+      }
     }
     svg.appendChild(group);
   }
@@ -1617,7 +1754,7 @@ $('map').addEventListener('load',()=>{
 window.addEventListener('resize',()=>{
   renderExportOverlay();
   renderCursorOverlay();
-  positionFeatureOverlay();
+  renderFeatureOverlay();
 });
 window.addEventListener('beforeunload',()=>{if(mapObjectURL)URL.revokeObjectURL(mapObjectURL)});
 
