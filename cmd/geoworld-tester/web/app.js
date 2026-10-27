@@ -11,7 +11,7 @@ let renderedSeed=null;
 let modelNameTouched=false;
 let exportNameTouched=false;
 let lastExport=null;
-const MAX_MAP_ZOOM=32;
+const MAX_MAP_ZOOM=64;
 const FULL_DETAIL_ZOOM=MAX_MAP_ZOOM;
 let mapZoom=1;
 let mapPanX=0;
@@ -1243,7 +1243,7 @@ function resetStructurePreview(){
   const detail=$('structureDetail');
   if(detail){detail.hidden=true;detail.textContent='';}
   const status=$('structureStatus');
-  if(status)status.textContent='低倍缩放按空间区域合并结构，只指示大概分布；缩放越大，区域越小、结构类型越精确；32× 最大缩放展开当前视野全部候选。';
+  if(status)status.textContent='低倍缩放按空间区域合并结构，只指示大概分布；16× / 32× / 48× 仍保持高精度聚合；缩放越大，区域越小、结构类型越精确；64× 最大缩放展开当前视野全部候选。';
 }
 
 function scheduleStructureRefresh(delay=300){
@@ -1389,6 +1389,60 @@ function structureSetName(id){
   })[id]||id;
 }
 
+function structureVariantName(id){
+  const exact={
+    'minecraft:ancient_city':'远古城市',
+    'minecraft:bastion_remnant':'堡垒遗迹',
+    'minecraft:buried_treasure':'埋藏宝藏',
+    'minecraft:desert_pyramid':'沙漠神殿',
+    'minecraft:end_city':'末地城',
+    'minecraft:fortress':'下界要塞',
+    'minecraft:igloo':'雪屋',
+    'minecraft:jungle_pyramid':'丛林神庙',
+    'minecraft:mansion':'林地府邸',
+    'minecraft:mineshaft':'废弃矿井',
+    'minecraft:mineshaft_mesa':'恶地废弃矿井',
+    'minecraft:monument':'海底神殿',
+    'minecraft:nether_fossil':'下界化石',
+    'minecraft:ocean_ruin_cold':'冷水海底废墟',
+    'minecraft:ocean_ruin_warm':'暖水海底废墟',
+    'minecraft:pillager_outpost':'掠夺者前哨站',
+    'minecraft:ruined_portal':'废弃传送门',
+    'minecraft:ruined_portal_desert':'沙漠废弃传送门',
+    'minecraft:ruined_portal_jungle':'丛林废弃传送门',
+    'minecraft:ruined_portal_mountain':'山地废弃传送门',
+    'minecraft:ruined_portal_nether':'下界废弃传送门',
+    'minecraft:ruined_portal_ocean':'海洋废弃传送门',
+    'minecraft:ruined_portal_swamp':'沼泽废弃传送门',
+    'minecraft:shipwreck':'沉船',
+    'minecraft:shipwreck_beached':'搁浅沉船',
+    'minecraft:stronghold':'强要塞',
+    'minecraft:swamp_hut':'沼泽小屋',
+    'minecraft:trail_ruins':'古迹废墟',
+    'minecraft:trial_chambers':'试炼密室',
+    'minecraft:village_desert':'沙漠村庄',
+    'minecraft:village_plains':'平原村庄',
+    'minecraft:village_savanna':'热带草原村庄',
+    'minecraft:village_snowy':'雪原村庄',
+    'minecraft:village_taiga':'针叶林村庄'
+  };
+  if(exact[id])return exact[id];
+  if(id.startsWith('minecraft:abandoned_camp_')){
+    const biome=id.slice('minecraft:abandoned_camp_'.length);
+    const biomeName=({
+      bamboo_jungle:'竹林',birch_forest:'白桦林',cherry_grove:'樱花树林',
+      dappled_forest:'斑驳森林',flower_forest:'繁花森林',forest:'森林',
+      meadow:'草甸',old_growth_birch_forest:'原始白桦林',
+      old_growth_pine_taiga:'原始松木针叶林',old_growth_spruce_taiga:'原始云杉针叶林',
+      pale_garden:'苍白花园',savanna:'热带草原',snowy_taiga:'积雪针叶林',
+      sparse_jungle:'稀疏丛林',swamp:'沼泽',taiga:'针叶林',
+      windswept_forest:'风袭森林',wooded_badlands:'繁茂恶地'
+    })[biome]||'未知群系';
+    return biomeName+'废弃营地';
+  }
+  return '未知结构';
+}
+
 function structureMarkerKind(id){
   if(id==='minecraft:strongholds')return 'stronghold';
   if(['minecraft:villages','minecraft:abandoned_camp','minecraft:pillager_outposts','minecraft:woodland_mansions'].includes(id))return 'settlement';
@@ -1440,20 +1494,20 @@ function showStructureDetail(candidate){
   const el=$('structureDetail');
   el.hidden=false;
   const meta=structureCandidates?.sets?.[candidate.setId]||{};
-  const variants=(meta.structures||[]).map(v=>String(v).replace('minecraft:','')).join(' / ');
+  const variants=(meta.structures||[]).map(structureVariantName).join(' / ');
   const stronghold=candidate.setId==='minecraft:strongholds';
   el.innerHTML=
     '<div class="structure-detail-title">'+escapeHtml(structureSetName(candidate.setId))+'</div>'+
     '<div class="structure-detail-grid">'+
       '<span>坐标</span><b>'+escapeHtml(candidate.x+', '+candidate.z)+'</b>'+
-      '<span>Chunk</span><b>'+escapeHtml(candidate.chunkX+', '+candidate.chunkZ)+'</b>'+
-      (variants?'<span>候选结构</span><b>'+escapeHtml(variants)+'</b>':'')+
-      '<span>性质</span><b>'+(stronghold?'精确规划位置':'原版 placement 候选')+'</b>'+
+      '<span>区块坐标</span><b>'+escapeHtml(candidate.chunkX+', '+candidate.chunkZ)+'</b>'+
+      (variants?'<span>具体结构</span><b>'+escapeHtml(variants)+'</b>':'')+
+      '<span>位置性质</span><b>'+(stronghold?'精确规划位置':'原版结构放置候选位置')+'</b>'+
     '</div>'+
     '<div class="structure-detail-note">'+
       (stronghold
-        ? 'Minecraft 26.3 concentric-rings + GeoWorld 群系偏移，且经过原生实现逐点校验。'
-        : '候选位置不等于 StructureStart 已确认生成。')+
+        ? '使用 Minecraft 26.3 原版同心环规则与 GeoWorld 群系偏移规则，并经过原生实现逐点一致性校验。'
+        : '这里表示原版结构放置候选位置；最终是否实际生成，还需要通过群系和结构生成条件检查。')+
     '</div>';
   openStructureInspector();
 }
@@ -1477,10 +1531,14 @@ function showStructureClusterDetail(cluster){
           : structureSetName(candidate.setId)
       )+'</b>'+
       '<span>显示精度</span><b>'+(
-        mapZoom<5?'概略区域':mapZoom<10?'区域分类':mapZoom<13?'细分区域':'高精度区域'
+        mapZoom<5?'概略区域':
+        mapZoom<10?'区域分类':
+        mapZoom<16?'细分区域':
+        mapZoom<32?'高精度区域':
+        mapZoom<48?'精细区域':'极精细区域'
       )+'</b>'+
     '</div>'+
-    '<div class="structure-detail-note">图标落在该聚合区域内的真实候选位置，不使用几何平均产生虚假坐标；继续放大会缩小聚合范围，32× 时全部展开。</div>';
+    '<div class="structure-detail-note">图标落在该聚合区域内的真实候选位置，不使用几何平均产生虚假坐标；继续放大会缩小聚合范围，64× 时全部展开。</div>';
   openStructureInspector();
 }
 
@@ -1640,7 +1698,9 @@ function structureSpatialCellPx(){
   if(mapZoom<10)return 160;
   if(mapZoom<16)return 125;
   if(mapZoom<24)return 92;
-  return 68;
+  if(mapZoom<32)return 68;
+  if(mapZoom<48)return 52;
+  return 40;
 }
 
 function structureSpatialBudget(){
@@ -1648,7 +1708,9 @@ function structureSpatialBudget(){
   if(mapZoom<10)return 30;
   if(mapZoom<16)return 44;
   if(mapZoom<24)return 64;
-  return 96;
+  if(mapZoom<32)return 96;
+  if(mapZoom<48)return 128;
+  return 160;
 }
 
 function clusterStructureCandidatesBySpace(items,{cellPx,key}){
@@ -1932,11 +1994,11 @@ function appendStructureSingleMarker(group,candidate){
 
   const title=document.createElementNS(ns,'title');
   title.textContent=
-    structureSetName(candidate.setId)+' · '+candidate.x+', '+candidate.z+
-    ' · Chunk '+candidate.chunkX+', '+candidate.chunkZ+
+    structureSetName(candidate.setId)+' · 坐标 '+candidate.x+', '+candidate.z+
+    ' · 区块 '+candidate.chunkX+', '+candidate.chunkZ+
     (candidate.setId==='minecraft:strongholds'
       ? ' · 精确强要塞位置'
-      : ' · 原版 placement 候选');
+      : ' · 原版结构放置候选位置');
   mark.appendChild(title);
   mark.addEventListener('click',e=>{
     e.stopPropagation();
