@@ -1241,7 +1241,7 @@ function resetStructurePreview(){
   const detail=$('structureDetail');
   if(detail){detail.hidden=true;detail.textContent='';}
   const status=$('structureStatus');
-  if(status)status.textContent='低倍缩放只显示结构的大概分布；缩放越大，同类结构会按空间逐步拆分得更精确；16× 最大缩放展开当前视野全部候选。';
+  if(status)status.textContent='低倍缩放按空间区域合并结构，只指示大概分布；缩放越大，区域越小、结构类型越精确；16× 最大缩放展开当前视野全部候选。';
 }
 
 function scheduleStructureRefresh(delay=300){
@@ -1287,7 +1287,7 @@ async function refreshStructureCandidates(){
       (mapZoom>=15.999
         ? '最大缩放：当前视野全部展开'
         : mapZoom<4
-          ? '概略显示：每种结构约 1 个代表位置'
+          ? '概略显示：按空间区域显示少量真实代表位置'
           : '聚合显示：继续放大可逐步提高位置精度')+
       (data.skippedStronghold?' · 强要塞不可用':' · 含强要塞');
     renderFeatureOverlay();
@@ -1399,6 +1399,7 @@ function structureMarkerKind(id){
 
 function structureGlyphPath(id){
   return ({
+    'geoworld:mixed_structures':'M-5-5 H-1 V-1 H-5 Z M1-5 H5 V-1 H1 Z M-5 1 H-1 V5 H-5 Z M1 1 H5 V5 H1 Z',
     'minecraft:villages':'M-6 1 L0-5 L6 1 M-4 0 V5 H4 V0 M-1 5 V1 H2 V5',
     'minecraft:abandoned_camp':'M-6 5 L0-5 L6 5 Z M0-5 V5',
     'minecraft:pillager_outposts':'M-5-4 H5 M-4-4 V5 H4 V-4 M-6 5 H6 M-2-1 H2',
@@ -1459,14 +1460,25 @@ function showStructureClusterDetail(cluster){
   const candidate=cluster.first;
   const el=$('structureDetail');
   el.hidden=false;
+  const typeEntries=Object.entries(cluster.typeCounts||{})
+    .sort((a,b)=>b[1]-a[1])
+    .slice(0,5);
+  const mixed=(cluster.typeCount||typeEntries.length)>1;
   el.innerHTML=
-    '<div class="structure-detail-title">'+escapeHtml(structureSetName(candidate.setId))+'</div>'+
+    '<div class="structure-detail-title">'+escapeHtml(mixed?'结构聚合':structureSetName(candidate.setId))+'</div>'+
     '<div class="structure-detail-grid">'+
       '<span>当前聚合</span><b>'+Number(cluster.count).toLocaleString()+' 个候选</b>'+
-      '<span>区域中心</span><b>'+Math.round(cluster.worldX)+', '+Math.round(cluster.worldZ)+'</b>'+
-      '<span>当前精度</span><b>每种结构最多 '+structurePrecisionPerType()+' 个区域图标</b>'+
+      '<span>代表位置</span><b>'+Math.round(cluster.worldX)+', '+Math.round(cluster.worldZ)+'</b>'+
+      '<span>结构类型</span><b>'+escapeHtml(
+        mixed
+          ? typeEntries.map(([id,count])=>structureSetName(id)+' × '+count).join(' / ')+(cluster.typeCount>typeEntries.length?' / …':'')
+          : structureSetName(candidate.setId)
+      )+'</b>'+
+      '<span>显示精度</span><b>'+(
+        mapZoom<5?'概略区域':mapZoom<10?'区域分类':mapZoom<13?'细分区域':'高精度区域'
+      )+'</b>'+
     '</div>'+
-    '<div class="structure-detail-note">继续放大会逐步拆分为更精确的位置；16× 时展开当前视野全部候选。</div>';
+    '<div class="structure-detail-note">图标落在该聚合区域内的真实候选位置，不使用几何平均产生虚假坐标；继续放大会缩小聚合范围，16× 时全部展开。</div>';
   openStructureInspector();
 }
 
@@ -1524,23 +1536,36 @@ function clusterOverlayItemsByKeyPrecision(items,{point,key,perKey=1}){
   }
 
   const clusters=[];
-  const buildCluster=(itemKey,entries)=>{
-    let sumX=0,sumY=0,sumWorldX=0,sumWorldZ=0;
+  const clusterCentroid=entries=>{
+    let sumX=0,sumY=0;
     for(const entry of entries){
       sumX+=entry.p.x;
       sumY+=entry.p.y;
-      sumWorldX+=Number(entry.item.x);
-      sumWorldZ+=Number(entry.item.z);
     }
-    const count=entries.length;
+    return {x:sumX/entries.length,y:sumY/entries.length};
+  };
+
+  const buildCluster=(itemKey,entries)=>{
+    const centroid=clusterCentroid(entries);
+    let representative=entries[0];
+    let bestDistance=Infinity;
+    for(const entry of entries){
+      const d=(entry.p.x-centroid.x)**2+(entry.p.y-centroid.y)**2;
+      if(d<bestDistance){
+        representative=entry;
+        bestDistance=d;
+      }
+    }
     return {
       key:itemKey,
-      count,
-      x:sumX/count,
-      y:sumY/count,
-      worldX:sumWorldX/count,
-      worldZ:sumWorldZ/count,
-      first:entries[0].item
+      count:entries.length,
+      x:representative.p.x,
+      y:representative.p.y,
+      worldX:Number(representative.item.x),
+      worldZ:Number(representative.item.z),
+      first:representative.item,
+      centroidX:centroid.x,
+      centroidY:centroid.y
     };
   };
 
@@ -1551,13 +1576,13 @@ function clusterOverlayItemsByKeyPrecision(items,{point,key,perKey=1}){
       continue;
     }
 
-    const mean=buildCluster(itemKey,entries);
+    const mean=clusterCentroid(entries);
     const centers=[];
     let first=entries[0];
-    let firstDistance=-1;
+    let firstDistance=Infinity;
     for(const entry of entries){
       const d=(entry.p.x-mean.x)**2+(entry.p.y-mean.y)**2;
-      if(d>firstDistance){first=entry;firstDistance=d;}
+      if(d<firstDistance){first=entry;firstDistance=d;}
     }
     centers.push({x:first.p.x,y:first.p.y});
 
@@ -1591,7 +1616,7 @@ function clusterOverlayItemsByKeyPrecision(items,{point,key,perKey=1}){
       for(let i=0;i<k;i++){
         if(!buckets[i].length)continue;
         const bucket=buildCluster(itemKey,buckets[i]);
-        centers[i]={x:bucket.x,y:bucket.y};
+        centers[i]={x:bucket.centroidX,y:bucket.centroidY};
       }
     }
 
@@ -1602,12 +1627,77 @@ function clusterOverlayItemsByKeyPrecision(items,{point,key,perKey=1}){
   return clusters;
 }
 
-function structurePrecisionPerType(){
-  if(mapZoom<5)return 1;
-  if(mapZoom<9)return 2;
-  if(mapZoom<13)return 3;
-  if(mapZoom<15.999)return 4;
-  return Number.MAX_SAFE_INTEGER;
+function structureSpatialGroupingKey(candidate){
+  if(mapZoom<5)return 'all';
+  if(mapZoom<10)return structureMarkerKind(candidate.setId);
+  return candidate.setId;
+}
+
+function structureSpatialCellPx(){
+  if(mapZoom<5)return 210;
+  if(mapZoom<10)return 160;
+  if(mapZoom<13)return 125;
+  return 92;
+}
+
+function structureSpatialBudget(){
+  if(mapZoom<5)return 18;
+  if(mapZoom<10)return 30;
+  if(mapZoom<13)return 44;
+  return 64;
+}
+
+function clusterStructureCandidatesBySpace(items,{cellPx,key}){
+  const rect=$('map').getBoundingClientRect();
+  if(rect.width<=0||rect.height<=0)return [];
+  const cellX=Math.max(.1,cellPx*1000/rect.width);
+  const cellY=Math.max(.1,cellPx*1000/rect.height);
+  const buckets=new Map();
+
+  for(const item of items||[]){
+    const p=worldToOverlay(item.x,item.z);
+    if(!p||p.x<0||p.x>1000||p.y<0||p.y>1000)continue;
+    const groupKey=key(item);
+    const bucketKey=groupKey+'|'+Math.floor(p.x/cellX)+'|'+Math.floor(p.y/cellY);
+    if(!buckets.has(bucketKey))buckets.set(bucketKey,{key:groupKey,entries:[]});
+    buckets.get(bucketKey).entries.push({item,p});
+  }
+
+  const out=[];
+  for(const bucket of buckets.values()){
+    let sumX=0,sumY=0;
+    const typeCounts={};
+    for(const entry of bucket.entries){
+      sumX+=entry.p.x;
+      sumY+=entry.p.y;
+      typeCounts[entry.item.setId]=(typeCounts[entry.item.setId]||0)+1;
+    }
+    const centroidX=sumX/bucket.entries.length;
+    const centroidY=sumY/bucket.entries.length;
+    let representative=bucket.entries[0];
+    let bestDistance=Infinity;
+    for(const entry of bucket.entries){
+      const d=(entry.p.x-centroidX)**2+(entry.p.y-centroidY)**2;
+      if(d<bestDistance){
+        representative=entry;
+        bestDistance=d;
+      }
+    }
+    out.push({
+      key:bucket.key,
+      count:bucket.entries.length,
+      x:representative.p.x,
+      y:representative.p.y,
+      worldX:Number(representative.item.x),
+      worldZ:Number(representative.item.z),
+      first:representative.item,
+      typeCount:Object.keys(typeCounts).length,
+      typeCounts,
+      centroidX,
+      centroidY
+    });
+  }
+  return out;
 }
 
 function overlayPointVisible(p,padPx=18){
@@ -1617,20 +1707,6 @@ function overlayPointVisible(p,padPx=18){
   const x=img.left+p.x/1000*img.width;
   const y=img.top+p.y/1000*img.height;
   return x>=wrap.left-padPx&&x<=wrap.right+padPx&&y>=wrap.top-padPx&&y<=wrap.bottom+padPx;
-}
-
-function structureDisplayBudget(typeCount){
-  if(mapZoom<4)return Math.max(1,typeCount);
-  if(mapZoom<8)return Math.max(typeCount,Math.min(24,typeCount*2));
-  if(mapZoom<12)return Math.max(typeCount,Math.min(36,typeCount*3));
-  return Math.max(typeCount,Math.min(60,typeCount*5));
-}
-
-function structureClusterCellPx(){
-  if(mapZoom<4)return 10000;
-  if(mapZoom<8)return 220;
-  if(mapZoom<12)return 145;
-  return 92;
 }
 
 function limitStructureClusters(clusters,maxTotal){
@@ -1992,21 +2068,25 @@ function renderFeatureOverlay(){
       overlayPointVisible(worldToOverlay(candidate.x,candidate.z),24)
     );
     if(mapZoom<15.999){
-      const perType=structurePrecisionPerType();
-      const clusters=clusterOverlayItemsByKeyPrecision(visibleCandidates,{
-        point:candidate=>worldToOverlay(candidate.x,candidate.z),
-        key:candidate=>candidate.setId,
-        perKey:perType
-      }).sort((a,b)=>structureCandidatePriority(b.first)-structureCandidatePriority(a.first));
+      let clusters=clusterStructureCandidatesBySpace(visibleCandidates,{
+        cellPx:structureSpatialCellPx(),
+        key:structureSpatialGroupingKey
+      });
+      clusters=limitStructureClusters(clusters,structureSpatialBudget())
+        .sort((a,b)=>structureCandidatePriority(b.first)-structureCandidatePriority(a.first));
       for(const cluster of clusters){
         cluster.approx=Boolean(structureCandidates.truncated);
-        const markerKind=structureMarkerKind(cluster.first.setId);
+        const markerKind=cluster.key==='all'
+          ? 'mixed'
+          : (mapZoom<10?cluster.key:structureMarkerKind(cluster.first.setId));
         appendClusterMarker(group,cluster,{
           className:'structure-cluster structure-'+markerKind,
-          title:c=>structureSetName(c.key)+' · 该区域约 '+c.count+' 个候选 · 放大后继续拆分',
+          title:c=>c.typeCount>1
+            ? '该区域约 '+c.count+' 个候选 · '+c.typeCount+' 种结构 · 放大后继续拆分'
+            : structureSetName(c.first.setId)+' · 该区域约 '+c.count+' 个候选 · 放大后继续拆分',
           targetZoom:()=>Math.min(16,Math.max(mapZoom*1.65,mapZoom+1.5)),
           radiusScale:markerKind==='stronghold'?1.05:1,
-          glyphId:cluster.first.setId,
+          glyphId:cluster.typeCount>1?'geoworld:mixed_structures':cluster.first.setId,
           onClick:showStructureClusterDetail
         });
       }

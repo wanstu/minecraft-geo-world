@@ -121,6 +121,7 @@ label{display:block;color:#58677c;font-size:12px;margin-bottom:10px}input,select
 .structure-portal{fill:#a65ac7}
 .structure-treasure{fill:#d4b23f}
 .structure-stronghold{fill:#d64f79}
+.structure-mixed{fill:#65758b}
 .structure-icon.structure-settlement .structure-icon-bg{fill:#d78b3d}
 .structure-icon.structure-ocean .structure-icon-bg{fill:#3c91c8}
 .structure-icon.structure-underground .structure-icon-bg{fill:#7666b8}
@@ -153,3 +154,4 @@ label{display:block;color:#58677c;font-size:12px;margin-bottom:10px}input,select
 .structure-cluster.structure-portal .feature-cluster-bubble{fill:#a65ac7}
 .structure-cluster.structure-treasure .feature-cluster-bubble{fill:#d4b23f}
 .structure-cluster.structure-stronghold .feature-cluster-bubble{fill:#d64f79}
+.structure-cluster.structure-mixed .feature-cluster-bubble{fill:#65758b}
