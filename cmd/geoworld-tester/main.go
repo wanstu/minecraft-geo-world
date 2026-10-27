@@ -49,6 +49,10 @@ type activeWorld struct {
 	sample                  func(float64, float64) runtimeprofile.Sample
 	previewGrid             []runtimeprofile.Sample
 	mineralPreviewModelPath string
+	strongholdMu            sync.Mutex
+	strongholdLoaded        bool
+	strongholdCandidates    []structureCandidate
+	strongholdErr           string
 	riverCount              int
 	lakeCount               int
 	plateCount              int

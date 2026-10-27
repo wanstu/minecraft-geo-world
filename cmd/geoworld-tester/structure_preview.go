@@ -243,6 +243,20 @@ func (s *appState) handleStructureCandidates(w http.ResponseWriter, r *http.Requ
 	candidates, total := predictStructureCandidates(
 		active.seed, snapshot, mode, minX, maxX, minZ, maxZ, limit,
 	)
+	randomTotal := total
+	randomReturned := len(candidates)
+	strongholds, strongholdErr := s.strongholdPreviewCandidates(active)
+	if strongholdErr == nil {
+		for _, candidate := range strongholds {
+			if candidate.X < minX || candidate.X > maxX ||
+				candidate.Z < minZ || candidate.Z > maxZ {
+				continue
+			}
+			candidates = append(candidates, candidate)
+			total++
+		}
+	}
+
 	sets := make(map[string]structureSetPreviewInfo)
 	for _, candidate := range candidates {
 		if _, ok := sets[candidate.SetID]; ok {
@@ -256,12 +270,20 @@ func (s *appState) handleStructureCandidates(w http.ResponseWriter, r *http.Requ
 		sets[candidate.SetID] = structureSetPreviewInfo{Structures: structures}
 	}
 
+	note := "普通结构点与 Minecraft 26.3 原版 StructureSet placement 候选 chunk 同源；最终 StructureStart 仍由群系、结构合法性与生成检查决定。"
+	if strongholdErr == nil {
+		note += " 强要塞使用 Minecraft 26.3 concentric-rings 规则与 GeoWorld 群系偏移搜索，构建时会与 Minecraft 原生实现逐点校验。"
+	} else {
+		note += " 强要塞精确预览需要从可执行 GeoWorld JAR 启动 Web 工具。"
+	}
+
 	writeJSON(w, http.StatusOK, structurePreviewResponse{
 		Seed: active.seed, MinecraftVersion: snapshot.MinecraftVersion,
 		Mode: mode, Sets: sets, Candidates: candidates,
-		Total: total, Returned: len(candidates), Truncated: total > len(candidates),
-		SkippedStronghold: true,
-		Note:              "这些点与 Minecraft 26.3 原版 StructureSet placement 候选 chunk 同源；最终 StructureStart 仍由 Minecraft 的群系、结构合法性与生成检查决定。强要塞因还需 GeoWorld 群系偏移搜索，暂不伪造。",
+		Total: total, Returned: len(candidates),
+		Truncated:         randomReturned < randomTotal,
+		SkippedStronghold: strongholdErr != nil,
+		Note:              note,
 	})
 }
 

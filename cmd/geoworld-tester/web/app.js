@@ -1284,7 +1284,7 @@ async function refreshStructureCandidates(){
     $('structureStatus').textContent=
       (mode==='all'?'详细结构候选 ':'主要结构候选 ')+
       structureSuffix+
-      (data.skippedStronghold?' · 强要塞暂不显示':'');
+      (data.skippedStronghold?' · 强要塞不可用':' · 含强要塞');
     renderFeatureOverlay();
   }catch(e){
     if(token!==structureLoadToken)return;
@@ -1377,11 +1377,13 @@ function structureSetName(id){
     'minecraft:trail_ruins':'古迹废墟',
     'minecraft:trial_chambers':'试炼密室',
     'minecraft:villages':'村庄',
-    'minecraft:woodland_mansions':'林地府邸'
+    'minecraft:woodland_mansions':'林地府邸',
+    'minecraft:strongholds':'强要塞'
   })[id]||id;
 }
 
 function structureMarkerKind(id){
+  if(id==='minecraft:strongholds')return 'stronghold';
   if(['minecraft:villages','minecraft:abandoned_camp','minecraft:pillager_outposts','minecraft:woodland_mansions'].includes(id))return 'settlement';
   if(['minecraft:ocean_monuments','minecraft:ocean_ruins','minecraft:shipwrecks'].includes(id))return 'ocean';
   if(['minecraft:ancient_cities','minecraft:mineshafts','minecraft:trial_chambers'].includes(id))return 'underground';
@@ -1395,12 +1397,15 @@ function showStructureDetail(candidate){
   el.hidden=false;
   const meta=structureCandidates?.sets?.[candidate.setId]||{};
   const variants=(meta.structures||[]).map(v=>String(v).replace('minecraft:','')).join(' / ');
+  const stronghold=candidate.setId==='minecraft:strongholds';
   el.textContent=
     structureSetName(candidate.setId)+
     ' · X '+candidate.x+', Z '+candidate.z+
     ' · Chunk '+candidate.chunkX+', '+candidate.chunkZ+
     (variants?' · 候选结构 '+variants:'')+
-    ' · 这是 Minecraft 26.3 原版 placement 候选，不代表 StructureStart 已确认生成。';
+    (stronghold
+      ? ' · 强要塞位置由 Minecraft 26.3 concentric-rings + GeoWorld 群系偏移规则精确规划，并经过原生实现逐点校验。'
+      : ' · 这是 Minecraft 26.3 原版 placement 候选，不代表 StructureStart 已确认生成。');
 }
 
 function overlayUnitScale(){
@@ -1603,7 +1608,7 @@ function renderFeatureOverlay(){
           className:'structure-cluster structure-'+markerKind,
           title:c=>{
             const name=broad
-              ? ({settlement:'聚落/据点',ocean:'海洋结构',underground:'地下结构',landmark:'地标结构',portal:'传送门',treasure:'宝藏'})[c.key]||'结构'
+              ? ({settlement:'聚落/据点',ocean:'海洋结构',underground:'地下结构',landmark:'地标结构',portal:'传送门',treasure:'宝藏',stronghold:'强要塞'})[c.key]||'结构'
               : structureSetName(c.key);
             return name+' · '+c.count+' 个候选 · 点击放大';
           },
@@ -1625,7 +1630,9 @@ function renderFeatureOverlay(){
         title.textContent=
           structureSetName(candidate.setId)+' · '+candidate.x+', '+candidate.z+
           ' · Chunk '+candidate.chunkX+', '+candidate.chunkZ+
-          ' · 原版 placement 候选';
+          (candidate.setId==='minecraft:strongholds'
+            ? ' · 精确强要塞位置'
+            : ' · 原版 placement 候选');
         mark.appendChild(title);
         mark.addEventListener('click',e=>{
           e.stopPropagation();

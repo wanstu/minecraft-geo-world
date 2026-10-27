@@ -262,6 +262,15 @@ tasks.register('verifyGeoWorldStructureSnapshot', JavaExec) {
     }
 }
 
+tasks.register('verifyGeoWorldStrongholdPreview', JavaExec) {
+    group = 'verification'
+    description = 'Proves the standalone Web stronghold planner matches Minecraft 26.3 concentric-ring and GeoWorld-biome bias behavior.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.minecraft.v26_3common.worldgen.GeoWorldV26_3StrongholdPreviewVerifier'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+}
+
 tasks.register('verifyGeoWorldSurfaceOutcrops', JavaExec) {
     group = 'verification'
     description = 'Checks rare high mountain ore outcrops in exposed vanilla stone and seam continuity.'
@@ -313,6 +322,7 @@ tasks.named('check') {
     dependsOn tasks.named('verifyGeoWorldShoreline')
     dependsOn tasks.named('verifyGeoWorldSurfaceBiome')
     dependsOn tasks.named('verifyGeoWorldStructureSnapshot')
+    dependsOn tasks.named('verifyGeoWorldStrongholdPreview')
     dependsOn tasks.named('verifyGeoWorldSurfaceOutcrops')
     dependsOn tasks.named('verifyGeoWorldMineralBodies')
     dependsOn tasks.named('verifyGeoWorldMinerals')
