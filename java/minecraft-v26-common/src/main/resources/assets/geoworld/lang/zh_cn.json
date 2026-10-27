@@ -72,7 +72,7 @@
   "geoworld.parameter.ocean_climate_strength.desc": "调高增强海洋对沿岸长期温湿度的影响；调低减弱海陆差异。不代表实时洋流。",
   "geoworld.parameter.prevailing_wind_strength.desc": "调高强化长期主导风、水汽输送和雨影；调低减弱。不会生成实时风场。",
   "geoworld.create.preview_pending": "当前参数尚未生成 GeoWorld 模型。",
-  "geoworld.create.generate_preview": "生成世界预览",
+  "geoworld.create.generate_preview": "生成世界模型",
   "geoworld.create.view_map": "查看世界地图",
   "geoworld.preview.title": "GeoWorld 世界预览",
   "geoworld.pause.preview": "GeoWorld 预览",

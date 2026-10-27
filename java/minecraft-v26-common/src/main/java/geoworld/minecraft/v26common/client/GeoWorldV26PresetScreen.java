@@ -133,10 +133,7 @@ public class GeoWorldV26PresetScreen extends Screen {
             worldgenAdapter,
             "worldgenAdapter"
         );
-        this.previewFactory = java.util.Objects.requireNonNull(
-            previewFactory,
-            "previewFactory"
-        );
+        this.previewFactory = previewFactory;
         this.screenNavigator = java.util.Objects.requireNonNull(
             screenNavigator,
             "screenNavigator"
@@ -344,12 +341,14 @@ public class GeoWorldV26PresetScreen extends Screen {
                 button -> this.generatePreview()
             ).width(152).build()
         );
-        this.viewMapButton = previewRow.addChild(
-            Button.builder(
-                Component.translatable("geoworld.create.view_map"),
-                button -> this.openPreviewMap()
-            ).width(152).build()
-        );
+        if (this.previewFactory != null) {
+            this.viewMapButton = previewRow.addChild(
+                Button.builder(
+                    Component.translatable("geoworld.create.view_map"),
+                    button -> this.openPreviewMap()
+                ).width(152).build()
+            );
+        }
         body.addChild(previewRow);
         this.statusText = body.addChild(
             new StringWidget(
@@ -512,7 +511,6 @@ public class GeoWorldV26PresetScreen extends Screen {
         if (
             this.doneButton == null ||
             this.previewButton == null ||
-            this.viewMapButton == null ||
             this.statusText == null
         ) {
             return;
@@ -524,7 +522,7 @@ public class GeoWorldV26PresetScreen extends Screen {
             if (!errors.isEmpty()) {
                 this.doneButton.active = false;
                 this.previewButton.active = false;
-                this.viewMapButton.active = false;
+                this.setViewMapActive(false);
                 this.statusText.setMessage(
                     Component.literal(errors.getFirst())
                 );
@@ -572,7 +570,9 @@ public class GeoWorldV26PresetScreen extends Screen {
             if (generated.isPresent()) {
                 GeoWorldEngineBridge.GeneratedModel model = generated.get();
                 this.doneButton.active = true;
-                this.viewMapButton.active = true;
+                if (this.viewMapButton != null) {
+                    this.viewMapButton.active = true;
+                }
                 this.statusText.setMessage(
                     Component.translatable(
                         "geoworld.create.preview_ready",
@@ -590,7 +590,7 @@ public class GeoWorldV26PresetScreen extends Screen {
                 );
             } else {
                 this.doneButton.active = false;
-                this.viewMapButton.active = false;
+                this.setViewMapActive(false);
                 if (!this.previewGenerating) {
                     this.statusText.setMessage(
                         Component.translatable(
@@ -602,7 +602,7 @@ public class GeoWorldV26PresetScreen extends Screen {
         } catch (NumberFormatException e) {
             this.doneButton.active = false;
             this.previewButton.active = false;
-            this.viewMapButton.active = false;
+            this.setViewMapActive(false);
             this.spanText.setMessage(Component.empty());
             this.statusText.setMessage(
                 Component.translatable("geoworld.create.invalid_number")
@@ -633,7 +633,7 @@ public class GeoWorldV26PresetScreen extends Screen {
         int serial = this.generationSerial;
         this.previewGenerating = true;
         this.previewButton.active = false;
-        this.viewMapButton.active = false;
+        this.setViewMapActive(false);
         this.doneButton.active = false;
         this.statusText.setMessage(
             Component.translatable("geoworld.create.preview_restoring")
@@ -691,7 +691,7 @@ public class GeoWorldV26PresetScreen extends Screen {
         int serial = ++this.generationSerial;
         this.previewGenerating = true;
         this.previewButton.active = false;
-        this.viewMapButton.active = false;
+        this.setViewMapActive(false);
         this.doneButton.active = false;
         this.statusText.setMessage(
             Component.translatable("geoworld.create.preview_generating")
@@ -710,7 +710,7 @@ public class GeoWorldV26PresetScreen extends Screen {
                     this.previewGenerating = false;
                     if (error != null) {
                         this.previewButton.active = true;
-                        this.viewMapButton.active = false;
+                        this.setViewMapActive(false);
                         this.doneButton.active = false;
                         this.statusText.setMessage(
                             Component.translatable(
@@ -726,7 +726,9 @@ public class GeoWorldV26PresetScreen extends Screen {
                         generated
                     );
                     this.validateForm();
-                    this.openPreviewMap();
+                    if (this.previewFactory != null) {
+                        this.openPreviewMap();
+                    }
                 });
             });
     }
@@ -764,7 +766,16 @@ public class GeoWorldV26PresetScreen extends Screen {
             .seed();
     }
 
+    private void setViewMapActive(boolean active) {
+        if (this.viewMapButton != null) {
+            this.viewMapButton.active = active;
+        }
+    }
+
     private void openPreviewMap() {
+        if (this.previewFactory == null) {
+            return;
+        }
         GeoWorldV26CreationSession
             .generated(this.parent.getUiState())
             .ifPresent(generated ->

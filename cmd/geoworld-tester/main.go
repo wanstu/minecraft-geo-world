@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha256"
+	"crypto/subtle"
 	"embed"
 	"encoding/json"
 	"errors"
@@ -108,15 +109,54 @@ type anomalyReport struct {
 }
 
 type appState struct {
-	mu         sync.RWMutex
-	active     *activeWorld
-	generating bool
-	exporting  bool
-	stage      generator.Stage
-	completed  int
-	total      int
-	startedAt  time.Time
-	lastError  string
+	mu          sync.RWMutex
+	active      *activeWorld
+	generating  bool
+	exporting   bool
+	stage       generator.Stage
+	completed   int
+	total       int
+	startedAt   time.Time
+	lastError   string
+	gameToken   string
+	gameClient  string
+	gameSession gameSessionState
+}
+
+type gameSessionState struct {
+	Managed                bool   `json:"managed"`
+	State                  string `json:"state"`
+	Client                 string `json:"client,omitempty"`
+	WorldName              string `json:"worldName,omitempty"`
+	MinecraftVersion       string `json:"minecraftVersion,omitempty"`
+	Seed                   int64  `json:"seed,omitempty"`
+	WorldProfileVersion    string `json:"worldProfileVersion,omitempty"`
+	GenerationRulesVersion string `json:"generationRulesVersion,omitempty"`
+	WorldModelVersion      string `json:"worldModelVersion,omitempty"`
+	DynamicWorldgen        bool   `json:"dynamicWorldgen,omitempty"`
+	Message                string `json:"message,omitempty"`
+	Revision               uint64 `json:"revision"`
+}
+
+type gameSessionRequest struct {
+	Action                  string `json:"action"`
+	State                   string `json:"state"`
+	Client                  string `json:"client"`
+	Message                 string `json:"message"`
+	WorldName               string `json:"worldName"`
+	WorldDirectory          string `json:"worldDirectory"`
+	ModelPath               string `json:"modelPath"`
+	BindingVersion          int    `json:"bindingVersion"`
+	MinecraftVersion        string `json:"minecraftVersion"`
+	ModelSchemaVersion      int    `json:"modelSchemaVersion"`
+	GeneratorVersion        string `json:"generatorVersion"`
+	Seed                    int64  `json:"seed"`
+	WorldProfileVersion     string `json:"worldProfileVersion"`
+	GenerationRulesVersion  string `json:"generationRulesVersion"`
+	WorldModelVersion       string `json:"worldModelVersion"`
+	Preset                  string `json:"preset"`
+	ParameterSnapshotSHA256 string `json:"parameterSnapshotSha256"`
+	DynamicWorldgen         bool   `json:"dynamicWorldgen"`
 }
 
 type generateRequest struct {
@@ -180,6 +220,8 @@ func main() {
 	addr := flag.String("addr", "0.0.0.0:8788", "listen address")
 	openBrowser := flag.Bool("open", false, "open browser automatically")
 	modelDir := flag.String("models", filepath.FromSlash("output/models"), "saved model directory")
+	gameToken := flag.String("game-token", "", "private Minecraft game-session control token")
+	gameClient := flag.String("game-client", "", "Minecraft game-session client label")
 	flag.Parse()
 
 	repoRoot, err := findRepoRoot()
@@ -188,7 +230,19 @@ func main() {
 		repoRoot = ""
 	}
 
-	state := &appState{}
+	state := &appState{
+		gameToken:  strings.TrimSpace(*gameToken),
+		gameClient: strings.TrimSpace(*gameClient),
+	}
+	if state.gameToken != "" {
+		state.gameSession = gameSessionState{
+			Managed:  true,
+			State:    "menu",
+			Client:   state.gameClient,
+			Message:  "Minecraft 已启动，当前尚未进入 GeoWorld 世界",
+			Revision: 1,
+		}
+	}
 	if err := os.MkdirAll(*modelDir, 0o755); err != nil {
 		log.Fatal(err)
 	}
@@ -204,6 +258,7 @@ func main() {
 		staticHandler.ServeHTTP(w, r)
 	}))
 	mux.HandleFunc("/api/status", state.handleStatus)
+	mux.HandleFunc("/api/game/session", state.handleGameSession)
 	mux.HandleFunc("/api/generate", state.handleGenerate)
 	mux.HandleFunc("/api/sample", state.handleSample)
 	mux.HandleFunc("/api/anomalies", state.handleAnomalies)
@@ -256,7 +311,170 @@ func (s *appState) handleStatus(w http.ResponseWriter, r *http.Request) {
 	if s.active != nil {
 		resp["active"] = activeSummary(s.active)
 	}
+	if s.gameSession.Managed {
+		resp["gameSession"] = s.gameSession
+	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func (s *appState) handleGameSession(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+	s.mu.RLock()
+	gameToken := s.gameToken
+	s.mu.RUnlock()
+	if gameToken == "" {
+		http.NotFound(w, r)
+		return
+	}
+	providedToken := r.Header.Get("X-GeoWorld-Game-Token")
+	if len(providedToken) != len(gameToken) ||
+		subtle.ConstantTimeCompare([]byte(providedToken), []byte(gameToken)) != 1 {
+		writeError(w, http.StatusUnauthorized, errors.New("invalid game-session token"))
+		return
+	}
+
+	var req gameSessionRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	switch strings.TrimSpace(req.Action) {
+	case "unbind":
+		state := strings.TrimSpace(req.State)
+		switch state {
+		case "menu", "non_geoworld", "incompatible":
+		default:
+			state = "menu"
+		}
+		client := strings.TrimSpace(req.Client)
+		if client == "" {
+			client = s.gameClient
+		}
+		message := strings.TrimSpace(req.Message)
+		if message == "" {
+			message = "当前没有已绑定的 GeoWorld 世界"
+		}
+
+		s.mu.Lock()
+		s.active = nil
+		s.lastError = ""
+		revision := s.gameSession.Revision + 1
+		s.gameSession = gameSessionState{
+			Managed:  true,
+			State:    state,
+			Client:   client,
+			Message:  message,
+			Revision: revision,
+		}
+		session := s.gameSession
+		s.mu.Unlock()
+		writeJSON(w, http.StatusOK, map[string]any{
+			"gameSession": session,
+		})
+		return
+
+	case "bind":
+		if req.BindingVersion < 2 {
+			writeError(w, http.StatusConflict, errors.New("GeoWorld binding version is not fully locked"))
+			return
+		}
+		if strings.TrimSpace(req.MinecraftVersion) != "26.3" {
+			writeError(w, http.StatusConflict, fmt.Errorf(
+				"Minecraft version mismatch: game=%q webui=%q",
+				req.MinecraftVersion,
+				"26.3",
+			))
+			return
+		}
+		if req.ModelSchemaVersion <= 0 ||
+			strings.TrimSpace(req.GeneratorVersion) == "" ||
+			strings.TrimSpace(req.WorldProfileVersion) == "" ||
+			strings.TrimSpace(req.GenerationRulesVersion) == "" ||
+			strings.TrimSpace(req.WorldModelVersion) == "" ||
+			strings.TrimSpace(req.Preset) == "" ||
+			strings.TrimSpace(req.ParameterSnapshotSHA256) == "" {
+			writeError(w, http.StatusConflict, errors.New("GeoWorld game identity is incomplete"))
+			return
+		}
+		modelPath := strings.TrimSpace(req.ModelPath)
+		if modelPath == "" {
+			writeError(w, http.StatusBadRequest, errors.New("modelPath is required"))
+			return
+		}
+
+		active, err := loadActiveWorldFromPath(modelPath, "game")
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("load game GeoWorld model: %w", err))
+			return
+		}
+		manifest := active.reopened.Manifest
+		if manifest.SchemaVersion != req.ModelSchemaVersion ||
+			manifest.GeneratorVersion != req.GeneratorVersion ||
+			manifest.Seed != req.Seed ||
+			manifest.WorldProfileVersion != req.WorldProfileVersion ||
+			manifest.GenerationRulesVersion != req.GenerationRulesVersion ||
+			manifest.WorldModelVersion != req.WorldModelVersion ||
+			manifest.Preset != req.Preset ||
+			manifest.ParameterSnapshotSHA256 != req.ParameterSnapshotSHA256 {
+			writeError(w, http.StatusConflict, errors.New(
+				"GeoWorld model identity does not match the running game process",
+			))
+			return
+		}
+
+		client := strings.TrimSpace(req.Client)
+		if client == "" {
+			client = s.gameClient
+		}
+		worldName := strings.TrimSpace(req.WorldName)
+		if worldName == "" {
+			worldName = filepath.Base(strings.TrimSpace(req.WorldDirectory))
+		}
+
+		s.mu.Lock()
+		if s.generating || s.exporting {
+			s.mu.Unlock()
+			writeError(w, http.StatusConflict, errors.New(
+				"WebUI is busy and cannot switch to the game world yet",
+			))
+			return
+		}
+		s.active = active
+		s.lastError = ""
+		revision := s.gameSession.Revision + 1
+		s.gameSession = gameSessionState{
+			Managed:                true,
+			State:                  "bound",
+			Client:                 client,
+			WorldName:              worldName,
+			MinecraftVersion:       req.MinecraftVersion,
+			Seed:                   req.Seed,
+			WorldProfileVersion:    req.WorldProfileVersion,
+			GenerationRulesVersion: req.GenerationRulesVersion,
+			WorldModelVersion:      req.WorldModelVersion,
+			DynamicWorldgen:        req.DynamicWorldgen,
+			Message:                "已自动加载当前游戏中的 GeoWorld 世界",
+			Revision:               revision,
+		}
+		session := s.gameSession
+		s.mu.Unlock()
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"active":      activeSummary(active),
+			"gameSession": session,
+		})
+		return
+
+	default:
+		writeError(w, http.StatusBadRequest, errors.New("action must be bind or unbind"))
+		return
+	}
 }
 
 func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
@@ -697,27 +915,15 @@ func (s *appState) handleSave(w http.ResponseWriter, r *http.Request, modelDir s
 	writeJSON(w, http.StatusOK, map[string]any{"name": name, "info": info})
 }
 
-func (s *appState) handleLoad(w http.ResponseWriter, r *http.Request, modelDir string) {
-	if r.Method != http.MethodPost {
-		methodNotAllowed(w)
-		return
-	}
-	var req loadRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
-	}
-	name := sanitizeName(req.Name)
-	if name == "" {
-		writeError(w, http.StatusBadRequest, errors.New("model name is required"))
-		return
-	}
-	path := filepath.Join(modelDir, name+".geoworld")
+func loadActiveWorldFromPath(path, source string) (*activeWorld, error) {
 	start := time.Now()
-	model, err := worldmodelio.Load(path)
+	absolutePath, err := filepath.Abs(path)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err)
-		return
+		return nil, err
+	}
+	model, err := worldmodelio.Load(absolutePath)
+	if err != nil {
+		return nil, err
 	}
 	landComponents, majorLandComponents, largestLandShare := summarizeLand(model.Surface)
 	fragmentation := model.Config.Phase1.ContinentFragmentation
@@ -746,8 +952,7 @@ func (s *appState) handleLoad(w http.ResponseWriter, r *http.Request, modelDir s
 	}
 	runtimeWorld, err := runtimeworld.NewReopened(model)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err)
-		return
+		return nil, err
 	}
 	active := &activeWorld{
 		seed:                    model.Manifest.Seed,
@@ -768,15 +973,41 @@ func (s *appState) handleLoad(w http.ResponseWriter, r *http.Request, modelDir s
 		landComponents:          landComponents,
 		majorLandComponents:     majorLandComponents,
 		largestLandShare:        largestLandShare,
-		source:                  "reopened",
+		source:                  source,
 		reopened:                model,
-		modelPath:               path,
+		modelPath:               absolutePath,
 		generatedAt:             time.Now(),
 		duration:                time.Since(start),
 	}
 	active.previewGrid = buildPreviewGrid(active)
 	applyAnomalyReport(active, buildAnomalyReport(active))
 	active.duration = time.Since(start)
+	return active, nil
+}
+
+func (s *appState) handleLoad(w http.ResponseWriter, r *http.Request, modelDir string) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+	var req loadRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	name := sanitizeName(req.Name)
+	if name == "" {
+		writeError(w, http.StatusBadRequest, errors.New("model name is required"))
+		return
+	}
+	active, err := loadActiveWorldFromPath(
+		filepath.Join(modelDir, name+".geoworld"),
+		"reopened",
+	)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 	s.mu.Lock()
 	s.active = active
 	s.lastError = ""

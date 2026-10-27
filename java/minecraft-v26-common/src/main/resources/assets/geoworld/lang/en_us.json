@@ -72,7 +72,7 @@
   "geoworld.parameter.ocean_climate_strength.desc": "Higher strengthens the ocean's long-term coastal temperature and moisture influence; lower weakens land-sea contrast. This is not realtime ocean simulation.",
   "geoworld.parameter.prevailing_wind_strength.desc": "Higher strengthens long-term prevailing wind, moisture transport, and rain-shadow effects; lower weakens them. It does not create realtime wind.",
   "geoworld.create.preview_pending": "The current parameters have not generated a GeoWorld model yet.",
-  "geoworld.create.generate_preview": "Generate World Preview",
+  "geoworld.create.generate_preview": "Generate World Model",
   "geoworld.create.view_map": "View World Map",
   "geoworld.preview.title": "GeoWorld World Preview",
   "geoworld.pause.preview": "GeoWorld Preview",

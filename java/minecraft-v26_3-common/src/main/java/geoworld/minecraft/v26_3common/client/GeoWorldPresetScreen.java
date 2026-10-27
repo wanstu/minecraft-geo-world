@@ -53,7 +53,7 @@ public final class GeoWorldPresetScreen extends GeoWorldV26PresetScreen {
             parent,
             settings,
             WORLDGEN,
-            GeoWorldPreviewScreen::new,
+            null,
             screen -> Minecraft.getInstance().gui.setScreen(screen)
         );
     }

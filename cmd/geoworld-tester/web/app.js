@@ -11,7 +11,7 @@ let renderedSeed=null;
 let modelNameTouched=false;
 let exportNameTouched=false;
 let lastExport=null;
-const MAX_MAP_ZOOM=64;
+const MAX_MAP_ZOOM=1024;
 const FULL_DETAIL_ZOOM=MAX_MAP_ZOOM;
 let mapZoom=1;
 let mapPanX=0;
@@ -32,10 +32,15 @@ let mineralBridgeUnavailable=false;
 let structureCandidates=null;
 let structureLoadToken=0;
 let structureRefreshTimer=null;
+let featureRenderTimer=null;
 let touchPoints=new Map();
 let pinchStartDistance=0;
 let pinchStartZoom=1;
 let acceptanceData=null;
+let gameSession=null;
+let gameSessionRevision=0;
+let syncingGameSession=false;
+let inspectorTab='layers';
 let currentPage='world';
 
 const stageNames={
@@ -159,21 +164,29 @@ function clampMapZoom(v){
   return Math.max(1,Math.min(MAX_MAP_ZOOM,v));
 }
 
+function scheduleFeatureRender(delay=120){
+  if(featureRenderTimer)clearTimeout(featureRenderTimer);
+  featureRenderTimer=setTimeout(()=>{
+    featureRenderTimer=null;
+    renderFeatureOverlay();
+  },delay);
+}
+
 function applyMapTransform(){
   const img=$('map');
   const wrap=$('mapWrap');
   img.style.transform=`translate(${mapPanX}px,${mapPanY}px) scale(${mapZoom})`;
   wrap.classList.toggle('zoomed',mapZoom>1.001);
-  $('mapZoomLabel').textContent=mapZoom.toFixed(1)+'×';
+  $('mapZoomLabel').textContent=(mapZoom>=100?Math.round(mapZoom):mapZoom.toFixed(1))+'×';
   updateActionState();
   requestAnimationFrame(()=>{
     renderExportOverlay();
     renderCursorOverlay();
     positionFeatureOverlay();
-    renderFeatureOverlay();
-    scheduleMineralRefresh();
-    scheduleStructureRefresh();
   });
+  scheduleFeatureRender();
+  scheduleMineralRefresh(180);
+  scheduleStructureRefresh(200);
 }
 
 function resetMapView(){
@@ -292,9 +305,10 @@ function renderExportOverlay(){
 }
 
 function updateActionState(){
-  $('generate').disabled=busy||!serviceOnline;
+  const gameBound=Boolean(gameSession&&gameSession.managed&&gameSession.state==='bound');
+  $('generate').disabled=busy||!serviceOnline||gameBound;
   $('save').disabled=busy||!serviceOnline||!active||active.source!=='generated';
-  $('load').disabled=busy||!serviceOnline||!$('models').value;
+  $('load').disabled=busy||!serviceOnline||!$('models').value||gameBound;
   $('exportMinecraft').disabled=busy||!serviceOnline||!active;
   $('openExport').disabled=busy||!serviceOnline||!lastExport;
   const mapDisabled=busy||!serviceOnline||!active||$('mapWrap').classList.contains('empty');
@@ -325,9 +339,146 @@ function stageLabel(stage){
   return stageNames[stage]||stage||'准备';
 }
 
+function renderGameSession(session){
+  const card=$('gameSessionCard');
+  if(!session||!session.managed){
+    card.hidden=true;
+    return;
+  }
+  card.hidden=false;
+  card.classList.toggle('bound',session.state==='bound');
+  card.classList.toggle('incompatible',session.state==='incompatible');
+  const badge=$('gameSessionBadge');
+  badge.textContent=({
+    bound:'已绑定',
+    incompatible:'版本不兼容',
+    non_geoworld:'非 GeoWorld 世界',
+    menu:'等待世界'
+  })[session.state]||'已连接';
+  const detail=$('gameSessionDetail');
+  if(session.state==='bound'){
+    detail.innerHTML=
+      '<b>'+escapeHtml(session.worldName||'GeoWorld 世界')+'</b>'+
+      ' · Seed '+escapeHtml(String(session.seed))+'<br>'+
+      'Minecraft '+escapeHtml(session.minecraftVersion||'—')+
+      ' · '+escapeHtml(session.generationRulesVersion||'—')+
+      '<br>'+escapeHtml(session.worldModelVersion||'—')+
+      (session.dynamicWorldgen?' · 动态世界生成':' · 已绑定世界模型');
+  }else{
+    detail.textContent=session.message||'当前没有已绑定的 GeoWorld 世界。';
+  }
+}
+
+function clearGameWorldView(session){
+  ++mapLoadToken;
+  active=null;
+  acceptanceData=null;
+  previewFeatures=null;
+  resetMineralPreview();
+  resetStructurePreview();
+  clearAcceptanceView();
+  clearSample();
+  clearExportResult();
+  lastFocusPoint=null;
+  renderedSeed=null;
+  if(mapObjectURL){
+    URL.revokeObjectURL(mapObjectURL);
+    mapObjectURL=null;
+  }
+  $('map').removeAttribute('src');
+  $('mapWrap').classList.add('empty');
+  resetMapView();
+  renderFeatureOverlay();
+  renderEmptyStats();
+  renderHomeCurrentWorld();
+  const incompatible=session?.state==='incompatible';
+  $('topStatus').textContent=incompatible?'世界不兼容':'等待世界';
+  $('progressText').textContent=session?.message||'等待进入 GeoWorld 世界';
+  setMapNotice(
+    session?.message||'当前没有已绑定的 GeoWorld 世界。',
+    incompatible?'error':'warn'
+  );
+  updateActionState();
+}
+
+async function applyGameWorld(next,session){
+  active=next;
+  acceptanceData=null;
+  previewFeatures=null;
+  resetMineralPreview();
+  resetStructurePreview();
+  clearAcceptanceView();
+  clearExportResult();
+  clearSample();
+  resetMapView();
+
+  $('seed').value=active.seed;
+  $('width').value=active.geometry.Width;
+  $('height').value=active.geometry.Height;
+  const cell=active.geometry.Width>1
+    ? active.geometry.SpanXBlocks/(active.geometry.Width-1)
+    : 0;
+  if(cell===64||cell===128)$('cellSize').value=String(cell);
+  $('plates').value=active.plateCount;
+  $('ocean').value=active.oceanFraction;
+  $('fragmentation').value=active.continentFragmentation||0.35;
+  $('separation').value=active.continentSeparation||0.65;
+  $('worldPreset').value=active.worldPreset||'standard';
+  if(!$('worldPreset').querySelector(`option[value="${$('worldPreset').value}"]`)){
+    $('worldPreset').value='custom';
+  }
+  $('parameterCsv').value=active.worldPreset==='legacy'?'':(active.parameterCsv||'');
+  updateWorldProfileControls();
+  updateRangePreview();
+  updateContinentLabels();
+  syncContinentPreset();
+  if(!active.intermediateDiagnostics&&(layer==='raw'||layer==='coast')){
+    selectLayer('final',{load:false});
+  }
+
+  const worldName=session?.worldName||('Seed '+active.seed);
+  $('topStatus').textContent='游戏世界已连接';
+  $('progressText').textContent='已自动加载游戏中的 GeoWorld 世界：'+worldName;
+  $('modelName').value=worldName;
+  modelNameTouched=true;
+  $('modelMessage').innerHTML=
+    '<span class="ok">当前模型由 Minecraft 游戏进程自动绑定；世界身份和版本已双重校验。</span>';
+  if(!exportNameTouched||!$('exportName').value.trim()){
+    $('exportName').value=worldName+' QA';
+    exportNameTouched=false;
+  }
+  renderStats();
+  await loadMap();
+  await refreshFeatures();
+  renderHomeCurrentWorld();
+  updateActionState();
+}
+
+async function syncGameSessionStatus(status){
+  const session=status?.gameSession||null;
+  gameSession=session;
+  renderGameSession(session);
+  updateActionState();
+  if(!session||!session.managed)return;
+  const revision=Number(session.revision||0);
+  if(syncingGameSession||revision===gameSessionRevision)return;
+  syncingGameSession=true;
+  gameSessionRevision=revision;
+  try{
+    if(session.state==='bound'&&status.active){
+      await applyGameWorld(status.active,session);
+    }else{
+      clearGameWorldView(session);
+    }
+  }finally{
+    syncingGameSession=false;
+  }
+}
+
 async function refreshStatus(){
   try{
     const s=await api('/api/status');
+    await syncGameSessionStatus(s);
     if(s.generating){
       const pct=s.total?Math.round(s.completed/s.total*100):0;
       $('progressBar').style.width=pct+'%';
@@ -878,8 +1029,14 @@ async function refreshModels(selectName=''){
 }
 
 
-async function focusWorldPoint(x,z){
+async function focusWorldPoint(x,z,{preserveFeatureDetail=false}={}){
   if(!active)return;
+  openDetailPane();
+  $('detailEmpty').hidden=true;
+  if(!preserveFeatureDetail){
+    $('structureDetail').hidden=true;
+    $('mineralDetail').hidden=true;
+  }
   lastFocusPoint={x,z};
   if($('structureSearchX'))$('structureSearchX').value=String(Math.round(x));
   if($('structureSearchZ'))$('structureSearchZ').value=String(Math.round(z));
@@ -902,7 +1059,7 @@ function renderStats(){
   const g=active.geometry;
   const cell=g.Width>1?g.SpanXBlocks/(g.Width-1):0;
   $('stats').outerHTML=`<div id="stats">
-    ${kv('来源',active.source==='generated'?'刚生成':'模型重开')}
+    ${kv('来源',active.source==='generated'?'刚生成':active.source==='game'?'当前游戏世界':'模型重开')}
     ${kv('Seed',active.seed)}
     ${kv('网格',g.Width+' × '+g.Height)}
     ${kv('采样间距',Math.round(cell)+' 方块 / 点')}
@@ -941,39 +1098,67 @@ function renderStats(){
 function clearSample(){
   lastFocusPoint=null;
   $('cursor').style.display='none';
-  $('sampleEmpty').hidden=false;
+  if($('detailEmpty'))$('detailEmpty').hidden=false;
+  if($('structureDetail'))$('structureDetail').hidden=true;
+  if($('mineralDetail'))$('mineralDetail').hidden=true;
+  $('sampleEmpty').hidden=true;
   $('sample').hidden=true;
   $('sample').innerHTML='';
 }
 
+const SAMPLE_VALUE_ZH={
+  'Warm Ocean':'暖水海洋','Temperate Ocean':'温带海洋','Cold Ocean':'冷水海洋','Frozen Ocean':'冰冻海洋',
+  'Ice Sheet':'冰盖','Tundra':'苔原','Alpine':'高山带','Boreal Forest':'北方针叶林',
+  'Temperate Forest':'温带森林','Temperate Grassland':'温带草原','Temperate Desert':'温带荒漠',
+  'Mediterranean Shrubland':'地中海灌丛','Subtropical Forest':'亚热带森林','Hot Desert':'热带荒漠',
+  'Savanna':'热带草原','Tropical Monsoon Forest':'热带季风林','Tropical Rainforest':'热带雨林','Wetland':'湿地',
+  'Ocean':'海洋','Plain':'平原','Rolling Plain':'起伏平原','Hills':'丘陵','Foothills':'山麓','Mountain':'山地',
+  'Plateau':'高原','Floodplain':'泛滥平原','Alluvial Plain':'冲积平原','Alluvial Fan':'冲积扇','Canyon':'峡谷',
+  'Ocean Sand':'海底沙','Ocean Gravel':'海底砾石','Ice / Snow':'冰雪','Tundra Soil':'苔原土',
+  'Alpine Rock':'高山裸岩','Alpine Snow':'高山积雪','Forest Loam':'森林壤土','Podzol':'灰化土',
+  'Grass Loam':'草地壤土','Dry Grass Soil':'干草地土','Shrub Soil':'灌丛土','Desert Sand':'沙漠沙',
+  'Desert Gravel':'沙漠砾石','Alluvial Silt':'冲积粉砂','Wet Mud':'湿泥','Peat':'泥炭',
+  'None':'无','Tundra Sparse':'稀疏苔原植被','Alpine Sparse':'稀疏高山植被','Conifer Forest':'针叶林',
+  'Mixed Forest':'混交林','Broadleaf Forest':'阔叶林','Dense Rainforest':'茂密雨林','Monsoon Forest':'季风林',
+  'Grassland':'草原','Dry Grassland':'干旱草原','Shrubland':'灌丛','Desert Sparse':'稀疏荒漠植被',
+  'River':'河流','Lake':'湖泊','No Water':'无水体','Unknown':'未知'
+};
+
+function sampleValueZh(value){
+  const raw=String(value??'').trim();
+  return SAMPLE_VALUE_ZH[raw]||raw||'—';
+}
+
 function renderSample(s){
+  $('detailEmpty').hidden=true;
   $('sampleEmpty').hidden=true;
   $('sample').hidden=false;
+  const waterKind=sampleValueZh(s.waterKind);
   const water=s.waterSurfaceDefined
-    ?`${s.waterKind} · 水面 ${f(s.waterSurfaceElevation)} · 深度 ${f(s.waterDepth)}`
-    :s.waterKind;
+    ?`${waterKind} · 水面 ${f(s.waterSurfaceElevation)} · 深度 ${f(s.waterDepth)}`
+    :waterKind;
   $('sample').innerHTML=`
-    <div class="sample-section"><h3>最终地面 / 水体</h3>
+    <div class="sample-section"><h3>位置与水体</h3>
       ${kv('坐标',Math.round(s.x)+', '+Math.round(s.z))}
-      ${kv('地面高度',f(s.groundHeight))}
+      ${kv('模型地面高度',f(s.groundHeight))}
       ${kv('水体',water)}
+    </div>
+    <div class="sample-section"><h3>生态与地表</h3>
+      ${kv('生态区',sampleValueZh(s.ecoRegion))}
+      ${kv('生物群系',sampleValueZh(s.biomeFamily))}
+      ${kv('地形类型',sampleValueZh(s.terrainVariant))}
+      ${kv('地表方案',sampleValueZh(s.surfaceProfile))}
+      ${kv('植被方案',sampleValueZh(s.vegetationProfile))}
+    </div>
+    <details class="technical-detail"><summary>技术诊断</summary>
       ${kv('海洋判定权重',f(s.oceanEligibility))}
       ${kv('河流权重',f(s.riverWeight))}
-    </div>
-    <div class="sample-section"><h3>生态 / Minecraft</h3>
-      ${kv('生态区',s.ecoRegion)}
-      ${kv('生物群系',s.biomeFamily)}
-      ${kv('地形类型',s.terrainVariant)}
-      ${kv('地表方案',s.surfaceProfile)}
-      ${kv('植被方案',s.vegetationProfile)}
       ${kv('配置置信度',f(s.profileConfidence))}
-    </div>
-    <div class="sample-section"><h3>一致性检查</h3>
       ${kv('来源节点',s.sourceNode)}
       ${kv('来源是否陆地',s.sourceLand?'是':'否')}
       ${kv('语义回退',s.semanticFallback?'<span class="error">是</span>':'<span class="ok">否</span>')}
       ${kv('语义冲突',s.semanticMismatch?'<span class="error">是</span>':'<span class="ok">否</span>')}
-    </div>`;
+    </details>`;
 }
 
 function kv(k,v){return `<div class="kv"><span>${k}</span><b>${v}</b></div>`}
@@ -987,6 +1172,20 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':
 function escapeAttr(s){return escapeHtml(s)}
 
 
+function setInspectorTab(tab){
+  inspectorTab=tab;
+  document.querySelectorAll('.inspector-tab').forEach(button=>
+    button.classList.toggle('active',button.dataset.inspectorTab===tab)
+  );
+  document.querySelectorAll('.inspector-pane').forEach(pane=>
+    pane.classList.toggle('active',pane.dataset.inspectorPane===tab)
+  );
+}
+
+function openDetailPane(){
+  setInspectorTab('detail');
+  if(window.matchMedia('(max-width: 1250px)').matches)setMobileSheet('features',true);
+}
 function navigatePage(page){
   currentPage=page;
   document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+page));
@@ -1245,7 +1444,7 @@ function resetStructurePreview(){
   const detail=$('structureDetail');
   if(detail){detail.hidden=true;detail.textContent='';}
   const status=$('structureStatus');
-  if(status)status.textContent='低倍缩放按空间区域合并结构，只指示大概分布；16× / 32× / 48× 仍保持高精度聚合；缩放越大，区域越小、结构类型越精确；64× 最大缩放展开当前视野全部候选。';
+  if(status)status.textContent='低倍按空间区域聚合；缩放越大定位越精确；1024× 最大缩放才展开当前视野全部候选。';
 }
 
 function scheduleStructureRefresh(delay=300){
@@ -1269,8 +1468,8 @@ async function refreshStructureCandidates(){
   }
   const bounds=mineralViewportBounds();
   if(!bounds)return;
-  const mode=mapZoom>=8?'all':'major';
-  const limit=window.innerWidth<=1250?25000:50000;
+  const mode=mapZoom>=32?'all':'major';
+  const limit=window.innerWidth<=1250?6000:12000;
   const token=++structureLoadToken;
   $('structureStatus').textContent=mode==='all'?'正在加载当前视野的详细结构候选…':'正在加载当前视野的主要结构分布…';
   try{
@@ -1358,14 +1557,21 @@ function mineralSourceName(source){
 }
 
 function showMineralDetail(body){
+  openDetailPane();
+  $('detailEmpty').hidden=true;
+  $('sample').hidden=true;
+  $('sample').innerHTML='';
+  $('structureDetail').hidden=true;
   const el=$('mineralDetail');
   el.hidden=false;
-  el.textContent=
-    mineralName(body.mineral)+' · '+mineralSourceName(body.source)+
-    (body.large?' · 大型矿体':'')+
-    (body.outcrop?' · 可形成露头':'')+
-    ' · 中心 '+Math.round(body.x)+', Y '+Math.round(body.y)+', '+Math.round(body.z)+
-    ' · 长约 '+body.length.toFixed(1)+' · 半径约 '+body.radius.toFixed(1);
+  el.innerHTML=
+    '<div class="structure-detail-title">'+escapeHtml(mineralName(body.mineral))+'</div>'+
+    '<div class="structure-detail-grid">'+
+      '<span>矿体类型</span><b>'+escapeHtml(mineralSourceName(body.source))+'</b>'+
+      '<span>中心坐标</span><b>'+Math.round(body.x)+', '+Math.round(body.y)+', '+Math.round(body.z)+'</b>'+
+      '<span>规模</span><b>长约 '+Number(body.length).toFixed(1)+' · 半径约 '+Number(body.radius).toFixed(1)+'</b>'+
+      '<span>特征</span><b>'+((body.large?'大型矿体 · ':'')+(body.outcrop?'可形成露头':'地下矿体'))+'</b>'+
+    '</div>';
 }
 
 const STRUCTURE_SET_IDS=[
@@ -1514,6 +1720,11 @@ function openStructureInspector(){
 }
 
 function showStructureDetail(candidate){
+  openDetailPane();
+  $('detailEmpty').hidden=true;
+  $('sample').hidden=true;
+  $('sample').innerHTML='';
+  $('mineralDetail').hidden=true;
   const el=$('structureDetail');
   el.hidden=false;
   const meta=structureCandidates?.sets?.[candidate.setId]||{};
@@ -1536,6 +1747,11 @@ function showStructureDetail(candidate){
 }
 
 function showStructureClusterDetail(cluster){
+  openDetailPane();
+  $('detailEmpty').hidden=true;
+  $('sample').hidden=true;
+  $('sample').innerHTML='';
+  $('mineralDetail').hidden=true;
   const candidate=cluster.first;
   const el=$('structureDetail');
   el.hidden=false;
@@ -1561,7 +1777,7 @@ function showStructureClusterDetail(cluster){
         mapZoom<48?'精细区域':'极精细区域'
       )+'</b>'+
     '</div>'+
-    '<div class="structure-detail-note">图标落在该聚合区域内的真实候选位置，不使用几何平均产生虚假坐标；继续放大会缩小聚合范围，64× 时全部展开。</div>';
+    '<div class="structure-detail-note">图标落在该聚合区域内的真实候选位置；继续放大会逐步细分，1024× 最大缩放才展开当前视野全部候选。</div>';
   openStructureInspector();
 }
 
@@ -1608,7 +1824,7 @@ function renderStructureSearchResult(data){
   $('structureSearchLocate').onclick=()=>{
     centerMapOnWorld(candidate.x,candidate.z,Math.max(24,mapZoom));
     showStructureDetail(candidate);
-    void focusWorldPoint(candidate.x,candidate.z);
+    void focusWorldPoint(candidate.x,candidate.z,{preserveFeatureDetail:true});
   };
   $('structureSearchCopy').onclick=async()=>{
     const button=$('structureSearchCopy');
@@ -1808,8 +2024,11 @@ function structureSpatialCellPx(){
   if(mapZoom<16)return 125;
   if(mapZoom<24)return 92;
   if(mapZoom<32)return 68;
-  if(mapZoom<48)return 52;
-  return 40;
+  if(mapZoom<64)return 52;
+  if(mapZoom<128)return 38;
+  if(mapZoom<256)return 28;
+  if(mapZoom<512)return 20;
+  return 14;
 }
 
 function structureSpatialBudget(){
@@ -1817,9 +2036,12 @@ function structureSpatialBudget(){
   if(mapZoom<10)return 30;
   if(mapZoom<16)return 44;
   if(mapZoom<24)return 64;
-  if(mapZoom<32)return 96;
-  if(mapZoom<48)return 128;
-  return 160;
+  if(mapZoom<32)return 80;
+  if(mapZoom<64)return 100;
+  if(mapZoom<128)return 140;
+  if(mapZoom<256)return 200;
+  if(mapZoom<512)return 280;
+  return 400;
 }
 
 function clusterStructureCandidatesBySpace(items,{cellPx,key}){
@@ -2112,7 +2334,7 @@ function appendStructureSingleMarker(group,candidate){
   mark.addEventListener('click',e=>{
     e.stopPropagation();
     showStructureDetail(candidate);
-    void focusWorldPoint(candidate.x,candidate.z);
+    void focusWorldPoint(candidate.x,candidate.z,{preserveFeatureDetail:true});
   });
   group.appendChild(mark);
   return true;
@@ -2136,7 +2358,11 @@ function renderFeatureOverlay(){
   if(enabled.has('rivers')){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-rivers');
+    const riverFilter=$('riverFilter')?.value||'';
     for(const river of previewFeatures.rivers||[]){
+      if(riverFilter==='ocean'&&!river.oceanMouth)continue;
+      if(riverFilter==='lake'&&!river.lakeMouth)continue;
+      if(riverFilter==='regular'&&(river.oceanMouth||river.lakeMouth))continue;
       const a=worldToOverlay(river.x0,river.z0);
       const b=worldToOverlay(river.x1,river.z1);
       if((a.x<0&&b.x<0)||(a.x>1000&&b.x>1000)||(a.y<0&&b.y<0)||(a.y>1000&&b.y>1000))continue;
@@ -2173,8 +2399,12 @@ function renderFeatureOverlay(){
   if(enabled.has('minerals')&&mineralBodies){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-minerals');
+    const mineralFilter=$('mineralFilter')?.value||'';
+    const visibleMineralBodies=(mineralBodies.bodies||[]).filter(body=>
+      !mineralFilter||String(body.mineral||'')===mineralFilter
+    );
     if(mapZoom<FULL_DETAIL_ZOOM-.001){
-      const clusters=aggregateOverlayItemsByKey(mineralBodies.bodies||[],{
+      const clusters=aggregateOverlayItemsByKey(visibleMineralBodies,{
         point:body=>worldToOverlay(body.x,body.z),
         key:body=>String(body.mineral||'UNKNOWN')
       });
@@ -2189,7 +2419,7 @@ function renderFeatureOverlay(){
       }
     }else{
       const worldScale=(active.geometry.SpanXBlocks+active.geometry.SpanZBlocks)/2;
-      for(const body of mineralBodies.bodies||[]){
+      for(const body of visibleMineralBodies){
         const a=worldToOverlay(body.startX,body.startZ);
         const m=worldToOverlay(body.midX,body.midZ);
         const b=worldToOverlay(body.endX,body.endZ);
@@ -2209,7 +2439,7 @@ function renderFeatureOverlay(){
         path.addEventListener('click',e=>{
           e.stopPropagation();
           showMineralDetail(body);
-          void focusWorldPoint(body.x,body.z);
+          void focusWorldPoint(body.x,body.z,{preserveFeatureDetail:true});
         });
         group.appendChild(path);
       }
@@ -2335,6 +2565,11 @@ $('mobileOpenSettings').onclick=()=>setMobileSheet('settings',true);
 $('mobileOpenFeatures').onclick=()=>setMobileSheet('features',true);
 $('mobileCloseSettings').onclick=()=>setMobileSheet('settings',false);
 $('mobileCloseFeatures').onclick=()=>setMobileSheet('features',false);
+
+document.querySelectorAll('.inspector-tab').forEach(button=>button.addEventListener('click',()=>{
+  setInspectorTab(button.dataset.inspectorTab);
+}));
+['riverFilter','mineralFilter'].forEach(id=>$(id).addEventListener('change',()=>renderFeatureOverlay()));
 
 document.querySelectorAll('.nav-item,.route-button').forEach(btn=>btn.addEventListener('click',()=>navigatePage(btn.dataset.page)));
 document.querySelectorAll('input[name="acceptanceType"]').forEach(radio=>radio.addEventListener('change',()=>{
