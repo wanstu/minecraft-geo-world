@@ -11,6 +11,8 @@ let renderedSeed=null;
 let modelNameTouched=false;
 let exportNameTouched=false;
 let lastExport=null;
+const MAX_MAP_ZOOM=32;
+const FULL_DETAIL_ZOOM=MAX_MAP_ZOOM;
 let mapZoom=1;
 let mapPanX=0;
 let mapPanY=0;
@@ -154,7 +156,7 @@ function clearExportResult({message=true}={}){
 }
 
 function clampMapZoom(v){
-  return Math.max(1,Math.min(16,v));
+  return Math.max(1,Math.min(MAX_MAP_ZOOM,v));
 }
 
 function applyMapTransform(){
@@ -296,10 +298,10 @@ function updateActionState(){
   $('exportMinecraft').disabled=busy||!serviceOnline||!active;
   $('openExport').disabled=busy||!serviceOnline||!lastExport;
   const mapDisabled=busy||!serviceOnline||!active||$('mapWrap').classList.contains('empty');
-  $('mapZoomIn').disabled=mapDisabled||mapZoom>=15.999;
+  $('mapZoomIn').disabled=mapDisabled||mapZoom>=MAX_MAP_ZOOM-.001;
   $('mapZoomOut').disabled=mapDisabled||mapZoom<=1.001;
   $('mapZoomReset').disabled=mapDisabled||(mapZoom<=1.001&&Math.abs(mapPanX)<0.5&&Math.abs(mapPanY)<0.5);
-  $('mobileZoomIn').disabled=mapDisabled||mapZoom>=15.999;
+  $('mobileZoomIn').disabled=mapDisabled||mapZoom>=MAX_MAP_ZOOM-.001;
   $('mobileZoomOut').disabled=mapDisabled||mapZoom<=1.001;
   $('jumpToCoord').disabled=mapDisabled;
   $('acceptanceGenerate').disabled=busy||!serviceOnline||!active;
@@ -1241,7 +1243,7 @@ function resetStructurePreview(){
   const detail=$('structureDetail');
   if(detail){detail.hidden=true;detail.textContent='';}
   const status=$('structureStatus');
-  if(status)status.textContent='低倍缩放按空间区域合并结构，只指示大概分布；缩放越大，区域越小、结构类型越精确；16× 最大缩放展开当前视野全部候选。';
+  if(status)status.textContent='低倍缩放按空间区域合并结构，只指示大概分布；缩放越大，区域越小、结构类型越精确；32× 最大缩放展开当前视野全部候选。';
 }
 
 function scheduleStructureRefresh(delay=300){
@@ -1284,7 +1286,7 @@ async function refreshStructureCandidates(){
     const visibleTypes=new Set((data.candidates||[]).map(candidate=>candidate.setId)).size;
     $('structureStatus').textContent=
       structureSuffix+' · '+visibleTypes+' 种结构 · '+
-      (mapZoom>=15.999
+      (mapZoom>=FULL_DETAIL_ZOOM-.001
         ? '最大缩放：当前视野全部展开'
         : mapZoom<4
           ? '概略显示：按空间区域显示少量真实代表位置'
@@ -1478,7 +1480,7 @@ function showStructureClusterDetail(cluster){
         mapZoom<5?'概略区域':mapZoom<10?'区域分类':mapZoom<13?'细分区域':'高精度区域'
       )+'</b>'+
     '</div>'+
-    '<div class="structure-detail-note">图标落在该聚合区域内的真实候选位置，不使用几何平均产生虚假坐标；继续放大会缩小聚合范围，16× 时全部展开。</div>';
+    '<div class="structure-detail-note">图标落在该聚合区域内的真实候选位置，不使用几何平均产生虚假坐标；继续放大会缩小聚合范围，32× 时全部展开。</div>';
   openStructureInspector();
 }
 
@@ -1636,15 +1638,17 @@ function structureSpatialGroupingKey(candidate){
 function structureSpatialCellPx(){
   if(mapZoom<5)return 210;
   if(mapZoom<10)return 160;
-  if(mapZoom<13)return 125;
-  return 92;
+  if(mapZoom<16)return 125;
+  if(mapZoom<24)return 92;
+  return 68;
 }
 
 function structureSpatialBudget(){
   if(mapZoom<5)return 18;
   if(mapZoom<10)return 30;
-  if(mapZoom<13)return 44;
-  return 64;
+  if(mapZoom<16)return 44;
+  if(mapZoom<24)return 64;
+  return 96;
 }
 
 function clusterStructureCandidatesBySpace(items,{cellPx,key}){
@@ -1874,25 +1878,6 @@ function appendClusterMarker(group,cluster,{className,title,targetZoom,radiusSca
   group.appendChild(marker);
 }
 
-function structureDisplayLevel(){
-  if(mapZoom<2.5)return 'overview';
-  if(mapZoom<5)return 'regional';
-  if(mapZoom<8)return 'near';
-  if(mapZoom<12)return 'detail';
-  if(mapZoom<16)return 'precision';
-  return 'raw';
-}
-
-function structureClusterZoom(){
-  const level=structureDisplayLevel();
-  if(level==='overview')return 3.1;
-  if(level==='regional')return 5.4;
-  if(level==='near')return 8.5;
-  if(level==='detail')return 12.5;
-  if(level==='precision')return 16.5;
-  return Math.min(24,mapZoom*1.35);
-}
-
 function structureClusterPriority(cluster){
   const kind=cluster.first?structureMarkerKind(cluster.first.setId):cluster.key;
   if(kind==='stronghold')return 100;
@@ -2017,7 +2002,7 @@ function renderFeatureOverlay(){
   if(enabled.has('minerals')&&mineralBodies){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-minerals');
-    if(mapZoom<15.999){
+    if(mapZoom<FULL_DETAIL_ZOOM-.001){
       const clusters=aggregateOverlayItemsByKey(mineralBodies.bodies||[],{
         point:body=>worldToOverlay(body.x,body.z),
         key:body=>String(body.mineral||'UNKNOWN')
@@ -2028,7 +2013,7 @@ function renderFeatureOverlay(){
         appendClusterMarker(group,cluster,{
           className:'mineral-cluster mineral-'+mineral,
           title:c=>mineralName(c.key)+' · 当前视野 '+c.count+' 个矿体 · 最大缩放后全部展开',
-          targetZoom:()=>Math.min(16,Math.max(mapZoom*1.8,mapZoom+2))
+          targetZoom:()=>Math.min(MAX_MAP_ZOOM,Math.max(mapZoom*1.8,mapZoom+2))
         });
       }
     }else{
@@ -2067,7 +2052,7 @@ function renderFeatureOverlay(){
     const visibleCandidates=(structureCandidates.candidates||[]).filter(candidate=>
       overlayPointVisible(worldToOverlay(candidate.x,candidate.z),24)
     );
-    if(mapZoom<15.999){
+    if(mapZoom<FULL_DETAIL_ZOOM-.001){
       let clusters=clusterStructureCandidatesBySpace(visibleCandidates,{
         cellPx:structureSpatialCellPx(),
         key:structureSpatialGroupingKey
@@ -2084,7 +2069,7 @@ function renderFeatureOverlay(){
           title:c=>c.typeCount>1
             ? '该区域约 '+c.count+' 个候选 · '+c.typeCount+' 种结构 · 放大后继续拆分'
             : structureSetName(c.first.setId)+' · 该区域约 '+c.count+' 个候选 · 放大后继续拆分',
-          targetZoom:()=>Math.min(16,Math.max(mapZoom*1.65,mapZoom+1.5)),
+          targetZoom:()=>Math.min(MAX_MAP_ZOOM,Math.max(mapZoom*1.65,mapZoom+1.5)),
           radiusScale:markerKind==='stronghold'?1.05:1,
           glyphId:cluster.typeCount>1?'geoworld:mixed_structures':cluster.first.setId,
           onClick:showStructureClusterDetail
@@ -2101,7 +2086,7 @@ function renderFeatureOverlay(){
   if(enabled.has('peaks')){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-peaks');
-    if(mapZoom<15.999){
+    if(mapZoom<FULL_DETAIL_ZOOM-.001){
       const bounds=mineralViewportBounds();
       const visiblePeaks=(previewFeatures.peaks||[]).filter(peak=>
         !bounds||(peak.x>=bounds.minX&&peak.x<=bounds.maxX&&peak.z>=bounds.minZ&&peak.z<=bounds.maxZ)
@@ -2114,7 +2099,7 @@ function renderFeatureOverlay(){
         appendClusterMarker(group,cluster,{
           className:'peak-cluster',
           title:c=>'山峰 · 当前视野 '+c.count+' 个 · 最大缩放后全部展开',
-          targetZoom:()=>Math.min(16,Math.max(mapZoom*1.8,mapZoom+2)),
+          targetZoom:()=>Math.min(MAX_MAP_ZOOM,Math.max(mapZoom*1.8,mapZoom+2)),
           radiusScale:.9
         });
       }
