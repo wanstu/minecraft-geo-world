@@ -54,6 +54,7 @@ final class GeoWorldGameWebUi {
     private static volatile URI sessionUri;
     private static volatile int webUiPort = -1;
     private static volatile MinecraftServer boundServer;
+    private static volatile long webUiGeneration;
     private static final AtomicBoolean gameSyncInFlight = new AtomicBoolean();
     private static boolean syncLoopStarted;
     private static boolean shutdownHookRegistered;
@@ -64,6 +65,7 @@ final class GeoWorldGameWebUi {
         if (managed != null && managed.isAlive()) {
             return;
         }
+        webUiGeneration++;
         GeoWorldToolLauncher.ManagedProcess stale = managed;
         managed = null;
         webUiUri = null;
@@ -161,6 +163,7 @@ final class GeoWorldGameWebUi {
     }
 
     static synchronized void stop() {
+        webUiGeneration++;
         GeoWorldToolLauncher.ManagedProcess current = managed;
         managed = null;
         webUiUri = null;
@@ -326,6 +329,7 @@ final class GeoWorldGameWebUi {
 
     private static void syncGameState() {
         MinecraftServer server = boundServer;
+        long generation = webUiGeneration;
         if (
             server == null ||
             !isRunning() ||
@@ -335,7 +339,10 @@ final class GeoWorldGameWebUi {
         }
         try {
             server.execute(() -> {
-                if (boundServer != server) {
+                if (
+                    boundServer != server ||
+                    generation != webUiGeneration
+                ) {
                     gameSyncInFlight.set(false);
                     return;
                 }
@@ -351,8 +358,8 @@ final class GeoWorldGameWebUi {
                 );
                 CONTROL.execute(() -> {
                     try {
-                        postSession(payload, 1);
-                        pollGameControl(server);
+                        postSession(payload, 1, generation);
+                        pollGameControl(server, generation);
                     } finally {
                         gameSyncInFlight.set(false);
                     }
@@ -364,9 +371,16 @@ final class GeoWorldGameWebUi {
         }
     }
 
-    private static void pollGameControl(MinecraftServer server) {
+    private static void pollGameControl(
+        MinecraftServer server,
+        long generation
+    ) {
         URI base = webUiUri;
-        if (base == null || boundServer != server) {
+        if (
+            base == null ||
+            boundServer != server ||
+            generation != webUiGeneration
+        ) {
             return;
         }
         try {
@@ -381,6 +395,12 @@ final class GeoWorldGameWebUi {
                 request,
                 HttpResponse.BodyHandlers.ofString()
             );
+            if (
+                generation != webUiGeneration ||
+                boundServer != server
+            ) {
+                return;
+            }
             if (response.statusCode() == 204) {
                 return;
             }
@@ -416,7 +436,10 @@ final class GeoWorldGameWebUi {
                 return;
             }
             server.execute(() -> {
-                if (boundServer != server) {
+                if (
+                    boundServer != server ||
+                    generation != webUiGeneration
+                ) {
                     return;
                 }
                 var player = singleplayerOwner(server);
@@ -539,13 +562,21 @@ final class GeoWorldGameWebUi {
     }
 
     private static void postSessionAsync(String payload, int attempts) {
-        CONTROL.execute(() -> postSession(payload, attempts));
+        long generation = webUiGeneration;
+        CONTROL.execute(() -> postSession(payload, attempts, generation));
     }
 
-    private static void postSession(String payload, int attempts) {
+    private static void postSession(
+        String payload,
+        int attempts,
+        long generation
+    ) {
         for (int attempt = 1; attempt <= attempts; attempt++) {
             GeoWorldToolLauncher.ManagedProcess current;
             synchronized (GeoWorldGameWebUi.class) {
+                if (generation != webUiGeneration) {
+                    return;
+                }
                 current = managed;
             }
             if (current == null || !current.isAlive()) {
