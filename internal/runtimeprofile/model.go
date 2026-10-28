@@ -36,6 +36,9 @@ type Sample struct {
 	VegetationProfile mcprofile.VegetationProfile
 	ProfileConfidence float64
 
+	SpecialFeature         string
+	SpecialFeatureStrength float64
+
 	// SemanticFallback means no macro corner on the desired land/ocean side was
 	// available and the strongest corner had to be used. It should remain false
 	// for valid in-domain final-world samples.

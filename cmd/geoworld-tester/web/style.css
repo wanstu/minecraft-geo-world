@@ -19,6 +19,8 @@ label{display:block;color:#58677c;font-size:12px;margin-bottom:10px}input,select
 .game-session-card.bound{border-color:#b9dfcd;background:#f2fbf7}.game-session-card.bound .game-session-head span{background:#dff4e9;color:#18704e}
 .game-session-card.incompatible{border-color:#efc4c5;background:#fff6f6}.game-session-card.incompatible .game-session-head span{background:#fbe1e2;color:#a53b3f}
 .game-session-detail{margin-top:6px;font-size:11px;line-height:1.5;color:#69788c;overflow-wrap:anywhere}
+.game-player-position{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:8px;padding-top:7px;border-top:1px solid #dfe9e5;color:#35566a}.game-player-position code{padding:3px 6px;border-radius:5px;background:#e9f5ef;color:#176249;font-weight:700}.game-player-position button{min-height:26px;padding:0 8px;border:1px solid #b9d9cc;border-radius:6px;background:#fff;color:#176249;font-weight:700;cursor:pointer}.game-player-position.waiting{color:#8190a0}
+.controls.game-bound-readonly .panel-body{background:linear-gradient(#fbfdfc,#f7faf9)}.controls.game-bound-readonly input:disabled,.controls.game-bound-readonly select:disabled,.controls.game-bound-readonly button:disabled{opacity:.72;cursor:not-allowed}
 
 .inspector-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:10px 12px 8px;border-bottom:1px solid #edf1f6;background:#fff;position:sticky;top:0;z-index:5}
 .inspector-tab{padding:7px 5px;font-size:11px;border-radius:7px;background:#f6f8fb;color:#617086}
@@ -59,7 +61,8 @@ label{display:block;color:#58677c;font-size:12px;margin-bottom:10px}input,select
 .river-line.ocean-mouth{stroke:#64bee8}.river-line.lake-mouth{stroke:#66b7dd}
 .lake-shape{fill:#3197c5;fill-opacity:.42;stroke:#74c8e8;stroke-width:.65}
 .peak-mark{fill:#d85b4f;stroke:#fff;stroke-width:.7;pointer-events:all;cursor:pointer;filter:drop-shadow(0 1px 1px #0008)}
-.marker-sample.river{background:#4ba8df}.marker-sample.lake{background:#3197c5}.marker-sample.peak{background:#d85b4f}
+.marker-sample.river{background:#4ba8df}.marker-sample.lake{background:#3197c5}.marker-sample.peak{background:#d85b4f}.marker-sample.special{background:linear-gradient(135deg,#57a773 0 34%,#e07ba8 34% 67%,#a678c7 67% 100%)}
+.special-landscape-shape{fill:#d98db8;fill-opacity:.16;stroke:#b85b91;stroke-width:.8;vector-effect:non-scaling-stroke}.special-landscape-mark{fill:#b85b91;stroke:#fff;stroke-width:1;vector-effect:non-scaling-stroke;filter:drop-shadow(0 1px 1px #0006)}.special-mushroom_island .special-landscape-shape,.special-mushroom_island .special-landscape-mark{fill:#b56bc4;stroke:#8e4ca2}.special-pale_garden_island .special-landscape-shape,.special-pale_garden_island .special-landscape-mark{fill:#9ca8a2;stroke:#74847c}.special-cherry_island .special-landscape-shape,.special-cherry_island .special-landscape-mark,.special-volcanic_crater_cherry .special-landscape-shape,.special-volcanic_crater_cherry .special-landscape-mark,.special-basin_cherry .special-landscape-shape,.special-basin_cherry .special-landscape-mark{fill:#ee9bbb;stroke:#c96591}.special-sinkhole .special-landscape-shape,.special-sinkhole .special-landscape-mark{fill:#8f765f;stroke:#6f5946}.special-volcanic_crater_snow .special-landscape-shape,.special-volcanic_crater_snow .special-landscape-mark,.special-basin_snow .special-landscape-shape,.special-basin_snow .special-landscape-mark{fill:#b7d5e8;stroke:#789eb8}
 .not-ready-feature{margin:2px 14px 10px;padding:10px;border:1px dashed #d6dee8;border-radius:8px;background:#fafbfd;display:flex;gap:9px;align-items:flex-start;color:#6d7a8d}
 .not-ready-feature b{display:block;font-size:12px;color:#536176}.not-ready-feature small{display:block;line-height:1.45;margin-top:2px}
 .mobile-map-actions,.mobile-close{display:none}

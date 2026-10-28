@@ -209,6 +209,71 @@ public final class GeoWorldV26SurfaceBiomeVerifier {
                 }
             }
         }
+        // v1.1.11 no longer fabricates Mushroom Fields or Pale Garden
+        // through the generic biome-coverage reserve. Verify those biomes at
+        // their persisted special-island centers instead.
+        int specialSurfacePatches = 0;
+        for (var landscape : runtime.specialLandscapes()) {
+            String expectedBiome = switch (landscape.kind()) {
+                case "mushroom_island" -> "minecraft:mushroom_fields";
+                case "pale_garden_island" -> "minecraft:pale_garden";
+                default -> null;
+            };
+            if (expectedBiome == null || checked.contains(expectedBiome)) {
+                continue;
+            }
+
+            int x = (int)Math.round(landscape.centerX());
+            int z = (int)Math.round(landscape.centerZ());
+            var sample = runtime.sample(x, z);
+            int groundY = HEIGHTS.boundaryY(sample.groundHeight()) - 1;
+            String actualBiome = BIOMES.biomeId(runtime, x, groundY, z);
+            if (!expectedBiome.equals(actualBiome)) {
+                throw new AssertionError(
+                    "special landscape biome missing " + expectedBiome +
+                    " at " + x + "," + groundY + "," + z +
+                    " got " + actualBiome +
+                    " kind=" + landscape.kind()
+                );
+            }
+            String expectedTop = GeoWorldV26SurfaceMaterials.top(
+                expectedBiome,
+                sample.surfaceProfile(),
+                null
+            );
+            String actualTop = GeoWorldV26SurfaceMaterials.top(
+                actualBiome,
+                sample.surfaceProfile(),
+                null
+            );
+            if (!expectedTop.equals(actualTop)) {
+                throw new AssertionError(
+                    "special landscape surface mismatch " + expectedBiome +
+                    " at " + x + "," + z +
+                    " got=" + actualTop +
+                    " expected=" + expectedTop
+                );
+            }
+            String underneath = GeoWorldV26SurfaceMaterials.below(
+                actualBiome,
+                sample.surfaceProfile(),
+                null,
+                x,
+                groundY - 2,
+                z,
+                2
+            );
+            if (underneath == null) {
+                throw new AssertionError(
+                    "missing special landscape subsoil " + expectedBiome
+                );
+            }
+            checked.add(expectedBiome);
+            specialSurfacePatches++;
+            columns++;
+            materials += 2;
+        }
+
         if (!checked.equals(required)) {
             var missing = new HashSet<>(required);
             missing.removeAll(checked);
@@ -218,11 +283,13 @@ public final class GeoWorldV26SurfaceBiomeVerifier {
             GeoWorldV26SurfaceMaterials.Cover.CAVE, 0
         );
         int expectedSurfacePatches = required.size() - expectedCavePatches;
-        if (surfacePatches != expectedSurfacePatches ||
+        if (surfacePatches + specialSurfacePatches != expectedSurfacePatches ||
             cavePatches != expectedCavePatches) {
             throw new AssertionError(
                 "unexpected surface/cave distribution " +
-                surfacePatches + "/" + cavePatches +
+                (surfacePatches + specialSurfacePatches) + "/" + cavePatches +
+                " (coverage=" + surfacePatches +
+                ", special=" + specialSurfacePatches + ")" +
                 " expected " + expectedSurfacePatches + "/" + expectedCavePatches
             );
         }

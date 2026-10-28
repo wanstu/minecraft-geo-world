@@ -19,6 +19,7 @@ import (
 	"geoworld/internal/phase1"
 	"geoworld/internal/runtimeprofile"
 	"geoworld/internal/sampling"
+	"geoworld/internal/specialfeatures"
 	"geoworld/internal/terrain"
 	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
@@ -332,19 +333,20 @@ func Load(path string) (*RuntimeModel, error) {
 	}
 
 	return &RuntimeModel{
-		Manifest:       env.Manifest,
-		Config:         env.Payload.Config,
-		Geometry:       g,
-		Surface:        surface,
-		CoastTerrain:   coastTerrain,
-		Waterbed:       wb,
-		Runtime:        runtimeModel,
-		Ecology:        eco,
-		Profile:        profile,
-		RuntimeProfile: runtimeProfile,
-		ClimatePreview: restoreClimatePreview(env.Payload.ClimatePreview),
-		HydrologyQuery: hydrologyQuery,
-		TectonicQuery:  tectonicQuery,
+		Manifest:        env.Manifest,
+		Config:          env.Payload.Config,
+		Geometry:        g,
+		Surface:         surface,
+		CoastTerrain:    coastTerrain,
+		Waterbed:        wb,
+		Runtime:         runtimeModel,
+		Ecology:         eco,
+		Profile:         profile,
+		RuntimeProfile:  runtimeProfile,
+		ClimatePreview:  restoreClimatePreview(env.Payload.ClimatePreview),
+		HydrologyQuery:  hydrologyQuery,
+		TectonicQuery:   tectonicQuery,
+		SpecialFeatures: append([]specialfeatures.Feature(nil), env.Payload.SpecialFeatures...),
 	}, nil
 }
 
@@ -493,6 +495,7 @@ func snapshotFromWorldModel(m *generator.WorldModel) (payload, error) {
 			InfluenceFeature: append([]phase1.TectonicFeature(nil), m.Phase1.InfluenceFeature...),
 			Influence:        cloneFloat64(m.Phase1.TectonicInfluence),
 		},
+		SpecialFeatures: append([]specialfeatures.Feature(nil), m.SpecialFeatures...),
 		Ecology: ecologySnapshot{
 			LandMask:         append([]bool(nil), m.Ecology.LandMask...),
 			EcoRegion:        append([]ecology.Region(nil), m.Ecology.EcoRegion...),

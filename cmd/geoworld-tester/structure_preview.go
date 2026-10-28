@@ -10,6 +10,10 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"geoworld/internal/mcprofile"
+	"geoworld/internal/reconcile"
+	"geoworld/internal/runtimeprofile"
 )
 
 //go:embed structure_data/minecraft-26.3.json
@@ -62,11 +66,14 @@ type structureVectorSnapshot struct {
 }
 
 type structureCandidate struct {
-	SetID  string `json:"setId"`
-	ChunkX int    `json:"chunkX"`
-	ChunkZ int    `json:"chunkZ"`
-	X      int    `json:"x"`
-	Z      int    `json:"z"`
+	SetID     string `json:"setId"`
+	ChunkX    int    `json:"chunkX"`
+	ChunkZ    int    `json:"chunkZ"`
+	X         int    `json:"x"`
+	Y         int    `json:"y"`
+	Z         int    `json:"z"`
+	GeoStatus string `json:"geoStatus,omitempty"`
+	GeoReason string `json:"geoReason,omitempty"`
 }
 
 type structureSetPreviewInfo struct {
@@ -83,6 +90,10 @@ type structurePreviewResponse struct {
 	Returned          int                                `json:"returned"`
 	Truncated         bool                               `json:"truncated"`
 	SkippedStronghold bool                               `json:"skippedStronghold"`
+	GeoFiltered       int                                `json:"geoFiltered"`
+	GeoPassed         int                                `json:"geoPassed"`
+	GeoUnknown        int                                `json:"geoUnknown"`
+	Exact             int                                `json:"exact"`
 	Note              string                             `json:"note"`
 }
 
@@ -250,8 +261,14 @@ func (s *appState) handleStructureCandidates(w http.ResponseWriter, r *http.Requ
 	}
 
 	limit := parseBoundedInt(r.URL.Query().Get("limit"), 30000, 100, 50000)
-	candidates, total := predictStructureCandidates(
-		active.seed, snapshot, mode, minX, maxX, minZ, maxZ, limit,
+	accept := func(candidate structureCandidate) bool {
+		return structureGeoCompatible(
+			candidate.SetID,
+			active.sample(float64(candidate.X), float64(candidate.Z)),
+		)
+	}
+	candidates, total, geoFiltered := predictStructureCandidates(
+		active.seed, snapshot, mode, minX, maxX, minZ, maxZ, limit, accept,
 	)
 	randomTotal := total
 	randomReturned := len(candidates)
@@ -264,6 +281,29 @@ func (s *appState) handleStructureCandidates(w http.ResponseWriter, r *http.Requ
 			}
 			candidates = append(candidates, candidate)
 			total++
+		}
+	}
+
+	geoPassed, geoUnknown, exactCount := 0, 0, 0
+	for i := range candidates {
+		sample := active.sample(
+			float64(candidates[i].X),
+			float64(candidates[i].Z),
+		)
+		candidates[i].Y = minecraft26TeleportY(sample)
+		if candidates[i].SetID == "minecraft:strongholds" {
+			candidates[i].GeoStatus = "exact"
+			candidates[i].GeoReason = "Minecraft 26.3 同心环位置，并应用 GeoWorld 群系偏移搜索。"
+			exactCount++
+			continue
+		}
+		candidates[i].GeoStatus, candidates[i].GeoReason =
+			structureGeoAssessment(candidates[i].SetID, sample)
+		switch candidates[i].GeoStatus {
+		case "pass":
+			geoPassed++
+		case "unknown":
+			geoUnknown++
 		}
 	}
 
@@ -280,7 +320,7 @@ func (s *appState) handleStructureCandidates(w http.ResponseWriter, r *http.Requ
 		sets[candidate.SetID] = structureSetPreviewInfo{Structures: structures}
 	}
 
-	note := "普通结构点与 Minecraft 26.3 原版 StructureSet placement 候选 chunk 同源；最终 StructureStart 仍由群系、结构合法性与生成检查决定。"
+	note := "普通结构点与 Minecraft 26.3 原版 StructureSet placement 候选 chunk 同源；已按 GeoWorld 当前水体/生态剔除可高置信判断为不兼容的候选，复杂地下或多条件结构仍保持候选身份。"
 	if strongholdErr == nil {
 		note += " 强要塞使用 Minecraft 26.3 concentric-rings 规则与 GeoWorld 群系偏移搜索，构建时会与 Minecraft 原生实现逐点校验。"
 	} else {
@@ -293,6 +333,10 @@ func (s *appState) handleStructureCandidates(w http.ResponseWriter, r *http.Requ
 		Total: total, Returned: len(candidates),
 		Truncated:         randomReturned < randomTotal,
 		SkippedStronghold: strongholdErr != nil,
+		GeoFiltered:       geoFiltered,
+		GeoPassed:         geoPassed,
+		GeoUnknown:        geoUnknown,
+		Exact:             exactCount,
 		Note:              note,
 	})
 }
@@ -384,6 +428,12 @@ func (s *appState) handleStructureSearch(w http.ResponseWriter, r *http.Request)
 			active.seed, snapshot, id,
 			queryX, queryZ,
 			modelMinX, modelMaxX, modelMinZ, modelMaxZ,
+			func(candidate structureCandidate) bool {
+				return structureGeoCompatible(
+					candidate.SetID,
+					active.sample(float64(candidate.X), float64(candidate.Z)),
+				)
+			},
 		)
 		if ok && distance < bestDistance {
 			bestDistance = distance
@@ -396,6 +446,15 @@ func (s *appState) handleStructureSearch(w http.ResponseWriter, r *http.Request)
 	if !found {
 		writeError(w, http.StatusNotFound, errors.New("no matching structure candidate inside the current World Model"))
 		return
+	}
+	bestSample := active.sample(float64(best.X), float64(best.Z))
+	best.Y = minecraft26TeleportY(bestSample)
+	if exactStronghold {
+		best.GeoStatus = "exact"
+		best.GeoReason = "Minecraft 26.3 同心环位置，并应用 GeoWorld 群系偏移搜索。"
+	} else {
+		best.GeoStatus, best.GeoReason =
+			structureGeoAssessment(best.SetID, bestSample)
 	}
 	writeJSON(w, http.StatusOK, structureSearchResponse{
 		Seed: active.seed, QueryX: queryX, QueryZ: queryZ,
@@ -410,6 +469,7 @@ func findNearestRandomSpreadCandidate(
 	setID string,
 	queryX, queryZ int,
 	modelMinX, modelMaxX, modelMinZ, modelMaxZ int,
+	accept func(structureCandidate) bool,
 ) (structureCandidate, float64, bool) {
 	set, ok := snapshot.StructureSets[setID]
 	if !ok || set.Placement.Type != "minecraft:random_spread" {
@@ -477,10 +537,14 @@ func findNearestRandomSpreadCandidate(
 		if x < modelMinX || x > modelMaxX || z < modelMinZ || z > modelMaxZ {
 			return
 		}
+		candidate := structureCandidate{SetID: setID, ChunkX: chunkX, ChunkZ: chunkZ, X: x, Z: z}
+		if accept != nil && !accept(candidate) {
+			return
+		}
 		distance := math.Hypot(float64(x-queryX), float64(z-queryZ))
 		if distance < bestDistance {
 			bestDistance = distance
-			best = structureCandidate{SetID: setID, ChunkX: chunkX, ChunkZ: chunkZ, X: x, Z: z}
+			best = candidate
 			found = true
 		}
 	}
@@ -515,7 +579,8 @@ func predictStructureCandidates(
 	snapshot *structureSnapshot,
 	mode string,
 	minX, maxX, minZ, maxZ, limit int,
-) ([]structureCandidate, int) {
+	accept func(structureCandidate) bool,
+) ([]structureCandidate, int, int) {
 	minChunkX := floorDiv(minX, 16)
 	maxChunkX := floorDiv(maxX, 16)
 	minChunkZ := floorDiv(minZ, 16)
@@ -532,6 +597,7 @@ func predictStructureCandidates(
 
 	perSet := make(map[string][]structureCandidate, len(setIDs))
 	total := 0
+	geoFiltered := 0
 	for _, id := range setIDs {
 		set, ok := snapshot.StructureSets[id]
 		if !ok || set.Placement.Type != "minecraft:random_spread" {
@@ -577,9 +643,14 @@ func predictStructureCandidates(
 					continue
 				}
 
-				list = append(list, structureCandidate{
+				candidate := structureCandidate{
 					SetID: id, ChunkX: chunkX, ChunkZ: chunkZ, X: x, Z: z,
-				})
+				}
+				if accept != nil && !accept(candidate) {
+					geoFiltered++
+					continue
+				}
+				list = append(list, candidate)
 			}
 		}
 		if len(list) > 0 {
@@ -588,7 +659,7 @@ func predictStructureCandidates(
 		}
 	}
 	if total <= limit {
-		return flattenStructureCandidates(setIDs, perSet, nil), total
+		return flattenStructureCandidates(setIDs, perSet, nil), total, geoFiltered
 	}
 
 	nonEmpty := make([]string, 0, len(perSet))
@@ -598,7 +669,7 @@ func predictStructureCandidates(
 		}
 	}
 	if len(nonEmpty) == 0 {
-		return nil, 0
+		return nil, 0, geoFiltered
 	}
 
 	allocation := make(map[string]int, len(nonEmpty))
@@ -629,7 +700,7 @@ func predictStructureCandidates(
 			break
 		}
 	}
-	return flattenStructureCandidates(nonEmpty, perSet, allocation), total
+	return flattenStructureCandidates(nonEmpty, perSet, allocation), total, geoFiltered
 }
 
 func flattenStructureCandidates(
@@ -672,6 +743,105 @@ func flattenStructureCandidates(
 		return out[i].SetID < out[j].SetID
 	})
 	return out
+}
+
+func structureGeoAssessment(
+	setID string,
+	sample runtimeprofile.Sample,
+) (string, string) {
+	water := sample.World.WaterKind
+	family := sample.BiomeFamily
+	landCandidate := water != reconcile.WaterOcean && water != reconcile.WaterLake
+
+	pass := func(ok bool, accepted, rejected string) (string, string) {
+		if ok {
+			return "pass", accepted
+		}
+		return "reject", rejected
+	}
+
+	switch setID {
+	case "minecraft:ocean_monuments", "minecraft:ocean_ruins":
+		return pass(
+			water == reconcile.WaterOcean,
+			"GeoWorld 水体条件通过：当前位置属于海洋。",
+			"GeoWorld 水体条件拒绝：当前位置不是海洋。",
+		)
+
+	case "minecraft:desert_pyramids":
+		return pass(
+			landCandidate &&
+				(family == mcprofile.BiomeHotDesert ||
+					family == mcprofile.BiomeTemperateDesert),
+			"GeoWorld 地表与荒漠生态条件通过。",
+			"GeoWorld 条件拒绝：当前位置不是兼容的陆地荒漠生态。",
+		)
+
+	case "minecraft:igloos":
+		return pass(
+			landCandidate &&
+				(family == mcprofile.BiomeTundra ||
+					family == mcprofile.BiomeIceSheet ||
+					family == mcprofile.BiomeAlpine ||
+					family == mcprofile.BiomeBorealForest),
+			"GeoWorld 地表与寒冷生态条件通过。",
+			"GeoWorld 条件拒绝：当前位置不是兼容的寒冷陆地生态。",
+		)
+
+	case "minecraft:jungle_temples":
+		return pass(
+			landCandidate &&
+				(family == mcprofile.BiomeTropicalRainforest ||
+					family == mcprofile.BiomeTropicalMonsoonForest),
+			"GeoWorld 地表与热带森林生态条件通过。",
+			"GeoWorld 条件拒绝：当前位置不是兼容的热带森林陆地生态。",
+		)
+
+	case "minecraft:swamp_huts":
+		return pass(
+			landCandidate && family == mcprofile.BiomeWetland,
+			"GeoWorld 地表与湿地生态条件通过。",
+			"GeoWorld 条件拒绝：当前位置不是兼容的陆地湿地生态。",
+		)
+
+	case "minecraft:woodland_mansions":
+		return pass(
+			landCandidate &&
+				(family == mcprofile.BiomeTemperateForest ||
+					family == mcprofile.BiomeBorealForest ||
+					family == mcprofile.BiomeSubtropicalForest),
+			"GeoWorld 地表与森林生态条件通过。",
+			"GeoWorld 条件拒绝：当前位置不是兼容的森林陆地生态。",
+		)
+
+	case "minecraft:villages", "minecraft:pillager_outposts":
+		return pass(
+			landCandidate &&
+				(family == mcprofile.BiomeTemperateGrassland ||
+					family == mcprofile.BiomeTemperateDesert ||
+					family == mcprofile.BiomeHotDesert ||
+					family == mcprofile.BiomeSavanna ||
+					family == mcprofile.BiomeBorealForest ||
+					family == mcprofile.BiomeTundra),
+			"GeoWorld 地表与聚落生态条件通过。",
+			"GeoWorld 条件拒绝：当前位置不是兼容的聚落陆地生态。",
+		)
+
+	default:
+		// These sets depend on underground conditions, coast/beach details,
+		// structure-specific terrain checks, or broad biome tags that the
+		// current surface World Model cannot classify with enough confidence.
+		// Keep them as candidates rather than creating false negatives.
+		return "unknown", "GeoWorld 当前只能确认原版 placement；地下、海岸或结构自身条件仍需 Minecraft 运行时判定。"
+	}
+}
+
+func structureGeoCompatible(
+	setID string,
+	sample runtimeprofile.Sample,
+) bool {
+	status, _ := structureGeoAssessment(setID, sample)
+	return status != "reject"
 }
 
 func structureExcludedByOtherSet(

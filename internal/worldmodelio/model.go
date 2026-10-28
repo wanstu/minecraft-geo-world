@@ -8,6 +8,7 @@ import (
 	"geoworld/internal/mcprofile"
 	"geoworld/internal/phase1"
 	"geoworld/internal/runtimeprofile"
+	"geoworld/internal/specialfeatures"
 	"geoworld/internal/terrain"
 	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
@@ -61,15 +62,16 @@ type RuntimeModel struct {
 	Geometry world.GridGeometry
 	Surface  *world.Surface
 
-	CoastTerrain   *terrain.Model
-	Waterbed       *waterbed.Model
-	Runtime        *worldsample.Model
-	Ecology        *ecology.Model
-	Profile        *mcprofile.Model
-	RuntimeProfile *runtimeprofile.Model
-	ClimatePreview *ClimatePreview
-	HydrologyQuery *HydrologyQuery
-	TectonicQuery  *TectonicQuery
+	CoastTerrain    *terrain.Model
+	Waterbed        *waterbed.Model
+	Runtime         *worldsample.Model
+	Ecology         *ecology.Model
+	Profile         *mcprofile.Model
+	RuntimeProfile  *runtimeprofile.Model
+	ClimatePreview  *ClimatePreview
+	HydrologyQuery  *HydrologyQuery
+	TectonicQuery   *TectonicQuery
+	SpecialFeatures []specialfeatures.Feature
 }
 
 type ClimatePreview struct {
@@ -100,7 +102,17 @@ type TectonicQuery struct {
 }
 
 func (m *RuntimeModel) Sample(worldX, worldZ float64) runtimeprofile.Sample {
-	return m.RuntimeProfile.Sample(worldX, worldZ)
+	out := m.RuntimeProfile.Sample(worldX, worldZ)
+	if m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.11" && len(m.SpecialFeatures) > 0 {
+		out = specialfeatures.Apply(
+			m.SpecialFeatures,
+			out,
+			m.Manifest.SeaLevelNormalized,
+			worldX,
+			worldZ,
+		)
+	}
+	return out
 }
 
 type fileEnvelope struct {
@@ -109,15 +121,16 @@ type fileEnvelope struct {
 }
 
 type payload struct {
-	Config         generator.ResolvedConfig `json:"config"`
-	Surface        surfaceSnapshot          `json:"surface"`
-	Terrain        terrainSnapshot          `json:"terrain"`
-	Waterbed       waterbedSnapshot         `json:"waterbed"`
-	ClimatePreview *climatePreviewSnapshot  `json:"climatePreview,omitempty"`
-	HydrologyQuery *hydrologyQuerySnapshot  `json:"hydrologyQuery,omitempty"`
-	TectonicQuery  *tectonicQuerySnapshot   `json:"tectonicQuery,omitempty"`
-	Ecology        ecologySnapshot          `json:"ecology"`
-	Profile        profileSnapshot          `json:"profile"`
+	Config          generator.ResolvedConfig  `json:"config"`
+	Surface         surfaceSnapshot           `json:"surface"`
+	Terrain         terrainSnapshot           `json:"terrain"`
+	Waterbed        waterbedSnapshot          `json:"waterbed"`
+	ClimatePreview  *climatePreviewSnapshot   `json:"climatePreview,omitempty"`
+	HydrologyQuery  *hydrologyQuerySnapshot   `json:"hydrologyQuery,omitempty"`
+	TectonicQuery   *tectonicQuerySnapshot    `json:"tectonicQuery,omitempty"`
+	SpecialFeatures []specialfeatures.Feature `json:"specialFeatures,omitempty"`
+	Ecology         ecologySnapshot           `json:"ecology"`
+	Profile         profileSnapshot           `json:"profile"`
 }
 
 type surfaceSnapshot struct {

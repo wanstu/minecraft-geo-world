@@ -73,8 +73,9 @@ public final class GeoWorldV26BiomeCoverageVerifier {
             );
         }
         var coverage = realizer.coverageForModel(model);
-        if (coverage.habitats().size() != expected.size()) {
-            throw new AssertionError("habitat reserve size differs from required catalog");
+        Set<String> coverageExpected = realizer.requiredCoverageBiomeIds(model);
+        if (coverage.habitats().size() != coverageExpected.size()) {
+            throw new AssertionError("habitat reserve size differs from coverage catalog");
         }
         for (var habitat : coverage.habitats()) {
             String atCenter = realizer.biomeId(

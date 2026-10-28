@@ -11,6 +11,7 @@ import (
 	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
+	"geoworld/internal/specialfeatures"
 	"geoworld/internal/terrain"
 	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
@@ -73,20 +74,21 @@ type WorldModel struct {
 	Geometry world.GridGeometry
 	Surface  *world.Surface
 
-	Phase1         *phase1.World
-	Climate        *climate.Model
-	Hydrology      *hydrology.Model
-	Erosion        *erosion.Model
-	Landform       *landform.Model
-	Geomorph       *geomorph.Model
-	Ecology        *ecology.Model
-	Profile        *mcprofile.Model
-	Terrain        *terrain.Model
-	CoastTerrain   *terrain.Model
-	Reconciliation *reconcile.Model
-	Waterbed       *waterbed.Model
-	Runtime        *worldsample.Model
-	RuntimeProfile *runtimeprofile.Model
+	Phase1          *phase1.World
+	Climate         *climate.Model
+	Hydrology       *hydrology.Model
+	Erosion         *erosion.Model
+	Landform        *landform.Model
+	Geomorph        *geomorph.Model
+	Ecology         *ecology.Model
+	Profile         *mcprofile.Model
+	Terrain         *terrain.Model
+	CoastTerrain    *terrain.Model
+	Reconciliation  *reconcile.Model
+	Waterbed        *waterbed.Model
+	Runtime         *worldsample.Model
+	RuntimeProfile  *runtimeprofile.Model
+	SpecialFeatures []specialfeatures.Feature
 }
 
 // Stage identifies one deterministic pipeline boundary for progress reporting.

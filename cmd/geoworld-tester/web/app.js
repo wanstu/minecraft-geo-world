@@ -38,6 +38,7 @@ let pinchStartDistance=0;
 let pinchStartZoom=1;
 let acceptanceData=null;
 let gameSession=null;
+let gameControlLocal=false;
 let gameSessionRevision=0;
 let syncingGameSession=false;
 let inspectorTab='layers';
@@ -306,6 +307,10 @@ function renderExportOverlay(){
 
 function updateActionState(){
   const gameBound=Boolean(gameSession&&gameSession.managed&&gameSession.state==='bound');
+  document.querySelectorAll('.controls .panel-body input,.controls .panel-body select,.controls .panel-body button')
+    .forEach(el=>{el.disabled=gameBound});
+  const controls=document.querySelector('.controls');
+  if(controls)controls.classList.toggle('game-bound-readonly',gameBound);
   $('generate').disabled=busy||!serviceOnline||gameBound;
   $('save').disabled=busy||!serviceOnline||!active||active.source!=='generated';
   $('load').disabled=busy||!serviceOnline||!$('models').value||gameBound;
@@ -357,13 +362,28 @@ function renderGameSession(session){
   })[session.state]||'已连接';
   const detail=$('gameSessionDetail');
   if(session.state==='bound'){
+    const player=session.player;
+    const playerHtml=player
+      ?'<div class="game-player-position"><b>玩家位置</b><code>'+
+        Math.round(player.x)+', '+Math.round(player.y)+', '+Math.round(player.z)+
+        '</code><button id="gameLocatePlayer" type="button">地图定位</button></div>'
+      :'<div class="game-player-position waiting">等待玩家位置…</div>';
     detail.innerHTML=
       '<b>'+escapeHtml(session.worldName||'GeoWorld 世界')+'</b>'+
       ' · Seed '+escapeHtml(String(session.seed))+'<br>'+
       'Minecraft '+escapeHtml(session.minecraftVersion||'—')+
       ' · '+escapeHtml(session.generationRulesVersion||'—')+
       '<br>'+escapeHtml(session.worldModelVersion||'—')+
-      (session.dynamicWorldgen?' · 动态世界生成':' · 已绑定世界模型');
+      (session.dynamicWorldgen?' · 动态世界生成':' · 已绑定世界模型')+
+      (!gameControlLocal?'<br><span class="muted">远程浏览模式 · 传送控制仅本机可用</span>':'')+
+      playerHtml;
+    const locate=$('gameLocatePlayer');
+    if(locate&&player){
+      locate.onclick=()=>{
+        centerMapOnWorld(player.x,player.z,Math.max(mapZoom,16));
+        void focusWorldPoint(player.x,player.z);
+      };
+    }
   }else{
     detail.textContent=session.message||'当前没有已绑定的 GeoWorld 世界。';
   }
@@ -457,6 +477,7 @@ async function applyGameWorld(next,session){
 async function syncGameSessionStatus(status){
   const session=status?.gameSession||null;
   gameSession=session;
+  gameControlLocal=Boolean(status?.localGameControl);
   renderGameSession(session);
   updateActionState();
   if(!session||!session.managed)return;
@@ -1137,11 +1158,19 @@ function renderSample(s){
   const water=s.waterSurfaceDefined
     ?`${waterKind} · 水面 ${f(s.waterSurfaceElevation)} · 深度 ${f(s.waterDepth)}`
     :waterKind;
+  const command=tpCommand(s.x,s.teleportY??s.y,s.z);
+  const gameBound=canControlGame();
   $('sample').innerHTML=`
     <div class="sample-section"><h3>位置与水体</h3>
-      ${kv('坐标',Math.round(s.x)+', '+Math.round(s.z))}
+      ${kv('坐标',Math.round(s.x)+', '+Math.round(s.teleportY??s.y)+', '+Math.round(s.z))}
+      ${kv('地表方块 Y',s.groundY)}
       ${kv('模型地面高度',f(s.groundHeight))}
       ${kv('水体',water)}
+      <code class="structure-tp-command">${escapeHtml(command)}</code>
+      <div class="structure-search-actions">
+        <button id="sampleCopyTp" type="button">复制 /tp</button>
+        ${gameBound?'<button id="sampleTeleport" class="primary" type="button">传送到这里</button>':''}
+      </div>
     </div>
     <div class="sample-section"><h3>生态与地表</h3>
       ${kv('生态区',sampleValueZh(s.ecoRegion))}
@@ -1159,6 +1188,14 @@ function renderSample(s){
       ${kv('语义回退',s.semanticFallback?'<span class="error">是</span>':'<span class="ok">否</span>')}
       ${kv('语义冲突',s.semanticMismatch?'<span class="error">是</span>':'<span class="ok">否</span>')}
     </details>`;
+  const copy=$('sampleCopyTp');
+  if(copy)copy.onclick=async()=>{
+    const ok=await copyPlainText(command);
+    copy.textContent=ok?'已复制':'复制失败';
+    setTimeout(()=>{if(copy)copy.textContent='复制 /tp';},1200);
+  };
+  const teleport=$('sampleTeleport');
+  if(teleport)teleport.onclick=()=>void requestGameTeleport(s.x,s.teleportY??s.y,s.z,teleport);
 }
 
 function kv(k,v){return `<div class="kv"><span>${k}</span><b>${v}</b></div>`}
@@ -1485,8 +1522,17 @@ async function refreshStructureCandidates(){
       ? '（共 '+Number(data.total||0).toLocaleString()+' 个，已按结构类别与视野位置均匀显示 '+Number(data.returned||0).toLocaleString()+' 个）'
       : Number(data.total||0).toLocaleString()+' 个';
     const visibleTypes=new Set((data.candidates||[]).map(candidate=>candidate.setId)).size;
+    const geoFiltered=Number(data.geoFiltered||0);
+    const geoPassed=Number(data.geoPassed||0);
+    const geoUnknown=Number(data.geoUnknown||0);
+    const exact=Number(data.exact||0);
     $('structureStatus').textContent=
-      structureSuffix+' · '+visibleTypes+' 种结构 · '+
+      structureSuffix+' · '+visibleTypes+' 种结构'+
+      (exact>0?' · 精确 '+exact.toLocaleString():'')+
+      (geoPassed>0?' · GeoWorld 通过 '+geoPassed.toLocaleString():'')+
+      (geoUnknown>0?' · 待确认 '+geoUnknown.toLocaleString():'')+
+      (geoFiltered>0?' · 已剔除 '+geoFiltered.toLocaleString()+' 个高置信不兼容候选':'')+
+      ' · '+
       (mapZoom>=FULL_DETAIL_ZOOM-.001
         ? '最大缩放：当前视野全部展开'
         : mapZoom<4
@@ -1516,11 +1562,13 @@ async function refreshFeatures(){
     $('featureNote').textContent=(previewFeatures.note||'')+
       ' 河流 '+Number(c.rivers||0).toLocaleString()+
       ' · 湖泊 '+Number(c.lakes||0).toLocaleString()+
-      ' · 山峰 '+Number(c.peaks||0).toLocaleString();
+      ' · 山峰 '+Number(c.peaks||0).toLocaleString()+
+      ' · 特殊景观 '+Number(c.special||0).toLocaleString();
     $('mapFeatureSummary').textContent=
       '河流 '+Number(c.rivers||0).toLocaleString()+
       ' · 湖泊 '+Number(c.lakes||0).toLocaleString()+
-      ' · 山峰 '+Number(c.peaks||0).toLocaleString();
+      ' · 山峰 '+Number(c.peaks||0).toLocaleString()+
+      ' · 特殊 '+Number(c.special||0).toLocaleString();
     renderFeatureOverlay();
   }catch(e){
     previewFeatures=null;
@@ -1719,6 +1767,26 @@ function openStructureInspector(){
   if(window.matchMedia('(max-width: 900px)').matches)setMobileSheet('features',true);
 }
 
+function structureGeoStatusLabel(candidate){
+  switch(candidate?.geoStatus){
+    case 'exact': return '精确结果';
+    case 'pass': return 'Placement 候选 · GeoWorld 条件通过';
+    case 'unknown': return 'Placement 候选 · GeoWorld 条件待确认';
+    default:
+      return candidate?.setId==='minecraft:strongholds'
+        ? '精确结果'
+        : '原版结构放置候选位置';
+  }
+}
+
+function structureGeoStatusNote(candidate){
+  if(candidate?.geoReason)return candidate.geoReason;
+  if(candidate?.setId==='minecraft:strongholds'){
+    return '使用 Minecraft 26.3 原版同心环规则与 GeoWorld 群系偏移规则，并经过原生实现逐点一致性校验。';
+  }
+  return '这里只确认原版 StructureSet placement 候选；最终是否实际生成仍取决于 Minecraft 的完整结构生成条件。';
+}
+
 function showStructureDetail(candidate){
   openDetailPane();
   $('detailEmpty').hidden=true;
@@ -1729,20 +1797,30 @@ function showStructureDetail(candidate){
   el.hidden=false;
   const meta=structureCandidates?.sets?.[candidate.setId]||{};
   const variants=(meta.structures||[]).map(structureVariantName).join(' / ');
-  const stronghold=candidate.setId==='minecraft:strongholds';
+  const command=structureTpCommand(candidate);
+  const gameBound=canControlGame();
   el.innerHTML=
     '<div class="structure-detail-title">'+escapeHtml(structureSetName(candidate.setId))+'</div>'+
     '<div class="structure-detail-grid">'+
-      '<span>坐标</span><b>'+escapeHtml(candidate.x+', '+candidate.z)+'</b>'+
+      '<span>坐标</span><b>'+escapeHtml(candidate.x+', '+candidate.y+', '+candidate.z)+'</b>'+
       '<span>区块坐标</span><b>'+escapeHtml(candidate.chunkX+', '+candidate.chunkZ)+'</b>'+
       (variants?'<span>具体结构</span><b>'+escapeHtml(variants)+'</b>':'')+
-      '<span>位置性质</span><b>'+(stronghold?'精确规划位置':'原版结构放置候选位置')+'</b>'+
+      '<span>位置性质</span><b>'+escapeHtml(structureGeoStatusLabel(candidate))+'</b>'+
     '</div>'+
-    '<div class="structure-detail-note">'+
-      (stronghold
-        ? '使用 Minecraft 26.3 原版同心环规则与 GeoWorld 群系偏移规则，并经过原生实现逐点一致性校验。'
-        : '这里表示原版结构放置候选位置；最终是否实际生成，还需要通过群系和结构生成条件检查。')+
+    '<div class="structure-detail-note">'+escapeHtml(structureGeoStatusNote(candidate))+'</div>'+
+    '<code class="structure-tp-command">'+escapeHtml(command)+'</code>'+
+    '<div class="structure-search-actions">'+
+      '<button id="structureDetailCopy" type="button">复制 /tp</button>'+
+      (gameBound?'<button id="structureDetailTeleport" class="primary" type="button">传送到这里</button>':'')+
     '</div>';
+  const copy=$('structureDetailCopy');
+  if(copy)copy.onclick=async()=>{
+    const ok=await copyPlainText(command);
+    copy.textContent=ok?'已复制':'复制失败';
+    setTimeout(()=>{if(copy)copy.textContent='复制 /tp';},1200);
+  };
+  const teleport=$('structureDetailTeleport');
+  if(teleport)teleport.onclick=()=>void requestGameTeleport(candidate.x,candidate.y,candidate.z,teleport);
   openStructureInspector();
 }
 
@@ -1800,26 +1878,57 @@ async function copyPlainText(text){
   return ok;
 }
 
+function tpCommand(x,y,z){
+  return '/tp @s '+Math.round(x)+' '+Math.round(y)+' '+Math.round(z);
+}
+
 function structureTpCommand(candidate){
-  return '/tp @s '+Math.round(candidate.x)+' ~ '+Math.round(candidate.z);
+  return tpCommand(candidate.x,candidate.y,candidate.z);
+}
+
+function canControlGame(){
+  return Boolean(
+    gameControlLocal &&
+    gameSession &&
+    gameSession.state==='bound'
+  );
+}
+
+async function requestGameTeleport(x,y,z,button=null){
+  if(button)button.disabled=true;
+  try{
+    await api('/api/game/teleport',{
+      method:'POST',
+      body:JSON.stringify({x:Number(x),y:Number(y),z:Number(z)})
+    });
+    if(button){
+      button.textContent='已发送';
+      setTimeout(()=>{if(button){button.textContent='传送到这里';button.disabled=false;}},1000);
+    }
+  }catch(err){
+    if(button){button.textContent='传送失败';button.disabled=false;}
+    setMapNotice('传送失败：'+err.message,'error');
+  }
 }
 
 function renderStructureSearchResult(data){
   const el=$('structureSearchResult');
   const candidate=data.candidate;
   const command=structureTpCommand(candidate);
-  const exact=Boolean(data.exactStronghold);
+  const gameBound=canControlGame();
   el.hidden=false;
   el.innerHTML=
     '<b>'+escapeHtml(structureSetName(candidate.setId))+'</b>'+
-    '<div>坐标：'+escapeHtml(candidate.x+', '+candidate.z)+'</div>'+
+    '<div>坐标：'+escapeHtml(candidate.x+', '+candidate.y+', '+candidate.z)+'</div>'+
     '<div>区块：'+escapeHtml(candidate.chunkX+', '+candidate.chunkZ)+'</div>'+
     '<div>距离：约 '+Math.round(Number(data.distance||0)).toLocaleString()+' 方块</div>'+
-    '<div>'+(exact?'精确强要塞位置':'原版结构放置候选位置')+'</div>'+
+    '<div>'+escapeHtml(structureGeoStatusLabel(candidate))+'</div>'+
+    '<div class="structure-detail-note">'+escapeHtml(structureGeoStatusNote(candidate))+'</div>'+
     '<code class="structure-tp-command">'+escapeHtml(command)+'</code>'+
     '<div class="structure-search-actions">'+
       '<button id="structureSearchLocate" class="primary" type="button">地图定位</button>'+
       '<button id="structureSearchCopy" type="button">复制 /tp</button>'+
+      (gameBound?'<button id="structureSearchTeleport" type="button">传送到这里</button>':'')+
     '</div>';
   $('structureSearchLocate').onclick=()=>{
     centerMapOnWorld(candidate.x,candidate.z,Math.max(24,mapZoom));
@@ -1832,6 +1941,82 @@ function renderStructureSearchResult(data){
     button.textContent=ok?'已复制':'复制失败';
     setTimeout(()=>{if(button)button.textContent='复制 /tp';},1200);
   };
+  const teleport=$('structureSearchTeleport');
+  if(teleport)teleport.onclick=()=>void requestGameTeleport(candidate.x,candidate.y,candidate.z,teleport);
+}
+
+function renderBiomeSearchResult(data){
+  const el=$('biomeSearchResult');
+  const command=tpCommand(data.x,data.y,data.z);
+  const gameBound=canControlGame();
+  el.hidden=false;
+  el.innerHTML=
+    '<b>'+escapeHtml(data.label||data.biome||'群系')+'</b>'+
+    '<div>坐标：'+escapeHtml(Math.round(data.x)+', '+Math.round(data.y)+', '+Math.round(data.z))+'</div>'+
+    '<div>距离：约 '+Math.round(Number(data.distance||0)).toLocaleString()+' 方块</div>'+
+    '<div>'+(data.matchKind==='special_landscape'?'特殊景观规划位置':'GeoWorld 生态群系最近采样点')+'</div>'+
+    '<code class="structure-tp-command">'+escapeHtml(command)+'</code>'+
+    '<div class="structure-search-actions">'+
+      '<button id="biomeSearchLocate" class="primary" type="button">地图定位</button>'+
+      '<button id="biomeSearchCopy" type="button">复制 /tp</button>'+
+      (gameBound?'<button id="biomeSearchTeleport" type="button">传送到这里</button>':'')+
+    '</div>';
+  $('biomeSearchLocate').onclick=()=>{
+    centerMapOnWorld(data.x,data.z,Math.max(24,mapZoom));
+    void focusWorldPoint(data.x,data.z);
+  };
+  $('biomeSearchCopy').onclick=async()=>{
+    const button=$('biomeSearchCopy');
+    const ok=await copyPlainText(command);
+    button.textContent=ok?'已复制':'复制失败';
+    setTimeout(()=>{if(button)button.textContent='复制 /tp';},1200);
+  };
+  const teleport=$('biomeSearchTeleport');
+  if(teleport)teleport.onclick=()=>void requestGameTeleport(data.x,data.y,data.z,teleport);
+}
+
+async function searchNearestBiome(){
+  if(!active){
+    $('biomeSearchResult').hidden=false;
+    $('biomeSearchResult').textContent='请先生成或打开一个 World Model。';
+    return;
+  }
+  const x=Number($('biomeSearchX').value);
+  const z=Number($('biomeSearchZ').value);
+  if(!Number.isFinite(x)||!Number.isFinite(z)){
+    $('biomeSearchResult').hidden=false;
+    $('biomeSearchResult').textContent='请输入有效的 X / Z 坐标。';
+    return;
+  }
+  const button=$('biomeSearchButton');
+  button.disabled=true;
+  button.textContent='查找中…';
+  try{
+    const q=new URLSearchParams({
+      x:String(Math.round(x)),
+      z:String(Math.round(z)),
+      biome:$('biomeSearchType').value
+    });
+    const data=await api('/api/biome-search?'+q.toString());
+    renderBiomeSearchResult(data);
+  }catch(e){
+    $('biomeSearchResult').hidden=false;
+    $('biomeSearchResult').textContent=e.status===404
+      ?'当前 World Model 中没有找到这个群系 / 特殊景观。'
+      :'查找失败：'+e.message;
+  }finally{
+    button.disabled=false;
+    button.textContent='查找';
+  }
+}
+
+function usePlayerPositionForSearch(){
+  const player=gameSession?.player;
+  if(!player)return;
+  $('biomeSearchX').value=Math.round(player.x);
+  $('biomeSearchZ').value=Math.round(player.z);
+  $('structureSearchX').value=Math.round(player.x);
+  $('structureSearchZ').value=Math.round(player.z);
 }
 
 async function searchNearestStructure(){
@@ -2327,9 +2512,7 @@ function appendStructureSingleMarker(group,candidate){
   title.textContent=
     structureSetName(candidate.setId)+' · 坐标 '+candidate.x+', '+candidate.z+
     ' · 区块 '+candidate.chunkX+', '+candidate.chunkZ+
-    (candidate.setId==='minecraft:strongholds'
-      ? ' · 精确强要塞位置'
-      : ' · 原版结构放置候选位置');
+    ' · '+structureGeoStatusLabel(candidate);
   mark.appendChild(title);
   mark.addEventListener('click',e=>{
     e.stopPropagation();
@@ -2392,6 +2575,50 @@ function renderFeatureOverlay(){
       title.textContent='湖泊 #'+lake.lakeId+' · '+Math.round(lake.x)+', '+Math.round(lake.z);
       circle.appendChild(title);
       group.appendChild(circle);
+    }
+    svg.appendChild(group);
+  }
+
+  if(enabled.has('special')){
+    const group=document.createElementNS(ns,'g');
+    group.setAttribute('class','feature-special-landscapes');
+    const specialFilter=$('specialFilter')?.value||'';
+    const markerScale=overlayUnitScale();
+    for(const feature of previewFeatures.specialLandscapes||[]){
+      if(specialFilter&&feature.kind!==specialFilter)continue;
+      const p=worldToOverlay(feature.x,feature.z);
+      if(!overlayPointVisible(p,40))continue;
+      const item=document.createElementNS(ns,'g');
+      const kind=String(feature.kind||'special').replace(/[^a-z0-9_-]/gi,'-');
+      item.setAttribute('class','special-landscape special-'+kind);
+      item.style.pointerEvents='all';
+      item.style.cursor='pointer';
+
+      const shape=document.createElementNS(ns,'ellipse');
+      shape.setAttribute('cx',p.x);
+      shape.setAttribute('cy',p.y);
+      shape.setAttribute('rx',Math.max(2,Number(feature.radiusX||0)/active.geometry.SpanXBlocks*1000));
+      shape.setAttribute('ry',Math.max(2,Number(feature.radiusZ||0)/active.geometry.SpanZBlocks*1000));
+      shape.setAttribute('class','special-landscape-shape');
+      item.appendChild(shape);
+
+      const mark=document.createElementNS(ns,'ellipse');
+      mark.setAttribute('cx',p.x);
+      mark.setAttribute('cy',p.y);
+      mark.setAttribute('rx',6*markerScale.x);
+      mark.setAttribute('ry',6*markerScale.y);
+      mark.setAttribute('class','special-landscape-mark');
+      item.appendChild(mark);
+
+      const title=document.createElementNS(ns,'title');
+      title.textContent=(feature.name||feature.kind)+' · '+Math.round(feature.x)+', '+Math.round(feature.z);
+      item.appendChild(title);
+      item.addEventListener('click',e=>{
+        e.stopPropagation();
+        centerMapOnWorld(feature.x,feature.z,Math.max(mapZoom,16));
+        void focusWorldPoint(feature.x,feature.z);
+      });
+      group.appendChild(item);
     }
     svg.appendChild(group);
   }
@@ -2569,7 +2796,7 @@ $('mobileCloseFeatures').onclick=()=>setMobileSheet('features',false);
 document.querySelectorAll('.inspector-tab').forEach(button=>button.addEventListener('click',()=>{
   setInspectorTab(button.dataset.inspectorTab);
 }));
-['riverFilter','mineralFilter'].forEach(id=>$(id).addEventListener('change',()=>renderFeatureOverlay()));
+['riverFilter','mineralFilter','specialFilter'].forEach(id=>$(id).addEventListener('change',()=>renderFeatureOverlay()));
 
 document.querySelectorAll('.nav-item,.route-button').forEach(btn=>btn.addEventListener('click',()=>navigatePage(btn.dataset.page)));
 document.querySelectorAll('input[name="acceptanceType"]').forEach(radio=>radio.addEventListener('change',()=>{
@@ -2582,6 +2809,11 @@ $('acceptanceGenerate').onclick=generateAcceptanceTable;
 $('acceptanceBigFilter').onchange=renderAcceptanceTable;
 document.querySelectorAll('.acceptance-download').forEach(btn=>btn.onclick=()=>downloadAcceptance(btn.dataset.format));
 $('structureFilter').onchange=()=>renderFeatureOverlay();
+$('biomeSearchButton').onclick=searchNearestBiome;
+$('biomeSearchUsePlayer').onclick=usePlayerPositionForSearch;
+['biomeSearchX','biomeSearchZ'].forEach(id=>$(id).addEventListener('keydown',e=>{
+  if(e.key==='Enter')$('biomeSearchButton').click();
+}));
 $('structureSearchButton').onclick=searchNearestStructure;
 ['structureSearchX','structureSearchZ'].forEach(id=>$(id).addEventListener('keydown',e=>{
   if(e.key==='Enter')$('structureSearchButton').click();

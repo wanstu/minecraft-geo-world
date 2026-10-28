@@ -167,8 +167,38 @@ public final class GeoWorldV1 {
         String surfaceProfile,
         String vegetationProfile,
         double profileConfidence,
+        String specialFeature,
+        double specialFeatureStrength,
         boolean semanticFallback,
         boolean semanticMismatch
+    ) {}
+
+    public record SpecialLandscape(
+        int id,
+        String kind,
+        double centerX,
+        double centerZ,
+        double radiusX,
+        double radiusZ,
+        String waterContext
+    ) {}
+
+    private record SpecialLobe(
+        double offsetX,
+        double offsetZ,
+        double radiusX,
+        double radiusZ
+    ) {}
+
+    private record SpecialFeature(
+        int id,
+        String kind,
+        double centerX,
+        double centerZ,
+        double radiusX,
+        double radiusZ,
+        String waterContext,
+        List<SpecialLobe> lobes
     ) {}
 
     public record ClimateSample(
@@ -350,6 +380,7 @@ public final class GeoWorldV1 {
     private final Terrain terrain;
     private final List<RiverSegment> rivers;
     private final List<LakeNode> lakes;
+    private final List<SpecialFeature> specialFeatures;
     private final double featureBucketSize;
     private final Map<Long, List<RiverSegment>> riverBuckets;
     private final Map<Long, List<LakeNode>> lakeBuckets;
@@ -381,6 +412,7 @@ public final class GeoWorldV1 {
         Terrain terrain,
         List<RiverSegment> rivers,
         List<LakeNode> lakes,
+        List<SpecialFeature> specialFeatures,
         WaterbedConfig waterbedConfig,
         WorldSampleConfig worldSampleConfig,
         ScalarGrid climateTemp,
@@ -407,6 +439,7 @@ public final class GeoWorldV1 {
         this.terrain = terrain;
         this.rivers = rivers;
         this.lakes = lakes;
+        this.specialFeatures = specialFeatures;
         this.featureBucketSize = Math.max(64.0, this.geometry.cellSize());
         this.riverBuckets = this.buildRiverBuckets(rivers);
         this.lakeBuckets = this.buildLakeBuckets(lakes);
@@ -595,6 +628,23 @@ public final class GeoWorldV1 {
         return worldProfile;
     }
 
+    public List<SpecialLandscape> specialLandscapes() {
+        if (this.specialFeatures.isEmpty()) {
+            return List.of();
+        }
+        return this.specialFeatures.stream()
+            .map(feature -> new SpecialLandscape(
+                feature.id(),
+                feature.kind(),
+                feature.centerX(),
+                feature.centerZ(),
+                feature.radiusX(),
+                feature.radiusZ(),
+                feature.waterContext()
+            ))
+            .toList();
+    }
+
     public boolean hasClimatePreview() {
         return this.climateTemp != null &&
             this.climatePrecip != null &&
@@ -750,7 +800,11 @@ public final class GeoWorldV1 {
 
     public RuntimeSample sample(double worldX, double worldZ) {
         if (!this.worldProfile.legacy() && outsideModel(worldX, worldZ)) {
-            return sampleOuterOcean(worldX, worldZ);
+            return applySpecialFeatures(
+                sampleOuterOcean(worldX, worldZ),
+                worldX,
+                worldZ
+            );
         }
         WorldSample world = sampleWorld(worldX, worldZ);
         boolean wantLand = world.waterKind() != WaterKind.OCEAN;
@@ -790,7 +844,7 @@ public final class GeoWorldV1 {
                 terrainCode == 1;
         }
 
-        return new RuntimeSample(
+        return applySpecialFeatures(new RuntimeSample(
             world.groundHeight(),
             world.waterKind().display,
             world.waterSurfaceDefined(),
@@ -808,9 +862,323 @@ public final class GeoWorldV1 {
             enumName(SURFACE_NAMES, surfaceCode),
             enumName(VEGETATION_NAMES, vegetationCode),
             profileConfidence[node],
+            "",
+            0.0,
             source.fallback(),
             mismatch
+        ), worldX, worldZ);
+    }
+
+    private RuntimeSample applySpecialFeatures(
+        RuntimeSample base,
+        double x,
+        double z
+    ) {
+        if (
+            !"geoworld-rules-v1.1.11".equals(
+                this.worldProfile.generationRulesVersion()
+            ) ||
+            this.specialFeatures.isEmpty()
+        ) {
+            return base;
+        }
+
+        SpecialFeature selected = null;
+        double best = 0.0;
+        for (SpecialFeature feature : this.specialFeatures) {
+            double influence = specialFeatureInfluence(feature, x, z);
+            if (influence > best) {
+                best = influence;
+                selected = feature;
+            }
+        }
+        if (selected == null || best <= 0.0) {
+            return base;
+        }
+
+        String kind = selected.kind();
+        double strength = best;
+        double ground = base.groundHeight();
+        String waterKind = base.waterKind();
+        boolean waterSurfaceDefined = base.waterSurfaceDefined();
+        Double waterSurface = base.waterSurfaceElevation();
+        double waterDepth = base.waterDepth();
+        double oceanEligibilityValue = base.oceanEligibility();
+        double riverWeightValue = base.riverWeight();
+        boolean sourceLand = base.sourceLand();
+        String eco = base.ecoRegion();
+        String biome = base.biomeFamily();
+        String terrainName = base.terrainVariant();
+        String surfaceName = base.surfaceProfile();
+        String vegetation = base.vegetationProfile();
+        boolean fallback = base.semanticFallback();
+        boolean mismatch = base.semanticMismatch();
+
+        double radial = specialFeatureNormalizedRadius(selected, x, z);
+
+        if (
+            "mushroom_island".equals(kind) ||
+            "pale_garden_island".equals(kind) ||
+            "cherry_island".equals(kind)
+        ) {
+            if ("River".equals(base.waterKind())) {
+                return new RuntimeSample(
+                    base.groundHeight(),
+                    base.waterKind(),
+                    base.waterSurfaceDefined(),
+                    base.waterSurfaceElevation(),
+                    base.waterDepth(),
+                    base.oceanEligibility(),
+                    base.riverWeight(),
+                    base.sourceNode(),
+                    base.sourceWeight(),
+                    base.sourceLand(),
+                    base.ecoRegion(),
+                    base.regionConfidence(),
+                    base.biomeFamily(),
+                    base.terrainVariant(),
+                    base.surfaceProfile(),
+                    base.vegetationProfile(),
+                    base.profileConfidence(),
+                    kind,
+                    best,
+                    base.semanticFallback(),
+                    base.semanticMismatch()
+                );
+            }
+            if (
+                !("Ocean".equals(base.waterKind()) ||
+                  "Lake".equals(base.waterKind())) ||
+                best < 0.035
+            ) {
+                return base;
+            }
+            double water = this.manifest.seaLevelNormalized();
+            if (base.waterSurfaceDefined() && base.waterSurfaceElevation() != null) {
+                water = base.waterSurfaceElevation();
+            }
+            ground = Math.max(
+                base.groundHeight(),
+                water + 0.008 + 0.052 * best
+            );
+            waterKind = "None";
+            waterSurfaceDefined = false;
+            waterSurface = null;
+            waterDepth = 0.0;
+            oceanEligibilityValue = 0.0;
+            sourceLand = true;
+            fallback = false;
+            mismatch = false;
+
+            if ("mushroom_island".equals(kind)) {
+                eco = "Temperate Grassland";
+                biome = "Temperate Grassland";
+                terrainName = "Rolling Plain";
+                surfaceName = "Shrub Soil";
+                vegetation = "Shrubland";
+            } else if ("pale_garden_island".equals(kind)) {
+                eco = "Temperate Forest";
+                biome = "Temperate Forest";
+                terrainName = "Hills";
+                surfaceName = "Forest Loam";
+                vegetation = "Mixed Forest";
+            } else {
+                eco = "Temperate Forest";
+                biome = "Temperate Forest";
+                terrainName = "Hills";
+                surfaceName = "Forest Loam";
+                vegetation = "Broadleaf Forest";
+            }
+        } else if ("sinkhole".equals(kind)) {
+            if (!"None".equals(base.waterKind()) || !base.sourceLand()) {
+                return base;
+            }
+            ground = Math.max(
+                this.manifest.seaLevelNormalized() + 0.008,
+                base.groundHeight() - 0.030 * best
+            );
+            waterKind = "None";
+            waterSurfaceDefined = false;
+            waterSurface = null;
+            waterDepth = 0.0;
+            oceanEligibilityValue = 0.0;
+            sourceLand = true;
+            fallback = false;
+            mismatch = false;
+            terrainName = "Canyon";
+        } else if (
+            "volcanic_crater_snow".equals(kind) ||
+            "volcanic_crater_cherry".equals(kind)
+        ) {
+            if (
+                !"None".equals(base.waterKind()) ||
+                !base.sourceLand() ||
+                radial > 1.05
+            ) {
+                return base;
+            }
+            double rim = clamp(
+                1.0 - Math.abs(radial - 0.68) / 0.20,
+                0.0,
+                1.0
+            );
+            double core = clamp(1.0 - radial / 0.50, 0.0, 1.0);
+            ground = Math.max(
+                this.manifest.seaLevelNormalized() + 0.010,
+                base.groundHeight() + 0.060 * rim - 0.028 * core
+            );
+            waterKind = "None";
+            waterSurfaceDefined = false;
+            waterSurface = null;
+            waterDepth = 0.0;
+            oceanEligibilityValue = 0.0;
+            sourceLand = true;
+            fallback = false;
+            mismatch = false;
+            strength = Math.max(rim, core * 0.6);
+            terrainName = radial < 0.48 ? "Canyon" : "Mountain";
+
+            if ("volcanic_crater_snow".equals(kind) && rim > 0.15) {
+                eco = "Alpine";
+                biome = "Alpine";
+                surfaceName = "Alpine Snow";
+                vegetation = "Alpine Sparse";
+            }
+            if ("volcanic_crater_cherry".equals(kind) && rim > 0.18) {
+                eco = "Temperate Forest";
+                biome = "Temperate Forest";
+                surfaceName = "Forest Loam";
+                vegetation = "Broadleaf Forest";
+            }
+        } else if (
+            "basin_cherry".equals(kind) ||
+            "basin_snow".equals(kind)
+        ) {
+            if (
+                !"None".equals(base.waterKind()) ||
+                !base.sourceLand() ||
+                radial > 1.08
+            ) {
+                return base;
+            }
+            double basin = clamp(1.0 - radial * radial, 0.0, 1.0);
+            double rim = clamp(
+                1.0 - Math.abs(radial - 0.90) / 0.18,
+                0.0,
+                1.0
+            );
+            ground = Math.max(
+                this.manifest.seaLevelNormalized() + 0.008,
+                base.groundHeight() - 0.020 * basin + 0.030 * rim
+            );
+            waterKind = "None";
+            waterSurfaceDefined = false;
+            waterSurface = null;
+            waterDepth = 0.0;
+            oceanEligibilityValue = 0.0;
+            sourceLand = true;
+            fallback = false;
+            mismatch = false;
+            strength = Math.max(basin * 0.8, rim);
+            terrainName = rim > 0.22 ? "Mountain" : "Rolling Plain";
+
+            if ("basin_snow".equals(kind) && rim > 0.20) {
+                eco = "Alpine";
+                biome = "Alpine";
+                surfaceName = "Alpine Snow";
+                vegetation = "Alpine Sparse";
+            }
+            if ("basin_cherry".equals(kind) && basin > 0.18) {
+                eco = "Temperate Forest";
+                biome = "Temperate Forest";
+                surfaceName = "Forest Loam";
+                vegetation = "Broadleaf Forest";
+            }
+        } else {
+            return base;
+        }
+
+        return new RuntimeSample(
+            clamp(ground, 0.001, 0.999),
+            waterKind,
+            waterSurfaceDefined,
+            waterSurface,
+            waterDepth,
+            oceanEligibilityValue,
+            riverWeightValue,
+            base.sourceNode(),
+            base.sourceWeight(),
+            sourceLand,
+            eco,
+            base.regionConfidence(),
+            biome,
+            terrainName,
+            surfaceName,
+            vegetation,
+            base.profileConfidence(),
+            kind,
+            strength,
+            fallback,
+            mismatch
         );
+    }
+
+    private static double specialFeatureInfluence(
+        SpecialFeature feature,
+        double x,
+        double z
+    ) {
+        double best = ellipseInfluence(
+            x - feature.centerX(),
+            z - feature.centerZ(),
+            feature.radiusX(),
+            feature.radiusZ()
+        );
+        for (SpecialLobe lobe : feature.lobes()) {
+            best = Math.max(
+                best,
+                ellipseInfluence(
+                    x - (feature.centerX() + lobe.offsetX()),
+                    z - (feature.centerZ() + lobe.offsetZ()),
+                    lobe.radiusX(),
+                    lobe.radiusZ()
+                )
+            );
+        }
+        return best;
+    }
+
+    private static double specialFeatureNormalizedRadius(
+        SpecialFeature feature,
+        double x,
+        double z
+    ) {
+        double dx = (x - feature.centerX()) /
+            Math.max(1.0, feature.radiusX());
+        double dz = (z - feature.centerZ()) /
+            Math.max(1.0, feature.radiusZ());
+        return Math.sqrt(dx * dx + dz * dz);
+    }
+
+    private static double ellipseInfluence(
+        double dx,
+        double dz,
+        double radiusX,
+        double radiusZ
+    ) {
+        if (radiusX <= 0.0 || radiusZ <= 0.0) {
+            return 0.0;
+        }
+        double q = 1.0 -
+            dx * dx / (radiusX * radiusX) -
+            dz * dz / (radiusZ * radiusZ);
+        if (q <= 0.0) {
+            return 0.0;
+        }
+        if (q >= 1.0) {
+            return 1.0;
+        }
+        return q * q * (3.0 - 2.0 * q);
     }
 
     private boolean outsideModel(double x, double z) {
@@ -1104,7 +1472,8 @@ public final class GeoWorldV1 {
             !"geoworld-rules-v1.1.7".equals(generationRulesVersion) &&
             !"geoworld-rules-v1.1.8".equals(generationRulesVersion) &&
             !"geoworld-rules-v1.1.9".equals(generationRulesVersion) &&
-            !"geoworld-rules-v1.1.10".equals(generationRulesVersion)
+            !"geoworld-rules-v1.1.10".equals(generationRulesVersion) &&
+            !"geoworld-rules-v1.1.11".equals(generationRulesVersion)
         ) {
             return legacy;
         }
@@ -1560,6 +1929,8 @@ public final class GeoWorldV1 {
                 enumName(SURFACE_NAMES, surfaceCode),
                 enumName(VEGETATION_NAMES, vegetationCode),
                 islandWeight,
+                "",
+                0.0,
                 false,
                 false
             );
@@ -1607,6 +1978,8 @@ public final class GeoWorldV1 {
             enumName(SURFACE_NAMES, surfaceCode),
             enumName(VEGETATION_NAMES, 1),
             1.0,
+            "",
+            0.0,
             false,
             false
         );
@@ -1697,6 +2070,9 @@ public final class GeoWorldV1 {
             )
         );
         validateWaterbed(manifest.geometry(), rivers, lakes);
+        List<SpecialFeature> specialFeatures = parseSpecialFeatures(
+            Json.arrayOrEmpty(payload.get("specialFeatures"), "payload.specialFeatures")
+        );
 
         Map<String, Object> worldSampleObject = Json.object(
             Json.required(config, "WorldSample"),
@@ -1889,6 +2265,7 @@ public final class GeoWorldV1 {
             terrain,
             List.copyOf(rivers),
             List.copyOf(lakes),
+            List.copyOf(specialFeatures),
             waterbedConfig,
             worldSampleConfig,
             climateTemp,
@@ -4127,6 +4504,75 @@ public final class GeoWorldV1 {
                 Json.doubleValue(l, "WaterSurface"),
                 l.containsKey("CoreCarve") && Json.bool(l, "CoreCarve")
             ));
+        }
+        return out;
+    }
+
+    private static List<SpecialFeature> parseSpecialFeatures(List<Object> values) {
+        List<SpecialFeature> out = new ArrayList<>(values.size());
+        for (int i = 0; i < values.size(); i++) {
+            Map<String, Object> f = Json.object(
+                values.get(i),
+                "specialFeature[" + i + "]"
+            );
+            List<Object> rawLobes = Json.arrayOrEmpty(
+                f.get("lobes"),
+                "specialFeature[" + i + "].lobes"
+            );
+            List<SpecialLobe> lobes = new ArrayList<>(rawLobes.size());
+            for (int j = 0; j < rawLobes.size(); j++) {
+                Map<String, Object> l = Json.object(
+                    rawLobes.get(j),
+                    "specialFeature[" + i + "].lobes[" + j + "]"
+                );
+                SpecialLobe lobe = new SpecialLobe(
+                    Json.doubleValue(l, "offsetX"),
+                    Json.doubleValue(l, "offsetZ"),
+                    Json.doubleValue(l, "radiusX"),
+                    Json.doubleValue(l, "radiusZ")
+                );
+                if (
+                    !finite(lobe.offsetX()) ||
+                    !finite(lobe.offsetZ()) ||
+                    !finite(lobe.radiusX()) ||
+                    !finite(lobe.radiusZ()) ||
+                    lobe.radiusX() <= 0 ||
+                    lobe.radiusZ() <= 0
+                ) {
+                    throw new IllegalArgumentException(
+                        "invalid persisted special feature lobe: " + i + "/" + j
+                    );
+                }
+                lobes.add(lobe);
+            }
+
+            SpecialFeature feature = new SpecialFeature(
+                Json.intValue(f, "id"),
+                Json.string(f, "kind"),
+                Json.doubleValue(f, "centerX"),
+                Json.doubleValue(f, "centerZ"),
+                Json.doubleValue(f, "radiusX"),
+                Json.doubleValue(f, "radiusZ"),
+                f.containsKey("waterContext")
+                    ? Json.string(f, "waterContext")
+                    : "",
+                List.copyOf(lobes)
+            );
+            if (
+                feature.id() <= 0 ||
+                feature.kind().isBlank() ||
+                !finite(feature.centerX()) ||
+                !finite(feature.centerZ()) ||
+                !finite(feature.radiusX()) ||
+                !finite(feature.radiusZ()) ||
+                feature.radiusX() <= 0 ||
+                feature.radiusZ() <= 0
+            ) {
+                throw new IllegalArgumentException(
+                    "invalid persisted special feature: " + i
+                );
+            }
+            out.add(feature);
         }
         return out;
     }

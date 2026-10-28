@@ -678,7 +678,8 @@ public final class GeoWorldV26ShorelineVerifier {
                 "geoworld-rules-v1.1.7".equals(generationRulesVersion) ||
                 "geoworld-rules-v1.1.8".equals(generationRulesVersion) ||
                 "geoworld-rules-v1.1.9".equals(generationRulesVersion) ||
-                "geoworld-rules-v1.1.10".equals(generationRulesVersion)
+                "geoworld-rules-v1.1.10".equals(generationRulesVersion) ||
+                "geoworld-rules-v1.1.11".equals(generationRulesVersion)
             ) ? 4 : 2;
         if (
             maxRaiseByKind.getOrDefault("River", 0) >

@@ -8,6 +8,7 @@ version = project.mod_version
 
 repositories {
     maven { url 'https://maven.fabricmc.net/' }
+    maven { url 'https://maven.terraformersmc.com/releases/' }
     mavenCentral()
 }
 
@@ -15,6 +16,7 @@ dependencies {
     minecraft 'com.mojang:minecraft:' + project.minecraft_version
     implementation 'net.fabricmc:fabric-loader:' + project.loader_version
     implementation 'net.fabricmc.fabric-api:fabric-api:' + project.fabric_api_version
+    modCompileOnly 'com.terraformersmc:modmenu:21.0.0'
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(25)
@@ -161,6 +163,36 @@ tasks.register('verifyGeoWorldEngineBridge', JavaExec) {
     systemProperty 'geoworld.cache.dir', layout.buildDirectory.dir('engine-bridge-verifier-cache').get().asFile.absolutePath
     doFirst {
         delete layout.buildDirectory.dir('engine-bridge-verifier-cache')
+    }
+}
+
+tasks.register('verifyGeoWorldWebUiLaunch', JavaExec) {
+    group = 'verification'
+    description = 'Starts the embedded GeoWorld WebUI and verifies dynamic-port launch readiness.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.fabric.client.GeoWorldWebUiLaunchVerifier'
+}
+
+tasks.register('verifyGeoWorldDynamicWebUiPort', JavaExec) {
+    group = 'verification'
+    description = 'Occupies port 8788 and verifies the in-game WebUI starts on a different dynamic port.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.fabric.client.GeoWorldWebUiLaunchVerifier'
+    args '--expect-fallback'
+}
+
+tasks.register('verifyGeoWorldSpecialLandscapes', JavaExec) {
+    group = 'verification'
+    description = 'Generates a fresh v1.1.11 model and verifies persisted special landscapes through the Java runtime reader.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir) + sourceSets.main.compileClasspath
+    mainClass = 'geoworld.minecraft.common.verification.GeoWorldSpecialLandscapeVerifier'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+    systemProperty 'geoworld.cache.dir', layout.buildDirectory.dir('special-landscape-verifier-cache').get().asFile.absolutePath
+    doFirst {
+        delete layout.buildDirectory.dir('special-landscape-verifier-cache')
     }
 }
 
@@ -315,6 +347,9 @@ tasks.register('fingerprintGeoWorldBiomeDecisions', JavaExec) {
 tasks.named('check') {
     dependsOn tasks.named('verifyGeoWorldAdapter')
     dependsOn tasks.named('verifyGeoWorldEngineBridge')
+    dependsOn tasks.named('verifyGeoWorldWebUiLaunch')
+    dependsOn tasks.named('verifyGeoWorldDynamicWebUiPort')
+    dependsOn tasks.named('verifyGeoWorldSpecialLandscapes')
     dependsOn tasks.named('verifyGeoWorldModelQuery')
     dependsOn tasks.named('verifyGeoWorldCreationConfig')
     dependsOn tasks.named('verifyGeoWorldPreviewModel')

@@ -128,7 +128,8 @@ public class GeoWorldShorelinePlanner {
             "geoworld-rules-v1.1.7".equals(rules) ||
             "geoworld-rules-v1.1.8".equals(rules) ||
             "geoworld-rules-v1.1.9".equals(rules) ||
-            "geoworld-rules-v1.1.10".equals(rules);
+            "geoworld-rules-v1.1.10".equals(rules) ||
+            "geoworld-rules-v1.1.11".equals(rules);
     }
 
     private static boolean sealHighRiverBanks(GeoWorldV1 runtime) {
@@ -137,13 +138,14 @@ public class GeoWorldShorelinePlanner {
             "geoworld-rules-v1.1.7".equals(rules) ||
             "geoworld-rules-v1.1.8".equals(rules) ||
             "geoworld-rules-v1.1.9".equals(rules) ||
-            "geoworld-rules-v1.1.10".equals(rules);
+            "geoworld-rules-v1.1.10".equals(rules) ||
+            "geoworld-rules-v1.1.11".equals(rules);
     }
 
     private static boolean adaptiveGentleBanks(GeoWorldV1 runtime) {
-        return "geoworld-rules-v1.1.10".equals(
-            runtime.manifest().generationRulesVersion()
-        );
+        String rules = runtime.manifest().generationRulesVersion();
+        return "geoworld-rules-v1.1.10".equals(rules) ||
+            "geoworld-rules-v1.1.11".equals(rules);
     }
 
     private int adaptiveSearchDistanceForChunk(

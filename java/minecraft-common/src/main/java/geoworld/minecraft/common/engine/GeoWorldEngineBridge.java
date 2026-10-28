@@ -22,11 +22,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public final class GeoWorldEngineBridge {
-    private static final String CACHE_FORMAT_VERSION = "v20";
+    private static final String CACHE_FORMAT_VERSION = "v21";
     private static final String EXPECTED_WORLD_PROFILE_VERSION =
         "geoworld-profile-v1.1";
     private static final String EXPECTED_GENERATION_RULES_VERSION =
-        "geoworld-rules-v1.1.10";
+        "geoworld-rules-v1.1.11";
     private static final String EXPECTED_WORLD_MODEL_VERSION =
         "geoworld-model-v1";
     private static final Duration GENERATION_TIMEOUT = Duration.ofMinutes(5);

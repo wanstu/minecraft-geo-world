@@ -132,7 +132,8 @@ public final class GeoWorldV26SparseCaves {
             "geoworld-rules-v1.1.7".equals(rules) ||
             "geoworld-rules-v1.1.8".equals(rules) ||
             "geoworld-rules-v1.1.9".equals(rules) ||
-            "geoworld-rules-v1.1.10".equals(rules)
+            "geoworld-rules-v1.1.10".equals(rules) ||
+            "geoworld-rules-v1.1.11".equals(rules)
         ) {
             carved[0] += populateUndergroundRivers(
                 chunk,

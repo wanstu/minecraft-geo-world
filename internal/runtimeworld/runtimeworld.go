@@ -10,6 +10,7 @@ import (
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
 	"geoworld/internal/sampling"
+	"geoworld/internal/specialfeatures"
 	"geoworld/internal/world"
 	"geoworld/internal/worldmodelio"
 	"geoworld/internal/worldsample"
@@ -29,7 +30,8 @@ type Model struct {
 	OuterIslandAbundance float64
 	PolarTransitionWidth float64
 
-	Finite *runtimeprofile.Model
+	Finite          *runtimeprofile.Model
+	SpecialFeatures []specialfeatures.Feature
 
 	climateTemp    sampling.ScalarGrid
 	climatePrecip  sampling.ScalarGrid
@@ -61,6 +63,7 @@ func NewGenerated(model *generator.WorldModel) (*Model, error) {
 		OuterIslandAbundance:   p.OuterIslandAbundance,
 		PolarTransitionWidth:   p.PolarTransitionWidth,
 		Finite:                 model.RuntimeProfile,
+		SpecialFeatures:        append([]specialfeatures.Feature(nil), model.SpecialFeatures...),
 		Climate: ClimateFields{
 			AnnualMeanTempC: model.Climate.AdjustedAnnualTempC,
 			AnnualPrecipMM:  model.Climate.AnnualPrecipMM,
@@ -98,6 +101,7 @@ func NewReopened(model *worldmodelio.RuntimeModel) (*Model, error) {
 		OuterIslandAbundance:   p.OuterIslandAbundance,
 		PolarTransitionWidth:   p.PolarTransitionWidth,
 		Finite:                 model.RuntimeProfile,
+		SpecialFeatures:        append([]specialfeatures.Feature(nil), model.SpecialFeatures...),
 		Climate: ClimateFields{
 			AnnualMeanTempC: model.ClimatePreview.AnnualMeanTempC,
 			AnnualPrecipMM:  model.ClimatePreview.AnnualPrecipMM,
@@ -118,6 +122,7 @@ type Config struct {
 	OuterIslandAbundance   float64
 	PolarTransitionWidth   float64
 	Finite                 *runtimeprofile.Model
+	SpecialFeatures        []specialfeatures.Feature
 	Climate                ClimateFields
 }
 
@@ -187,6 +192,7 @@ func New(cfg Config) (*Model, error) {
 		OuterIslandAbundance:   cfg.OuterIslandAbundance,
 		PolarTransitionWidth:   cfg.PolarTransitionWidth,
 		Finite:                 cfg.Finite,
+		SpecialFeatures:        append([]specialfeatures.Feature(nil), cfg.SpecialFeatures...),
 		climateTemp:            temp,
 		climatePrecip:          precip,
 		climateMonsoon:         monsoon,
@@ -196,10 +202,29 @@ func New(cfg Config) (*Model, error) {
 }
 
 func (m *Model) Sample(worldX, worldZ float64) runtimeprofile.Sample {
+	var out runtimeprofile.Sample
 	if m.Legacy || !m.outside(worldX, worldZ) {
-		return m.Finite.Sample(worldX, worldZ)
+		out = m.Finite.Sample(worldX, worldZ)
+	} else {
+		out = m.sampleOuterOcean(worldX, worldZ)
 	}
-	return m.sampleOuterOcean(worldX, worldZ)
+	if m.GenerationRulesVersion == "geoworld-rules-v1.1.11" && len(m.SpecialFeatures) > 0 {
+		out = m.applySpecialFeatures(out, worldX, worldZ)
+	}
+	return out
+}
+
+func (m *Model) applySpecialFeatures(
+	base runtimeprofile.Sample,
+	x, z float64,
+) runtimeprofile.Sample {
+	return specialfeatures.Apply(
+		m.SpecialFeatures,
+		base,
+		m.SeaLevelNormalized,
+		x,
+		z,
+	)
 }
 
 type ClimateSample struct {
@@ -481,7 +506,8 @@ func (m *Model) outerOceanSeafloor(x, z, sea, deep float64) float64 {
 	if m.GenerationRulesVersion != "geoworld-rules-v1.1.7" &&
 		m.GenerationRulesVersion != "geoworld-rules-v1.1.8" &&
 		m.GenerationRulesVersion != "geoworld-rules-v1.1.9" &&
-		m.GenerationRulesVersion != "geoworld-rules-v1.1.10" {
+		m.GenerationRulesVersion != "geoworld-rules-v1.1.10" &&
+		m.GenerationRulesVersion != "geoworld-rules-v1.1.11" {
 		return legacy
 	}
 

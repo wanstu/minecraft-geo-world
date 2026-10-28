@@ -30,10 +30,21 @@ public final class GeoWorldV26BiomeRealizer {
                 value -> new GeoWorldV26BiomeCoverage(
                     value,
                     this.heights,
-                    requiredBiomeIds()
+                    requiredCoverageBiomeIds(value)
                 )
             );
         }
+    }
+
+    public Set<String> requiredCoverageBiomeIds(GeoWorldV1 model) {
+        Set<String> required = requiredBiomeIds();
+        if (!usesSpecialLandscapeRules(model)) {
+            return required;
+        }
+        LinkedHashSet<String> filtered = new LinkedHashSet<>(required);
+        filtered.remove("minecraft:mushroom_fields");
+        filtered.remove("minecraft:pale_garden");
+        return Set.copyOf(filtered);
     }
 
     public Set<String> requiredBiomeIds() {
@@ -151,6 +162,24 @@ public final class GeoWorldV26BiomeRealizer {
             return oceanBiomeId(sample, climate);
         }
 
+        String specialFeature = sample.specialFeature();
+        if ("mushroom_island".equals(specialFeature)) {
+            return "minecraft:mushroom_fields";
+        }
+        if ("pale_garden_island".equals(specialFeature)) {
+            return "minecraft:pale_garden";
+        }
+        if (
+            "cherry_island".equals(specialFeature) ||
+            (
+                ("volcanic_crater_cherry".equals(specialFeature) ||
+                 "basin_cherry".equals(specialFeature)) &&
+                sample.specialFeatureStrength() > 0.18
+            )
+        ) {
+            return "minecraft:cherry_grove";
+        }
+
         if (!"Wetland".equals(family) &&
             sample.sourceLand() &&
             nearOcean(model, blockX, blockZ, 28.0)) {
@@ -161,7 +190,8 @@ public final class GeoWorldV26BiomeRealizer {
         // ocean-neighbor test. Reuse it rather than sampling eight model
         // positions twice for every temperate-forest or grassland column.
         boolean nearOcean96 = nearOcean(model, blockX, blockZ, 96.0);
-        if (isMushroomCandidate(model, sample, blockX, blockZ, nearOcean96)) {
+        if (!usesSpecialLandscapeRules(model) &&
+            isMushroomCandidate(model, sample, blockX, blockZ, nearOcean96)) {
             return "minecraft:mushroom_fields";
         }
 
@@ -282,7 +312,7 @@ public final class GeoWorldV26BiomeRealizer {
         String fallback = this.profile.biomeFamilyMapping().biomeId(
             sample.biomeFamily()
         );
-        return this.profile.biomeCatalog().choose(
+        String selected = this.profile.biomeCatalog().choose(
             new GeoWorldBiomeRegion(
                 tags,
                 temp,
@@ -294,6 +324,13 @@ public final class GeoWorldV26BiomeRealizer {
             z,
             fallback
         );
+        if (
+            usesSpecialLandscapeRules(model) &&
+            "minecraft:pale_garden".equals(selected)
+        ) {
+            return "minecraft:forest";
+        }
+        return selected;
     }
 
     private EnumSet<GeoWorldBiomeTag> regionTags(
@@ -741,6 +778,12 @@ public final class GeoWorldV26BiomeRealizer {
     private double smoothstep(double t) {
         t = Math.max(0.0, Math.min(1.0, t));
         return t * t * (3.0 - 2.0 * t);
+    }
+
+    private boolean usesSpecialLandscapeRules(GeoWorldV1 model) {
+        return "geoworld-rules-v1.1.11".equals(
+            model.manifest().generationRulesVersion()
+        );
     }
 
     private boolean supportsSulfurCaves() {

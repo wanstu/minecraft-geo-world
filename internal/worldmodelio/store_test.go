@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"geoworld/internal/generator"
+	"geoworld/internal/specialfeatures"
 	"geoworld/internal/world"
 )
 
@@ -55,6 +56,9 @@ func TestSaveLoadRoundTripPreservesRuntimeSamplesExactly(t *testing.T) {
 	if reopened.Geometry != original.Geometry {
 		t.Fatalf("geometry changed after reopen: got=%+v want=%+v", reopened.Geometry, original.Geometry)
 	}
+	if !reflect.DeepEqual(reopened.SpecialFeatures, original.SpecialFeatures) {
+		t.Fatalf("special landscape plan changed after reopen\nbefore=%+v\nafter=%+v", original.SpecialFeatures, reopened.SpecialFeatures)
+	}
 
 	points := [][2]float64{
 		{original.Geometry.OriginX, original.Geometry.OriginZ},
@@ -86,6 +90,21 @@ func TestSaveLoadRoundTripPreservesRuntimeSamplesExactly(t *testing.T) {
 		if !reflect.DeepEqual(before, after) {
 			t.Fatalf("runtime sample changed after reopen at %.6f,%.6f\nbefore=%+v\nafter=%+v",
 				p[0], p[1], before, after)
+		}
+	}
+
+	for _, feature := range original.SpecialFeatures {
+		before := specialfeatures.Apply(
+			original.SpecialFeatures,
+			original.RuntimeProfile.Sample(feature.CenterX, feature.CenterZ),
+			original.Config.SeaLevelNormalized,
+			feature.CenterX,
+			feature.CenterZ,
+		)
+		after := reopened.Sample(feature.CenterX, feature.CenterZ)
+		if !reflect.DeepEqual(before, after) {
+			t.Fatalf("special landscape sample changed after reopen at %.6f,%.6f kind=%q\nbefore=%+v\nafter=%+v",
+				feature.CenterX, feature.CenterZ, feature.Kind, before, after)
 		}
 	}
 

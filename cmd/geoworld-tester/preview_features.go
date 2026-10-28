@@ -9,12 +9,23 @@ import (
 )
 
 type previewFeatureResponse struct {
-	Seed   int64                 `json:"seed"`
-	Rivers []previewRiver        `json:"rivers"`
-	Lakes  []previewLake         `json:"lakes"`
-	Peaks  []previewPointFeature `json:"peaks"`
-	Counts map[string]int        `json:"counts"`
-	Note   string                `json:"note,omitempty"`
+	Seed              int64                     `json:"seed"`
+	Rivers            []previewRiver            `json:"rivers"`
+	Lakes             []previewLake             `json:"lakes"`
+	Peaks             []previewPointFeature     `json:"peaks"`
+	SpecialLandscapes []previewSpecialLandscape `json:"specialLandscapes"`
+	Counts            map[string]int            `json:"counts"`
+	Note              string                    `json:"note,omitempty"`
+}
+
+type previewSpecialLandscape struct {
+	Kind         string  `json:"kind"`
+	Name         string  `json:"name"`
+	X            float64 `json:"x"`
+	Z            float64 `json:"z"`
+	RadiusX      float64 `json:"radiusX"`
+	RadiusZ      float64 `json:"radiusZ"`
+	WaterContext string  `json:"waterContext,omitempty"`
 }
 
 type previewRiver struct {
@@ -87,16 +98,19 @@ func (s *appState) handlePreviewFeatures(w http.ResponseWriter, r *http.Request)
 	}
 
 	peaks := collectPreviewPeaks(active)
+	special := collectPreviewSpecialLandscapes(active)
 	tectonicCount := countPreviewTectonics(active)
 	resp := previewFeatureResponse{
-		Seed:   active.seed,
-		Rivers: rivers,
-		Lakes:  lakes,
-		Peaks:  peaks,
+		Seed:              active.seed,
+		Rivers:            rivers,
+		Lakes:             lakes,
+		Peaks:             peaks,
+		SpecialLandscapes: special,
 		Counts: map[string]int{
 			"rivers":    len(rivers),
 			"lakes":     len(lakes),
 			"peaks":     len(peaks),
+			"special":   len(special),
 			"tectonics": tectonicCount,
 		},
 		Note: "世界预览要素直接来自当前 World Model；与验收表和抽检表完全独立。",
@@ -109,6 +123,26 @@ var errNoActiveWorld = &previewStateError{"generate or load a world first"}
 type previewStateError struct{ text string }
 
 func (e *previewStateError) Error() string { return e.text }
+
+func collectPreviewSpecialLandscapes(active *activeWorld) []previewSpecialLandscape {
+	features := activeSpecialFeatures(active)
+	if len(features) == 0 {
+		return nil
+	}
+	out := make([]previewSpecialLandscape, 0, len(features))
+	for _, feature := range features {
+		out = append(out, previewSpecialLandscape{
+			Kind:         string(feature.Kind),
+			Name:         specialFeatureLabel(string(feature.Kind)),
+			X:            feature.CenterX,
+			Z:            feature.CenterZ,
+			RadiusX:      feature.RadiusX,
+			RadiusZ:      feature.RadiusZ,
+			WaterContext: feature.WaterContext,
+		})
+	}
+	return out
+}
 
 func collectPreviewPeaks(active *activeWorld) []previewPointFeature {
 	if active == nil || active.sample == nil {

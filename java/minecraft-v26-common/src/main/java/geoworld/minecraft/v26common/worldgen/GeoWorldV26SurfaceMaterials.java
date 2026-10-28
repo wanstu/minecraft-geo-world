@@ -111,7 +111,8 @@ public final class GeoWorldV26SurfaceMaterials {
                 "geoworld-rules-v1.1.7".equals(generationRulesVersion) ||
                 "geoworld-rules-v1.1.8".equals(generationRulesVersion) ||
                 "geoworld-rules-v1.1.9".equals(generationRulesVersion) ||
-                "geoworld-rules-v1.1.10".equals(generationRulesVersion)
+                "geoworld-rules-v1.1.10".equals(generationRulesVersion) ||
+                "geoworld-rules-v1.1.11".equals(generationRulesVersion)
             ) &&
             "Alpine Rock".equals(profile) &&
             (cover == Cover.GRASS || cover == Cover.PODZOL)
@@ -139,7 +140,8 @@ public final class GeoWorldV26SurfaceMaterials {
                 "geoworld-rules-v1.1.7".equals(generationRulesVersion) ||
                 "geoworld-rules-v1.1.8".equals(generationRulesVersion) ||
                 "geoworld-rules-v1.1.9".equals(generationRulesVersion) ||
-                "geoworld-rules-v1.1.10".equals(generationRulesVersion)
+                "geoworld-rules-v1.1.10".equals(generationRulesVersion) ||
+                "geoworld-rules-v1.1.11".equals(generationRulesVersion)
             ) &&
             "Alpine Rock".equals(profile) &&
             (cover == Cover.GRASS || cover == Cover.PODZOL)

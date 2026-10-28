@@ -16,6 +16,7 @@ import (
 	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
+	"geoworld/internal/specialfeatures"
 	"geoworld/internal/terrain"
 	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
@@ -213,23 +214,37 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 	}
 	reporter.done(StageRuntimeProfile)
 
+	var special []specialfeatures.Feature
+	if resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.11" {
+		special = specialfeatures.Plan(
+			resolved.Seed,
+			w.Geometry,
+			w.Surface,
+			h,
+			p,
+			runtimeModel,
+			resolved.WorldProfile.Parameters.RareMacroTerrain,
+		)
+	}
+
 	model := &WorldModel{
-		Geometry:       w.Geometry,
-		Surface:        w.Surface,
-		Phase1:         w,
-		Climate:        c,
-		Hydrology:      h,
-		Erosion:        e,
-		Landform:       l,
-		Geomorph:       g,
-		Ecology:        eco,
-		Profile:        p,
-		Terrain:        t,
-		CoastTerrain:   coastTerrain,
-		Reconciliation: rec,
-		Waterbed:       wb,
-		Runtime:        runtimeModel,
-		RuntimeProfile: runtimeProfile,
+		Geometry:        w.Geometry,
+		Surface:         w.Surface,
+		Phase1:          w,
+		Climate:         c,
+		Hydrology:       h,
+		Erosion:         e,
+		Landform:        l,
+		Geomorph:        g,
+		Ecology:         eco,
+		Profile:         p,
+		Terrain:         t,
+		CoastTerrain:    coastTerrain,
+		Reconciliation:  rec,
+		Waterbed:        wb,
+		Runtime:         runtimeModel,
+		RuntimeProfile:  runtimeProfile,
+		SpecialFeatures: special,
 	}
 	model.Config = ResolvedConfig{
 		Seed:               resolved.Seed,
