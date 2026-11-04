@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -36,19 +37,22 @@ type progressLine struct {
 
 func main() {
 	var (
-		seed          = flag.Int64("seed", 731894205, "world seed")
-		width         = flag.Int("width", 320, "macro grid width")
-		height        = flag.Int("height", 200, "macro grid height")
-		cellSize      = flag.Float64("cell-size", world.DefaultMacroSpacingBlocks, "blocks per macro node")
-		plateCount    = flag.Int("plates", 18, "tectonic plate count")
-		ocean         = flag.Float64("ocean", 0.68, "oceanic crust fraction")
-		fragmentation = flag.Float64("fragmentation", 0.35, "continent fragmentation")
-		separation    = flag.Float64("separation", 0.65, "continent separation")
-		profilePreset = flag.String("profile", "standard", "world profile preset id")
-		parameters    = flag.String("parameters", "", "25-value world parameter snapshot CSV")
-		output        = flag.String("output", "", "output .geoworld path")
-		force         = flag.Bool("force", false, "replace an existing output atomically")
-		progressJSON  = flag.Bool("progress-json", false, "emit line-delimited progress JSON on stderr")
+		seed              = flag.Int64("seed", 731894205, "world seed")
+		width             = flag.Int("width", 320, "macro grid width")
+		height            = flag.Int("height", 200, "macro grid height")
+		cellSize          = flag.Float64("cell-size", world.DefaultMacroSpacingBlocks, "blocks per macro node")
+		plateCount        = flag.Int("plates", 18, "tectonic plate count")
+		ocean             = flag.Float64("ocean", 0.68, "oceanic crust fraction")
+		fragmentation     = flag.Float64("fragmentation", 0.35, "continent fragmentation")
+		separation        = flag.Float64("separation", 0.65, "continent separation")
+		profilePreset     = flag.String("profile", "standard", "world profile preset id")
+		parameters        = flag.String("parameters", "", "25-value world parameter snapshot CSV")
+		mineralDictionary = flag.String("mineral-dictionary", "", "comma-separated ore dictionary families used for district planning")
+		availableMinerals = flag.String("available-minerals", "", "comma-separated ore families that have concrete blocks in this world")
+		surfaceOrePile    = flag.Bool("surface-ore-pile", false, "generate surface raw-ore marker piles at mining district centers")
+		output            = flag.String("output", "", "output .geoworld path")
+		force             = flag.Bool("force", false, "replace an existing output atomically")
+		progressJSON      = flag.Bool("progress-json", false, "emit line-delimited progress JSON on stderr")
 	)
 	flag.Parse()
 
@@ -94,6 +98,9 @@ func main() {
 		OceanFraction:          *ocean,
 		ContinentFragmentation: *fragmentation,
 		ContinentSeparation:    *separation,
+		MineralDictionary:      splitCSV(*mineralDictionary),
+		AvailableMinerals:      splitCSV(*availableMinerals),
+		SurfaceOrePile:         *surfaceOrePile,
 	}, func(p generator.Progress) {
 		if !*progressJSON {
 			return
@@ -181,6 +188,21 @@ func validateArgs(
 		return errors.New("output is required")
 	}
 	return nil
+}
+
+func splitCSV(value string) []string {
+	if value == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 func exitError(err error) {

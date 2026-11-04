@@ -231,8 +231,19 @@ func TestRiverDepthDefaultsAreGenerationRuleLocked(t *testing.T) {
 	if got := current.WorldSample.RiverCenterDepthNormalized; math.Abs(got-0.004) > 1e-12 {
 		t.Fatalf("current river center depth=%v want=0.004", got)
 	}
-	if got := current.Waterbed.RiverGeometryVersion; got != 3 {
-		t.Fatalf("current river geometry version=%d want=3", got)
+	if got := current.Waterbed.RiverGeometryVersion; got != 5 {
+		t.Fatalf("current river geometry version=%d want=5", got)
+	}
+
+	lockedV1112Cfg := testConfig(2026)
+	lockedV1112Cfg.WorldProfile = StandardWorldProfile()
+	lockedV1112Cfg.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.12"
+	lockedV1112, err := resolveTopLevelConfig(lockedV1112Cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := lockedV1112.Waterbed.RiverGeometryVersion; got != 4 {
+		t.Fatalf("locked v1.1.12 river geometry version=%d want=4", got)
 	}
 	if got := current.Waterbed.LakeGeometryVersion; got != 1 {
 		t.Fatalf("current lake geometry version=%d want=1", got)
@@ -245,6 +256,17 @@ func TestRiverDepthDefaultsAreGenerationRuleLocked(t *testing.T) {
 	}
 	if !current.Ecology.EnsureWetlandRegion {
 		t.Fatal("current rules must guarantee a natural wetland region")
+	}
+
+	lockedV1111Cfg := testConfig(2026)
+	lockedV1111Cfg.WorldProfile = StandardWorldProfile()
+	lockedV1111Cfg.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.11"
+	lockedV1111, err := resolveTopLevelConfig(lockedV1111Cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := lockedV1111.Waterbed.RiverGeometryVersion; got != 3 {
+		t.Fatalf("locked v1.1.11 river geometry version=%d want=3", got)
 	}
 
 	lockedV118Cfg := testConfig(2026)
@@ -408,6 +430,90 @@ func TestV115OrdinaryRiverInnerWetCoreHasNoDryHoles(t *testing.T) {
 			dry,
 			samples,
 		)
+	}
+}
+
+func TestV1113RealGenerationEnablesDeltaAndV1112StaysLocked(t *testing.T) {
+	const width, height = 160, 100
+	cell := float64(world.DefaultMacroSpacingBlocks)
+	base := Config{
+		Seed: 123456,
+		Geometry: world.GridGeometry{
+			Width: width, Height: height,
+			OriginX:     -float64(width-1) * cell / 2,
+			OriginZ:     -float64(height-1) * cell / 2,
+			SpanXBlocks: float64(width-1) * cell,
+			SpanZBlocks: float64(height-1) * cell,
+		},
+		PlateCount:    18,
+		OceanFraction: 0.68,
+		WorldProfile:  StandardWorldProfile(),
+	}
+
+	current, err := GenerateWorld(context.Background(), base, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oceanMouths := 0
+	versionFiveMouths := 0
+	for _, seg := range current.Waterbed.Rivers {
+		if !seg.OceanMouth {
+			continue
+		}
+		oceanMouths++
+		if seg.MouthExpansionVersion >= 5 {
+			versionFiveMouths++
+		}
+	}
+	deltaCandidates := 0
+	for _, candidate := range current.Waterbed.AcceptanceFluvialCandidates() {
+		if candidate.Kind == "delta" {
+			deltaCandidates++
+		}
+	}
+	if oceanMouths == 0 || versionFiveMouths != oceanMouths {
+		t.Fatalf(
+			"v1.1.13 real ocean-mouth activation failed: ocean=%d v5=%d",
+			oceanMouths,
+			versionFiveMouths,
+		)
+	}
+	if deltaCandidates == 0 {
+		t.Fatal("v1.1.13 real generation produced no deterministic delta candidate")
+	}
+	deltaRoute := current.Waterbed.AcceptanceDeltaRoute()
+	if len(deltaRoute) < 4 {
+		t.Fatalf("v1.1.13 real delta acceptance route points=%d want>=4", len(deltaRoute))
+	}
+
+	locked := base
+	locked.WorldProfile = StandardWorldProfile()
+	locked.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.12"
+	legacy, err := GenerateWorld(context.Background(), locked, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lockedV5Mouths := 0
+	for _, seg := range legacy.Waterbed.Rivers {
+		if seg.OceanMouth && seg.MouthExpansionVersion >= 5 {
+			lockedV5Mouths++
+		}
+	}
+	lockedDeltaCandidates := 0
+	for _, candidate := range legacy.Waterbed.AcceptanceFluvialCandidates() {
+		if candidate.Kind == "delta" {
+			lockedDeltaCandidates++
+		}
+	}
+	if lockedV5Mouths != 0 || lockedDeltaCandidates != 0 {
+		t.Fatalf(
+			"locked v1.1.12 unexpectedly enabled delta geometry: oceanV5=%d delta=%d",
+			lockedV5Mouths,
+			lockedDeltaCandidates,
+		)
+	}
+	if route := legacy.Waterbed.AcceptanceDeltaRoute(); len(route) != 0 {
+		t.Fatalf("locked v1.1.12 unexpectedly produced delta route points=%d", len(route))
 	}
 }
 

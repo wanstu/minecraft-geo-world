@@ -1044,6 +1044,87 @@ func TestLowestOpenNodeBreaksEqualCostTiesByNodeID(t *testing.T) {
 	}
 }
 
+func TestV4RiverSurfaceStaysBelowBothBanks(t *testing.T) {
+	g := testGeometry()
+	base := testTerrain(t, g, 0.60)
+	n := g.Width * g.Height
+	from, to := 3, 4
+	rec := &reconcile.Model{
+		Geometry:              g,
+		Config:                reconcile.Config{RiverStrengthThreshold: 0.30},
+		RiverBaseElevation:    filled(n, 0.595),
+		RiverBedTarget:        filled(n, 0.595),
+		LakeBedCeilingDefined: make([]bool, n),
+		LakeBedCeiling:        make([]float64, n),
+		WaterKind:             make([]reconcile.WaterKind, n),
+		WaterSurfaceDefined:   make([]bool, n),
+		WaterSurfaceElevation: make([]float64, n),
+		RiverEdges: []reconcile.RiverEdgeConstraint{{
+			From: from, To: to, RiverStrength: 1,
+		}},
+	}
+	h := emptyHydrology(g)
+	cfg := Config{
+		MinRiverHalfWidthBlocks:     6,
+		MaxRiverHalfWidthBlocks:     18,
+		RiverProfileStepBlocks:      1,
+		RiverGeometryVersion:        4,
+		MinRiverBedDepthNormalized:  0.006,
+		RiverCenterDepthNormalized:  0.004,
+		MinLakeWaterDepthNormalized: 0.002,
+	}
+	m, err := Build(base, rec, h, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Rivers) != 1 {
+		t.Fatalf("river segments=%d want=1", len(m.Rivers))
+	}
+	seg := m.Rivers[0]
+	depth := riverCenterDepth(m.Config, seg.HalfWidth)
+	for i, bed := range seg.Profile {
+		surface := bed + depth
+		const bankCeiling = 0.60 - 0.0022
+		if surface > bankCeiling+1e-12 {
+			t.Fatalf(
+				"v4 river surface escapes bank at profile[%d]: surface=%.12f bankCeiling=%.12f bed=%.12f depth=%.12f",
+				i,
+				surface,
+				bankCeiling,
+				bed,
+				depth,
+			)
+		}
+	}
+
+	// Runtime samples can land between persisted profile points, and widened
+	// mouths probe a different physical bank offset. Verify the exact sampled
+	// datum too, not only the stored centerline profile.
+	for i := 0; i <= len(seg.Profile)*2; i++ {
+		tt := float64(i) / float64(len(seg.Profile)*2)
+		x, z := RiverCenterPoint(seg, tt)
+		got := m.Sample(x, z)
+		if !got.RiverBedDefined {
+			t.Fatalf("v4 runtime sample lost river bed at t=%.6f: %+v", tt, got)
+		}
+		surface := got.RiverBedElevation + depth
+		if got.RiverReceiverSurfaceDefined &&
+			got.RiverReceiverSurface > surface {
+			surface = got.RiverReceiverSurface
+		}
+		ceiling := riverBankSurfaceCeiling(m.Base, seg, tt)
+		if surface > ceiling+1e-12 {
+			t.Fatalf(
+				"v4 runtime river surface escapes bank at t=%.6f: surface=%.12f ceiling=%.12f sample=%+v",
+				tt,
+				surface,
+				ceiling,
+				got,
+			)
+		}
+	}
+}
+
 func TestRiverCorridorHitsBedTargetAndStaysLocal(t *testing.T) {
 	g := testGeometry()
 	base := testTerrain(t, g, 0.70)

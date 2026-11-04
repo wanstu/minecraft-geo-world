@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"crypto/subtle"
 	"embed"
@@ -29,13 +30,18 @@ import (
 	"time"
 
 	"geoworld/acceptance"
+	"geoworld/internal/advantage"
+	"geoworld/internal/civilization"
 	"geoworld/internal/generator"
 	"geoworld/internal/mcprofile"
 	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
 	"geoworld/internal/runtimeworld"
+	"geoworld/internal/scopebudget"
+	"geoworld/internal/specialfeatures"
 	"geoworld/internal/terrain"
+	"geoworld/internal/transportgeo"
 	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
 	"geoworld/internal/worldmodelio"
@@ -45,42 +51,55 @@ import (
 var webFiles embed.FS
 
 type activeWorld struct {
-	seed                    int64
-	geometry                world.GridGeometry
-	sample                  func(float64, float64) runtimeprofile.Sample
-	previewGrid             []runtimeprofile.Sample
-	mineralPreviewModelPath string
-	strongholdMu            sync.Mutex
-	strongholdLoaded        bool
-	strongholdCandidates    []structureCandidate
-	strongholdErr           string
-	riverCount              int
-	lakeCount               int
-	plateCount              int
-	oceanFraction           float64
-	continentFragmentation  float64
-	continentSeparation     float64
-	worldPreset             string
-	worldProfileVersion     string
-	generationRulesVersion  string
-	worldModelVersion       string
-	parameterSnapshotSHA256 string
-	parameterSnapshot       generator.ParameterSnapshot
-	landComponents          int
-	majorLandComponents     int
-	largestLandShare        float64
-	finalRiverUpslope       int
-	finalLakeBedViolations  int
-	finalCoastMismatch      int
-	runtimeFallback         int
-	runtimeMismatch         int
-	anomalies               anomalyReport
-	source                  string
-	model                   *generator.WorldModel
-	reopened                *worldmodelio.RuntimeModel
-	modelPath               string
-	generatedAt             time.Time
-	duration                time.Duration
+	cacheMu                  sync.Mutex
+	seed                     int64
+	geometry                 world.GridGeometry
+	sample                   func(float64, float64) runtimeprofile.Sample
+	runtimeWorld             *runtimeworld.Model
+	previewGrid              []runtimeprofile.Sample
+	layerPNGCache            map[string][]byte
+	settlementGrid           []settlementPreviewCell
+	navigationGrid           []navigationPreviewCell
+	miningGrid               []miningPreviewCell
+	regionalAdvantageGrid    []regionalAdvantagePreviewCell
+	regionalAdvantageSummary advantage.Summary
+	regionalAdvantageRegions advantage.RegionModel
+	scopeBudget              scopebudget.Summary
+	transportGeoModel        transportgeo.Model
+	civilizationGrid         []civilizationPreviewCell
+	civilizationNetwork      civilization.Network
+	mineralPreviewModelPath  string
+	strongholdMu             sync.Mutex
+	strongholdLoaded         bool
+	strongholdCandidates     []structureCandidate
+	strongholdErr            string
+	riverCount               int
+	lakeCount                int
+	plateCount               int
+	oceanFraction            float64
+	continentFragmentation   float64
+	continentSeparation      float64
+	worldPreset              string
+	worldProfileVersion      string
+	generationRulesVersion   string
+	worldModelVersion        string
+	parameterSnapshotSHA256  string
+	parameterSnapshot        generator.ParameterSnapshot
+	landComponents           int
+	majorLandComponents      int
+	largestLandShare         float64
+	finalRiverUpslope        int
+	finalLakeBedViolations   int
+	finalCoastMismatch       int
+	runtimeFallback          int
+	runtimeMismatch          int
+	anomalies                anomalyReport
+	source                   string
+	model                    *generator.WorldModel
+	reopened                 *worldmodelio.RuntimeModel
+	modelPath                string
+	generatedAt              time.Time
+	duration                 time.Duration
 }
 
 const anomalyPointLimit = 250
@@ -109,54 +128,161 @@ type anomalyReport struct {
 }
 
 type appState struct {
-	mu          sync.RWMutex
-	active      *activeWorld
-	generating  bool
-	exporting   bool
-	stage       generator.Stage
-	completed   int
-	total       int
-	startedAt   time.Time
-	lastError   string
-	gameToken   string
-	gameClient  string
-	gameSession gameSessionState
+	mu                   sync.RWMutex
+	active               *activeWorld
+	generating           bool
+	exporting            bool
+	stage                generator.Stage
+	completed            int
+	total                int
+	startedAt            time.Time
+	lastError            string
+	gameToken            string
+	gameClient           string
+	gameMinecraftVersion string
+	gameSession          gameSessionState
+	pendingTeleport      *gameTeleportCommand
+	teleportSeq          uint64
+	pendingChunky        *gameChunkCommand
+	chunkSeq             uint64
 }
 
 type gameSessionState struct {
-	Managed                bool   `json:"managed"`
-	State                  string `json:"state"`
-	Client                 string `json:"client,omitempty"`
-	WorldName              string `json:"worldName,omitempty"`
-	MinecraftVersion       string `json:"minecraftVersion,omitempty"`
-	Seed                   int64  `json:"seed,omitempty"`
-	WorldProfileVersion    string `json:"worldProfileVersion,omitempty"`
-	GenerationRulesVersion string `json:"generationRulesVersion,omitempty"`
-	WorldModelVersion      string `json:"worldModelVersion,omitempty"`
-	DynamicWorldgen        bool   `json:"dynamicWorldgen,omitempty"`
-	Message                string `json:"message,omitempty"`
-	Revision               uint64 `json:"revision"`
+	Managed                bool                      `json:"managed"`
+	State                  string                    `json:"state"`
+	Client                 string                    `json:"client,omitempty"`
+	WorldName              string                    `json:"worldName,omitempty"`
+	MinecraftVersion       string                    `json:"minecraftVersion,omitempty"`
+	Seed                   int64                     `json:"seed,omitempty"`
+	WorldProfileVersion    string                    `json:"worldProfileVersion,omitempty"`
+	GenerationRulesVersion string                    `json:"generationRulesVersion,omitempty"`
+	WorldModelVersion      string                    `json:"worldModelVersion,omitempty"`
+	DynamicWorldgen        bool                      `json:"dynamicWorldgen,omitempty"`
+	OreFamilies            []string                  `json:"oreFamilies,omitempty"`
+	OreIcons               map[string]string         `json:"oreIcons,omitempty"`
+	Player                 *gamePlayerPosition       `json:"player,omitempty"`
+	Message                string                    `json:"message,omitempty"`
+	TeleportCommandID      uint64                    `json:"teleportCommandId,omitempty"`
+	TeleportState          string                    `json:"teleportState,omitempty"`
+	TeleportMessage        string                    `json:"teleportMessage,omitempty"`
+	ChunkGeneration        *gameChunkGenerationState `json:"chunkGeneration,omitempty"`
+	Revision               uint64                    `json:"revision"`
+}
+
+func cloneStringMap(source map[string]string) map[string]string {
+	if len(source) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(source))
+	for key, value := range source {
+		out[key] = value
+	}
+	return out
+}
+
+type gamePlayerPosition struct {
+	X         float64 `json:"x"`
+	Y         float64 `json:"y"`
+	Z         float64 `json:"z"`
+	Yaw       float64 `json:"yaw"`
+	Pitch     float64 `json:"pitch"`
+	Dimension string  `json:"dimension,omitempty"`
+}
+
+type gameTeleportCommand struct {
+	ID uint64  `json:"id"`
+	X  float64 `json:"x"`
+	Y  float64 `json:"y"`
+	Z  float64 `json:"z"`
+}
+
+type gameTeleportRequest struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+	Z float64 `json:"z"`
+}
+
+type gameChunkCommand struct {
+	ID     uint64 `json:"id"`
+	Action string `json:"action"`
+	X1     int    `json:"x1,omitempty"`
+	Z1     int    `json:"z1,omitempty"`
+	X2     int    `json:"x2,omitempty"`
+	Z2     int    `json:"z2,omitempty"`
+}
+
+type gameChunkRequest struct {
+	Action string `json:"action"`
+	X1     int    `json:"x1"`
+	Z1     int    `json:"z1"`
+	X2     int    `json:"x2"`
+	Z2     int    `json:"z2"`
+}
+
+type gameChunkGenerationState struct {
+	Available       bool    `json:"available"`
+	State           string  `json:"state"`
+	CommandID       uint64  `json:"commandId,omitempty"`
+	Action          string  `json:"action,omitempty"`
+	X1              int     `json:"x1,omitempty"`
+	Z1              int     `json:"z1,omitempty"`
+	X2              int     `json:"x2,omitempty"`
+	Z2              int     `json:"z2,omitempty"`
+	TotalChunks     int64   `json:"totalChunks,omitempty"`
+	ProcessedChunks int64   `json:"processedChunks,omitempty"`
+	Percent         float64 `json:"percent,omitempty"`
+	Rate            float64 `json:"rate,omitempty"`
+	CurrentChunkX   int     `json:"currentChunkX,omitempty"`
+	CurrentChunkZ   int     `json:"currentChunkZ,omitempty"`
+	ElapsedMillis   int64   `json:"elapsedMillis,omitempty"`
+	Message         string  `json:"message,omitempty"`
 }
 
 type gameSessionRequest struct {
-	Action                  string `json:"action"`
-	State                   string `json:"state"`
-	Client                  string `json:"client"`
-	Message                 string `json:"message"`
-	WorldName               string `json:"worldName"`
-	WorldDirectory          string `json:"worldDirectory"`
-	ModelPath               string `json:"modelPath"`
-	BindingVersion          int    `json:"bindingVersion"`
-	MinecraftVersion        string `json:"minecraftVersion"`
-	ModelSchemaVersion      int    `json:"modelSchemaVersion"`
-	GeneratorVersion        string `json:"generatorVersion"`
-	Seed                    int64  `json:"seed"`
-	WorldProfileVersion     string `json:"worldProfileVersion"`
-	GenerationRulesVersion  string `json:"generationRulesVersion"`
-	WorldModelVersion       string `json:"worldModelVersion"`
-	Preset                  string `json:"preset"`
-	ParameterSnapshotSHA256 string `json:"parameterSnapshotSha256"`
-	DynamicWorldgen         bool   `json:"dynamicWorldgen"`
+	Action                  string            `json:"action"`
+	State                   string            `json:"state"`
+	Client                  string            `json:"client"`
+	Message                 string            `json:"message"`
+	WorldName               string            `json:"worldName"`
+	WorldDirectory          string            `json:"worldDirectory"`
+	ModelPath               string            `json:"modelPath"`
+	BindingVersion          int               `json:"bindingVersion"`
+	MinecraftVersion        string            `json:"minecraftVersion"`
+	ModelSchemaVersion      int               `json:"modelSchemaVersion"`
+	GeneratorVersion        string            `json:"generatorVersion"`
+	Seed                    int64             `json:"seed"`
+	WorldProfileVersion     string            `json:"worldProfileVersion"`
+	GenerationRulesVersion  string            `json:"generationRulesVersion"`
+	WorldModelVersion       string            `json:"worldModelVersion"`
+	Preset                  string            `json:"preset"`
+	ParameterSnapshotSHA256 string            `json:"parameterSnapshotSha256"`
+	DynamicWorldgen         bool              `json:"dynamicWorldgen"`
+	OreFamilies             []string          `json:"oreFamilies"`
+	OreIcons                map[string]string `json:"oreIcons"`
+	PlayerX                 float64           `json:"playerX"`
+	PlayerY                 float64           `json:"playerY"`
+	PlayerZ                 float64           `json:"playerZ"`
+	PlayerYaw               float64           `json:"playerYaw"`
+	PlayerPitch             float64           `json:"playerPitch"`
+	Dimension               string            `json:"dimension"`
+	CommandID               uint64            `json:"commandId"`
+	Success                 bool              `json:"success"`
+	ChunkyAvailable         bool              `json:"chunkyAvailable"`
+	ChunkyTaskExists        bool              `json:"chunkyTaskExists"`
+	ChunkyTaskLive          bool              `json:"chunkyTaskLive"`
+	ChunkyComplete          bool              `json:"chunkyComplete"`
+	ChunkyProcessedChunks   int64             `json:"chunkyProcessedChunks"`
+	ChunkyTotalChunks       int64             `json:"chunkyTotalChunks"`
+	ChunkyPercent           float64           `json:"chunkyPercent"`
+	ChunkyRate              float64           `json:"chunkyRate"`
+	ChunkyCurrentChunkX     int               `json:"chunkyCurrentChunkX"`
+	ChunkyCurrentChunkZ     int               `json:"chunkyCurrentChunkZ"`
+	ChunkyX1                int               `json:"chunkyX1"`
+	ChunkyZ1                int               `json:"chunkyZ1"`
+	ChunkyX2                int               `json:"chunkyX2"`
+	ChunkyZ2                int               `json:"chunkyZ2"`
+	ChunkyElapsedMillis     int64             `json:"chunkyElapsedMillis"`
+	ChunkyCancelled         bool              `json:"chunkyCancelled"`
 }
 
 type generateRequest struct {
@@ -222,7 +348,17 @@ func main() {
 	modelDir := flag.String("models", filepath.FromSlash("output/models"), "saved model directory")
 	gameToken := flag.String("game-token", "", "private Minecraft game-session control token")
 	gameClient := flag.String("game-client", "", "Minecraft game-session client label")
+	gameMinecraftVersion := flag.String("game-minecraft-version", "", "Minecraft version expected for managed game binding")
 	flag.Parse()
+
+	if strings.TrimSpace(*gameClient) != "" ||
+		strings.TrimSpace(*gameMinecraftVersion) != "" {
+		previous := runtime.GOMAXPROCS(1)
+		fmt.Printf(
+			"GeoWorld managed WebUI CPU guard enabled: GOMAXPROCS=1 (was %d)\n",
+			previous,
+		)
+	}
 
 	repoRoot, err := findRepoRoot()
 	if err != nil {
@@ -231,8 +367,9 @@ func main() {
 	}
 
 	state := &appState{
-		gameToken:  strings.TrimSpace(*gameToken),
-		gameClient: strings.TrimSpace(*gameClient),
+		gameToken:            strings.TrimSpace(*gameToken),
+		gameClient:           strings.TrimSpace(*gameClient),
+		gameMinecraftVersion: strings.TrimSpace(*gameMinecraftVersion),
 	}
 	if state.gameToken != "" {
 		state.gameSession = gameSessionState{
@@ -259,14 +396,20 @@ func main() {
 	}))
 	mux.HandleFunc("/api/status", state.handleStatus)
 	mux.HandleFunc("/api/game/session", state.handleGameSession)
+	mux.HandleFunc("/api/game/control", state.handleGameControl)
+	mux.HandleFunc("/api/game/teleport", state.handleGameTeleport)
+	mux.HandleFunc("/api/game/chunks", state.handleGameChunks)
 	mux.HandleFunc("/api/generate", state.handleGenerate)
 	mux.HandleFunc("/api/sample", state.handleSample)
 	mux.HandleFunc("/api/anomalies", state.handleAnomalies)
 	mux.HandleFunc("/api/acceptance", state.handleAcceptance)
 	mux.HandleFunc("/api/features", state.handlePreviewFeatures)
 	mux.HandleFunc("/api/minerals", state.handleMineralBodies)
+	mux.HandleFunc("/api/civilization", state.handleCivilizationNetwork)
+	mux.HandleFunc("/api/transport-geography", state.handleTransportGeography)
 	mux.HandleFunc("/api/structures", state.handleStructureCandidates)
 	mux.HandleFunc("/api/structure-search", state.handleStructureSearch)
+	mux.HandleFunc("/api/biome-search", state.handleBiomeSearch)
 	mux.HandleFunc("/api/layer", state.handleLayer)
 	mux.HandleFunc("/api/save", func(w http.ResponseWriter, r *http.Request) { state.handleSave(w, r, *modelDir) })
 	mux.HandleFunc("/api/load", func(w http.ResponseWriter, r *http.Request) { state.handleLoad(w, r, *modelDir) })
@@ -298,12 +441,13 @@ func (s *appState) handleStatus(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	resp := map[string]any{
-		"generating": s.generating,
-		"exporting":  s.exporting,
-		"stage":      s.stage,
-		"completed":  s.completed,
-		"total":      s.total,
-		"error":      s.lastError,
+		"generating":       s.generating,
+		"exporting":        s.exporting,
+		"stage":            s.stage,
+		"completed":        s.completed,
+		"total":            s.total,
+		"error":            s.lastError,
+		"localGameControl": isLoopbackRequest(r),
 	}
 	if s.generating {
 		resp["elapsedMs"] = time.Since(s.startedAt).Milliseconds()
@@ -345,6 +489,124 @@ func (s *appState) handleGameSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch strings.TrimSpace(req.Action) {
+	case "player":
+		if !finite3(req.PlayerX, req.PlayerY, req.PlayerZ) {
+			writeError(w, http.StatusBadRequest, errors.New("invalid player position"))
+			return
+		}
+		s.mu.Lock()
+		if s.gameSession.State != "bound" {
+			s.mu.Unlock()
+			writeError(w, http.StatusConflict, errors.New("no bound GeoWorld game session"))
+			return
+		}
+		s.gameSession.Player = &gamePlayerPosition{
+			X: req.PlayerX, Y: req.PlayerY, Z: req.PlayerZ,
+			Yaw: req.PlayerYaw, Pitch: req.PlayerPitch,
+			Dimension: strings.TrimSpace(req.Dimension),
+		}
+		session := s.gameSession
+		s.mu.Unlock()
+		writeJSON(w, http.StatusOK, map[string]any{"gameSession": session})
+		return
+
+	case "teleport_result":
+		if req.CommandID == 0 {
+			writeError(w, http.StatusBadRequest, errors.New("teleport commandId is required"))
+			return
+		}
+		s.mu.Lock()
+		if s.pendingTeleport != nil && s.pendingTeleport.ID == req.CommandID {
+			s.pendingTeleport = nil
+		}
+		s.gameSession.TeleportCommandID = req.CommandID
+		if req.Success {
+			s.gameSession.TeleportState = "done"
+		} else {
+			s.gameSession.TeleportState = "failed"
+		}
+		s.gameSession.TeleportMessage = strings.TrimSpace(req.Message)
+		session := s.gameSession
+		s.mu.Unlock()
+		writeJSON(w, http.StatusOK, map[string]any{"gameSession": session})
+		return
+
+	case "chunky_result":
+		if req.CommandID == 0 {
+			writeError(w, http.StatusBadRequest, errors.New("chunky commandId is required"))
+			return
+		}
+		s.mu.Lock()
+		if s.pendingChunky != nil && s.pendingChunky.ID == req.CommandID {
+			s.pendingChunky = nil
+		}
+		if s.gameSession.ChunkGeneration == nil {
+			s.gameSession.ChunkGeneration = &gameChunkGenerationState{}
+		}
+		chunk := s.gameSession.ChunkGeneration
+		chunk.CommandID = req.CommandID
+		chunk.Message = strings.TrimSpace(req.Message)
+		if req.Success {
+			switch chunk.Action {
+			case "start", "continue":
+				chunk.State = "running"
+			case "pause":
+				chunk.State = "paused"
+			case "cancel":
+				chunk.State = "canceled"
+			default:
+				chunk.State = "idle"
+			}
+		} else {
+			chunk.State = "failed"
+		}
+		session := s.gameSession
+		s.mu.Unlock()
+		writeJSON(w, http.StatusOK, map[string]any{"gameSession": session})
+		return
+
+	case "chunky_status":
+		s.mu.Lock()
+		if s.gameSession.ChunkGeneration == nil {
+			s.gameSession.ChunkGeneration = &gameChunkGenerationState{}
+		}
+		chunk := s.gameSession.ChunkGeneration
+		chunk.Available = req.ChunkyAvailable
+		chunk.ProcessedChunks = max64(0, req.ChunkyProcessedChunks)
+		chunk.ElapsedMillis = max64(0, req.ChunkyElapsedMillis)
+		chunk.Rate = math.Max(0, req.ChunkyRate)
+		chunk.Percent = math.Max(0, math.Min(100, req.ChunkyPercent))
+		chunk.CurrentChunkX = req.ChunkyCurrentChunkX
+		chunk.CurrentChunkZ = req.ChunkyCurrentChunkZ
+		if req.ChunkyTaskExists {
+			if req.ChunkyTotalChunks > 0 {
+				chunk.TotalChunks = req.ChunkyTotalChunks
+			}
+			chunk.X1, chunk.Z1 = req.ChunkyX1, req.ChunkyZ1
+			chunk.X2, chunk.Z2 = req.ChunkyX2, req.ChunkyZ2
+		}
+		if req.ChunkyCancelled {
+			chunk.State = "canceled"
+		} else if req.ChunkyComplete {
+			chunk.State = "complete"
+		} else if req.ChunkyTaskLive {
+			if chunk.State != "paused" {
+				chunk.State = "running"
+			}
+		} else if req.ChunkyTaskExists {
+			if chunk.State != "paused" {
+				chunk.State = "existing"
+			}
+		} else if chunk.State == "" || chunk.State == "existing" || chunk.State == "canceled" {
+			chunk.State = "idle"
+		} else if chunk.State == "running" && s.pendingChunky == nil {
+			chunk.State = "complete"
+		}
+		session := s.gameSession
+		s.mu.Unlock()
+		writeJSON(w, http.StatusOK, map[string]any{"gameSession": session})
+		return
+
 	case "unbind":
 		state := strings.TrimSpace(req.State)
 		switch state {
@@ -363,6 +625,8 @@ func (s *appState) handleGameSession(w http.ResponseWriter, r *http.Request) {
 
 		s.mu.Lock()
 		s.active = nil
+		s.pendingTeleport = nil
+		s.pendingChunky = nil
 		s.lastError = ""
 		revision := s.gameSession.Revision + 1
 		s.gameSession = gameSessionState{
@@ -384,11 +648,13 @@ func (s *appState) handleGameSession(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusConflict, errors.New("GeoWorld binding version is not fully locked"))
 			return
 		}
-		if strings.TrimSpace(req.MinecraftVersion) != "26.3" {
+		expectedMinecraftVersion := strings.TrimSpace(s.gameMinecraftVersion)
+		if expectedMinecraftVersion != "" &&
+			strings.TrimSpace(req.MinecraftVersion) != expectedMinecraftVersion {
 			writeError(w, http.StatusConflict, fmt.Errorf(
 				"Minecraft version mismatch: game=%q webui=%q",
 				req.MinecraftVersion,
-				"26.3",
+				expectedMinecraftVersion,
 			))
 			return
 		}
@@ -408,7 +674,7 @@ func (s *appState) handleGameSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		active, err := loadActiveWorldFromPath(modelPath, "game")
+		active, err := loadActiveWorldBaseFromPath(modelPath, "game")
 		if err != nil {
 			writeError(w, http.StatusBadRequest, fmt.Errorf("load game GeoWorld model: %w", err))
 			return
@@ -459,22 +725,293 @@ func (s *appState) handleGameSession(w http.ResponseWriter, r *http.Request) {
 			GenerationRulesVersion: req.GenerationRulesVersion,
 			WorldModelVersion:      req.WorldModelVersion,
 			DynamicWorldgen:        req.DynamicWorldgen,
+			OreFamilies:            append([]string(nil), req.OreFamilies...),
+			OreIcons:               cloneStringMap(req.OreIcons),
 			Message:                "已自动加载当前游戏中的 GeoWorld 世界",
+			ChunkGeneration:        &gameChunkGenerationState{State: "idle"},
 			Revision:               revision,
 		}
 		session := s.gameSession
+		boundRevision := revision
 		s.mu.Unlock()
 
 		writeJSON(w, http.StatusOK, map[string]any{
 			"active":      activeSummary(active),
 			"gameSession": session,
 		})
+
+		// Managed Minecraft binding stays lightweight. Preview/analysis caches
+		// are built lazily by the first endpoint that actually needs them.
+		// Never warm every full-world analysis grid merely because a game
+		// entered a GeoWorld world: that can monopolize the machine for tens
+		// of seconds while the browser is trying to load the WebUI.
+		_ = boundRevision
 		return
 
 	default:
-		writeError(w, http.StatusBadRequest, errors.New("action must be bind or unbind"))
+		writeError(w, http.StatusBadRequest, errors.New("action must be bind, unbind, player, teleport_result, chunky_result, or chunky_status"))
 		return
 	}
+}
+
+func (s *appState) handleGameControl(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+	if !s.validGameToken(r.Header.Get("X-GeoWorld-Game-Token")) {
+		writeError(w, http.StatusUnauthorized, errors.New("invalid game-session token"))
+		return
+	}
+
+	s.mu.RLock()
+	if s.pendingTeleport != nil {
+		command := *s.pendingTeleport
+		s.mu.RUnlock()
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprintf(
+			w,
+			"teleport\t%d\t%.6f\t%.6f\t%.6f",
+			command.ID,
+			command.X,
+			command.Y,
+			command.Z,
+		)
+		return
+	}
+	if s.pendingChunky != nil {
+		command := *s.pendingChunky
+		s.mu.RUnlock()
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprintf(
+			w,
+			"chunky\t%d\t%s\t%d\t%d\t%d\t%d",
+			command.ID,
+			command.Action,
+			command.X1,
+			command.Z1,
+			command.X2,
+			command.Z2,
+		)
+		return
+	}
+	s.mu.RUnlock()
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *appState) handleGameTeleport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+	if !isLoopbackRequest(r) {
+		writeError(w, http.StatusForbidden, errors.New(
+			"direct game control is only available from the local computer",
+		))
+		return
+	}
+
+	var req gameTeleportRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	if !finite3(req.X, req.Y, req.Z) || req.Y < -64 || req.Y > 320 {
+		writeError(w, http.StatusBadRequest, errors.New("invalid teleport target"))
+		return
+	}
+
+	s.mu.Lock()
+	if s.gameSession.State != "bound" {
+		s.mu.Unlock()
+		writeError(w, http.StatusConflict, errors.New(
+			"direct teleport requires a bound GeoWorld game session",
+		))
+		return
+	}
+	s.teleportSeq++
+	command := &gameTeleportCommand{
+		ID: s.teleportSeq,
+		X:  req.X,
+		Y:  req.Y,
+		Z:  req.Z,
+	}
+	s.pendingTeleport = command
+	s.gameSession.TeleportCommandID = command.ID
+	s.gameSession.TeleportState = "pending"
+	s.gameSession.TeleportMessage = "等待 Minecraft 执行"
+	s.mu.Unlock()
+
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"accepted": true,
+		"command":  command,
+	})
+}
+
+func (s *appState) handleGameChunks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodNotAllowed(w)
+		return
+	}
+	if !isLoopbackRequest(r) {
+		writeError(w, http.StatusForbidden, errors.New(
+			"runtime chunk generation is only available from the local computer",
+		))
+		return
+	}
+
+	var req gameChunkRequest
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	action := strings.TrimSpace(req.Action)
+	switch action {
+	case "start", "pause", "continue", "cancel":
+	default:
+		writeError(w, http.StatusBadRequest, errors.New(
+			"chunk action must be start, pause, continue, or cancel",
+		))
+		return
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.gameSession.State != "bound" {
+		writeError(w, http.StatusConflict, errors.New(
+			"runtime chunk generation requires a bound GeoWorld game session",
+		))
+		return
+	}
+	if s.pendingChunky != nil {
+		writeError(w, http.StatusConflict, errors.New(
+			"another Chunky command is still waiting for Minecraft",
+		))
+		return
+	}
+	if s.gameSession.ChunkGeneration == nil {
+		s.gameSession.ChunkGeneration = &gameChunkGenerationState{State: "idle"}
+	}
+	chunk := s.gameSession.ChunkGeneration
+	if !chunk.Available && action != "start" {
+		writeError(w, http.StatusConflict, errors.New(
+			"Chunky is not available in the running Minecraft instance",
+		))
+		return
+	}
+
+	command := &gameChunkCommand{Action: action}
+	if action == "start" {
+		minX, maxX := req.X1, req.X2
+		if minX > maxX {
+			minX, maxX = maxX, minX
+		}
+		minZ, maxZ := req.Z1, req.Z2
+		if minZ > maxZ {
+			minZ, maxZ = maxZ, minZ
+		}
+		if minX < -29999984 || maxX > 29999984 ||
+			minZ < -29999984 || maxZ > 29999984 {
+			writeError(w, http.StatusBadRequest, errors.New(
+				"selected region exceeds the Minecraft world coordinate limit",
+			))
+			return
+		}
+		minX = floorChunkBlock(minX)
+		minZ = floorChunkBlock(minZ)
+		maxX = floorChunkBlock(maxX) + 15
+		maxZ = floorChunkBlock(maxZ) + 15
+		chunksX := int64((maxX - minX + 1) / 16)
+		chunksZ := int64((maxZ - minZ + 1) / 16)
+		total := chunksX * chunksZ
+		if total <= 0 {
+			writeError(w, http.StatusBadRequest, errors.New("empty chunk region"))
+			return
+		}
+		command.X1, command.Z1 = minX, minZ
+		command.X2, command.Z2 = maxX, maxZ
+		chunk.X1, chunk.Z1 = minX, minZ
+		chunk.X2, chunk.Z2 = maxX, maxZ
+		chunk.TotalChunks = total
+		chunk.ProcessedChunks = 0
+		chunk.ElapsedMillis = 0
+	}
+
+	s.chunkSeq++
+	command.ID = s.chunkSeq
+	s.pendingChunky = command
+	chunk.CommandID = command.ID
+	chunk.Action = action
+	chunk.State = "pending"
+	chunk.Message = "等待 Minecraft 执行"
+	writeJSON(w, http.StatusAccepted, map[string]any{
+		"accepted":        true,
+		"command":         command,
+		"chunkGeneration": chunk,
+	})
+}
+
+func (s *appState) validGameToken(provided string) bool {
+	s.mu.RLock()
+	gameToken := s.gameToken
+	s.mu.RUnlock()
+	return gameToken != "" &&
+		len(provided) == len(gameToken) &&
+		subtle.ConstantTimeCompare([]byte(provided), []byte(gameToken)) == 1
+}
+
+func isLoopbackRequest(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr))
+	if err != nil {
+		host = strings.TrimSpace(r.RemoteAddr)
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	if ip == nil {
+		return false
+	}
+	if ip.IsLoopback() {
+		return true
+	}
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return false
+	}
+	for _, addr := range addrs {
+		var local net.IP
+		switch value := addr.(type) {
+		case *net.IPNet:
+			local = value.IP
+		case *net.IPAddr:
+			local = value.IP
+		}
+		if local != nil && local.Equal(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+func finite3(x, y, z float64) bool {
+	return !math.IsNaN(x) && !math.IsInf(x, 0) &&
+		!math.IsNaN(y) && !math.IsInf(y, 0) &&
+		!math.IsNaN(z) && !math.IsInf(z, 0)
+}
+
+func floorChunkBlock(v int) int {
+	return int(math.Floor(float64(v)/16.0)) * 16
+}
+
+func max64(a, b int64) int64 {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
@@ -609,6 +1146,7 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		seed:                    model.Config.Seed,
 		geometry:                model.Geometry,
 		sample:                  runtimeWorld.Sample,
+		runtimeWorld:            runtimeWorld,
 		riverCount:              len(model.Waterbed.Rivers),
 		lakeCount:               len(model.Waterbed.Lakes),
 		plateCount:              model.Config.Phase1.PlateCount,
@@ -624,13 +1162,14 @@ func (s *appState) handleGenerate(w http.ResponseWriter, r *http.Request) {
 		landComponents:          landComponents,
 		majorLandComponents:     majorLandComponents,
 		largestLandShare:        largestLandShare,
+		scopeBudget:             buildScopeBudget(model.Config),
 		source:                  "generated",
 		model:                   model,
 		generatedAt:             time.Now(),
 		duration:                duration,
 	}
-	active.previewGrid = buildPreviewGrid(active)
-	applyAnomalyReport(active, buildAnomalyReport(active))
+	// Keep the generated World Model cold. Preview and analysis caches are
+	// built only when their corresponding API/layer is actually requested.
 	s.mu.Lock()
 	s.generating = false
 	s.lastError = ""
@@ -662,7 +1201,220 @@ func (s *appState) handleSample(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sample := active.sample(x, z)
-	writeJSON(w, http.StatusOK, sampleJSON(x, z, sample))
+	payload := sampleJSON(x, z, sample)
+	if score, ok := settlementScoreExact(active, x, z, 16); ok {
+		payload["settlement"] = score
+	}
+	if score, ok := navigationScoreExact(active, x, z); ok {
+		payload["navigation"] = score
+	}
+	if score, ok := miningScoreExact(active, x, z); ok {
+		payload["mining"] = score
+	}
+	if score, ok := regionalAdvantageScoreExact(active, x, z); ok {
+		payload["regionalAdvantage"] = score
+	}
+	if region, ok := regionalAdvantageRegionAt(active, x, z); ok {
+		payload["regionalRegion"] = region
+	}
+	if score, ok := transportGeoScoreAt(active, x, z); ok {
+		payload["transportGeography"] = score
+	}
+	if score, ok := civilizationScoreExact(active, x, z); ok {
+		payload["civilization"] = score
+	}
+	writeJSON(w, http.StatusOK, payload)
+}
+
+func (s *appState) handleCivilizationNetwork(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+	s.mu.RLock()
+	active := s.active
+	s.mu.RUnlock()
+	if active == nil {
+		writeError(
+			w,
+			http.StatusConflict,
+			errors.New("generate or load a world first"),
+		)
+		return
+	}
+	ensureLayerCaches(active, "civilization")
+	writeJSON(w, http.StatusOK, map[string]any{
+		"seed":                   active.seed,
+		"generationRulesVersion": active.generationRulesVersion,
+		"network":                active.civilizationNetwork,
+	})
+}
+
+func (s *appState) handleTransportGeography(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+	s.mu.RLock()
+	active := s.active
+	s.mu.RUnlock()
+	if active == nil {
+		writeError(
+			w,
+			http.StatusConflict,
+			errors.New("generate or load a world first"),
+		)
+		return
+	}
+	ensureLayerCaches(active, "transport")
+	writeJSON(w, http.StatusOK, map[string]any{
+		"seed":                   active.seed,
+		"generationRulesVersion": active.generationRulesVersion,
+		"model":                  active.transportGeoModel,
+	})
+}
+
+func (s *appState) handleBiomeSearch(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w)
+		return
+	}
+	target := strings.TrimSpace(r.URL.Query().Get("biome"))
+	if target == "" {
+		writeError(w, http.StatusBadRequest, errors.New("missing biome"))
+		return
+	}
+	queryX, err := queryInt(r, "x", 0)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	queryZ, err := queryInt(r, "z", 0)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	s.mu.RLock()
+	active := s.active
+	s.mu.RUnlock()
+	if active == nil {
+		writeError(w, http.StatusConflict, errNoActiveWorld)
+		return
+	}
+
+	bestDistance := math.Inf(1)
+	bestX, bestZ := 0.0, 0.0
+	label := target
+	matchKind := "biome_family"
+	found := false
+
+	if strings.HasPrefix(target, "special:") {
+		kind := strings.TrimPrefix(target, "special:")
+		label = specialFeatureLabel(kind)
+		matchKind = "special_landscape"
+		for _, feature := range activeSpecialFeatures(active) {
+			if string(feature.Kind) != kind {
+				continue
+			}
+			distance := math.Hypot(
+				feature.CenterX-float64(queryX),
+				feature.CenterZ-float64(queryZ),
+			)
+			if distance < bestDistance {
+				bestDistance = distance
+				bestX = feature.CenterX
+				bestZ = feature.CenterZ
+				found = true
+			}
+		}
+	} else {
+		family := strings.TrimPrefix(target, "family:")
+		label = family
+		g := active.geometry
+		for z := 0; z < g.Height; z++ {
+			for x := 0; x < g.Width; x++ {
+				wx, wz := g.NodePosition(x, z)
+				sample := active.sample(wx, wz)
+				if !strings.EqualFold(sample.BiomeFamily.String(), family) {
+					continue
+				}
+				distance := math.Hypot(
+					wx-float64(queryX),
+					wz-float64(queryZ),
+				)
+				if distance < bestDistance {
+					bestDistance = distance
+					bestX = wx
+					bestZ = wz
+					found = true
+				}
+			}
+		}
+	}
+
+	if !found {
+		writeError(w, http.StatusNotFound, fmt.Errorf(
+			"current World Model has no matching biome or special landscape %q",
+			target,
+		))
+		return
+	}
+
+	sample := active.sample(bestX, bestZ)
+	y := minecraft26TeleportY(sample)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"biome":     target,
+		"label":     label,
+		"matchKind": matchKind,
+		"x":         bestX,
+		"y":         y,
+		"z":         bestZ,
+		"distance":  bestDistance,
+		"sample":    sampleJSON(bestX, bestZ, sample),
+	})
+}
+
+func activeSpecialFeatures(active *activeWorld) []specialfeatures.Feature {
+	if active == nil {
+		return nil
+	}
+	if active.model != nil {
+		return active.model.SpecialFeatures
+	}
+	if active.reopened != nil {
+		return active.reopened.SpecialFeatures
+	}
+	return nil
+}
+
+func specialFeatureLabel(kind string) string {
+	switch kind {
+	case "mushroom_island":
+		return "蘑菇岛"
+	case "pale_garden_island":
+		return "苍白森林岛"
+	case "cherry_island":
+		return "樱花岛"
+	case "sinkhole":
+		return "天坑"
+	case "volcanic_crater_snow":
+		return "雪山火山坑"
+	case "volcanic_crater_cherry":
+		return "樱花火山坑"
+	case "basin_cherry":
+		return "樱花盆地"
+	case "basin_snow":
+		return "雪山盆地"
+	default:
+		return kind
+	}
 }
 
 func (s *appState) handleAnomalies(w http.ResponseWriter, r *http.Request) {
@@ -677,6 +1429,7 @@ func (s *appState) handleAnomalies(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, errors.New("generate or load a world first"))
 		return
 	}
+	ensureLayerCaches(active, "anomalies")
 	writeJSON(w, http.StatusOK, active.anomalies)
 }
 
@@ -687,8 +1440,13 @@ func (s *appState) currentAcceptanceReport() (acceptance.Report, error) {
 	if active == nil {
 		return acceptance.Report{}, errors.New("generate or load a world first")
 	}
+	ensureLayerCaches(active, "acceptance")
 	if active.reopened != nil {
-		return acceptance.Plan(active.reopened)
+		report, err := acceptance.Plan(active.reopened)
+		if err != nil {
+			return acceptance.Report{}, err
+		}
+		return applyActiveAcceptanceEvidence(report, active), nil
 	}
 	if active.model == nil {
 		return acceptance.Report{}, errors.New("active world has no acceptance model")
@@ -707,7 +1465,88 @@ func (s *appState) currentAcceptanceReport() (acceptance.Report, error) {
 	if err != nil {
 		return acceptance.Report{}, err
 	}
-	return acceptance.Plan(reopened)
+	report, err := acceptance.Plan(reopened)
+	if err != nil {
+		return acceptance.Report{}, err
+	}
+	return applyActiveAcceptanceEvidence(report, active), nil
+}
+
+func applyActiveAcceptanceEvidence(
+	report acceptance.Report,
+	active *activeWorld,
+) acceptance.Report {
+	if active == nil {
+		return report
+	}
+	summary := active.regionalAdvantageSummary
+	report = acceptance.ApplyMacro05Evidence(
+		report,
+		acceptance.Macro05Evidence{
+			PotentialCells:            summary.PotentialCells,
+			RoleCoverage:              summary.RoleCoverage,
+			CoreTripleOverlapFraction: summary.CoreTripleOverlapFraction,
+			CoreTripleOverlapLimit:    summary.Macro05CoreTripleLimit,
+			Satisfied:                 summary.Macro05Satisfied,
+		},
+	)
+	scope := active.scopeBudget
+	report = acceptance.ApplyMacro06Evidence(
+		report,
+		acceptance.Macro06Evidence{
+			MinSpanBlocks:            scope.MinSpanBlocks,
+			MaxScaleBlocks:           scope.MaxScaleBlocks,
+			MaxScaleName:             scope.MaxScaleName,
+			ScaleCapacity:            scope.ScaleCapacity,
+			InteriorFraction:         scope.InteriorFraction,
+			RecommendedMinSpanBlocks: scope.RecommendedMinSpanBlocks,
+			ShortfallBlocks:          scope.ShortfallBlocks,
+			Satisfied:                scope.Macro06Satisfied,
+		},
+	)
+
+	nodeCounts := make(map[string]int, 8)
+	for _, node := range active.transportGeoModel.Nodes {
+		nodeCounts[node.Class]++
+	}
+	totalCells := len(active.transportGeoModel.Scores)
+	nodeFraction := 0.0
+	if totalCells > 0 {
+		nodeFraction = float64(len(active.transportGeoModel.Nodes)) /
+			float64(totalCells)
+	}
+	report = acceptance.ApplyNodeEvidence(
+		report,
+		acceptance.NodeEvidence{
+			TotalCells:        totalCells,
+			TotalNodes:        len(active.transportGeoModel.Nodes),
+			ConfluenceNodes:   nodeCounts[transportgeo.NodeConfluence],
+			LakeOutletNodes:   nodeCounts[transportgeo.NodeLakeOutlet],
+			EstuaryNodes:      nodeCounts[transportgeo.NodeEstuary],
+			MountainPassNodes: nodeCounts[transportgeo.NodeMountainPass],
+			StraitNodes:       nodeCounts[transportgeo.NodeStrait],
+			IsthmusNodes:      nodeCounts[transportgeo.NodeIsthmus],
+			NodeFraction:      nodeFraction,
+			NodeFractionLimit: 0.01,
+		},
+	)
+
+	corridors := make(map[string]acceptance.CorridorClassEvidence, 6)
+	for _, route := range active.transportGeoModel.Routes {
+		item := corridors[route.Class]
+		item.Routes++
+		if route.SemanticComplete {
+			item.CompleteRoutes++
+			if route.LengthBlocks > item.LongestCompleteBlocks {
+				item.LongestCompleteBlocks = route.LengthBlocks
+			}
+		}
+		corridors[route.Class] = item
+	}
+	return acceptance.ApplyCorridorEvidence(
+		report,
+		acceptance.CorridorEvidence{Classes: corridors},
+	)
 }
 
 func (s *appState) handleAcceptance(w http.ResponseWriter, r *http.Request) {
@@ -817,6 +1656,96 @@ func acceptanceExtension(format string) string {
 	}
 }
 
+func ensureLayerCaches(active *activeWorld, layer string) {
+	if active == nil {
+		return
+	}
+
+	active.cacheMu.Lock()
+	defer active.cacheMu.Unlock()
+
+	if len(active.previewGrid) == 0 {
+		active.previewGrid = buildPreviewGrid(active)
+	}
+
+	ensureSettlement := func() {
+		if len(active.settlementGrid) == 0 {
+			active.settlementGrid = buildSettlementPreviewGrid(active)
+		}
+	}
+	ensureNavigation := func() {
+		ensureSettlement()
+		if len(active.navigationGrid) == 0 {
+			active.navigationGrid = buildNavigationPreviewGrid(active)
+		}
+	}
+	ensureMining := func() {
+		if len(active.miningGrid) == 0 {
+			active.miningGrid = buildMiningPreviewGrid(active)
+		}
+	}
+	ensureCoreAnalysis := func() {
+		ensureSettlement()
+		ensureNavigation()
+		ensureMining()
+	}
+
+	switch layer {
+	case "settlement":
+		ensureSettlement()
+	case "navigation":
+		ensureNavigation()
+	case "mining":
+		ensureMining()
+	case "advantage":
+		ensureCoreAnalysis()
+		if len(active.regionalAdvantageGrid) == 0 {
+			active.regionalAdvantageGrid,
+				active.regionalAdvantageSummary,
+				active.regionalAdvantageRegions =
+				buildRegionalAdvantagePreviewGrid(active)
+		}
+	case "transport":
+		ensureCoreAnalysis()
+		if len(active.transportGeoModel.Scores) == 0 {
+			active.transportGeoModel = buildTransportGeography(active)
+		}
+	case "civilization":
+		ensureCoreAnalysis()
+		if len(active.transportGeoModel.Scores) == 0 {
+			active.transportGeoModel = buildTransportGeography(active)
+		}
+		if len(active.civilizationGrid) == 0 {
+			active.civilizationGrid,
+				active.civilizationNetwork =
+				buildCivilizationPreview(active)
+		}
+	case "acceptance":
+		ensureCoreAnalysis()
+		if len(active.regionalAdvantageGrid) == 0 {
+			active.regionalAdvantageGrid,
+				active.regionalAdvantageSummary,
+				active.regionalAdvantageRegions =
+				buildRegionalAdvantagePreviewGrid(active)
+		}
+		if len(active.transportGeoModel.Scores) == 0 {
+			active.transportGeoModel = buildTransportGeography(active)
+		}
+		if len(active.civilizationGrid) == 0 {
+			active.civilizationGrid,
+				active.civilizationNetwork =
+				buildCivilizationPreview(active)
+		}
+		if active.anomalies.Counts == nil {
+			applyAnomalyReport(active, buildAnomalyReport(active))
+		}
+	case "anomalies":
+		if active.anomalies.Counts == nil {
+			applyAnomalyReport(active, buildAnomalyReport(active))
+		}
+	}
+}
+
 func (s *appState) handleLayer(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		methodNotAllowed(w)
@@ -837,8 +1766,32 @@ func (s *appState) handleLayer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	cacheKey := fmt.Sprintf("%s:%dx%d", layer, width, height)
+	active.cacheMu.Lock()
+	cachedPNG := active.layerPNGCache[cacheKey]
+	active.cacheMu.Unlock()
+	if len(cachedPNG) > 0 {
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write(cachedPNG)
+		return
+	}
+
+	ensureLayerCaches(active, layer)
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	if layer == "tectonic" {
+	if layer == "settlement" {
+		renderSettlementPreviewLayer(img, active)
+	} else if layer == "navigation" {
+		renderNavigationPreviewLayer(img, active)
+	} else if layer == "mining" {
+		renderMiningPreviewLayer(img, active)
+	} else if layer == "civilization" {
+		renderCivilizationPreviewLayer(img, active)
+	} else if layer == "advantage" {
+		renderRegionalAdvantagePreviewLayer(img, active)
+	} else if layer == "transport" {
+		renderTransportGeographyLayer(img, active)
+	} else if layer == "tectonic" {
 		renderTectonicPreviewLayer(img, active)
 	} else if layer == "skeleton" || layer == "rivers" || layer == "lakes" || layer == "anomalies" {
 		if err := renderDiagnosticLayer(img, active, layer); err != nil {
@@ -853,6 +1806,9 @@ func (s *appState) handleLayer(w http.ResponseWriter, r *http.Request) {
 	} else {
 		g := active.geometry
 		for py := 0; py < height; py++ {
+			if r.Context().Err() != nil {
+				return
+			}
 			z := g.OriginZ + float64(py)/float64(maxInt(height-1, 1))*g.SpanZBlocks
 			for px := 0; px < width; px++ {
 				x := g.OriginX + float64(px)/float64(maxInt(width-1, 1))*g.SpanXBlocks
@@ -861,11 +1817,24 @@ func (s *appState) handleLayer(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	encoder := png.Encoder{CompressionLevel: png.BestSpeed}
+	var encoded bytes.Buffer
+	if err := encoder.Encode(&encoded, img); err != nil {
+		log.Printf("encode layer: %v", err)
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	pngBytes := encoded.Bytes()
+	active.cacheMu.Lock()
+	if active.layerPNGCache == nil {
+		active.layerPNGCache = make(map[string][]byte)
+	}
+	active.layerPNGCache[cacheKey] = append([]byte(nil), pngBytes...)
+	active.cacheMu.Unlock()
+
 	w.Header().Set("Content-Type", "image/png")
 	w.Header().Set("Cache-Control", "no-store")
-	if err := png.Encode(w, img); err != nil {
-		log.Printf("encode layer: %v", err)
-	}
+	_, _ = w.Write(pngBytes)
 }
 
 func (s *appState) handleSave(w http.ResponseWriter, r *http.Request, modelDir string) {
@@ -915,7 +1884,7 @@ func (s *appState) handleSave(w http.ResponseWriter, r *http.Request, modelDir s
 	writeJSON(w, http.StatusOK, map[string]any{"name": name, "info": info})
 }
 
-func loadActiveWorldFromPath(path, source string) (*activeWorld, error) {
+func loadActiveWorldBaseFromPath(path, source string) (*activeWorld, error) {
 	start := time.Now()
 	absolutePath, err := filepath.Abs(path)
 	if err != nil {
@@ -958,6 +1927,7 @@ func loadActiveWorldFromPath(path, source string) (*activeWorld, error) {
 		seed:                    model.Manifest.Seed,
 		geometry:                model.Geometry,
 		sample:                  runtimeWorld.Sample,
+		runtimeWorld:            runtimeWorld,
 		riverCount:              len(model.Waterbed.Rivers),
 		lakeCount:               len(model.Waterbed.Lakes),
 		plateCount:              model.Config.Phase1.PlateCount,
@@ -973,16 +1943,20 @@ func loadActiveWorldFromPath(path, source string) (*activeWorld, error) {
 		landComponents:          landComponents,
 		majorLandComponents:     majorLandComponents,
 		largestLandShare:        largestLandShare,
+		scopeBudget:             buildScopeBudget(model.Config),
 		source:                  source,
 		reopened:                model,
 		modelPath:               absolutePath,
 		generatedAt:             time.Now(),
 		duration:                time.Since(start),
 	}
-	active.previewGrid = buildPreviewGrid(active)
-	applyAnomalyReport(active, buildAnomalyReport(active))
-	active.duration = time.Since(start)
 	return active, nil
+}
+
+func loadActiveWorldFromPath(path, source string) (*activeWorld, error) {
+	// Loading a model must not eagerly warm every world-scale analysis cache.
+	// The same lazy policy used by Minecraft-managed binding applies here.
+	return loadActiveWorldBaseFromPath(path, source)
 }
 
 func (s *appState) handleLoad(w http.ResponseWriter, r *http.Request, modelDir string) {
@@ -1277,6 +2251,10 @@ func activeSummary(a *activeWorld) map[string]any {
 		"landComponents":          a.landComponents,
 		"majorLandComponents":     a.majorLandComponents,
 		"largestLandShare":        a.largestLandShare,
+		"regionalAdvantage":       a.regionalAdvantageSummary,
+		"regionalRegions":         a.regionalAdvantageRegions.Summary,
+		"scopeBudget":             a.scopeBudget,
+		"transportGeoNodes":       len(a.transportGeoModel.Nodes),
 		"finalCoastMismatch":      a.finalCoastMismatch,
 		"finalRiverUpslope":       a.finalRiverUpslope,
 		"finalLakeBedViolations":  a.finalLakeBedViolations,
@@ -1547,28 +2525,61 @@ func activeCoastTerrain(active *activeWorld) *terrain.Model {
 }
 
 func sampleJSON(x, z float64, s runtimeprofile.Sample) map[string]any {
+	groundBoundaryY := minecraft26BoundaryY(s.World.GroundHeight)
+	teleportY := minecraft26TeleportY(s)
 	return map[string]any{
-		"x": x, "z": z,
-		"groundHeight":          s.World.GroundHeight,
-		"waterKind":             waterKindName(s.World.WaterKind),
-		"waterSurfaceDefined":   s.World.WaterSurfaceDefined,
-		"waterSurfaceElevation": s.World.WaterSurfaceElevation,
-		"waterDepth":            s.World.WaterDepth,
-		"oceanEligibility":      s.World.OceanEligibility,
-		"riverWeight":           s.World.RiverWeight,
-		"ecoRegion":             s.EcoRegion.String(),
-		"regionConfidence":      s.RegionConfidence,
-		"biomeFamily":           s.BiomeFamily.String(),
-		"terrainVariant":        s.TerrainVariant.String(),
-		"surfaceProfile":        s.SurfaceProfile.String(),
-		"vegetationProfile":     s.VegetationProfile.String(),
-		"profileConfidence":     s.ProfileConfidence,
-		"sourceNode":            s.SourceNode,
-		"sourceWeight":          s.SourceWeight,
-		"sourceLand":            s.SourceLand,
-		"semanticFallback":      s.SemanticFallback,
-		"semanticMismatch":      s.SemanticMismatch,
+		"x": x, "y": teleportY, "z": z,
+		"groundY":                groundBoundaryY - 1,
+		"teleportY":              teleportY,
+		"groundHeight":           s.World.GroundHeight,
+		"waterKind":              waterKindName(s.World.WaterKind),
+		"waterSurfaceDefined":    s.World.WaterSurfaceDefined,
+		"waterSurfaceElevation":  s.World.WaterSurfaceElevation,
+		"waterDepth":             s.World.WaterDepth,
+		"oceanEligibility":       s.World.OceanEligibility,
+		"riverWeight":            s.World.RiverWeight,
+		"ecoRegion":              s.EcoRegion.String(),
+		"regionConfidence":       s.RegionConfidence,
+		"biomeFamily":            s.BiomeFamily.String(),
+		"terrainVariant":         s.TerrainVariant.String(),
+		"surfaceProfile":         s.SurfaceProfile.String(),
+		"vegetationProfile":      s.VegetationProfile.String(),
+		"profileConfidence":      s.ProfileConfidence,
+		"specialFeature":         s.SpecialFeature,
+		"specialFeatureStrength": s.SpecialFeatureStrength,
+		"sourceNode":             s.SourceNode,
+		"sourceWeight":           s.SourceWeight,
+		"sourceLand":             s.SourceLand,
+		"semanticFallback":       s.SemanticFallback,
+		"semanticMismatch":       s.SemanticMismatch,
 	}
+}
+
+func minecraft26TeleportY(s runtimeprofile.Sample) int {
+	height := s.World.GroundHeight
+	if s.World.WaterSurfaceDefined &&
+		s.World.WaterSurfaceElevation > height {
+		height = s.World.WaterSurfaceElevation
+	}
+	return minecraft26BoundaryY(height)
+}
+
+func minecraft26BoundaryY(normalizedHeight float64) int {
+	h := math.Max(0, math.Min(1, normalizedHeight))
+	var mapped float64
+	if h <= 0.5 {
+		mapped = -64 + (63-(-64))*(h/0.5)
+	} else {
+		mapped = 63 + (320-63)*((h-0.5)/0.5)
+	}
+	y := int(math.Round(mapped))
+	if y < -64 {
+		return -64
+	}
+	if y > 320 {
+		return 320
+	}
+	return y
 }
 
 func waterKindName(k reconcile.WaterKind) string {

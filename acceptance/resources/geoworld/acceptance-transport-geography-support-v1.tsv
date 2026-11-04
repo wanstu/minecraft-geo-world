@@ -1,0 +1,13 @@
+# GeoWorld Transport Geography Support Acceptance v1
+# Deterministic readonly natural-transport checkpoints. These are geographic opportunities, not generated roads, bridges, ports or settlements.
+# id	generation_rules	seed	requirement	inspection	name	x	y	z	pass_standard	method
+TRANSPORT-01	geoworld-rules-v1.1.11	123456	CORE	POINT	主河谷交通走廊	8896	142	-832	自然交通图层应显示 river_valley，综合走廊潜力约 0.87；该结果只描述顺谷通行条件，不生成道路。	WebUI 自然交通图层核对河谷走廊评分，并进入游戏观察河谷地形连续性
+TRANSPORT-02	geoworld-rules-v1.1.11	123456	CORE	POINT	山口自然通道	-12224	201	-7744	自然交通图层应显示 mountain_pass，山口通道潜力约 0.75；应表现为高成本山地中的相对低鞍部。	WebUI 核对山口通道与瓶颈强度，并进入游戏观察两侧山地与低鞍部关系
+TRANSPORT-03	geoworld-rules-v1.1.11	123456	CORE	POINT	高原入口	11584	167	-1600	自然交通图层应显示 plateau_access，潜力约 0.82；应体现高原边缘进入条件，而非人为道路。	WebUI 核对高原入口评分并观察高原边界地形
+TRANSPORT-04	geoworld-rules-v1.1.11	123456	CORE	POINT	盆地出口	-14016	138	-5952	自然交通图层应显示 basin_gateway，走廊和瓶颈潜力约 0.96；应体现流域边界与局部地形共同收束通行。	WebUI 核对盆地出口、低分水岭和瓶颈评分
+TRANSPORT-05	geoworld-rules-v1.1.11	123456	CORE	POINT	低分水岭跨流域通道	-14912	149	5440	自然交通图层应显示 low_divide，潜力约 0.93；应体现较低起伏的跨流域连接机会。	WebUI 核对低分水岭评分并观察两侧流域关系
+TRANSPORT-06	geoworld-rules-v1.1.11	123456	CORE	POINT	天然海峡瓶颈	-10176	87	-5184	节点应识别为 strait，适宜度约 0.90；两侧陆地夹持狭窄水域，允许成为航运瓶颈但不生成桥梁或港口。	WebUI 自然交通节点核对海峡类型并进入游戏观察两侧陆地
+TRANSPORT-07	geoworld-rules-v1.1.11	123456	CORE	POINT	天然地峡瓶颈	7616	96	-9152	节点应识别为 isthmus，适宜度约 0.95；两侧水体压缩陆地连接，允许成为陆路瓶颈但不生成道路。	WebUI 自然交通节点核对地峡类型并观察两侧水体
+TRANSPORT-08	geoworld-rules-v1.1.11	123456	CORE	POINT	河口交通节点	-3264	107	-2880	节点应识别为 estuary，适宜度约 0.80；应对应河流入海的天然换装/交通机会，不代表已有港口。	WebUI 自然交通节点与航运图层交叉核对河口和可航行条件
+TRANSPORT-09	geoworld-rules-v1.1.11	123456	CORE	POINT	大湖出口节点	4032	133	-1728	节点应识别为 lake_outlet；应对应大湖出口向河流过渡的天然节点，不强制生成码头或聚落。	WebUI 自然交通节点与水系图层交叉核对湖出口关系
+TRANSPORT-10	geoworld-rules-v1.1.11	123456	CORE	POINT	河流汇流节点	3776	131	-1984	节点应识别为 confluence；多个上游排水支路在此汇聚形成天然交通汇合机会，不生成道路。	WebUI 自然交通节点核对汇流类型并观察上游水系汇聚

@@ -1,0 +1,292 @@
+package geoworld.minecraft.common.verification;
+
+import geoworld.minecraft.common.creation.GeoWorldCreationConfig;
+import geoworld.minecraft.common.creation.GeoWorldCreationConfig.ContinentPreset;
+import geoworld.minecraft.common.engine.GeoWorldEngineBridge;
+import geoworld.runtime.GeoWorldV1;
+
+import java.util.HashMap;
+import java.util.Map;
+
+public final class GeoWorldSpecialLandscapeVerifier {
+    private GeoWorldSpecialLandscapeVerifier() {}
+
+    public static void main(String[] args) throws Exception {
+        GeoWorldCreationConfig config = new GeoWorldCreationConfig(
+            96,
+            60,
+            128,
+            18,
+            0.68,
+            0.35,
+            0.65,
+            ContinentPreset.DEFAULT
+        );
+        long seed = 123456L;
+
+        GeoWorldEngineBridge.GeneratedModel generated =
+            GeoWorldEngineBridge.generate(seed, config);
+        GeoWorldV1 model = generated.model();
+
+        if (!"geoworld-rules-v1.1.16".equals(
+            model.manifest().generationRulesVersion()
+        )) {
+            throw new AssertionError(
+                "special landscape verifier requires v1.1.16, got " +
+                model.manifest().generationRulesVersion()
+            );
+        }
+
+        var landscapes = model.specialLandscapes();
+        if (landscapes.isEmpty()) {
+            throw new AssertionError("generated model has no special landscapes");
+        }
+
+        Map<String, Integer> counts = new HashMap<>();
+        double sea = model.manifest().seaLevelNormalized();
+
+        for (GeoWorldV1.SpecialLandscape landscape : landscapes) {
+            counts.merge(landscape.kind(), 1, Integer::sum);
+
+            if (
+                "pale_garden_island".equals(landscape.kind()) &&
+                !"ocean".equals(landscape.waterContext())
+            ) {
+                throw new AssertionError(
+                    "pale garden island is not ocean-only: " + landscape
+                );
+            }
+            if (
+                "cherry_island".equals(landscape.kind()) &&
+                !("ocean".equals(landscape.waterContext()) ||
+                  "lake".equals(landscape.waterContext()))
+            ) {
+                throw new AssertionError(
+                    "cherry island has invalid water context: " + landscape
+                );
+            }
+            if (
+                "mushroom_island".equals(landscape.kind()) &&
+                !("ocean".equals(landscape.waterContext()) ||
+                  "lake".equals(landscape.waterContext()))
+            ) {
+                throw new AssertionError(
+                    "mushroom island has invalid water context: " + landscape
+                );
+            }
+
+            GeoWorldV1.RuntimeSample sample = model.sample(
+                landscape.centerX(),
+                landscape.centerZ()
+            );
+            if (!landscape.kind().equals(sample.specialFeature())) {
+                throw new AssertionError(
+                    "runtime sample lost special landscape " + landscape +
+                    ", sampleFeature=" + sample.specialFeature()
+                );
+            }
+
+            if (landscape.kind().endsWith("_island")) {
+                if (!"None".equals(sample.waterKind()) || !sample.sourceLand()) {
+                    throw new AssertionError(
+                        "special island center is not land: " + landscape +
+                        ", water=" + sample.waterKind()
+                    );
+                }
+                if (sample.groundHeight() <= sea) {
+                    throw new AssertionError(
+                        "special island center is not above sea datum: " +
+                        landscape + ", height=" + sample.groundHeight()
+                    );
+                }
+            }
+
+            if (
+                "sinkhole".equals(landscape.kind()) ||
+                "basin_cherry".equals(landscape.kind()) ||
+                "basin_snow".equals(landscape.kind()) ||
+                "volcanic_crater_cherry".equals(landscape.kind()) ||
+                "volcanic_crater_snow".equals(landscape.kind())
+            ) {
+                verifyDepressionSemantics(model, landscape);
+            }
+
+            System.out.printf(
+                "SPECIAL_POINT kind=%s id=%d x=%.0f z=%.0f radius=%.0fx%.0f water=%s feature=%s%n",
+                landscape.kind(),
+                landscape.id(),
+                landscape.centerX(),
+                landscape.centerZ(),
+                landscape.radiusX(),
+                landscape.radiusZ(),
+                landscape.waterContext(),
+                sample.specialFeature()
+            );
+        }
+
+        requireKind(counts, "mushroom_island");
+        requireKind(counts, "pale_garden_island");
+        requireKind(counts, "cherry_island");
+        requireKind(counts, "sinkhole");
+        requireAnyKind(
+            counts,
+            "basin_cherry",
+            "basin_snow",
+            "volcanic_crater_cherry",
+            "volcanic_crater_snow"
+        );
+
+        System.out.printf(
+            "GeoWorld special landscape verification passed: seed=%d, landscapes=%d, kinds=%s, cacheKey=%s%n",
+            seed,
+            landscapes.size(),
+            counts,
+            generated.cacheKey()
+        );
+    }
+
+    private static void verifyDepressionSemantics(
+        GeoWorldV1 model,
+        GeoWorldV1.SpecialLandscape landscape
+    ) {
+        String kind = landscape.kind();
+        if (
+            landscape.baseHeight() <= 0.0 ||
+            landscape.floorHeight() <= 0.0 ||
+            landscape.floorHeight() >= landscape.baseHeight()
+        ) {
+            throw new AssertionError(
+                "invalid carved-depression height contract: " + landscape
+            );
+        }
+        if (landscape.rimHeight() > landscape.baseHeight() + 1.0e-9) {
+            throw new AssertionError(
+                "non-island special terrain invented a raised rim: " +
+                landscape
+            );
+        }
+
+        double maxRadius = Math.max(
+            landscape.radiusX(),
+            landscape.radiusZ()
+        );
+        if ("sinkhole".equals(kind) && maxRadius > 280.0) {
+            throw new AssertionError(
+                "sinkhole is too large and reads as a basin: " + landscape
+            );
+        }
+        if (kind.startsWith("volcanic_crater_") && maxRadius > 300.0) {
+            throw new AssertionError(
+                "volcanic crater is too large for a single peak: " + landscape
+            );
+        }
+        if (kind.startsWith("basin_") && maxRadius < 500.0) {
+            throw new AssertionError(
+                "basin is too small to remain distinct from a sinkhole: " +
+                landscape
+            );
+        }
+
+        GeoWorldV1.RuntimeSample center = model.sample(
+            landscape.centerX(),
+            landscape.centerZ()
+        );
+        GeoWorldV1.RuntimeSample inner = model.sample(
+            landscape.centerX() + landscape.radiusX() * 0.30,
+            landscape.centerZ()
+        );
+        GeoWorldV1.RuntimeSample outer = model.sample(
+            landscape.centerX() + landscape.radiusX() * 0.92,
+            landscape.centerZ()
+        );
+
+        if (
+            !"Plain".equals(center.terrainVariant()) ||
+            !"Plain".equals(inner.terrainVariant())
+        ) {
+            throw new AssertionError(
+                "depression floor is not plain: kind=" + kind +
+                " center=" + center.terrainVariant() +
+                " inner=" + inner.terrainVariant()
+            );
+        }
+        if (!habitableFloorBiome(center.biomeFamily()) ||
+            !habitableFloorBiome(inner.biomeFamily())) {
+            throw new AssertionError(
+                "depression floor has forbidden biome: kind=" + kind +
+                " center=" + center.biomeFamily() +
+                " inner=" + inner.biomeFamily()
+            );
+        }
+        if (Math.abs(center.groundHeight() - inner.groundHeight()) > 0.015) {
+            throw new AssertionError(
+                "depression center is not flat: kind=" + kind +
+                " center=" + center.groundHeight() +
+                " inner=" + inner.groundHeight()
+            );
+        }
+        if (outer.groundHeight() - center.groundHeight() < 0.018) {
+            throw new AssertionError(
+                "depression did not carve below surrounding terrain: kind=" +
+                kind + " center=" + center.groundHeight() +
+                " outer=" + outer.groundHeight()
+            );
+        }
+
+        if ("sinkhole".equals(kind)) {
+            boolean canyonWall = false;
+            double minWall = Double.POSITIVE_INFINITY;
+            double maxWall = Double.NEGATIVE_INFINITY;
+            for (int i = 0; i < 16; i++) {
+                double angle = 2.0 * Math.PI * i / 16.0;
+                double x = landscape.centerX() +
+                    Math.cos(angle) * landscape.radiusX() * 0.68;
+                double z = landscape.centerZ() +
+                    Math.sin(angle) * landscape.radiusZ() * 0.68;
+                GeoWorldV1.RuntimeSample wall = model.sample(x, z);
+                minWall = Math.min(minWall, wall.groundHeight());
+                maxWall = Math.max(maxWall, wall.groundHeight());
+                canyonWall |= "Canyon".equals(wall.terrainVariant());
+            }
+            if (!canyonWall) {
+                throw new AssertionError(
+                    "sinkhole has no canyon-like carved wall: " + landscape
+                );
+            }
+            if (maxWall - minWall < 0.004) {
+                throw new AssertionError(
+                    "sinkhole wall is still an unnaturally uniform ring: " +
+                    landscape
+                );
+            }
+        }
+    }
+
+    private static boolean habitableFloorBiome(String biome) {
+        return "Temperate Grassland".equals(biome) ||
+            "Mediterranean Shrubland".equals(biome) ||
+            "Savanna".equals(biome);
+    }
+
+    private static void requireAnyKind(
+        Map<String, Integer> counts,
+        String... kinds
+    ) {
+        for (String kind : kinds) {
+            if (counts.getOrDefault(kind, 0) > 0) return;
+        }
+        throw new AssertionError(
+            "missing required special landscape family " +
+            String.join("/", kinds) + ", got=" + counts
+        );
+    }
+
+    private static void requireKind(Map<String, Integer> counts, String kind) {
+        if (counts.getOrDefault(kind, 0) <= 0) {
+            throw new AssertionError(
+                "missing required special landscape kind " + kind +
+                ", got=" + counts
+            );
+        }
+    }
+}

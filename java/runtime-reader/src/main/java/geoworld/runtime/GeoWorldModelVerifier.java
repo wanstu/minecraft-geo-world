@@ -31,6 +31,13 @@ public final class GeoWorldModelVerifier {
         "MODEL-06",
         "MODEL-07",
         "MODEL-08",
+        "MODEL-09",
+        "MODEL-10",
+        "MODEL-11",
+        "MODEL-12",
+        "MODEL-13",
+        "MODEL-14",
+        "MODEL-15",
         "RUNTIME-01",
         "RUNTIME-02",
         "RUNTIME-03",
@@ -148,6 +155,13 @@ public final class GeoWorldModelVerifier {
         verifyResolutions(model, path);
         verifySharedCache(model, path);
         verifyFieldLaziness(model, path);
+        verifySettlementSuitability(model, path);
+        verifyNavigationSuitability(model, path);
+        verifyMiningDistrict(model, path);
+        verifyCivilizationSuitability(model, path);
+        verifyRegionalAdvantage(model, path);
+        verifyRegionalRegionIdentity(model, path);
+        verifyTransportGeography(model, path);
         verifyInFlightCoalescing(model, path);
         verifyQueryIdentity(model, path);
     }
@@ -559,6 +573,1246 @@ public final class GeoWorldModelVerifier {
                 afterFeatures.hydrologyQueries() == 1 &&
                 afterFeatures.naturalFeatureQueries() == 1,
             "natural-feature field did not remain isolated from other field groups"
+        );
+
+        service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                337.5,
+                654.5,
+                GeoWorldQueryService.Resolution.BLOCK_4,
+                EnumSet.of(
+                    GeoWorldQueryService.NaturalField.SETTLEMENT_SUITABILITY
+                )
+            )
+        );
+        var afterSettlement = service.computationStats();
+        require(
+            "MODEL-08",
+            afterSettlement.climateQueries() == 2 &&
+                afterSettlement.hydrologyQueries() == 1 &&
+                afterSettlement.naturalFeatureQueries() == 2,
+            "settlement query did not lazily reuse exactly its climate/natural-feature dependencies"
+        );
+
+        service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                341.5,
+                654.5,
+                GeoWorldQueryService.Resolution.BLOCK_4,
+                EnumSet.of(
+                    GeoWorldQueryService.NaturalField.NEAREST_RIVER_HALF_WIDTH
+                )
+            )
+        );
+        var afterNavigationGeometry = service.computationStats();
+        require(
+            "MODEL-08",
+            afterNavigationGeometry.climateQueries() == 2 &&
+                afterNavigationGeometry.hydrologyQueries() == 1 &&
+                afterNavigationGeometry.naturalFeatureQueries() == 2,
+            "river-geometry navigation query evaluated unrelated field groups"
+        );
+
+        service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                345.5,
+                654.5,
+                GeoWorldQueryService.Resolution.BLOCK_4,
+                EnumSet.of(
+                    GeoWorldQueryService.NaturalField.PORT_SUITABILITY
+                )
+            )
+        );
+        var afterNavigationScore = service.computationStats();
+        require(
+            "MODEL-08",
+            afterNavigationScore.climateQueries() == 3 &&
+                afterNavigationScore.hydrologyQueries() == 1 &&
+                afterNavigationScore.naturalFeatureQueries() == 3,
+            "navigation score did not lazily reuse settlement/natural-feature dependencies"
+        );
+
+        service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                349.5,
+                654.5,
+                GeoWorldQueryService.Resolution.BLOCK_4,
+                EnumSet.of(
+                    GeoWorldQueryService.NaturalField.NATURAL_CORRIDOR_SUITABILITY
+                )
+            )
+        );
+        var afterTransport = service.computationStats();
+        require(
+            "MODEL-08",
+            afterTransport.climateQueries() == 4 &&
+                afterTransport.hydrologyQueries() == 2 &&
+                afterTransport.naturalFeatureQueries() == 4,
+            "transport geography did not lazily load exactly its natural dependencies"
+        );
+    }
+
+    private static void verifySettlementSuitability(
+        GeoWorldV1 model,
+        Path path
+    ) {
+        GeoWorldQueryService service = new GeoWorldQueryService(model);
+        GeoWorldV1.Geometry geometry = model.manifest().geometry();
+        double landX = Double.NaN;
+        double landZ = Double.NaN;
+        double waterX = Double.NaN;
+        double waterZ = Double.NaN;
+
+        for (int z = 0; z < geometry.height(); z++) {
+            double worldZ = geometry.originZ() + z * geometry.spacingZ();
+            for (int x = 0; x < geometry.width(); x++) {
+                double worldX = geometry.originX() + x * geometry.spacingX();
+                GeoWorldV1.RuntimeSample sample = model.sample(worldX, worldZ);
+                if (
+                    Double.isNaN(landX) &&
+                    sample.sourceLand() &&
+                    "None".equals(sample.waterKind())
+                ) {
+                    landX = worldX;
+                    landZ = worldZ;
+                }
+                if (
+                    Double.isNaN(waterX) &&
+                    !"None".equals(sample.waterKind())
+                ) {
+                    waterX = worldX;
+                    waterZ = worldZ;
+                }
+                if (!Double.isNaN(landX) && !Double.isNaN(waterX)) {
+                    break;
+                }
+            }
+            if (!Double.isNaN(landX) && !Double.isNaN(waterX)) {
+                break;
+            }
+        }
+
+        require(
+            "MODEL-09",
+            !Double.isNaN(landX) && !Double.isNaN(waterX),
+            "model did not expose both a dry-land and water sample"
+        );
+
+        EnumSet<GeoWorldQueryService.NaturalField> settlementFields =
+            EnumSet.of(
+                GeoWorldQueryService.NaturalField.SETTLEMENT_BUILDABILITY,
+                GeoWorldQueryService.NaturalField.FRESH_WATER_ACCESS,
+                GeoWorldQueryService.NaturalField.FLOOD_RISK,
+                GeoWorldQueryService.NaturalField.AGRICULTURE_SUITABILITY,
+                GeoWorldQueryService.NaturalField.CLIMATE_COMFORT,
+                GeoWorldQueryService.NaturalField.TRANSPORT_ACCESS,
+                GeoWorldQueryService.NaturalField.RESOURCE_ACCESS,
+                GeoWorldQueryService.NaturalField.SETTLEMENT_SUITABILITY
+            );
+
+        var land = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                landX,
+                landZ,
+                GeoWorldQueryService.Resolution.BLOCK_16,
+                settlementFields
+            )
+        );
+        require(
+            "MODEL-09",
+            land.unavailableFields().isEmpty() &&
+                land.values().size() == settlementFields.size(),
+            "current model did not expose all settlement suitability fields"
+        );
+        for (Object value : land.values().values()) {
+            require(
+                "MODEL-09",
+                value instanceof Number number &&
+                    number.doubleValue() >= 0 &&
+                    number.doubleValue() <= 1 &&
+                    Double.isFinite(number.doubleValue()),
+                "settlement suitability field escaped [0,1]"
+            );
+        }
+
+        var water = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                waterX,
+                waterZ,
+                GeoWorldQueryService.Resolution.BLOCK_1,
+                EnumSet.of(
+                    GeoWorldQueryService.NaturalField.SETTLEMENT_SUITABILITY,
+                    GeoWorldQueryService.NaturalField.FLOOD_RISK
+                )
+            )
+        );
+        double waterSuitability = ((Number) water.values().get(
+            GeoWorldQueryService.NaturalField.SETTLEMENT_SUITABILITY
+        )).doubleValue();
+        double waterRisk = ((Number) water.values().get(
+            GeoWorldQueryService.NaturalField.FLOOD_RISK
+        )).doubleValue();
+        require(
+            "MODEL-09",
+            waterSuitability == 0.0 && waterRisk == 1.0,
+            "water sample was incorrectly considered a land settlement site"
+        );
+    }
+
+    private static void verifyNavigationSuitability(
+        GeoWorldV1 model,
+        Path path
+    ) {
+        GeoWorldQueryService service = new GeoWorldQueryService(model);
+        GeoWorldV1.Geometry geometry = model.manifest().geometry();
+
+        double landX = Double.NaN;
+        double landZ = Double.NaN;
+        double farLandX = Double.NaN;
+        double farLandZ = Double.NaN;
+        double openWaterX = Double.NaN;
+        double openWaterZ = Double.NaN;
+        double riverProbeX = Double.NaN;
+        double riverProbeZ = Double.NaN;
+
+        for (int z = 0; z < geometry.height(); z++) {
+            double worldZ = geometry.originZ() + z * geometry.spacingZ();
+            for (int x = 0; x < geometry.width(); x++) {
+                double worldX = geometry.originX() + x * geometry.spacingX();
+                GeoWorldV1.RuntimeSample sample = model.sample(worldX, worldZ);
+
+                if (
+                    Double.isNaN(landX) &&
+                    sample.sourceLand() &&
+                    "None".equals(sample.waterKind())
+                ) {
+                    landX = worldX;
+                    landZ = worldZ;
+                }
+                if (
+                    Double.isNaN(farLandX) &&
+                    sample.sourceLand() &&
+                    "None".equals(sample.waterKind())
+                ) {
+                    GeoWorldV1.NaturalFeatureSample natural =
+                        model.sampleNaturalFeatures(worldX, worldZ);
+                    if (
+                        natural.distanceToRiver() != null &&
+                        natural.distanceToRiver() > 256
+                    ) {
+                        farLandX = worldX;
+                        farLandZ = worldZ;
+                    }
+                }
+                if (
+                    Double.isNaN(openWaterX) &&
+                    (
+                        "Ocean".equals(sample.waterKind()) ||
+                        "Lake".equals(sample.waterKind())
+                    )
+                ) {
+                    openWaterX = worldX;
+                    openWaterZ = worldZ;
+                }
+                if (Double.isNaN(riverProbeX)) {
+                    GeoWorldV1.NavigationFeatureSample river =
+                        model.sampleNavigationFeatures(worldX, worldZ);
+                    if (river.available()) {
+                        riverProbeX = worldX;
+                        riverProbeZ = worldZ;
+                    }
+                }
+
+                if (
+                    !Double.isNaN(landX) &&
+                    !Double.isNaN(farLandX) &&
+                    !Double.isNaN(openWaterX) &&
+                    !Double.isNaN(riverProbeX)
+                ) {
+                    break;
+                }
+            }
+            if (
+                !Double.isNaN(landX) &&
+                !Double.isNaN(farLandX) &&
+                !Double.isNaN(openWaterX) &&
+                !Double.isNaN(riverProbeX)
+            ) {
+                break;
+            }
+        }
+
+        require(
+            "MODEL-10",
+            !Double.isNaN(landX) &&
+                !Double.isNaN(farLandX) &&
+                !Double.isNaN(openWaterX) &&
+                !Double.isNaN(riverProbeX),
+            "model did not expose land, far land, open water and persisted river geometry"
+        );
+
+        EnumSet<GeoWorldQueryService.NaturalField> scoreFields =
+            EnumSet.of(
+                GeoWorldQueryService.NaturalField.WATERWAY_NAVIGABILITY,
+                GeoWorldQueryService.NaturalField.PORT_SUITABILITY,
+                GeoWorldQueryService.NaturalField.NAVIGATION_BOTTLENECK_RISK,
+                GeoWorldQueryService.NaturalField.WATERWAY_CLASS,
+                GeoWorldQueryService.NaturalField.PORT_TYPE
+            );
+
+        var land = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                landX,
+                landZ,
+                GeoWorldQueryService.Resolution.BLOCK_16,
+                scoreFields
+            )
+        );
+        require(
+            "MODEL-10",
+            land.unavailableFields().isEmpty() &&
+                land.values().size() == scoreFields.size(),
+            "current model did not expose all navigation suitability fields"
+        );
+        for (
+            GeoWorldQueryService.NaturalField field :
+            List.of(
+                GeoWorldQueryService.NaturalField.WATERWAY_NAVIGABILITY,
+                GeoWorldQueryService.NaturalField.PORT_SUITABILITY,
+                GeoWorldQueryService.NaturalField.NAVIGATION_BOTTLENECK_RISK
+            )
+        ) {
+            Object value = land.values().get(field);
+            require(
+                "MODEL-10",
+                value instanceof Number number &&
+                    Double.isFinite(number.doubleValue()) &&
+                    number.doubleValue() >= 0 &&
+                    number.doubleValue() <= 1,
+                field + " escaped [0,1]"
+            );
+        }
+        require(
+            "MODEL-10",
+            land.values().get(
+                GeoWorldQueryService.NaturalField.WATERWAY_CLASS
+            ) instanceof String waterwayClass &&
+                nonBlank(waterwayClass) &&
+            land.values().get(
+                GeoWorldQueryService.NaturalField.PORT_TYPE
+            ) instanceof String portType &&
+                nonBlank(portType),
+            "navigation classification fields were blank"
+        );
+
+        var river = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                riverProbeX,
+                riverProbeZ,
+                GeoWorldQueryService.Resolution.BLOCK_4,
+                EnumSet.of(
+                    GeoWorldQueryService.NaturalField.NEAREST_RIVER_HALF_WIDTH,
+                    GeoWorldQueryService.NaturalField.NEAREST_RIVER_GRADIENT
+                )
+            )
+        );
+        require(
+            "MODEL-10",
+            river.unavailableFields().isEmpty(),
+            "persisted river geometry was unavailable to navigation query"
+        );
+        double halfWidth = ((Number) river.values().get(
+            GeoWorldQueryService.NaturalField.NEAREST_RIVER_HALF_WIDTH
+        )).doubleValue();
+        double gradient = ((Number) river.values().get(
+            GeoWorldQueryService.NaturalField.NEAREST_RIVER_GRADIENT
+        )).doubleValue();
+        require(
+            "MODEL-10",
+            Double.isFinite(halfWidth) &&
+                halfWidth > 0 &&
+                Double.isFinite(gradient) &&
+                gradient >= 0,
+            "river width/gradient facts were invalid"
+        );
+
+        var water = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                openWaterX,
+                openWaterZ,
+                GeoWorldQueryService.Resolution.BLOCK_1,
+                EnumSet.of(
+                    GeoWorldQueryService.NaturalField.WATERWAY_NAVIGABILITY,
+                    GeoWorldQueryService.NaturalField.PORT_SUITABILITY,
+                    GeoWorldQueryService.NaturalField.NAVIGATION_BOTTLENECK_RISK,
+                    GeoWorldQueryService.NaturalField.WATERWAY_CLASS,
+                    GeoWorldQueryService.NaturalField.PORT_TYPE
+                )
+            )
+        );
+        double waterNavigability = ((Number) water.values().get(
+            GeoWorldQueryService.NaturalField.WATERWAY_NAVIGABILITY
+        )).doubleValue();
+        double waterPort = ((Number) water.values().get(
+            GeoWorldQueryService.NaturalField.PORT_SUITABILITY
+        )).doubleValue();
+        Object waterPortType = water.values().get(
+            GeoWorldQueryService.NaturalField.PORT_TYPE
+        );
+        require(
+            "MODEL-10",
+            waterNavigability > 0 &&
+                waterNavigability <= 1 &&
+                waterPort == 0.0 &&
+                "none".equals(waterPortType),
+            "open water was not navigable or was incorrectly considered a port site"
+        );
+
+        var farLand = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                farLandX,
+                farLandZ,
+                GeoWorldQueryService.Resolution.BLOCK_16,
+                EnumSet.of(
+                    GeoWorldQueryService.NaturalField.WATERWAY_NAVIGABILITY,
+                    GeoWorldQueryService.NaturalField.WATERWAY_CLASS
+                )
+            )
+        );
+        double farNavigability = ((Number) farLand.values().get(
+            GeoWorldQueryService.NaturalField.WATERWAY_NAVIGABILITY
+        )).doubleValue();
+        Object farClass = farLand.values().get(
+            GeoWorldQueryService.NaturalField.WATERWAY_CLASS
+        );
+        require(
+            "MODEL-10",
+            farNavigability == 0.0 && "none".equals(farClass),
+            "far inland land was incorrectly classified as a river waterway"
+        );
+    }
+
+    private static void verifyMiningDistrict(
+        GeoWorldV1 model,
+        Path path
+    ) {
+        require(
+            "MODEL-11",
+            Math.abs(GeoWorldMineralAffinity.affinity(
+                "IRON", "Mountain", "Alpine", 80
+            ) - 19.8) <= 1.0e-12,
+            "shared mineral affinity drifted from mineral rules"
+        );
+
+        GeoWorldQueryService service = new GeoWorldQueryService(model);
+        GeoWorldV1.Geometry geometry = model.manifest().geometry();
+        double[] land = findMiningProbe(model, geometry, false);
+        double[] water = findMiningProbe(model, geometry, true);
+        require(
+            "MODEL-11",
+            land != null && water != null,
+            "model did not expose land and water mining probes"
+        );
+
+        var fields = EnumSet.of(
+            GeoWorldQueryService.NaturalField.MINING_SUITABILITY,
+            GeoWorldQueryService.NaturalField.SURFACE_MINING_SUITABILITY,
+            GeoWorldQueryService.NaturalField.SHALLOW_MINING_SUITABILITY,
+            GeoWorldQueryService.NaturalField.DEEP_MINING_SUITABILITY,
+            GeoWorldQueryService.NaturalField.INDUSTRIAL_MINERAL_VALUE,
+            GeoWorldQueryService.NaturalField.MINERAL_RESOURCE_DIVERSITY,
+            GeoWorldQueryService.NaturalField.DOMINANT_MINERAL_RESOURCE,
+            GeoWorldQueryService.NaturalField.MINING_DISTRICT_CLASS,
+            GeoWorldQueryService.NaturalField.MINERAL_RESOURCE_PROFILE
+        );
+        verifyMiningLand(service, land, fields);
+        verifyMiningWater(service, water, fields);
+    }
+
+    private static double[] findMiningProbe(
+        GeoWorldV1 model,
+        GeoWorldV1.Geometry geometry,
+        boolean wantWater
+    ) {
+        for (int z = 0; z < geometry.height(); z++) {
+            double worldZ = geometry.originZ() + z * geometry.spacingZ();
+            for (int x = 0; x < geometry.width(); x++) {
+                double worldX = geometry.originX() + x * geometry.spacingX();
+                GeoWorldV1.RuntimeSample sample = model.sample(worldX, worldZ);
+                boolean water = !"None".equals(sample.waterKind());
+                if (
+                    water == wantWater &&
+                    (wantWater || sample.sourceLand())
+                ) {
+                    return new double[]{worldX, worldZ};
+                }
+            }
+        }
+        return null;
+    }
+
+    private static void verifyMiningLand(
+        GeoWorldQueryService service,
+        double[] point,
+        EnumSet<GeoWorldQueryService.NaturalField> fields
+    ) {
+        var result = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                point[0],
+                point[1],
+                GeoWorldQueryService.Resolution.BLOCK_16,
+                fields
+            )
+        );
+        require(
+            "MODEL-11",
+            result.unavailableFields().isEmpty() &&
+                result.values().size() == fields.size(),
+            "current model did not expose all mining district fields"
+        );
+
+        for (
+            GeoWorldQueryService.NaturalField field :
+            List.of(
+                GeoWorldQueryService.NaturalField.MINING_SUITABILITY,
+                GeoWorldQueryService.NaturalField.SURFACE_MINING_SUITABILITY,
+                GeoWorldQueryService.NaturalField.SHALLOW_MINING_SUITABILITY,
+                GeoWorldQueryService.NaturalField.DEEP_MINING_SUITABILITY,
+                GeoWorldQueryService.NaturalField.INDUSTRIAL_MINERAL_VALUE,
+                GeoWorldQueryService.NaturalField.MINERAL_RESOURCE_DIVERSITY
+            )
+        ) {
+            double value = ((Number)result.values().get(field)).doubleValue();
+            require(
+                "MODEL-11",
+                Double.isFinite(value) && value >= 0 && value <= 1,
+                field + " escaped [0,1]"
+            );
+        }
+
+        Object profileObject = result.values().get(
+            GeoWorldQueryService.NaturalField.MINERAL_RESOURCE_PROFILE
+        );
+        require(
+            "MODEL-11",
+            profileObject instanceof Map<?, ?>,
+            "mineral resource profile was not a map"
+        );
+        Map<?, ?> profile = (Map<?, ?>)profileObject;
+        double sum = 0.0;
+        for (Object value : profile.values()) {
+            sum += ((Number)value).doubleValue();
+        }
+        require(
+            "MODEL-11",
+            profile.size() == 8 && Math.abs(sum - 1.0) <= 1.0e-9,
+            "mineral resource profile was not normalized across eight minerals"
+        );
+    }
+
+    private static void verifyMiningWater(
+        GeoWorldQueryService service,
+        double[] point,
+        EnumSet<GeoWorldQueryService.NaturalField> fields
+    ) {
+        var result = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                point[0],
+                point[1],
+                GeoWorldQueryService.Resolution.BLOCK_1,
+                fields
+            )
+        );
+        double score = ((Number)result.values().get(
+            GeoWorldQueryService.NaturalField.MINING_SUITABILITY
+        )).doubleValue();
+        require(
+            "MODEL-11",
+            score == 0.0 &&
+                "none".equals(result.values().get(
+                    GeoWorldQueryService.NaturalField.DOMINANT_MINERAL_RESOURCE
+                )) &&
+                "none".equals(result.values().get(
+                    GeoWorldQueryService.NaturalField.MINING_DISTRICT_CLASS
+                )),
+            "water was incorrectly classified as a mining district"
+        );
+    }
+
+    private static void verifyCivilizationSuitability(
+        GeoWorldV1 model,
+        Path path
+    ) {
+        GeoWorldQueryService service = new GeoWorldQueryService(model);
+        GeoWorldV1.Geometry geometry = model.manifest().geometry();
+        double[] land = findMiningProbe(model, geometry, false);
+        double[] water = findMiningProbe(model, geometry, true);
+        require(
+            "MODEL-12",
+            land != null && water != null,
+            "model did not expose land and water civilization probes"
+        );
+
+        EnumSet<GeoWorldQueryService.NaturalField> fields = EnumSet.of(
+            GeoWorldQueryService.NaturalField.CIVILIZATION_AGRICULTURAL_SETTLEMENT_SUITABILITY,
+            GeoWorldQueryService.NaturalField.CIVILIZATION_PORT_CITY_SUITABILITY,
+            GeoWorldQueryService.NaturalField.CIVILIZATION_MINING_TOWN_SUITABILITY,
+            GeoWorldQueryService.NaturalField.CIVILIZATION_TRANSPORT_NODE_SUITABILITY,
+            GeoWorldQueryService.NaturalField.CIVILIZATION_NODE_SUITABILITY,
+            GeoWorldQueryService.NaturalField.CIVILIZATION_SPECIALIZATION_STRENGTH,
+            GeoWorldQueryService.NaturalField.CIVILIZATION_NODE_CLASS
+        );
+
+        for (GeoWorldQueryService.Resolution resolution :
+            GeoWorldQueryService.Resolution.values()) {
+            var result = service.queryNatural(
+                new GeoWorldQueryService.QueryRequest(
+                    land[0],
+                    land[1],
+                    resolution,
+                    fields
+                )
+            );
+            require(
+                "MODEL-12",
+                result.unavailableFields().isEmpty() &&
+                    result.values().size() == fields.size(),
+                "civilization fields unavailable at resolution " + resolution
+            );
+            for (
+                GeoWorldQueryService.NaturalField field :
+                List.of(
+                    GeoWorldQueryService.NaturalField.CIVILIZATION_AGRICULTURAL_SETTLEMENT_SUITABILITY,
+                    GeoWorldQueryService.NaturalField.CIVILIZATION_PORT_CITY_SUITABILITY,
+                    GeoWorldQueryService.NaturalField.CIVILIZATION_MINING_TOWN_SUITABILITY,
+                    GeoWorldQueryService.NaturalField.CIVILIZATION_TRANSPORT_NODE_SUITABILITY,
+                    GeoWorldQueryService.NaturalField.CIVILIZATION_NODE_SUITABILITY,
+                    GeoWorldQueryService.NaturalField.CIVILIZATION_SPECIALIZATION_STRENGTH
+                )
+            ) {
+                Object value = result.values().get(field);
+                require(
+                    "MODEL-12",
+                    value instanceof Number number &&
+                        Double.isFinite(number.doubleValue()) &&
+                        number.doubleValue() >= 0 &&
+                        number.doubleValue() <= 1,
+                    field + " escaped [0,1] at " + resolution
+                );
+            }
+            require(
+                "MODEL-12",
+                result.values().get(
+                    GeoWorldQueryService.NaturalField.CIVILIZATION_NODE_CLASS
+                ) instanceof String nodeClass &&
+                    nonBlank(nodeClass) &&
+                    !"none".equals(nodeClass),
+                "land civilization class was blank or none at " + resolution
+            );
+        }
+
+        var waterResult = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                water[0],
+                water[1],
+                GeoWorldQueryService.Resolution.BLOCK_1,
+                fields
+            )
+        );
+        require(
+            "MODEL-12",
+            "none".equals(waterResult.values().get(
+                GeoWorldQueryService.NaturalField.CIVILIZATION_NODE_CLASS
+            )),
+            "water was assigned a civilization node class"
+        );
+        for (
+            GeoWorldQueryService.NaturalField field :
+            List.of(
+                GeoWorldQueryService.NaturalField.CIVILIZATION_AGRICULTURAL_SETTLEMENT_SUITABILITY,
+                GeoWorldQueryService.NaturalField.CIVILIZATION_PORT_CITY_SUITABILITY,
+                GeoWorldQueryService.NaturalField.CIVILIZATION_MINING_TOWN_SUITABILITY,
+                GeoWorldQueryService.NaturalField.CIVILIZATION_TRANSPORT_NODE_SUITABILITY,
+                GeoWorldQueryService.NaturalField.CIVILIZATION_NODE_SUITABILITY,
+                GeoWorldQueryService.NaturalField.CIVILIZATION_SPECIALIZATION_STRENGTH
+            )
+        ) {
+            double value = ((Number)waterResult.values().get(field)).doubleValue();
+            require(
+                "MODEL-12",
+                value == 0.0,
+                "water civilization field was non-zero: " + field
+            );
+        }
+
+        GeoWorldV1.RuntimeSample landSample = model.sample(land[0], land[1]);
+        GeoWorldSettlementSuitability.Score agriculturalSettlement =
+            new GeoWorldSettlementSuitability.Score(
+                0.90, 0.90, 0.08, 0.95,
+                0.90, 0.72, 0.40, 0.88
+            );
+        GeoWorldNavigationSuitability.Score noNavigation =
+            new GeoWorldNavigationSuitability.Score(
+                0.0, 0.0, 0.0, "none", "none"
+            );
+        GeoWorldMiningDistrict.Score lowMining =
+            new GeoWorldMiningDistrict.Score(
+                0.20, 0.20, 0.20, 0.20,
+                0.20, 0.30,
+                "iron", "low_potential", Map.of()
+            );
+        var agricultural = GeoWorldCivilizationSuitability.evaluate(
+            landSample,
+            agriculturalSettlement,
+            noNavigation,
+            lowMining
+        );
+        require(
+            "MODEL-12",
+            "agricultural_settlement".equals(agricultural.nodeClass()),
+            "synthetic agricultural site was misclassified"
+        );
+
+        GeoWorldSettlementSuitability.Score miningSettlement =
+            new GeoWorldSettlementSuitability.Score(
+                0.70, 0.55, 0.12, 0.35,
+                0.80, 0.72, 0.95, 0.72
+            );
+        GeoWorldMiningDistrict.Score strongMining =
+            new GeoWorldMiningDistrict.Score(
+                0.94, 0.78, 0.90, 0.84,
+                0.91, 0.82,
+                "iron", "mixed_district", Map.of()
+            );
+        var miningTown = GeoWorldCivilizationSuitability.evaluate(
+            landSample,
+            miningSettlement,
+            noNavigation,
+            strongMining
+        );
+        require(
+            "MODEL-12",
+            "mining_town".equals(miningTown.nodeClass()),
+            "synthetic mining site was misclassified"
+        );
+    }
+
+    private static void verifyRegionalAdvantage(
+        GeoWorldV1 model,
+        Path path
+    ) {
+        GeoWorldQueryService service = new GeoWorldQueryService(model);
+        GeoWorldV1.Geometry geometry = model.manifest().geometry();
+        double[] land = findMiningProbe(model, geometry, false);
+        double[] water = findMiningProbe(model, geometry, true);
+        require(
+            "MODEL-13",
+            land != null && water != null,
+            "model did not expose land and water regional-advantage probes"
+        );
+
+        EnumSet<GeoWorldQueryService.NaturalField> fields = EnumSet.of(
+            GeoWorldQueryService.NaturalField.REGIONAL_BUILDING_ADVANTAGE,
+            GeoWorldQueryService.NaturalField.REGIONAL_AGRICULTURE_ADVANTAGE,
+            GeoWorldQueryService.NaturalField.REGIONAL_PORT_ADVANTAGE,
+            GeoWorldQueryService.NaturalField.REGIONAL_MINING_ADVANTAGE,
+            GeoWorldQueryService.NaturalField.REGIONAL_TRANSPORT_ADVANTAGE,
+            GeoWorldQueryService.NaturalField.REGIONAL_SPECIALIZATION_STRENGTH,
+            GeoWorldQueryService.NaturalField.REGIONAL_ADVANTAGE_OVERLAP_RISK,
+            GeoWorldQueryService.NaturalField.REGIONAL_HIGH_ADVANTAGE_COUNT,
+            GeoWorldQueryService.NaturalField.REGIONAL_DOMINANT_ADVANTAGE,
+            GeoWorldQueryService.NaturalField.REGIONAL_ADVANTAGE_CLASS
+        );
+        List<GeoWorldQueryService.NaturalField> normalized = List.of(
+            GeoWorldQueryService.NaturalField.REGIONAL_BUILDING_ADVANTAGE,
+            GeoWorldQueryService.NaturalField.REGIONAL_AGRICULTURE_ADVANTAGE,
+            GeoWorldQueryService.NaturalField.REGIONAL_PORT_ADVANTAGE,
+            GeoWorldQueryService.NaturalField.REGIONAL_MINING_ADVANTAGE,
+            GeoWorldQueryService.NaturalField.REGIONAL_TRANSPORT_ADVANTAGE,
+            GeoWorldQueryService.NaturalField.REGIONAL_SPECIALIZATION_STRENGTH,
+            GeoWorldQueryService.NaturalField.REGIONAL_ADVANTAGE_OVERLAP_RISK
+        );
+        List<String> dominantValues = List.of(
+            "building",
+            "agriculture",
+            "port",
+            "mining",
+            "transport"
+        );
+        List<String> classes = List.of(
+            "low_potential",
+            "building_region",
+            "agriculture_region",
+            "port_region",
+            "mining_region",
+            "transport_region",
+            "multi_advantage_region"
+        );
+
+        for (GeoWorldQueryService.Resolution resolution :
+            GeoWorldQueryService.Resolution.values()) {
+            var result = service.queryNatural(
+                new GeoWorldQueryService.QueryRequest(
+                    land[0],
+                    land[1],
+                    resolution,
+                    fields
+                )
+            );
+            require(
+                "MODEL-13",
+                result.unavailableFields().isEmpty() &&
+                    result.values().size() == fields.size(),
+                "regional advantage fields unavailable at " + resolution
+            );
+            for (GeoWorldQueryService.NaturalField field : normalized) {
+                Object value = result.values().get(field);
+                require(
+                    "MODEL-13",
+                    value instanceof Number number &&
+                        Double.isFinite(number.doubleValue()) &&
+                        number.doubleValue() >= 0 &&
+                        number.doubleValue() <= 1,
+                    field + " escaped [0,1] at " + resolution
+                );
+            }
+            Object highCount = result.values().get(
+                GeoWorldQueryService.NaturalField.REGIONAL_HIGH_ADVANTAGE_COUNT
+            );
+            require(
+                "MODEL-13",
+                highCount instanceof Number number &&
+                    number.intValue() >= 0 &&
+                    number.intValue() <= 5 &&
+                    Math.abs(number.doubleValue() - number.intValue()) < 1e-12,
+                "regional high-advantage count escaped 0..5"
+            );
+            Object dominant = result.values().get(
+                GeoWorldQueryService.NaturalField.REGIONAL_DOMINANT_ADVANTAGE
+            );
+            Object regionalClass = result.values().get(
+                GeoWorldQueryService.NaturalField.REGIONAL_ADVANTAGE_CLASS
+            );
+            require(
+                "MODEL-13",
+                dominant instanceof String value &&
+                    dominantValues.contains(value),
+                "land regional dominant advantage was invalid: " + dominant
+            );
+            require(
+                "MODEL-13",
+                regionalClass instanceof String value &&
+                    classes.contains(value),
+                "land regional class was invalid: " + regionalClass
+            );
+        }
+
+        var waterResult = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                water[0],
+                water[1],
+                GeoWorldQueryService.Resolution.BLOCK_1,
+                fields
+            )
+        );
+        for (GeoWorldQueryService.NaturalField field : normalized) {
+            require(
+                "MODEL-13",
+                ((Number)waterResult.values().get(field)).doubleValue() == 0.0,
+                "water regional advantage field was non-zero: " + field
+            );
+        }
+        require(
+            "MODEL-13",
+            ((Number)waterResult.values().get(
+                GeoWorldQueryService.NaturalField.REGIONAL_HIGH_ADVANTAGE_COUNT
+            )).intValue() == 0 &&
+                "none".equals(waterResult.values().get(
+                    GeoWorldQueryService.NaturalField.REGIONAL_DOMINANT_ADVANTAGE
+                )) &&
+                "none".equals(waterResult.values().get(
+                    GeoWorldQueryService.NaturalField.REGIONAL_ADVANTAGE_CLASS
+                )),
+            "water was incorrectly assigned a regional advantage"
+        );
+
+        GeoWorldQueryService.NaturalField[] all =
+            GeoWorldQueryService.NaturalField.values();
+        require(
+            "MODEL-13",
+            all.length > 64,
+            "regional query expansion did not cross the former 64-field cache boundary"
+        );
+        GeoWorldQueryService.NaturalField low = all[0];
+        GeoWorldQueryService.NaturalField high = all[64];
+        service.clearCache();
+        var lowResult = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                land[0],
+                land[1],
+                GeoWorldQueryService.Resolution.BLOCK_1,
+                EnumSet.of(low)
+            )
+        );
+        var highResult = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                land[0],
+                land[1],
+                GeoWorldQueryService.Resolution.BLOCK_1,
+                EnumSet.of(high)
+            )
+        );
+        require(
+            "MODEL-13",
+            lowResult.values().size() == 1 &&
+                lowResult.values().containsKey(low) &&
+                !lowResult.values().containsKey(high) &&
+                highResult.values().size() == 1 &&
+                highResult.values().containsKey(high) &&
+                !highResult.values().containsKey(low) &&
+                service.cacheSize() == 2,
+            "natural query cache collided across field ordinals 0 and 64"
+        );
+
+        GeoWorldV1.RuntimeSample landSample = model.sample(land[0], land[1]);
+        GeoWorldSettlementSuitability.Score miningSettlement =
+            new GeoWorldSettlementSuitability.Score(
+                0.55, 0.48, 0.08, 0.20,
+                0.70, 0.55, 0.92, 0.55
+            );
+        GeoWorldNavigationSuitability.Score lowNavigation =
+            new GeoWorldNavigationSuitability.Score(
+                0.10, 0.05, 0.10, "none", "none"
+            );
+        GeoWorldMiningDistrict.Score strongMining =
+            new GeoWorldMiningDistrict.Score(
+                0.96, 0.80, 0.92, 0.88,
+                0.94, 0.88,
+                "iron", "mixed_district", Map.of()
+            );
+        var miningRegion = GeoWorldRegionalAdvantage.evaluate(
+            landSample,
+            miningSettlement,
+            lowNavigation,
+            strongMining
+        );
+        require(
+            "MODEL-13",
+            "mining".equals(miningRegion.dominantAdvantage()) &&
+                "mining_region".equals(miningRegion.regionalClass()),
+            "synthetic mining advantage site was misclassified"
+        );
+    }
+
+    private static void verifyRegionalRegionIdentity(
+        GeoWorldV1 model,
+        Path path
+    ) throws IOException {
+        GeoWorldQueryService service = new GeoWorldQueryService(model);
+        GeoWorldV1.Geometry geometry = model.manifest().geometry();
+        EnumSet<GeoWorldQueryService.NaturalField> fields = EnumSet.of(
+            GeoWorldQueryService.NaturalField.REGIONAL_REGION_KEY,
+            GeoWorldQueryService.NaturalField.REGIONAL_REGION_CELL_COUNT,
+            GeoWorldQueryService.NaturalField.REGIONAL_REGION_AREA_BLOCKS2,
+            GeoWorldQueryService.NaturalField.REGIONAL_REGION_CENTROID_X,
+            GeoWorldQueryService.NaturalField.REGIONAL_REGION_CENTROID_Z
+        );
+
+        GeoWorldQueryService.NaturalResult region = null;
+        double regionX = 0;
+        double regionZ = 0;
+        search:
+        for (int gz = 0; gz < geometry.height(); gz++) {
+            double z = geometry.originZ() + gz * geometry.spacingZ();
+            for (int gx = 0; gx < geometry.width(); gx++) {
+                double x = geometry.originX() + gx * geometry.spacingX();
+                var candidate = service.queryNatural(
+                    new GeoWorldQueryService.QueryRequest(
+                        x,
+                        z,
+                        GeoWorldQueryService.Resolution.BLOCK_1,
+                        fields
+                    )
+                );
+                Object key = candidate.values().get(
+                    GeoWorldQueryService.NaturalField.REGIONAL_REGION_KEY
+                );
+                if (key instanceof String value && !"none".equals(value)) {
+                    region = candidate;
+                    regionX = x;
+                    regionZ = z;
+                    break search;
+                }
+            }
+        }
+        require(
+            "MODEL-15",
+            region != null,
+            "locked model exposed no connected regional-advantage component"
+        );
+
+        String key = (String)region.values().get(
+            GeoWorldQueryService.NaturalField.REGIONAL_REGION_KEY
+        );
+        int cellCount = ((Number)region.values().get(
+            GeoWorldQueryService.NaturalField.REGIONAL_REGION_CELL_COUNT
+        )).intValue();
+        double area = ((Number)region.values().get(
+            GeoWorldQueryService.NaturalField.REGIONAL_REGION_AREA_BLOCKS2
+        )).doubleValue();
+        double centroidX = ((Number)region.values().get(
+            GeoWorldQueryService.NaturalField.REGIONAL_REGION_CENTROID_X
+        )).doubleValue();
+        double centroidZ = ((Number)region.values().get(
+            GeoWorldQueryService.NaturalField.REGIONAL_REGION_CENTROID_Z
+        )).doubleValue();
+        double expectedArea =
+            cellCount * geometry.spacingX() * geometry.spacingZ();
+        require(
+            "MODEL-15",
+            region.unavailableFields().isEmpty() &&
+                region.values().size() == fields.size() &&
+                key.contains("-g") &&
+                cellCount > 0 &&
+                Double.isFinite(area) &&
+                Math.abs(area - expectedArea) <=
+                    Math.max(1e-9, expectedArea * 1e-12) &&
+                Double.isFinite(centroidX) &&
+                Double.isFinite(centroidZ) &&
+                centroidX >= geometry.originX() &&
+                centroidX <= geometry.originX() + geometry.spanXBlocks() &&
+                centroidZ >= geometry.originZ() &&
+                centroidZ <= geometry.originZ() + geometry.spanZBlocks(),
+            "connected regional identity metadata was invalid: " + region.values()
+        );
+
+        var repeated = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                regionX,
+                regionZ,
+                GeoWorldQueryService.Resolution.BLOCK_1,
+                fields
+            )
+        );
+        require(
+            "MODEL-15",
+            region.equals(repeated),
+            "same regional component query was not deterministic"
+        );
+
+        if (cellCount > 1) {
+            int gx = (int)Math.round(
+                (regionX - geometry.originX()) / geometry.spacingX()
+            );
+            int gz = (int)Math.round(
+                (regionZ - geometry.originZ()) / geometry.spacingZ()
+            );
+            boolean foundAdjacent = false;
+            int[][] offsets = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+            for (int[] offset : offsets) {
+                int nx = gx + offset[0];
+                int nz = gz + offset[1];
+                if (
+                    nx < 0 || nx >= geometry.width() ||
+                    nz < 0 || nz >= geometry.height()
+                ) {
+                    continue;
+                }
+                double x = geometry.originX() + nx * geometry.spacingX();
+                double z = geometry.originZ() + nz * geometry.spacingZ();
+                var adjacent = service.queryNatural(
+                    new GeoWorldQueryService.QueryRequest(
+                        x,
+                        z,
+                        GeoWorldQueryService.Resolution.BLOCK_1,
+                        fields
+                    )
+                );
+                if (key.equals(adjacent.values().get(
+                    GeoWorldQueryService.NaturalField.REGIONAL_REGION_KEY
+                ))) {
+                    foundAdjacent = true;
+                    break;
+                }
+            }
+            require(
+                "MODEL-15",
+                foundAdjacent,
+                "multi-cell regional component had no four-connected neighbor"
+            );
+        }
+
+        GeoWorldV1 reopened = GeoWorldV1.load(path);
+        var reopenedRegion = new GeoWorldQueryService(reopened).queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                regionX,
+                regionZ,
+                GeoWorldQueryService.Resolution.BLOCK_1,
+                fields
+            )
+        );
+        require(
+            "MODEL-15",
+            key.equals(reopenedRegion.values().get(
+                GeoWorldQueryService.NaturalField.REGIONAL_REGION_KEY
+            )) &&
+                cellCount == ((Number)reopenedRegion.values().get(
+                    GeoWorldQueryService.NaturalField.REGIONAL_REGION_CELL_COUNT
+                )).intValue(),
+            "regional identity changed after reopening the locked World Model"
+        );
+
+        double[] water = findMiningProbe(model, geometry, true);
+        require(
+            "MODEL-15",
+            water != null,
+            "model exposed no water probe for regional identity"
+        );
+        var waterRegion = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                water[0],
+                water[1],
+                GeoWorldQueryService.Resolution.BLOCK_1,
+                fields
+            )
+        );
+        require(
+            "MODEL-15",
+            "none".equals(waterRegion.values().get(
+                GeoWorldQueryService.NaturalField.REGIONAL_REGION_KEY
+            )) &&
+                ((Number)waterRegion.values().get(
+                    GeoWorldQueryService.NaturalField.REGIONAL_REGION_CELL_COUNT
+                )).intValue() == 0 &&
+                ((Number)waterRegion.values().get(
+                    GeoWorldQueryService.NaturalField.REGIONAL_REGION_AREA_BLOCKS2
+                )).doubleValue() == 0.0,
+            "water was incorrectly assigned to a connected advantage region"
+        );
+    }
+
+    private static void verifyTransportGeography(
+        GeoWorldV1 model,
+        Path path
+    ) {
+        GeoWorldQueryService service = new GeoWorldQueryService(model);
+        GeoWorldV1.Geometry geometry = model.manifest().geometry();
+        double[] land = findMiningProbe(model, geometry, false);
+        double[] ocean = null;
+        for (int gz = 0; gz < geometry.height() && ocean == null; gz++) {
+            double z = geometry.originZ() + gz * geometry.spacingZ();
+            for (int gx = 0; gx < geometry.width(); gx++) {
+                double x = geometry.originX() + gx * geometry.spacingX();
+                GeoWorldV1.RuntimeSample sample = model.sample(x, z);
+                if (!sample.sourceLand() && "Ocean".equals(sample.waterKind())) {
+                    ocean = new double[]{x, z};
+                    break;
+                }
+            }
+        }
+        require(
+            "MODEL-14",
+            land != null && ocean != null,
+            "model did not expose land and ocean transport probes"
+        );
+
+        EnumSet<GeoWorldQueryService.NaturalField> fields = EnumSet.of(
+            GeoWorldQueryService.NaturalField.NATURAL_CORRIDOR_SUITABILITY,
+            GeoWorldQueryService.NaturalField.RIVER_VALLEY_CORRIDOR,
+            GeoWorldQueryService.NaturalField.HILL_PASS_CORRIDOR,
+            GeoWorldQueryService.NaturalField.MOUNTAIN_PASS_CORRIDOR,
+            GeoWorldQueryService.NaturalField.PLATEAU_ACCESS_CORRIDOR,
+            GeoWorldQueryService.NaturalField.BASIN_GATEWAY_CORRIDOR,
+            GeoWorldQueryService.NaturalField.LOW_DIVIDE_CORRIDOR,
+            GeoWorldQueryService.NaturalField.STRAIT_ISTHMUS_POTENTIAL,
+            GeoWorldQueryService.NaturalField.TRANSPORT_CHOKEPOINT_STRENGTH,
+            GeoWorldQueryService.NaturalField.NATURAL_CORRIDOR_CLASS
+        );
+        List<GeoWorldQueryService.NaturalField> normalized = List.of(
+            GeoWorldQueryService.NaturalField.NATURAL_CORRIDOR_SUITABILITY,
+            GeoWorldQueryService.NaturalField.RIVER_VALLEY_CORRIDOR,
+            GeoWorldQueryService.NaturalField.HILL_PASS_CORRIDOR,
+            GeoWorldQueryService.NaturalField.MOUNTAIN_PASS_CORRIDOR,
+            GeoWorldQueryService.NaturalField.PLATEAU_ACCESS_CORRIDOR,
+            GeoWorldQueryService.NaturalField.BASIN_GATEWAY_CORRIDOR,
+            GeoWorldQueryService.NaturalField.LOW_DIVIDE_CORRIDOR,
+            GeoWorldQueryService.NaturalField.STRAIT_ISTHMUS_POTENTIAL,
+            GeoWorldQueryService.NaturalField.TRANSPORT_CHOKEPOINT_STRENGTH
+        );
+        List<String> classes = List.of(
+            "low_potential",
+            "river_valley",
+            "hill_pass",
+            "mountain_pass",
+            "plateau_access",
+            "basin_gateway",
+            "low_divide"
+        );
+
+        for (GeoWorldQueryService.Resolution resolution :
+            GeoWorldQueryService.Resolution.values()) {
+            var result = service.queryNatural(
+                new GeoWorldQueryService.QueryRequest(
+                    land[0], land[1], resolution, fields
+                )
+            );
+            require(
+                "MODEL-14",
+                result.unavailableFields().isEmpty() &&
+                    result.values().size() == fields.size(),
+                "transport geography fields unavailable at " + resolution
+            );
+            for (GeoWorldQueryService.NaturalField field : normalized) {
+                Object value = result.values().get(field);
+                require(
+                    "MODEL-14",
+                    value instanceof Number number &&
+                        Double.isFinite(number.doubleValue()) &&
+                        number.doubleValue() >= 0 &&
+                        number.doubleValue() <= 1,
+                    field + " escaped [0,1] at " + resolution
+                );
+            }
+            Object corridorClass = result.values().get(
+                GeoWorldQueryService.NaturalField.NATURAL_CORRIDOR_CLASS
+            );
+            require(
+                "MODEL-14",
+                corridorClass instanceof String value &&
+                    classes.contains(value),
+                "land natural corridor class was invalid: " + corridorClass
+            );
+        }
+
+        var oceanResult = service.queryNatural(
+            new GeoWorldQueryService.QueryRequest(
+                ocean[0],
+                ocean[1],
+                GeoWorldQueryService.Resolution.BLOCK_1,
+                fields
+            )
+        );
+        for (GeoWorldQueryService.NaturalField field : List.of(
+            GeoWorldQueryService.NaturalField.NATURAL_CORRIDOR_SUITABILITY,
+            GeoWorldQueryService.NaturalField.RIVER_VALLEY_CORRIDOR,
+            GeoWorldQueryService.NaturalField.HILL_PASS_CORRIDOR,
+            GeoWorldQueryService.NaturalField.MOUNTAIN_PASS_CORRIDOR,
+            GeoWorldQueryService.NaturalField.PLATEAU_ACCESS_CORRIDOR,
+            GeoWorldQueryService.NaturalField.BASIN_GATEWAY_CORRIDOR,
+            GeoWorldQueryService.NaturalField.LOW_DIVIDE_CORRIDOR
+        )) {
+            require(
+                "MODEL-14",
+                ((Number)oceanResult.values().get(field)).doubleValue() == 0.0,
+                "ocean gained a land corridor field: " + field
+            );
+        }
+        require(
+            "MODEL-14",
+            "none".equals(oceanResult.values().get(
+                GeoWorldQueryService.NaturalField.NATURAL_CORRIDOR_CLASS
+            )),
+            "ocean was assigned a land corridor class"
         );
     }
 

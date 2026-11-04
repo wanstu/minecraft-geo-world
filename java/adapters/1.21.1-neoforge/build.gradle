@@ -22,9 +22,11 @@ sourceSets.main.java {
     // Go <-> Java cross-language golden vectors. Do not fork the math here.
     srcDir('../../runtime-reader/src/main/java')
     srcDir('../../minecraft-common/src/main/java')
+    srcDir('../../minecraft-client-common/src/main/java')
     srcDir('../../minecraft-v26-common/src/main/java')
     srcDir('../../minecraft-v1_21_1-common/src/main/java')
     exclude 'geoworld/minecraft/v26common/client/GeoWorldV26PresetScreen.java'
+    exclude 'geoworld/minecraft/v26common/client/GeoWorldV26CreationSession.java'
     exclude 'geoworld/minecraft/v26common/client/GeoWorldV26PreviewScreen.java'
 }
 sourceSets.main.resources {
@@ -173,6 +175,98 @@ sourceSets.main.resources.srcDir generateModMetadata
 // To avoid having to run "generateModMetadata" manually, make it run on every project reload
 neoForge.ideSyncTask generateModMetadata
 
+tasks.register('verifyNeoForgeModMetadata') {
+    group = 'verification'
+    description = 'Verifies the finalized NeoForge JAR contains valid JavaFML loader metadata.'
+    dependsOn tasks.named('jar')
+    doLast {
+        def jarFile = tasks.named('jar', Jar).get().archiveFile.get().asFile
+        def zip = new java.util.zip.ZipFile(jarFile)
+        try {
+            def entry = zip.getEntry('META-INF/neoforge.mods.toml')
+            if (entry == null) {
+                throw new GradleException('Missing META-INF/neoforge.mods.toml in ' + jarFile)
+            }
+            def metadata = zip.getInputStream(entry).getText('UTF-8')
+            if (!(metadata =~ /(?m)^\s*modLoader\s*=\s*"javafml"\s*$/)) {
+                throw new GradleException('NeoForge metadata is missing modLoader="javafml"')
+            }
+            if (!(metadata =~ /(?m)^\s*loaderVersion\s*=\s*"[^"]+"\s*$/)) {
+                throw new GradleException('NeoForge metadata is missing loaderVersion')
+            }
+        } finally {
+            zip.close()
+        }
+    }
+}
+tasks.register('verifyGeoWorldWebUiLaunch', JavaExec) {
+    group = 'verification'
+    description = 'Verifies the embedded GeoWorld WebUI starts, stops, and restarts.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.client.GeoWorldWebUiLaunchVerifier'
+}
+tasks.register('verifyGeoWorldWebUiDynamicPort', JavaExec) {
+    group = 'verification'
+    description = 'Verifies GeoWorld WebUI falls back when port 8788 is occupied.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.client.GeoWorldWebUiLaunchVerifier'
+    args '--expect-fallback'
+}
+
+tasks.register('verifyGeoWorldClientLayering') {
+    group = 'verification'
+    description = 'Guards the shared client architecture and rejects duplicated product UI.'
+    dependsOn tasks.named('jar')
+    doLast {
+        def privateWebUi = file('src/main/java/geoworld/neoforge/client/GeoWorldGameWebUi.java')
+        def privateSettings = file('src/main/java/geoworld/neoforge/client/GeoWorldWebUiSettingsScreen.java')
+        def clientEntry = file('src/main/java/geoworld/neoforge/client/GeoWorldClientMod.java')
+        if (privateWebUi.exists() || privateSettings.exists()) {
+            throw new GradleException(
+                'GeoWorld WebUI product screens must stay in minecraft-client-common; NeoForge may only provide thin loader/API bridges.'
+            )
+        }
+        def clientEntryText = clientEntry.getText('UTF-8')
+        if (clientEntryText.contains('PauseScreen') ||
+            clientEntryText.contains('addPauseWebUiButton') ||
+            clientEntryText.contains('GeoWorldPreviewScreen')) {
+            throw new GradleException(
+                'NeoForge adapter must not own pause-menu or retired preview product UI.'
+            )
+        }
+        def jarFile = tasks.named('jar').get().archiveFile.get().asFile
+        def zip = new java.util.zip.ZipFile(jarFile)
+        try {
+            if (zip.getEntry('geoworld/minecraft/client/GeoWorldGameWebUi.class') == null ||
+                zip.getEntry('geoworld/minecraft/client/GeoWorldWebUiSettingsScreen.class') == null ||
+                zip.getEntry('geoworld/minecraft/client/GeoWorldPresetScreenBase.class') == null ||
+                zip.getEntry('geoworld/minecraft/client/GeoWorldCreationSession.class') == null) {
+                throw new GradleException('Shared GeoWorld client product classes are missing from the finalized NeoForge JAR.')
+            }
+            if (zip.getEntry('geoworld/neoforge/client/GeoWorldGameWebUi.class') != null) {
+                throw new GradleException('NeoForge-private GeoWorldGameWebUi must not be packaged.')
+            }
+            if (zip.getEntry('geoworld/minecraft/v1_21_1common/client/GeoWorldPreviewScreen.class') != null ||
+                zip.getEntry('geoworld/minecraft/v1_21_1common/client/GeoWorld1_21_1PreviewScreenBase.class') != null ||
+                zip.getEntry('geoworld/minecraft/v1_21_1common/client/GeoWorld1_21_1PresetScreenBase.class') != null ||
+                zip.getEntry('geoworld/minecraft/v26common/client/GeoWorldV26PresetScreen.class') != null ||
+                zip.getEntry('geoworld/minecraft/v26common/client/GeoWorldV26CreationSession.class') != null) {
+                throw new GradleException('Retired or duplicated GeoWorld client product UI must not be packaged.')
+            }
+        } finally {
+            zip.close()
+        }
+    }
+}
+tasks.named('check').configure {
+    dependsOn tasks.named('verifyGeoWorldClientLayering')
+    dependsOn tasks.named('verifyNeoForgeModMetadata')
+    dependsOn tasks.named('verifyGeoWorldWebUiLaunch')
+    dependsOn tasks.named('verifyGeoWorldWebUiDynamicPort')
+}
+
 // Example configuration to allow publishing using the maven-publish plugin
 publishing {
     publications {
@@ -258,6 +352,52 @@ def additionalEngineBuilds = geoWorldEnginePlatforms.collect { target, spec ->
     }
 }
 sourceSets.main.resources.srcDir geoWorldEngineResources
+
+def geoWorldToolResources = layout.buildDirectory.dir('generated/geoworldToolResources')
+def geoWorldToolPlatforms = [
+    'windows-x64'  : ['windows', 'amd64', 'geoworld-tool.exe'],
+    'windows-arm64': ['windows', 'arm64', 'geoworld-tool.exe'],
+    'linux-x64'    : ['linux', 'amd64', 'geoworld-tool'],
+    'linux-arm64'  : ['linux', 'arm64', 'geoworld-tool'],
+    'macos-x64'    : ['darwin', 'amd64', 'geoworld-tool'],
+    'macos-arm64'  : ['darwin', 'arm64', 'geoworld-tool']
+]
+def geoWorldToolBuilds = geoWorldToolPlatforms.collect { target, spec ->
+    tasks.register('buildGeoWorldTool_' + target.replace('-', '_'), Exec) {
+        group = 'build'
+        description = "Cross-compiles GeoWorld Web Tool for ${target}."
+        workingDir file('../../..')
+        inputs.files(fileTree('../../..') {
+            include 'go.mod'
+            include 'go.sum'
+            include 'acceptance/**/*.go'
+            include 'acceptance/resources/**'
+            include 'cmd/geoworld-tester/**/*.go'
+            include 'cmd/geoworld-tester/web/**'
+            include 'internal/**/*.go'
+        })
+        def output = geoWorldToolResources.map {
+            it.file("geoworld/tool/native/${target}/${spec[2]}")
+        }
+        outputs.file output
+        environment 'GOOS', spec[0]
+        environment 'GOARCH', spec[1]
+        environment 'CGO_ENABLED', '0'
+        doFirst {
+            output.get().asFile.parentFile.mkdirs()
+            commandLine 'go', 'build', '-trimpath', '-ldflags=-s -w',
+                '-o', output.get().asFile.absolutePath,
+                './cmd/geoworld-tester'
+        }
+    }
+}
+sourceSets.main.resources.srcDir geoWorldToolResources
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes('Main-Class': 'geoworld.minecraft.common.tool.GeoWorldToolLauncher')
+    }
+}
+
 // A dev build automatically enables bounded GeoWorld chunk profiling.
 // Explicit Gradle release builds remain quiet unless the JVM flag opts in.
 def geoWorldDevBuild = providers.gradleProperty('geoworld.devBuild').orElse('false')
@@ -278,6 +418,7 @@ sourceSets.main.resources.srcDir geoWorldBuildProfileDir
 tasks.named('processResources').configure {
     dependsOn tasks.named('buildGeoWorldEngine')
     dependsOn additionalEngineBuilds
+    dependsOn geoWorldToolBuilds
     dependsOn tasks.named('generateGeoWorldBuildProfile')
 }
 tasks.register('verifyGeoWorldSpawn', JavaExec) {
@@ -285,6 +426,9 @@ tasks.register('verifyGeoWorldSpawn', JavaExec) {
     description = 'Verifies GeoWorld chooses safe land spawn for an ocean-center seed.'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'geoworld.minecraft.v1_21_1common.worldgen.GeoWorldSpawnVerifier'
+    if (project.hasProperty('geoWorldSpawnSeed')) {
+        args project.property('geoWorldSpawnSeed').toString()
+    }
 }
 
 tasks.register('auditGeoWorldBiomeCoverage', JavaExec) {
@@ -356,6 +500,16 @@ tasks.register('verifyGeoWorldMinerals', JavaExec) {
     }
 }
 
+tasks.register('verifyGeoWorldMiningDistricts', JavaExec) {
+    group = 'verification'
+    description = 'Verifies v1.1.15 mining districts are sparse, mine-scale and chunk-order stable.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.minecraft.v26common.worldgen.GeoWorldV26MiningDistrictVerifier'
+    if (project.hasProperty('geoWorldMineralSeed')) {
+        args project.property('geoWorldMineralSeed').toString()
+    }
+}
+
 tasks.register('verifyGeoWorldBiomePreset', JavaExec) {
     group = 'verification'
     description = 'Verifies every GeoWorld-realized biome is registered by the world preset.'
@@ -382,6 +536,18 @@ tasks.register('probeGeoWorldReportedCoast', JavaExec) {
     description = 'Prints actual water/shore voxel cross sections at the reported beach sites.'
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'geoworld.minecraft.v1_21_1common.worldgen.GeoWorldReportedCoastProbe'
+}
+
+
+tasks.register('verifyGeoWorldBasinRivers', JavaExec) {
+    group = 'verification'
+    description = 'Verifies basin rivers stay incised below dry banks through final voxel planning.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.minecraft.v26common.worldgen.GeoWorldV26BasinRiverVerifier'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+}
+tasks.named('check') {
+    dependsOn tasks.named('verifyGeoWorldBasinRivers')
 }
 
 tasks.register('verifyGeoWorldShoreline', JavaExec) {
@@ -478,8 +644,16 @@ tasks.register('verifyMinecraftVersionCommonIsolation') {
     }
 }
 
+tasks.register('verifyGeoWorldStructureAdaptation', JavaExec) {
+    group = 'verification'
+    description = 'Verifies piece-local bounded Vanilla structure terrain concessions.'
+    dependsOn tasks.named('compileJava')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.minecraft.v26common.worldgen.GeoWorldV26StructureAdaptationVerifier'
+}
 tasks.named('check').configure {
     dependsOn tasks.named('verifyMinecraftCommonIsolation')
+    dependsOn tasks.named('verifyGeoWorldStructureAdaptation')
     dependsOn tasks.named('verifyMinecraftV26CommonIsolation')
     dependsOn tasks.named('verifyMinecraftVersionCommonIsolation')
     dependsOn tasks.named('verifyGeoWorldChunkPerformanceMode')
@@ -488,6 +662,7 @@ tasks.named('check').configure {
     dependsOn tasks.named('verifyGeoWorldSurfaceBiomes')
     dependsOn tasks.named('verifyGeoWorldMineralBodies')
     dependsOn tasks.named('verifyGeoWorldMinerals')
+    dependsOn tasks.named('verifyGeoWorldMiningDistricts')
     dependsOn tasks.named('verifyGeoWorldSurfaceOutcrops')
     dependsOn tasks.named('fingerprintGeoWorldBiomeDecisions')
     dependsOn tasks.named('verifyGeoWorldDecorationPolicy')

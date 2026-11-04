@@ -54,6 +54,16 @@
 GeoWorld 当前组合“服务器生命周期 + 世界生成注册”；其它功能模组以后
 只使用自己需要的能力即可。
 
+
+### 客户端产品层约束
+
+WebUI、会话绑定、玩家同步、控制协议等 GeoWorld 产品行为只能有一份公共实现，位于
+java/minecraft-client-common。Minecraft 版本 / Loader 层只允许提供薄桥接：
+版本标识、当前世界查询、少量 Mojang API 差异以及 Loader 特有能力发现。
+
+禁止在 java/adapters/* 中复制 GeoWorldGameWebUi 或重新实现一套产品行为；
+当前活跃构建通过 verifyGeoWorldClientLayering 对最终 JAR 做硬校验。游戏内旧地图预览
+不再作为活跃版本的产品入口，地图查看统一由 WebUI 承担。
 具体 Minecraft 版本负责把这些抽象绑定到该版本的 Server、Codec、
 世界高度、Registry 与 Block/Biome API；NeoForge/Fabric/Forge 再只负责
 Loader 注册和事件桥接。

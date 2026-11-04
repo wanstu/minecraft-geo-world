@@ -131,7 +131,7 @@ public final class GeoWorldV26BiomeCoverage {
 
     private Site siteAt(GeoWorldV1 model, double x, double z) {
         var sample = model.sample(x, z);
-        var climate = model.sampleClimate(x, z);
+        var climate = model.sampleBiomeClimate(x, z);
         return new Site(
             x, z, this.heights.boundaryY(sample.groundHeight()) - 1,
             sample.terrainVariant(), sample.biomeFamily(),
@@ -155,6 +155,16 @@ public final class GeoWorldV26BiomeCoverage {
     }
 
     public String override(GeoWorldV1 model, double x, double y, double z) {
+        return override(model, x, y, z, null);
+    }
+
+    public String override(
+        GeoWorldV1 model,
+        double x,
+        double y,
+        double z,
+        GeoWorldV1.RuntimeSample surfaceSample
+    ) {
         List<Habitat> nearby = habitatBuckets.get(
             bucketKey(bucket(x), bucket(z))
         );
@@ -174,7 +184,10 @@ public final class GeoWorldV26BiomeCoverage {
                 if (Math.abs(y - habitat.y()) > 24.0) continue;
             } else {
                 // Surface patches do not suppress underground cave biomes.
-                int ground = this.heights.boundaryY(model.sample(x, z).groundHeight()) - 1;
+                GeoWorldV1.RuntimeSample sample = surfaceSample != null
+                    ? surfaceSample
+                    : model.sample(x, z);
+                int ground = this.heights.boundaryY(sample.groundHeight()) - 1;
                 if (y < ground - 16.0) continue;
             }
             chosen = habitat;

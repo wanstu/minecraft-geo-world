@@ -3,6 +3,8 @@ package geoworld.minecraft.v26common.client;
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 import geoworld.minecraft.common.engine.GeoWorldEngineBridge;
+import geoworld.minecraft.common.engine.GeoWorldMineralContext;
+import geoworld.minecraft.v26common.worldgen.GeoWorldOreCatalog;
 
 import geoworld.minecraft.common.creation.GeoWorldCreationConfig;
 import geoworld.minecraft.common.creation.GeoWorldCreationConfig.ContinentPreset;
@@ -76,6 +78,8 @@ public class GeoWorldV26PresetScreen extends Screen {
         Component.translatable("geoworld.create.world_preset");
     private static final Component PRESET_LABEL =
         Component.translatable("geoworld.create.continent_preset");
+    private static final Component SURFACE_ORE_PILE_LABEL =
+        Component.translatable("geoworld.create.surface_ore_pile");
     private static final List<String> PARAMETER_IDS = List.of(
         "mainland_scale", "region_scale", "transition_width",
         "mountain_strength", "plain_continuity", "plateau_scale",
@@ -111,6 +115,7 @@ public class GeoWorldV26PresetScreen extends Screen {
     private FractionSlider separationSlider;
     private CycleButton<WorldPreset> worldPresetButton;
     private CycleButton<ContinentPreset> presetButton;
+    private CycleButton<Boolean> surfaceOrePileButton;
     private final List<FractionSlider> parameterSliders = new ArrayList<>();
     private StringWidget statusText;
     private StringWidget spanText;
@@ -216,6 +221,33 @@ public class GeoWorldV26PresetScreen extends Screen {
                 (button, preset) -> this.applyPreset(preset)
             );
         body.addChild(this.presetButton);
+
+        this.surfaceOrePileButton = CycleButton
+            .builder(
+                value -> Component.translatable(
+                    value
+                        ? "geoworld.value.enabled"
+                        : "geoworld.value.disabled"
+                ),
+                this.initialConfig.surfaceOrePile()
+            )
+            .withValues(List.of(false, true))
+            .create(
+                0,
+                0,
+                310,
+                20,
+                SURFACE_ORE_PILE_LABEL,
+                (button, value) -> this.onConfigEdited()
+            );
+        this.surfaceOrePileButton.setTooltip(
+            Tooltip.create(
+                Component.translatable(
+                    "geoworld.create.surface_ore_pile.desc"
+                )
+            )
+        );
+        body.addChild(this.surfaceOrePileButton);
 
         this.widthEdit = numberBox(
             152,
@@ -639,6 +671,7 @@ public class GeoWorldV26PresetScreen extends Screen {
             Component.translatable("geoworld.create.preview_restoring")
         );
 
+        publishMineralContext();
         GeoWorldEngineBridge
             .loadCachedAsync(seed, config)
             .whenComplete((cached, error) -> {
@@ -697,6 +730,7 @@ public class GeoWorldV26PresetScreen extends Screen {
             Component.translatable("geoworld.create.preview_generating")
         );
 
+        publishMineralContext();
         GeoWorldEngineBridge
             .generateAsync(seed, config)
             .whenComplete((generated, error) -> {
@@ -823,7 +857,8 @@ public class GeoWorldV26PresetScreen extends Screen {
             separation,
             preset,
             this.selectedWorldPreset,
-            this.selectedParameters
+            this.selectedParameters,
+            this.surfaceOrePileButton.getValue()
         );
     }
 
@@ -891,6 +926,24 @@ public class GeoWorldV26PresetScreen extends Screen {
     public void onClose() {
         this.generationSerial++;
         this.screenNavigator.setScreen(this.parent);
+    }
+
+    private void publishMineralContext() {
+        GeoWorldOreCatalog.invalidate();
+        var blockRegistry = this.parent
+            .getUiState()
+            .getSettings()
+            .worldgenLoadContext()
+            .registryOrThrow(Registries.BLOCK);
+        var catalog = GeoWorldOreCatalog.scanWorldgenRegistry(blockRegistry);
+        GeoWorldMineralContext.publish(
+            catalog.dictionaryFamilies(),
+            catalog.families()
+        );
+        LOGGER.info(
+            "GeoWorld creation mineral context published: available={}",
+            catalog.families()
+        );
     }
 
     private static String formatFraction(double value) {

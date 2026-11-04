@@ -1,0 +1,6 @@
+# GeoWorld Settlement Support Acceptance v1
+# Deterministic civilization-support checkpoints derived from the locked Natural Model.
+# id	generation_rules	seed	requirement	inspection	name	x	y	z	pass_standard	method
+SETTLEMENT-01	geoworld-rules-v1.1.11	123456	CORE	POINT	高适宜建设区	10560	160	-2240	应表现为较平缓、低洪水风险、淡水可达且农业/气候/交通综合条件良好的陆地区域；聚落适宜度应明显偏高。	WebUI 聚落适宜度图层与点选详情核对后进入游戏俯视
+SETTLEMENT-02	geoworld-rules-v1.1.11	123456	CORE	POINT	临河高洪水风险区	2752	130	-2880	应具有很高淡水与交通优势，但因紧邻河道而显示高洪水风险，综合聚落适宜度不得反而超过安全建设区。	WebUI 点选核对淡水/洪水/综合分数并进入游戏观察河岸关系
+SETTLEMENT-03	geoworld-rules-v1.1.11	123456	CORE	POINT	高资源低建设性山区	-12480	184	-7488	应表现为资源条件高但建设便利度低的山区，证明资源优势不会掩盖陡峭地形对聚落建设的不利影响。	WebUI 点选核对资源/建设/综合分数并进入游戏俯视地形

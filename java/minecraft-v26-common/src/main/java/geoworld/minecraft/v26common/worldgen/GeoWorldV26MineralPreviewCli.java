@@ -3,6 +3,7 @@ package geoworld.minecraft.v26common.worldgen;
 import geoworld.minecraft.common.worldgen.GeoWorldMineralPlanner;
 import geoworld.minecraft.common.worldgen.GeoWorldMineralPlanner.Body;
 import geoworld.minecraft.common.worldgen.GeoWorldMineralPlanner.BodySource;
+import geoworld.minecraft.common.worldgen.GeoWorldMiningDistrictPlanner;
 import geoworld.minecraft.v26common.MinecraftV26HeightMapping;
 import geoworld.runtime.GeoWorldV1;
 
@@ -24,6 +25,37 @@ import java.util.function.Consumer;
  * deterministic mineral bodies consumed by Minecraft without booting the game.
  */
 public final class GeoWorldV26MineralPreviewCli {
+    private static final List<String> VANILLA_FAMILIES = List.of(
+        "coal", "iron", "copper", "gold",
+        "lapis", "redstone", "diamond", "emerald"
+    );
+
+    private record PreviewBody(
+        String mineral,
+        String source,
+        double centerX,
+        double centerY,
+        double centerZ,
+        double length,
+        double radius,
+        double angle,
+        double tilt,
+        double bend,
+        boolean large,
+        boolean outcrop
+    ) {}
+
+    private record PreviewDistrict(
+        long id,
+        double centerX,
+        double centerZ,
+        double radius,
+        String primary,
+        String companion,
+        int primaryLodes,
+        int companionLodes
+    ) {}
+
     private GeoWorldV26MineralPreviewCli() {}
 
     public static void main(String[] args) throws Exception {
@@ -64,7 +96,7 @@ public final class GeoWorldV26MineralPreviewCli {
     private static String render(String[] args, ModelCache cache) throws Exception {
         if (args.length < 6) {
             throw new IllegalArgumentException(
-                "expected <model> <minX> <maxX> <minZ> <maxZ> <major|all> [limit]"
+                "expected <model> <minX> <maxX> <minZ> <maxZ> <major|all> [limit] [oreFamiliesCsv]"
             );
         }
 
@@ -85,11 +117,24 @@ public final class GeoWorldV26MineralPreviewCli {
         }
 
         GeoWorldV1 model = cache.load(modelPath);
+        MinecraftV26HeightMapping heightMapping =
+            new MinecraftV26HeightMapping();
         GeoWorldMineralPlanner planner = new GeoWorldMineralPlanner(
-            new MinecraftV26HeightMapping()
+            heightMapping
         );
+        GeoWorldMiningDistrictPlanner districtPlanner =
+            new GeoWorldMiningDistrictPlanner(heightMapping);
+        List<String> oreFamilies = parseOreFamilies(
+            args.length >= 8 ? args[7] : ""
+        );
+        boolean miningDistricts = ("geoworld-rules-v1.1.15".equals(
+            model.manifest().generationRulesVersion()
+        ) || "geoworld-rules-v1.1.16".equals(
+            model.manifest().generationRulesVersion()
+        ));
 
-        List<Body> bodies = new ArrayList<>(limit);
+        List<PreviewBody> bodies = new ArrayList<>(limit);
+        List<PreviewDistrict> districts = new ArrayList<>();
         int[] total = {0};
         long sampleSeed =
             model.manifest().seed() ^
@@ -99,13 +144,7 @@ public final class GeoWorldV26MineralPreviewCli {
             ((long) maxZ * 0x85EBCA77C2B2AE63L) ^
             (mode.equals("all") ? 0xA11D37A11D37L : 0x6D616A6F72L);
         SplittableRandom previewSampler = new SplittableRandom(sampleSeed);
-        Consumer<Body> collect = body -> {
-            if (mode.equals("major") &&
-                body.source() != BodySource.GUARANTEE &&
-                body.source() != BodySource.OUTCROP &&
-                !body.large()) {
-                return;
-            }
+        Consumer<PreviewBody> collect = body -> {
             int seen = ++total[0];
             if (bodies.size() < limit) {
                 bodies.add(body);
@@ -117,24 +156,61 @@ public final class GeoWorldV26MineralPreviewCli {
             }
         };
 
-        planner.planBodies(
-            model, model.manifest().seed(),
-            minX, maxX, minZ, maxZ, collect
-        );
-        planner.planSurfaceOutcropBodies(
-            model, model.manifest().seed(),
-            minX, maxX, minZ, maxZ, collect
-        );
-        if (mode.equals("all")) {
-            planner.planScatterBodies(
+        Consumer<Body> collectLegacy = body -> {
+            if (mode.equals("major") &&
+                body.source() != BodySource.GUARANTEE &&
+                body.source() != BodySource.OUTCROP &&
+                !body.large()) {
+                return;
+            }
+            collect.accept(fromBody(body));
+        };
+
+        if (miningDistricts) {
+            districtPlanner.planDistricts(
                 model, model.manifest().seed(),
-                minX, maxX, minZ, maxZ, collect
+                minX, maxX, minZ, maxZ,
+                district -> districts.add(fromDistrict(model, district, oreFamilies))
             );
+            districtPlanner.planLodes(
+                model, model.manifest().seed(),
+                minX, maxX, minZ, maxZ,
+                lode -> collect.accept(fromDistrictLode(model, lode, oreFamilies))
+            );
+            // v1.1.15 keeps only a light background resource layer outside
+            // districts. It is shown only in the detailed "all" mode.
+            if (mode.equals("all")) {
+                planner.planScatterBodies(
+                    model, model.manifest().seed(),
+                    minX, maxX, minZ, maxZ,
+                    body -> collect.accept(fromBody(body))
+                );
+                planner.planSurfaceOutcropBodies(
+                    model, model.manifest().seed(),
+                    minX, maxX, minZ, maxZ,
+                    body -> collect.accept(fromBody(body))
+                );
+            }
+        } else {
+            planner.planBodies(
+                model, model.manifest().seed(),
+                minX, maxX, minZ, maxZ, collectLegacy
+            );
+            planner.planSurfaceOutcropBodies(
+                model, model.manifest().seed(),
+                minX, maxX, minZ, maxZ, collectLegacy
+            );
+            if (mode.equals("all")) {
+                planner.planScatterBodies(
+                    model, model.manifest().seed(),
+                    minX, maxX, minZ, maxZ, collectLegacy
+                );
+            }
         }
         bodies.sort(
-            Comparator.comparingDouble(Body::centerZ)
-                .thenComparingDouble(Body::centerX)
-                .thenComparing(body -> body.mineral().ordinal())
+            Comparator.comparingDouble(PreviewBody::centerZ)
+                .thenComparingDouble(PreviewBody::centerX)
+                .thenComparing(PreviewBody::mineral)
         );
 
         StringBuilder out = new StringBuilder(
@@ -152,6 +228,13 @@ public final class GeoWorldV26MineralPreviewCli {
         field(out, "total", total[0]).append(',');
         field(out, "returned", bodies.size()).append(',');
         out.append("\"truncated\":").append(total[0] > bodies.size()).append(',');
+        appendStringArray(out, "families", oreFamilies).append(',');
+        out.append("\"districts\":[");
+        for (int i = 0; i < districts.size(); i++) {
+            if (i > 0) out.append(',');
+            appendDistrict(out, districts.get(i));
+        }
+        out.append("],");
         out.append("\"bodies\":[");
 
         for (int i = 0; i < bodies.size(); i++) {
@@ -162,10 +245,11 @@ public final class GeoWorldV26MineralPreviewCli {
         return out.toString();
     }
 
-    private static void appendBody(StringBuilder out, Body body, int index) {
+    private static void appendBody(StringBuilder out, PreviewBody body, int index) {
         double dx = Math.cos(body.angle());
         double dz = Math.sin(body.angle());
-        double half = body.source() == BodySource.SCATTER
+        double half = body.source().equals("SCATTER") ||
+            body.source().startsWith("DISTRICT_")
             ? body.length() * 0.5
             : body.length() * 0.34;
         double startX = body.centerX() - half * dx;
@@ -177,8 +261,8 @@ public final class GeoWorldV26MineralPreviewCli {
 
         out.append('{');
         field(out, "id", index).append(',');
-        field(out, "mineral", body.mineral().name()).append(',');
-        field(out, "source", body.source().name()).append(',');
+        field(out, "mineral", body.mineral()).append(',');
+        field(out, "source", body.source()).append(',');
         field(out, "x", body.centerX()).append(',');
         field(out, "y", body.centerY()).append(',');
         field(out, "z", body.centerZ()).append(',');
@@ -194,8 +278,196 @@ public final class GeoWorldV26MineralPreviewCli {
         field(out, "endX", endX).append(',');
         field(out, "endZ", endZ).append(',');
         out.append("\"large\":").append(body.large()).append(',');
-        out.append("\"outcrop\":").append(body.rockyOutcrop());
+        out.append("\"outcrop\":").append(body.outcrop());
         out.append('}');
+    }
+
+    private static PreviewDistrict fromDistrict(
+        GeoWorldV1 model,
+        GeoWorldMiningDistrictPlanner.District district,
+        List<String> families
+    ) {
+        GeoWorldV1.MineralDistrictAssignment assignment =
+            model.mineralDistrictAssignment(district.id());
+        String primary;
+        String companion;
+        if (assignment != null) {
+            primary = assignment.primary();
+            companion = assignment.companion();
+        } else {
+            String primaryFallback =
+                district.primary().name().toLowerCase(Locale.ROOT);
+            String companionFallback =
+                district.companion().name().toLowerCase(Locale.ROOT);
+            primary = primaryFamily(
+                district.id(),
+                primaryFallback,
+                families
+            );
+            companion = companionFamily(
+                district.id(),
+                companionFallback,
+                families
+            );
+        }
+        return new PreviewDistrict(
+            district.id(),
+            district.centerX(),
+            district.centerZ(),
+            district.radius(),
+            primary,
+            companion,
+            district.primaryLodes(),
+            district.companionLodes()
+        );
+    }
+
+    private static void appendDistrict(
+        StringBuilder out,
+        PreviewDistrict district
+    ) {
+        out.append('{');
+        field(out, "id", district.id()).append(',');
+        field(out, "x", district.centerX()).append(',');
+        field(out, "z", district.centerZ()).append(',');
+        field(out, "radius", district.radius()).append(',');
+        field(out, "primary", district.primary()).append(',');
+        field(out, "companion", district.companion()).append(',');
+        field(out, "primaryLodes", district.primaryLodes()).append(',');
+        field(out, "companionLodes", district.companionLodes());
+        out.append('}');
+    }
+
+    private static PreviewBody fromBody(Body body) {
+        return new PreviewBody(
+            body.mineral().name(),
+            body.source().name(),
+            body.centerX(), body.centerY(), body.centerZ(),
+            body.length(), body.radius(), body.angle(),
+            body.tilt(), body.bend(), body.large(),
+            body.rockyOutcrop()
+        );
+    }
+
+    private static PreviewBody fromDistrictLode(
+        GeoWorldV1 model,
+        GeoWorldMiningDistrictPlanner.Lode lode,
+        List<String> families
+    ) {
+        GeoWorldV1.MineralDistrictAssignment assignment =
+            model.mineralDistrictAssignment(lode.districtId());
+        String family;
+        if (assignment != null) {
+            family = lode.companion()
+                ? assignment.companion()
+                : assignment.primary();
+        } else {
+            String fallback =
+                lode.mineral().name().toLowerCase(Locale.ROOT);
+            family = lode.companion()
+                ? companionFamily(lode.districtId(), fallback, families)
+                : primaryFamily(lode.districtId(), fallback, families);
+        }
+        return new PreviewBody(
+            family,
+            lode.companion() ? "DISTRICT_COMPANION" : "DISTRICT_PRIMARY",
+            lode.centerX(), lode.centerY(), lode.centerZ(),
+            lode.length(), lode.radius(), lode.angle(),
+            lode.tilt(), lode.bend(), true, false
+        );
+    }
+
+    private static List<String> parseOreFamilies(String csv) {
+        List<String> families = new ArrayList<>();
+        if (csv != null && !csv.isBlank()) {
+            for (String part : csv.split(",")) {
+                String value = part.trim().toLowerCase(Locale.ROOT);
+                if (!value.isBlank() && !families.contains(value)) {
+                    families.add(value);
+                }
+            }
+        }
+        if (families.isEmpty()) {
+            families.addAll(VANILLA_FAMILIES);
+        }
+        families.sort(String::compareTo);
+        return List.copyOf(families);
+    }
+
+    private static String primaryFamily(
+        long districtId,
+        String fallback,
+        List<String> families
+    ) {
+        List<String> extras = extraFamilies(families);
+        if (usesExtraPrimary(districtId, extras)) {
+            return extras.get(Math.floorMod(
+                mix32(districtId ^ 0x5052494D415259L),
+                extras.size()
+            ));
+        }
+        if (families.contains(fallback)) return fallback;
+        return families.get(0);
+    }
+
+    private static String companionFamily(
+        long districtId,
+        String fallback,
+        List<String> families
+    ) {
+        List<String> extras = extraFamilies(families);
+        if (usesExtraPrimary(districtId, extras)) {
+            if (families.contains(fallback)) return fallback;
+            return families.get(0);
+        }
+        if (!extras.isEmpty()) {
+            return extras.get(Math.floorMod(
+                mix32(districtId ^ 0x434F4D50414E494FL),
+                extras.size()
+            ));
+        }
+        if (families.contains(fallback)) return fallback;
+        return families.get(0);
+    }
+
+    private static List<String> extraFamilies(List<String> families) {
+        return families.stream()
+            .filter(name -> !VANILLA_FAMILIES.contains(name))
+            .toList();
+    }
+
+    private static boolean usesExtraPrimary(
+        long districtId,
+        List<String> extras
+    ) {
+        return !extras.isEmpty() &&
+            Math.floorMod(
+                mix32(districtId ^ 0x4558545241505249L),
+                100
+            ) < 32;
+    }
+
+    private static int mix32(long value) {
+        long h = value;
+        h ^= h >>> 30;
+        h *= 0xBF58476D1CE4E5B9L;
+        h ^= h >>> 27;
+        h *= 0x94D049BB133111EBL;
+        h ^= h >>> 31;
+        return (int)(h ^ (h >>> 32));
+    }
+
+    private static StringBuilder appendStringArray(
+        StringBuilder out,
+        String name,
+        List<String> values
+    ) {
+        out.append('"').append(name).append("\":[");
+        for (int i = 0; i < values.size(); i++) {
+            if (i > 0) out.append(',');
+            out.append('"').append(escape(values.get(i))).append('"');
+        }
+        return out.append(']');
     }
 
     private static StringBuilder field(

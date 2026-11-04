@@ -111,7 +111,7 @@ public final class GeoWorldV26GeneratorSupport {
             modelProvider,
             this.heights,
             this.shoreline,
-            this.biomes::biomeIdFromSample,
+            this.biomes::surfaceBiomeIdFromSample,
             biome -> GeoWorldV26SurfaceMaterials.cover(biome) ==
                 GeoWorldV26SurfaceMaterials.Cover.BADLANDS,
             this::blockAt,
@@ -185,7 +185,7 @@ public final class GeoWorldV26GeneratorSupport {
         GeoWorldShorelinePlanner.Column column =
             this.shoreline.planModel(model, x, z);
         int ground = column.groundBoundary();
-        String surfaceBiome = this.biomes.biomeIdFromSample(
+        String surfaceBiome = this.biomes.surfaceBiomeIdFromSample(
             model,
             x,
             ground - 1,

@@ -11,6 +11,7 @@ public interface HeightMapping {
     int seaLevel();
 
     int boundaryY(double normalizedHeight);
+    int boundaryYFloor(double normalizedHeight);
     int boundaryYCeil(double normalizedHeight);
 
     default int relativeHeightmapValue(int firstAvailableY) {

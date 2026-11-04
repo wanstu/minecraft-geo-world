@@ -1,5 +1,7 @@
 package geoworld.minecraft.common.worldgen;
 
+import geoworld.runtime.GeoWorldMineralAffinity;
+
 /**
  * Version-neutral GeoWorld mineral selection and geology rules.
  * Minecraft-version modules are responsible only for mapping Kind to blocks.
@@ -108,43 +110,12 @@ public final class GeoWorldMineralRules {
         String biome,
         double y
     ) {
-        if (y < mineral.minY() || y > mineral.maxY()) return 0;
-
-        boolean mountains = "Mountain".equals(terrain);
-        boolean foothills =
-            "Foothills".equals(terrain) || "Hills".equals(terrain);
-        boolean sedimentary = switch (terrain) {
-            case "Plain", "Rolling Plain", "Floodplain",
-                 "Alluvial Plain", "Alluvial Fan" -> true;
-            default -> false;
-        };
-        boolean arid =
-            biome.contains("Desert") || "Savanna".equals(biome);
-        boolean highlands =
-            mountains || foothills || "Plateau".equals(terrain);
-
-        double multiplier = switch (mineral) {
-            case COAL -> sedimentary ? 2.1 : 0.80;
-            case IRON -> mountains ? 2.2 : foothills ? 1.6 : 1.0;
-            case COPPER -> highlands ? 2.0 : 0.9;
-            case GOLD ->
-                ("Plateau".equals(terrain) ||
-                 "Canyon".equals(terrain) ||
-                 arid) ? 2.1 : 0.75;
-            case LAPIS -> sedimentary ? 1.5 : 1.0;
-            case REDSTONE -> highlands ? 1.25 : 1.0;
-            case DIAMOND -> 1.0;
-            case EMERALD -> mountains ? 2.4 : foothills ? 1.4 : 0.08;
-        };
-
-        double vertical = switch (mineral) {
-            case COAL -> y < 0 ? 0.10 : y < 25 ? 0.7 : 1.3;
-            case DIAMOND -> y > 0 ? 0.18 : 0.5 + (-y / 63.0);
-            case REDSTONE -> y > 0 ? 0.3 : 1.0 + (-y / 100.0);
-            case EMERALD -> y < 0 ? 0.08 : y > 55 ? 1.2 : 0.6;
-            default -> 1.0;
-        };
-        return mineral.weight() * multiplier * vertical;
+        return GeoWorldMineralAffinity.affinity(
+            mineral.name(),
+            terrain,
+            biome,
+            y
+        );
     }
 
     public static int guaranteeY(Kind mineral, boolean deep) {

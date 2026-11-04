@@ -17,11 +17,13 @@ type Config struct {
 	// It is a physical Minecraft-block distance, independent of macro-grid size.
 	RiverProfileStepBlocks float64
 
-	// RiverGeometryVersion versions only horizontal river footprint geometry.
+	// RiverGeometryVersion versions river footprint/profile geometry.
 	// Version 1 (v1.1.5+) prevents wide low-gradient D8 diagonal reaches from
 	// remaining perfectly grid-locked when the legacy random straight-reach
 	// branch fires. Version 3 (v1.1.8+) scales lake-mouth transition breadth
 	// with large rivers instead of clipping them at the legacy fixed cap.
+	// Version 4 (v1.1.12+) also constrains the river free surface by the actual
+	// rendered banks so elevated river sheets cannot escape onto lower land.
 	// Omitted/zero preserves all older worlds exactly.
 	RiverGeometryVersion uint8 `json:",omitempty"`
 
@@ -101,6 +103,18 @@ type LakeNode struct {
 	// would otherwise be completely erased by detailed terrain. At most one
 	// low-excess node per LakeID receives it; old persisted worlds omit it.
 	CoreCarve bool `json:",omitempty"`
+}
+
+// RiverNavigationSample exposes only immutable, persisted river geometry facts
+// needed by navigation/port suitability. It does not contain gameplay state.
+type RiverNavigationSample struct {
+	RiverID      int
+	BankDistance float64
+	HalfWidth    float64
+	Gradient     float64
+	OceanMouth   bool
+	LakeMouth    bool
+	LakeOutlet   bool
 }
 
 type Model struct {

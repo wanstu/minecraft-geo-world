@@ -18,6 +18,14 @@ public final class GeoWorldV26SpawnVerifier {
         String[] args
     ) throws Exception {
         GeoWorldCreationConfig config = GeoWorldCreationConfig.defaults();
+        if (args.length > 0) {
+            probeSeed(
+                profile,
+                Long.parseLong(args[0]),
+                config
+            );
+            return;
+        }
         GeoWorldEngineBridge.GeneratedModel generated =
             GeoWorldEngineBridge.generate(OCEAN_CENTER_SEED, config);
         GeoWorldV1 runtime = generated.model();
@@ -104,6 +112,73 @@ public final class GeoWorldV26SpawnVerifier {
         );
     }
 
+    private static void probeSeed(
+        MinecraftVersionProfile profile,
+        long seed,
+        GeoWorldCreationConfig config
+    ) throws Exception {
+        GeoWorldEngineBridge.GeneratedModel generated =
+            GeoWorldEngineBridge.generate(seed, config);
+        GeoWorldV1 runtime = generated.model();
+        double influence = runtime
+            .worldProfile()
+            .parameters()
+            .spawnPreference();
+        GeoWorldSpawnPlanner.Candidate candidate =
+            GeoWorldSpawnPlanner.find(runtime, influence);
+        GeoWorldV1.RuntimeSample spawn = assertSafeSpawn(
+            runtime,
+            candidate,
+            runtime.manifest().seaLevelNormalized()
+        );
+        int y = profile
+            .heightMapping()
+            .boundaryY(spawn.groundHeight());
+        int originX = candidate.chunkX() * 16;
+        int originZ = candidate.chunkZ() * 16;
+        GeoWorldV1.RuntimeSample chunkOrigin = runtime.sample(
+            originX,
+            originZ
+        );
+        if (
+            !GeoWorldSpawnPlanner.isSpawnLand(
+                chunkOrigin,
+                runtime.manifest().seaLevelNormalized()
+            )
+        ) {
+            throw new AssertionError(
+                "planned spawn chunk origin is unsafe: " +
+                chunkOrigin
+            );
+        }
+        int originY = profile
+            .heightMapping()
+            .boundaryY(chunkOrigin.groundHeight());
+
+        System.out.printf(
+            "GeoWorld spawn probe: minecraft=%s, seed=%d, " +
+            "chunk=%d,%d, center=%d,%d,%d, origin=%d,%d,%d, " +
+            "biome=%s, originBiome=%s, water=%s, " +
+            "ground=%.6f, originGround=%.6f, score=%.6f, influence=%.2f%n",
+            profile.minecraftVersion(),
+            seed,
+            candidate.chunkX(),
+            candidate.chunkZ(),
+            candidate.blockX(),
+            y,
+            candidate.blockZ(),
+            originX,
+            originY,
+            originZ,
+            spawn.biomeFamily(),
+            chunkOrigin.biomeFamily(),
+            chunkOrigin.waterKind(),
+            spawn.groundHeight(),
+            chunkOrigin.groundHeight(),
+            candidate.score(),
+            influence
+        );
+    }
     private static GeoWorldV1.RuntimeSample assertSafeSpawn(
         GeoWorldV1 runtime,
         GeoWorldSpawnPlanner.Candidate origin,

@@ -17,7 +17,8 @@ public record GeoWorldCreationConfig(
     double continentSeparation,
     ContinentPreset continentPreset,
     WorldPreset worldPreset,
-    Parameters parameters
+    Parameters parameters,
+    boolean surfaceOrePile
 ) {
     public static final int DEFAULT_WIDTH = 320;
     public static final int DEFAULT_HEIGHT = 200;
@@ -61,11 +62,15 @@ public record GeoWorldCreationConfig(
             Parameters.CODEC.optionalFieldOf(
                 "parameters",
                 Parameters.standard()
-            ).forGetter(GeoWorldCreationConfig::parameters)
+            ).forGetter(GeoWorldCreationConfig::parameters),
+            Codec.BOOL.optionalFieldOf(
+                "surface_ore_pile",
+                false
+            ).forGetter(GeoWorldCreationConfig::surfaceOrePile)
         ).apply(
             instance,
             (width, height, cellSizeBlocks, plateCount, ocean, fragmentation,
-             separation, worldPreset, parameters) ->
+             separation, worldPreset, parameters, surfaceOrePile) ->
                 new GeoWorldCreationConfig(
                     width,
                     height,
@@ -76,7 +81,8 @@ public record GeoWorldCreationConfig(
                     separation,
                     detectPreset(ocean, fragmentation, separation),
                     worldPreset,
-                    parameters
+                    parameters,
+                    surfaceOrePile
                 )
         ));
 
@@ -102,6 +108,34 @@ public record GeoWorldCreationConfig(
             continentPreset,
             WorldPreset.STANDARD,
             Parameters.standard()
+        );
+    }
+
+    /** Compatibility constructor: surface ore piles are opt-in. */
+    public GeoWorldCreationConfig(
+        int width,
+        int height,
+        int cellSizeBlocks,
+        int plateCount,
+        double oceanFraction,
+        double continentFragmentation,
+        double continentSeparation,
+        ContinentPreset continentPreset,
+        WorldPreset worldPreset,
+        Parameters parameters
+    ) {
+        this(
+            width,
+            height,
+            cellSizeBlocks,
+            plateCount,
+            oceanFraction,
+            continentFragmentation,
+            continentSeparation,
+            continentPreset,
+            worldPreset,
+            parameters,
+            false
         );
     }
 
@@ -141,13 +175,14 @@ public record GeoWorldCreationConfig(
             return new GeoWorldCreationConfig(
                 width, height, cellSizeBlocks, plateCount,
                 oceanFraction, continentFragmentation, continentSeparation,
-                ContinentPreset.CUSTOM, worldPreset, parameters
+                ContinentPreset.CUSTOM, worldPreset, parameters,
+                surfaceOrePile
             );
         }
         return new GeoWorldCreationConfig(
             width, height, cellSizeBlocks, plateCount,
             preset.oceanFraction(), preset.fragmentation(), preset.separation(),
-            preset, worldPreset, parameters
+            preset, worldPreset, parameters, surfaceOrePile
         );
     }
 
@@ -156,7 +191,8 @@ public record GeoWorldCreationConfig(
             return new GeoWorldCreationConfig(
                 width, height, cellSizeBlocks, plateCount,
                 oceanFraction, continentFragmentation, continentSeparation,
-                continentPreset, WorldPreset.CUSTOM, parameters
+                continentPreset, WorldPreset.CUSTOM, parameters,
+                surfaceOrePile
             );
         }
         Parameters next = Parameters.forPreset(preset);
@@ -165,7 +201,7 @@ public record GeoWorldCreationConfig(
         return new GeoWorldCreationConfig(
             nextWidth, nextHeight, cellSizeBlocks, plateCount,
             oceanFraction, continentFragmentation, continentSeparation,
-            continentPreset, preset, next
+            continentPreset, preset, next, surfaceOrePile
         );
     }
 
@@ -173,7 +209,15 @@ public record GeoWorldCreationConfig(
         return new GeoWorldCreationConfig(
             width, height, cellSizeBlocks, plateCount,
             oceanFraction, continentFragmentation, continentSeparation,
-            continentPreset, WorldPreset.CUSTOM, next
+            continentPreset, WorldPreset.CUSTOM, next, surfaceOrePile
+        );
+    }
+
+    public GeoWorldCreationConfig withSurfaceOrePile(boolean enabled) {
+        return new GeoWorldCreationConfig(
+            width, height, cellSizeBlocks, plateCount,
+            oceanFraction, continentFragmentation, continentSeparation,
+            continentPreset, worldPreset, parameters, enabled
         );
     }
 

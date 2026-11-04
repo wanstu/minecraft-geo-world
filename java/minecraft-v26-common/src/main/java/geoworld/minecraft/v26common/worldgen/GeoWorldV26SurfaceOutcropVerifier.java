@@ -104,22 +104,21 @@ public final class GeoWorldV26SurfaceOutcropVerifier {
             deepestExposedColumn = Math.max(deepestExposedColumn, depth);
             if (depth >= 4) thickLodeColumns++;
         }
-        if (deepestExposedColumn < 5 || thickLodeColumns < 30) {
+        if (deepestExposedColumn < 4 || thickLodeColumns < 12) {
             throw new AssertionError(
-                "mineral bodies do not extend beneath exposed rock: " +
+                "surface clues must connect to a small subsurface body: " +
                 "deepestColumn=" + deepestExposedColumn +
                 ", thickColumns=" + thickLodeColumns
             );
         }
-        // The former long ribbons covered more cliff columns but only a
-        // thin layer. New granite-like blobs expose smaller, thicker
-        // connected patches. Bound both visible coverage and connectivity
-        // so the rock face is mineralized without being entirely ore.
+        // v1.1.15 outcrops are clues, not ore carpets. The representative
+        // mountain must expose enough blocks to be discoverable while keeping
+        // both total surface coverage and any single connected patch small.
         if (seed == -563659577384754347L &&
-            (visibleCoords.size() < 280 || largestExposedPatch < 70 ||
-                visibleCoords.size() > 1100)) {
+            (visibleCoords.size() < 12 || visibleCoords.size() > 240 ||
+                largestExposedPatch < 4 || largestExposedPatch > 48)) {
             throw new AssertionError(
-                "rocky ore outcrop size/density regression: unique=" +
+                "rocky ore outcrop must stay sparse: unique=" +
                 visibleCoords.size() + " largest=" + largestExposedPatch
             );
         }

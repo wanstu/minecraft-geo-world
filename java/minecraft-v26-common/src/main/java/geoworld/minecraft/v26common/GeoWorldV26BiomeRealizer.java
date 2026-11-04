@@ -7,16 +7,28 @@ import geoworld.minecraft.common.worldgen.HeightMapping;
 import geoworld.runtime.GeoWorldV1;
 
 import java.util.EnumSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
 public final class GeoWorldV26BiomeRealizer {
+    private static final double SQRT_HALF = 0.7071067811865476;
+    private static final double[] NEARBY_X = {
+        1.0, -1.0, 0.0, 0.0,
+        SQRT_HALF, SQRT_HALF, -SQRT_HALF, -SQRT_HALF
+    };
+    private static final double[] NEARBY_Z = {
+        0.0, 0.0, 1.0, -1.0,
+        SQRT_HALF, -SQRT_HALF, SQRT_HALF, -SQRT_HALF
+    };
+    private static final ThreadLocal<BoundaryScratch> BOUNDARY_SCRATCH =
+        ThreadLocal.withInitial(BoundaryScratch::new);
     private final MinecraftVersionProfile profile;
     private final HeightMapping heights;
     private final Map<GeoWorldV1, GeoWorldV26BiomeCoverage> coverageCache =
         java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+    private volatile GeoWorldV1 lastCoverageModel;
+    private volatile GeoWorldV26BiomeCoverage lastCoverage;
 
     public GeoWorldV26BiomeRealizer(MinecraftVersionProfile profile) {
         this.profile = java.util.Objects.requireNonNull(profile, "profile");
@@ -24,16 +36,35 @@ public final class GeoWorldV26BiomeRealizer {
     }
 
     public GeoWorldV26BiomeCoverage coverageForModel(GeoWorldV1 model) {
+        GeoWorldV1 cachedModel = this.lastCoverageModel;
+        GeoWorldV26BiomeCoverage cachedCoverage = this.lastCoverage;
+        if (cachedModel == model && cachedCoverage != null) {
+            return cachedCoverage;
+        }
         synchronized (coverageCache) {
-            return coverageCache.computeIfAbsent(
+            GeoWorldV26BiomeCoverage coverage = coverageCache.computeIfAbsent(
                 model,
                 value -> new GeoWorldV26BiomeCoverage(
                     value,
                     this.heights,
-                    requiredBiomeIds()
+                    requiredCoverageBiomeIds(value)
                 )
             );
+            this.lastCoverage = coverage;
+            this.lastCoverageModel = model;
+            return coverage;
         }
+    }
+
+    public Set<String> requiredCoverageBiomeIds(GeoWorldV1 model) {
+        Set<String> required = requiredBiomeIds();
+        if (!usesSpecialLandscapeRules(model)) {
+            return required;
+        }
+        LinkedHashSet<String> filtered = new LinkedHashSet<>(required);
+        filtered.remove("minecraft:mushroom_fields");
+        filtered.remove("minecraft:pale_garden");
+        return Set.copyOf(filtered);
     }
 
     public Set<String> requiredBiomeIds() {
@@ -75,7 +106,7 @@ public final class GeoWorldV26BiomeRealizer {
         return ensured != null ? ensured
             : surfaceBiomeId(
                 model, blockX, blockZ, model.sample(blockX, blockZ),
-                model.sampleClimate(blockX, blockZ)
+                null
             );
     }
 
@@ -109,10 +140,37 @@ public final class GeoWorldV26BiomeRealizer {
         GeoWorldV1.RuntimeSample sample
     ) {
         String ensured = coverageForModel(model).override(
-            model, blockX, blockY, blockZ
+            model, blockX, blockY, blockZ, sample
         );
         return ensured != null ? ensured
             : biomeWithoutOverride(model, blockX, blockY, blockZ, sample);
+    }
+
+    /**
+     * Surface-only fast path used by terrain generation. It preserves the
+     * coverage override and surface biome rules while avoiding cave checks.
+     * River/lake columns do not need climate sampling at all.
+     */
+    public String surfaceBiomeIdFromSample(
+        GeoWorldV1 model,
+        double blockX,
+        double blockY,
+        double blockZ,
+        GeoWorldV1.RuntimeSample sample
+    ) {
+        String ensured = coverageForModel(model).override(
+            model, blockX, blockY, blockZ, sample
+        );
+        if (ensured != null) {
+            return ensured;
+        }
+        return surfaceBiomeId(
+            model,
+            blockX,
+            blockZ,
+            sample,
+            null
+        );
     }
 
     private String biomeWithoutOverride(
@@ -122,8 +180,8 @@ public final class GeoWorldV26BiomeRealizer {
         double blockZ,
         GeoWorldV1.RuntimeSample sample
     ) {
-        GeoWorldV1.ClimateSample climate =
-            model.sampleClimate(blockX, blockZ);
+        GeoWorldV1.BiomeClimateSample climate =
+            model.sampleBiomeClimate(blockX, blockZ);
         int surfaceY = this.heights.boundaryY(sample.groundHeight()) - 1;
         String cave = caveBiomeId(
             model, sample, climate, blockX, blockY, blockZ, surfaceY
@@ -137,7 +195,7 @@ public final class GeoWorldV26BiomeRealizer {
         double blockX,
         double blockZ,
         GeoWorldV1.RuntimeSample sample,
-        GeoWorldV1.ClimateSample climate
+        GeoWorldV1.BiomeClimateSample climate
     ) {
         String family = sample.biomeFamily();
 
@@ -148,7 +206,43 @@ public final class GeoWorldV26BiomeRealizer {
                 : "minecraft:river";
         }
         if ("Ocean".equals(sample.waterKind())) {
-            return oceanBiomeId(sample, climate);
+            double temp = climate != null
+                ? (climate.available()
+                    ? climate.annualMeanTempC()
+                    : 12.0)
+                : model.sampleBiomeTemperature(blockX, blockZ, 12.0);
+            return oceanBiomeId(sample, temp);
+        }
+
+        String specialFeature = sample.specialFeature();
+        if ("mushroom_island".equals(specialFeature)) {
+            return "minecraft:mushroom_fields";
+        }
+        if ("pale_garden_island".equals(specialFeature)) {
+            return this.profile.biomeCatalog().candidateBiomeIds().contains(
+                "minecraft:pale_garden"
+            )
+                ? "minecraft:pale_garden"
+                : "minecraft:dark_forest";
+        }
+        if (
+            "cherry_island".equals(specialFeature) ||
+            (
+                ("volcanic_crater_cherry".equals(specialFeature) ||
+                 "basin_cherry".equals(specialFeature)) &&
+                sample.specialFeatureStrength() > 0.18
+            )
+        ) {
+            return "minecraft:cherry_grove";
+        }
+        if (
+            ("volcanic_crater_snow".equals(specialFeature) ||
+             "basin_snow".equals(specialFeature)) &&
+            sample.specialFeatureStrength() > 0.18
+        ) {
+            return sample.specialFeatureStrength() >= 0.62
+                ? "minecraft:frozen_peaks"
+                : "minecraft:snowy_slopes";
         }
 
         if (!"Wetland".equals(family) &&
@@ -161,7 +255,8 @@ public final class GeoWorldV26BiomeRealizer {
         // ocean-neighbor test. Reuse it rather than sampling eight model
         // positions twice for every temperate-forest or grassland column.
         boolean nearOcean96 = nearOcean(model, blockX, blockZ, 96.0);
-        if (isMushroomCandidate(model, sample, blockX, blockZ, nearOcean96)) {
+        if (!usesSpecialLandscapeRules(model) &&
+            isMushroomCandidate(model, sample, blockX, blockZ, nearOcean96)) {
             return "minecraft:mushroom_fields";
         }
 
@@ -178,10 +273,14 @@ public final class GeoWorldV26BiomeRealizer {
             }
         }
 
+        GeoWorldV1.BiomeClimateSample resolvedClimate =
+            climate != null
+                ? climate
+                : model.sampleBiomeClimate(blockX, blockZ);
         String base = landBiomeId(
             model,
             sample,
-            climate,
+            resolvedClimate,
             blockX,
             blockZ,
             nearOcean96
@@ -197,14 +296,11 @@ public final class GeoWorldV26BiomeRealizer {
 
     private String oceanBiomeId(
         GeoWorldV1.RuntimeSample sample,
-        GeoWorldV1.ClimateSample climate
+        double temp
     ) {
         String family = sample.biomeFamily();
         double depth = Math.max(0.0, sample.waterDepth());
         boolean deep = depth >= 0.08;
-        double temp = climate.available()
-            ? climate.annualMeanTempC()
-            : 12.0;
 
         return switch (family) {
             case "Warm Ocean" -> {
@@ -256,7 +352,7 @@ public final class GeoWorldV26BiomeRealizer {
     private String landBiomeId(
         GeoWorldV1 model,
         GeoWorldV1.RuntimeSample sample,
-        GeoWorldV1.ClimateSample climate,
+        GeoWorldV1.BiomeClimateSample climate,
         double x,
         double z,
         boolean nearOcean96
@@ -282,7 +378,7 @@ public final class GeoWorldV26BiomeRealizer {
         String fallback = this.profile.biomeFamilyMapping().biomeId(
             sample.biomeFamily()
         );
-        return this.profile.biomeCatalog().choose(
+        String selected = this.profile.biomeCatalog().choose(
             new GeoWorldBiomeRegion(
                 tags,
                 temp,
@@ -294,6 +390,13 @@ public final class GeoWorldV26BiomeRealizer {
             z,
             fallback
         );
+        if (
+            usesSpecialLandscapeRules(model) &&
+            "minecraft:pale_garden".equals(selected)
+        ) {
+            return "minecraft:forest";
+        }
+        return selected;
     }
 
     private EnumSet<GeoWorldBiomeTag> regionTags(
@@ -470,7 +573,7 @@ public final class GeoWorldV26BiomeRealizer {
     private String caveBiomeId(
         GeoWorldV1 model,
         GeoWorldV1.RuntimeSample sample,
-        GeoWorldV1.ClimateSample climate,
+        GeoWorldV1.BiomeClimateSample climate,
         double x,
         double y,
         double z,
@@ -575,24 +678,14 @@ public final class GeoWorldV26BiomeRealizer {
         String base
     ) {
         final double radius = 56.0;
-        final double diagonal = radius * 0.7071067811865476;
-        double[][] offsets = {
-            {radius, 0.0},
-            {-radius, 0.0},
-            {0.0, radius},
-            {0.0, -radius},
-            {diagonal, diagonal},
-            {diagonal, -diagonal},
-            {-diagonal, diagonal},
-            {-diagonal, -diagonal}
-        };
+        BoundaryScratch candidates = BOUNDARY_SCRATCH.get();
+        candidates.reset();
 
-        LinkedHashMap<String, Integer> candidates = new LinkedHashMap<>();
         int different = 0;
-        for (double[] offset : offsets) {
+        for (int i = 0; i < NEARBY_X.length; i++) {
             GeoWorldV1.RuntimeSample nearby = model.sample(
-                x + offset[0],
-                z + offset[1]
+                x + radius * NEARBY_X[i],
+                z + radius * NEARBY_Z[i]
             );
             if (
                 !nearby.sourceLand() ||
@@ -601,22 +694,18 @@ public final class GeoWorldV26BiomeRealizer {
             ) {
                 continue;
             }
-            String candidate = this.profile.biomeFamilyMapping().biomeId(
-                nearby.biomeFamily()
+            candidates.add(
+                this.profile.biomeFamilyMapping().biomeId(
+                    nearby.biomeFamily()
+                )
             );
-            candidates.merge(candidate, 1, Integer::sum);
             different++;
         }
         if (different == 0 || candidates.isEmpty()) {
             return base;
         }
 
-        String neighbor = candidates
-            .entrySet()
-            .stream()
-            .max(Map.Entry.comparingByValue())
-            .map(Map.Entry::getKey)
-            .orElse(base);
+        String neighbor = candidates.mostFrequent(base);
         if (neighbor.equals(base)) {
             return base;
         }
@@ -637,13 +726,15 @@ public final class GeoWorldV26BiomeRealizer {
         double z,
         double radius
     ) {
-        return anyNearby(
-            model,
-            x,
-            z,
-            radius,
-            sample -> "Ocean".equals(sample.waterKind())
-        );
+        for (int i = 0; i < NEARBY_X.length; i++) {
+            if ("Ocean".equals(model.sample(
+                x + radius * NEARBY_X[i],
+                z + radius * NEARBY_Z[i]
+            ).waterKind())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean nearTropicalLand(
@@ -652,14 +743,19 @@ public final class GeoWorldV26BiomeRealizer {
         double z,
         double radius
     ) {
-        return anyNearby(
-            model,
-            x,
-            z,
-            radius,
-            sample -> sample.sourceLand() &&
-                isTropicalForest(sample.biomeFamily())
-        );
+        for (int i = 0; i < NEARBY_X.length; i++) {
+            GeoWorldV1.RuntimeSample nearby = model.sample(
+                x + radius * NEARBY_X[i],
+                z + radius * NEARBY_Z[i]
+            );
+            if (
+                nearby.sourceLand() &&
+                isTropicalForest(nearby.biomeFamily())
+            ) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean nearNonTropicalLand(
@@ -668,36 +764,15 @@ public final class GeoWorldV26BiomeRealizer {
         double z,
         double radius
     ) {
-        return anyNearby(
-            model,
-            x,
-            z,
-            radius,
-            sample -> sample.sourceLand() &&
-                !isTropicalForest(sample.biomeFamily())
-        );
-    }
-
-    private boolean anyNearby(
-        GeoWorldV1 model,
-        double x,
-        double z,
-        double radius,
-        java.util.function.Predicate<GeoWorldV1.RuntimeSample> predicate
-    ) {
-        double diagonal = radius * 0.7071067811865476;
-        double[][] offsets = {
-            {radius, 0.0},
-            {-radius, 0.0},
-            {0.0, radius},
-            {0.0, -radius},
-            {diagonal, diagonal},
-            {diagonal, -diagonal},
-            {-diagonal, diagonal},
-            {-diagonal, -diagonal}
-        };
-        for (double[] offset : offsets) {
-            if (predicate.test(model.sample(x + offset[0], z + offset[1]))) {
+        for (int i = 0; i < NEARBY_X.length; i++) {
+            GeoWorldV1.RuntimeSample nearby = model.sample(
+                x + radius * NEARBY_X[i],
+                z + radius * NEARBY_Z[i]
+            );
+            if (
+                nearby.sourceLand() &&
+                !isTropicalForest(nearby.biomeFamily())
+            ) {
                 return true;
             }
         }
@@ -743,6 +818,15 @@ public final class GeoWorldV26BiomeRealizer {
         return t * t * (3.0 - 2.0 * t);
     }
 
+    private boolean usesSpecialLandscapeRules(GeoWorldV1 model) {
+        String rules = model.manifest().generationRulesVersion();
+        return "geoworld-rules-v1.1.11".equals(rules) ||
+            "geoworld-rules-v1.1.12".equals(rules) ||
+            "geoworld-rules-v1.1.13".equals(rules) ||
+            "geoworld-rules-v1.1.14".equals(rules) ||
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules));
+    }
+
     private boolean supportsSulfurCaves() {
         return this.profile instanceof MinecraftV26Profile v26 &&
             v26.supportsSulfurCaves();
@@ -758,5 +842,44 @@ public final class GeoWorldV26BiomeRealizer {
             "Ice Sheet".equals(family) ||
             "Tundra".equals(family) ||
             "Alpine".equals(family);
+    }
+
+    private static final class BoundaryScratch {
+        private final String[] values = new String[8];
+        private final int[] counts = new int[8];
+        private int size;
+
+        void reset() {
+            size = 0;
+        }
+
+        boolean isEmpty() {
+            return size == 0;
+        }
+
+        void add(String value) {
+            for (int i = 0; i < size; i++) {
+                if (values[i].equals(value)) {
+                    counts[i]++;
+                    return;
+                }
+            }
+            values[size] = value;
+            counts[size] = 1;
+            size++;
+        }
+
+        String mostFrequent(String fallback) {
+            if (size == 0) {
+                return fallback;
+            }
+            int best = 0;
+            for (int i = 1; i < size; i++) {
+                if (counts[i] > counts[best]) {
+                    best = i;
+                }
+            }
+            return values[best];
+        }
     }
 }

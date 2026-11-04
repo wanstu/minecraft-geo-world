@@ -13,9 +13,11 @@ import (
 	"geoworld/internal/hydrology"
 	"geoworld/internal/landform"
 	"geoworld/internal/mcprofile"
+	"geoworld/internal/mineralmodel"
 	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
+	"geoworld/internal/specialfeatures"
 	"geoworld/internal/terrain"
 	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
@@ -213,29 +215,57 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 	}
 	reporter.done(StageRuntimeProfile)
 
+	minerals := mineralmodel.Build(
+		resolved.Seed,
+		w.Geometry,
+		resolved.MineralDictionary,
+		resolved.AvailableMinerals,
+	)
+
+	var special []specialfeatures.Feature
+	if resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.11" ||
+		resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.12" ||
+		resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.13" ||
+		resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.14" ||
+		(resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.15" || resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.16") {
+		special = specialfeatures.Plan(
+			resolved.Seed,
+			w.Geometry,
+			w.Surface,
+			h,
+			p,
+			runtimeModel,
+			resolved.WorldProfile.Parameters.RareMacroTerrain,
+			resolved.WorldProfile.GenerationRulesVersion,
+		)
+	}
+
 	model := &WorldModel{
-		Geometry:       w.Geometry,
-		Surface:        w.Surface,
-		Phase1:         w,
-		Climate:        c,
-		Hydrology:      h,
-		Erosion:        e,
-		Landform:       l,
-		Geomorph:       g,
-		Ecology:        eco,
-		Profile:        p,
-		Terrain:        t,
-		CoastTerrain:   coastTerrain,
-		Reconciliation: rec,
-		Waterbed:       wb,
-		Runtime:        runtimeModel,
-		RuntimeProfile: runtimeProfile,
+		Geometry:        w.Geometry,
+		Surface:         w.Surface,
+		Phase1:          w,
+		Climate:         c,
+		Hydrology:       h,
+		Erosion:         e,
+		Landform:        l,
+		Geomorph:        g,
+		Ecology:         eco,
+		Profile:         p,
+		Terrain:         t,
+		CoastTerrain:    coastTerrain,
+		Reconciliation:  rec,
+		Waterbed:        wb,
+		Runtime:         runtimeModel,
+		RuntimeProfile:  runtimeProfile,
+		SpecialFeatures: special,
+		Minerals:        minerals,
 	}
 	model.Config = ResolvedConfig{
 		Seed:               resolved.Seed,
 		Geometry:           w.Geometry,
 		SeaLevelNormalized: w.Surface.SeaLevelNormalized,
 		WorldProfile:       resolved.WorldProfile,
+		SurfaceOrePile:     resolved.SurfaceOrePile,
 		Phase1:             w.Config,
 		Climate:            c.Config,
 		Hydrology:          h.Config,

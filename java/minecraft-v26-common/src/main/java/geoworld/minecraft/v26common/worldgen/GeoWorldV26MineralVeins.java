@@ -2,6 +2,7 @@ package geoworld.minecraft.v26common.worldgen;
 
 import geoworld.runtime.GeoWorldV1;
 import geoworld.minecraft.common.worldgen.GeoWorldMineralPlanner;
+import geoworld.minecraft.common.worldgen.GeoWorldMiningDistrictPlanner;
 import geoworld.minecraft.common.worldgen.GeoWorldMineralRules;
 import geoworld.minecraft.common.worldgen.HeightMapping;
 import geoworld.minecraft.common.worldgen.GeoWorldShorelinePlanner;
@@ -30,6 +31,8 @@ public final class GeoWorldV26MineralVeins {
         new MinecraftV26HeightMapping();
     private static final GeoWorldMineralPlanner PLANNER =
         new GeoWorldMineralPlanner(HEIGHTS);
+    private static final GeoWorldMiningDistrictPlanner DISTRICTS =
+        new GeoWorldMiningDistrictPlanner(HEIGHTS);
     // Optional vanilla blocks must not become compile-time dependencies of
     // version-common code. Resolve once so older supported Minecraft versions
     // simply omit hosts that did not exist yet.
@@ -76,6 +79,14 @@ public final class GeoWorldV26MineralVeins {
 
     public record Placement(int x, int y, int z, Mineral mineral) {}
 
+    public record SurfaceOrePileColumn(
+        int x,
+        int z,
+        int levels,
+        long districtId,
+        boolean companion
+    ) {}
+
     private GeoWorldV26MineralVeins() {}
 
     private static boolean usesV117Minerals(GeoWorldV1 model) {
@@ -83,7 +94,20 @@ public final class GeoWorldV26MineralVeins {
         return "geoworld-rules-v1.1.7".equals(rules) ||
             "geoworld-rules-v1.1.8".equals(rules) ||
             "geoworld-rules-v1.1.9".equals(rules) ||
-            "geoworld-rules-v1.1.10".equals(rules);
+            "geoworld-rules-v1.1.10".equals(rules) ||
+            "geoworld-rules-v1.1.11".equals(rules) ||
+            "geoworld-rules-v1.1.12".equals(rules) ||
+            "geoworld-rules-v1.1.13".equals(rules) ||
+            "geoworld-rules-v1.1.14".equals(rules) ||
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules));
+    }
+
+    private static boolean usesV115MiningDistricts(GeoWorldV1 model) {
+        return ("geoworld-rules-v1.1.15".equals(
+            model.manifest().generationRulesVersion()
+        ) || "geoworld-rules-v1.1.16".equals(
+            model.manifest().generationRulesVersion()
+        ));
     }
 
     public static int populate(
@@ -98,46 +122,114 @@ public final class GeoWorldV26MineralVeins {
         BlockPos.MutableBlockPos position = new BlockPos.MutableBlockPos();
         final int[] added = {0};
         boolean modernMinerals = usesV117Minerals(model);
-        // Long, thick seams contain overlapping ellipsoid sweeps. Skip each
-        // voxel after the first mineral candidate, before expensive chunk
-        // state and surface checks. First-seen ordering is unchanged.
-        BitSet seenUnderground = new BitSet(HEIGHTS.height() * 256);
-        plan(model, seed, minX, minX + 15, minZ, minZ + 15, placement -> {
-            int localX = placement.x() - minX;
-            int localZ = placement.z() - minZ;
-            int voxel = ((placement.y() - (HEIGHTS.minY() + 1)) * 256) +
-                localZ * 16 + localX;
-            if (seenUnderground.get(voxel)) return;
-            seenUnderground.set(voxel);
-            position.set(placement.x(), placement.y(), placement.z());
-            BlockState host = chunk.getBlockState(position);
-            // Leave bedrock, ocean/river water, soil, snow, and decorations intact.
-            // The vanilla ore features are suppressed for this generator only.
-            GeoWorldShorelinePlanner.Column column = shoreline.column(localX, localZ);
-            int safeBoundary = column.groundBoundary() - 4;
-            int surfaceY = column.groundBoundary() - 1;
-            boolean solidHost = host.is(Blocks.STONE) || host.is(Blocks.DEEPSLATE);
-            // Rare natural ore exposures occur only where a planned vein
-            // intersects an actual STONE mountain face. Never expose ore on
-            // grass, snow, a shoreline, or underwater. Default remains buried.
-            boolean outcrop = !modernMinerals &&
-                placement.y() == surfaceY &&
-                host.is(Blocks.STONE) &&
-                column.surfaceOverride() == null &&
-                isOutcropLocation(
-                    placement.mineral(), column.sample().terrainVariant(),
-                    column.sample().waterKind(),
-                    placement.x(), placement.z(), seed
-                );
-            if (solidHost && (placement.y() < safeBoundary || outcrop)) {
-                blockSetter.set(
-                    chunk,
-                    position,
-                    placement.mineral().blockAt(placement.y())
-                );
-                added[0]++;
-            }
-        });
+        boolean miningDistricts = usesV115MiningDistricts(model);
+
+        if (miningDistricts) {
+            BitSet seenDistrict = new BitSet(HEIGHTS.height() * 256);
+            DISTRICTS.plan(
+                model,
+                seed,
+                minX,
+                minX + 15,
+                minZ,
+                minZ + 15,
+                placement -> {
+                    int localX = placement.x() - minX;
+                    int localZ = placement.z() - minZ;
+                    int voxel =
+                        ((placement.y() - (HEIGHTS.minY() + 1)) * 256) +
+                        localZ * 16 + localX;
+                    if (seenDistrict.get(voxel)) return;
+                    seenDistrict.set(voxel);
+
+                    GeoWorldShorelinePlanner.Column column =
+                        shoreline.column(localX, localZ);
+                    if (placement.y() >= column.groundBoundary() - 4) {
+                        return;
+                    }
+                    position.set(
+                        placement.x(), placement.y(), placement.z()
+                    );
+                    BlockState host = chunk.getBlockState(position);
+                    if (!host.is(Blocks.STONE) &&
+                        !host.is(Blocks.DEEPSLATE)) {
+                        return;
+                    }
+
+                    Mineral base = Mineral.valueOf(
+                        placement.mineral().name()
+                    );
+                    BlockState fallback = base.blockAt(placement.y());
+                    BlockState ore = GeoWorldOreCatalog.resolve(
+                        model,
+                        placement,
+                        host,
+                        fallback
+                    );
+                    blockSetter.set(chunk, position, ore);
+                    added[0]++;
+                }
+            );
+        } else {
+            // v1.1.14 and older keep their locked global vein geometry.
+            BitSet seenUnderground =
+                new BitSet(HEIGHTS.height() * 256);
+            plan(
+                model,
+                seed,
+                minX,
+                minX + 15,
+                minZ,
+                minZ + 15,
+                placement -> {
+                    int localX = placement.x() - minX;
+                    int localZ = placement.z() - minZ;
+                    int voxel =
+                        ((placement.y() - (HEIGHTS.minY() + 1)) * 256) +
+                        localZ * 16 + localX;
+                    if (seenUnderground.get(voxel)) return;
+                    seenUnderground.set(voxel);
+                    GeoWorldShorelinePlanner.Column column =
+                        shoreline.column(localX, localZ);
+                    int safeBoundary = column.groundBoundary() - 4;
+                    int surfaceY = column.groundBoundary() - 1;
+                    boolean buriedCandidate =
+                        placement.y() < safeBoundary;
+                    boolean legacyOutcropCandidate =
+                        !modernMinerals &&
+                        placement.y() == surfaceY &&
+                        column.surfaceOverride() == null;
+                    if (!buriedCandidate && !legacyOutcropCandidate) {
+                        return;
+                    }
+
+                    position.set(
+                        placement.x(), placement.y(), placement.z()
+                    );
+                    BlockState host = chunk.getBlockState(position);
+                    boolean solidHost =
+                        host.is(Blocks.STONE) ||
+                        host.is(Blocks.DEEPSLATE);
+                    boolean outcrop =
+                        legacyOutcropCandidate &&
+                        host.is(Blocks.STONE) &&
+                        isOutcropLocation(
+                            placement.mineral(),
+                            column.sample().terrainVariant(),
+                            column.sample().waterKind(),
+                            placement.x(), placement.z(), seed
+                        );
+                    if (solidHost && (buriedCandidate || outcrop)) {
+                        blockSetter.set(
+                            chunk,
+                            position,
+                            placement.mineral().blockAt(placement.y())
+                        );
+                        added[0]++;
+                    }
+                }
+            );
+        }
         if (modernMinerals) {
             BitSet seenScatter = new BitSet(HEIGHTS.height() * 256);
             planScatter(
@@ -193,7 +285,9 @@ public final class GeoWorldV26MineralVeins {
                 GeoWorldShorelinePlanner.Column column =
                     shoreline.column(localX, localZ);
                 int surface = column.groundBoundary() - 1;
-                int outcropDepth = modernMinerals ? 31 : 23;
+                int outcropDepth = modernMinerals
+                    ? (miningDistricts ? 8 : 31)
+                    : 23;
                 if (placement.y() > surface ||
                     placement.y() < surface - outcropDepth) {
                     return;
@@ -208,7 +302,14 @@ public final class GeoWorldV26MineralVeins {
                         placement.x(), placement.y(), placement.z()
                     );
                     BlockState host = chunk.getBlockState(position);
-                    if (!isNaturalOutcropHost(host)) return;
+                    if (miningDistricts) {
+                        // District-era outcrops may be visible where bedrock is
+                        // naturally exposed, but must never replace an entire
+                        // grass/dirt/sand surface with a sheet of ore.
+                        if (!isRockOutcropHost(host)) return;
+                    } else if (!isNaturalOutcropHost(host)) {
+                        return;
+                    }
                 } else {
                     int columnIndex = localZ * 16 + localX;
                     if (rockSurface[columnIndex] == 0) {
@@ -243,7 +344,227 @@ public final class GeoWorldV26MineralVeins {
                 );
                 added[0]++;
             });
+
+        if (miningDistricts && model.surfaceOrePileEnabled()) {
+            planSurfaceOrePiles(
+                model,
+                seed,
+                minX,
+                minX + 15,
+                minZ,
+                minZ + 15,
+                pile -> {
+                    int localX = pile.x() - minX;
+                    int localZ = pile.z() - minZ;
+                    if (
+                        localX < 0 || localX > 15 ||
+                        localZ < 0 || localZ > 15
+                    ) {
+                        return;
+                    }
+                    GeoWorldShorelinePlanner.Column column =
+                        shoreline.column(localX, localZ);
+
+                    BlockState marker =
+                        GeoWorldOreCatalog.surfaceMarkerBlock(
+                            model,
+                            pile.districtId(),
+                            pile.companion()
+                        );
+                    if (marker == null) {
+                        return;
+                    }
+
+                    int baseY = column.groundBoundary();
+                    for (int level = 0; level < pile.levels(); level++) {
+                        int y = baseY + level;
+                        if (y >= HEIGHTS.maxYExclusive()) {
+                            break;
+                        }
+                        position.set(pile.x(), y, pile.z());
+                        BlockState existing = chunk.getBlockState(position);
+                        if (
+                            !existing.isAir() &&
+                            existing.getFluidState().isEmpty()
+                        ) {
+                            break;
+                        }
+                        blockSetter.set(chunk, position, marker);
+                        added[0]++;
+                    }
+                }
+            );
+        }
+
         return added[0];
+    }
+
+    public static void planSurfaceOrePiles(
+        GeoWorldV1 model,
+        long seed,
+        int minX,
+        int maxX,
+        int minZ,
+        int maxZ,
+        Consumer<SurfaceOrePileColumn> consumer
+    ) {
+        if (!model.surfaceOrePileEnabled()) {
+            return;
+        }
+
+        final int searchMargin = 80;
+        DISTRICTS.planDistricts(
+            model,
+            seed,
+            minX - searchMargin,
+            maxX + searchMargin,
+            minZ - searchMargin,
+            maxZ + searchMargin,
+            district -> {
+                int[] anchor = surfaceOrePileAnchor(district);
+                if (anchor == null) {
+                    return;
+                }
+
+                long shapeSalt =
+                    district.id() ^ 0x5355524641434550L;
+                int peakHeight =
+                    5 + Math.floorMod(
+                        mix32(shapeSalt ^ 0x5045414B48454947L),
+                        4
+                    );
+                int radius =
+                    5 + Math.floorMod(
+                        mix32(shapeSalt ^ 0x4241534552414449L),
+                        3
+                    );
+                if (
+                    anchor[0] + radius < minX ||
+                    anchor[0] - radius > maxX ||
+                    anchor[1] + radius < minZ ||
+                    anchor[1] - radius > maxZ
+                ) {
+                    return;
+                }
+
+                for (int dx = -radius - 1; dx <= radius + 1; dx++) {
+                    for (int dz = -radius - 1; dz <= radius + 1; dz++) {
+                        int x = anchor[0] + dx;
+                        int z = anchor[1] + dz;
+                        if (
+                            x < minX || x > maxX ||
+                            z < minZ || z > maxZ
+                        ) {
+                            continue;
+                        }
+
+                        double distance = Math.sqrt(
+                            dx * dx + dz * dz
+                        );
+                        double edgeJitter =
+                            (unitHash(shapeSalt, x, 0, z) - 0.5) *
+                            1.8;
+                        if (distance > radius + edgeJitter) {
+                            continue;
+                        }
+                        if (
+                            distance > radius * 0.45 &&
+                            unitHash(
+                                shapeSalt ^ 0x484F4C4553504F54L,
+                                x,
+                                0,
+                                z
+                            ) < 0.10
+                        ) {
+                            continue;
+                        }
+
+                        double normalized =
+                            Math.max(
+                                0.0,
+                                1.0 - distance / (radius + 0.65)
+                            );
+                        double mound =
+                            Math.pow(normalized, 1.18);
+                        double heightJitter =
+                            (unitHash(
+                                shapeSalt ^ 0x4845494748544A49L,
+                                x,
+                                3,
+                                z
+                            ) - 0.5) * 1.35;
+                        int levels = (int)Math.round(
+                            1.0 +
+                            (peakHeight - 1.0) * mound +
+                            heightJitter
+                        );
+                        levels = Math.max(
+                            1,
+                            Math.min(peakHeight, levels)
+                        );
+                        if (dx == 0 && dz == 0) {
+                            levels = peakHeight;
+                        }
+
+                        boolean companion =
+                            unitHash(
+                                shapeSalt ^ 0x434F4D50414E494FL,
+                                x,
+                                levels,
+                                z
+                            ) < 0.20;
+                        consumer.accept(
+                            new SurfaceOrePileColumn(
+                                x,
+                                z,
+                                levels,
+                                district.id(),
+                                companion
+                            )
+                        );
+                    }
+                }
+            }
+        );
+    }
+
+    private static int[] surfaceOrePileAnchor(
+        GeoWorldMiningDistrictPlanner.District district
+    ) {
+        // Water does not move the marker onto a shore. Underwater districts
+        // get their ore pile on the sea/lake floor at the district center.
+        return new int[]{
+            (int)Math.round(district.centerX()),
+            (int)Math.round(district.centerZ())
+        };
+    }
+
+    private static double unitHash(
+        long seed,
+        int x,
+        int y,
+        int z
+    ) {
+        long value = seed;
+        value ^= (long)x * 0x9E3779B97F4A7C15L;
+        value ^= (long)y * 0xBF58476D1CE4E5B9L;
+        value ^= (long)z * 0x94D049BB133111EBL;
+        value = mix64(value);
+        return (value >>> 11) * 0x1.0p-53;
+    }
+
+    private static int mix32(long value) {
+        long mixed = mix64(value);
+        return (int)(mixed ^ (mixed >>> 32));
+    }
+
+    private static long mix64(long value) {
+        long mixed = value;
+        mixed ^= mixed >>> 30;
+        mixed *= 0xBF58476D1CE4E5B9L;
+        mixed ^= mixed >>> 27;
+        mixed *= 0x94D049BB133111EBL;
+        return mixed ^ (mixed >>> 31);
     }
 
     /**
@@ -331,6 +652,19 @@ public final class GeoWorldV26MineralVeins {
             seed,
             placement -> consumer.accept(fromCommon(placement))
         );
+    }
+
+    private static boolean isRockOutcropHost(BlockState host) {
+        return host.is(Blocks.STONE) ||
+            host.is(Blocks.DEEPSLATE) ||
+            host.is(Blocks.GRANITE) ||
+            host.is(Blocks.DIORITE) ||
+            host.is(Blocks.ANDESITE) ||
+            host.is(Blocks.TUFF) ||
+            host.is(Blocks.CALCITE) ||
+            host.is(Blocks.SANDSTONE) ||
+            host.is(Blocks.RED_SANDSTONE) ||
+            host.is(Blocks.TERRACOTTA);
     }
 
     private static boolean isNaturalOutcropHost(BlockState host) {

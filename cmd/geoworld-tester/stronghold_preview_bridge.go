@@ -63,17 +63,20 @@ func (s *appState) loadStrongholdPreviewCandidates(
 	active *activeWorld,
 ) ([]structureCandidate, error) {
 	javaExecutable := strings.TrimSpace(os.Getenv("GEOWORLD_JAVA"))
-	jarPath := strings.TrimSpace(os.Getenv("GEOWORLD_TOOL_JAR"))
-	if javaExecutable == "" || jarPath == "" {
+	classpath := strings.TrimSpace(os.Getenv("GEOWORLD_TOOL_CLASSPATH"))
+	if classpath == "" {
+		classpath = strings.TrimSpace(os.Getenv("GEOWORLD_TOOL_JAR"))
+	}
+	if javaExecutable == "" || classpath == "" {
 		return nil, errors.New(
-			"exact stronghold preview is available from the executable GeoWorld JAR",
+			"exact stronghold preview requires the GeoWorld Java planner bridge",
 		)
 	}
 	if _, err := os.Stat(javaExecutable); err != nil {
 		return nil, fmt.Errorf("java runtime unavailable: %w", err)
 	}
-	if _, err := os.Stat(jarPath); err != nil {
-		return nil, fmt.Errorf("GeoWorld JAR unavailable: %w", err)
+	if _, err := os.Stat(classpath); err != nil {
+		return nil, fmt.Errorf("GeoWorld planner classpath unavailable: %w", err)
 	}
 
 	modelPath, err := s.ensureMineralPreviewModel(active)
@@ -88,7 +91,7 @@ func (s *appState) loadStrongholdPreviewCandidates(
 		ctx,
 		javaExecutable,
 		"-cp",
-		jarPath,
+		classpath,
 		strongholdPreviewClass,
 		modelPath,
 	)

@@ -43,7 +43,10 @@ public final class GeoWorldV26ShorelineVerifier {
         {1030, -3010},
         {1906, -2961},
         {1891, -2905},
-        {20873, 2725}
+        {20873, 2725},
+        // 2026-11-01 screenshot: beach/backshore transition ends in a
+        // vertical terrain wall instead of reconnecting gradually.
+        {-10464, -5294}
     };
 
     private static final Set<String> SUGAR_CANE_SUBSTRATES = Set.of(
@@ -316,10 +319,35 @@ public final class GeoWorldV26ShorelineVerifier {
                                 )
                             ) {
                                 int expectedWater =
-                                    heights.boundaryYCeil(
-                                        riverColumn.sample()
-                                            .waterSurfaceElevation()
-                                    );
+                                    (
+                                        "geoworld-rules-v1.1.12".equals(
+                                            runtime.manifest()
+                                                .generationRulesVersion()
+                                        ) ||
+                                        "geoworld-rules-v1.1.13".equals(
+                                            runtime.manifest()
+                                                .generationRulesVersion()
+                                        ) ||
+                                        "geoworld-rules-v1.1.14".equals(
+                                            runtime.manifest()
+                                                .generationRulesVersion()
+                                        ) ||
+                                        ("geoworld-rules-v1.1.15".equals(
+                                            runtime.manifest()
+                                                .generationRulesVersion()
+                                        ) || "geoworld-rules-v1.1.16".equals(
+                                            runtime.manifest()
+                                                .generationRulesVersion()
+                                        ))
+                                    )
+                                        ? heights.boundaryYFloor(
+                                            riverColumn.sample()
+                                                .waterSurfaceElevation()
+                                        )
+                                        : heights.boundaryYCeil(
+                                            riverColumn.sample()
+                                                .waterSurfaceElevation()
+                                        );
                                 if (
                                     riverColumn.waterBoundary() !=
                                     expectedWater
@@ -498,6 +526,31 @@ public final class GeoWorldV26ShorelineVerifier {
                                         column.shoreWaterBoundary()
                                     );
                                 }
+                                if (
+                                    (
+                                        "geoworld-rules-v1.1.12".equals(
+                                            runtime.manifest().generationRulesVersion()
+                                        ) ||
+                                        "geoworld-rules-v1.1.13".equals(
+                                            runtime.manifest().generationRulesVersion()
+                                        ) ||
+                                        "geoworld-rules-v1.1.14".equals(
+                                            runtime.manifest().generationRulesVersion()
+                                        ) ||
+                                        ("geoworld-rules-v1.1.15".equals(
+                                            runtime.manifest().generationRulesVersion()
+                                        ) || "geoworld-rules-v1.1.16".equals(
+                                            runtime.manifest().generationRulesVersion()
+                                        ))
+                                    ) &&
+                                    "River".equals(column.shoreWaterKind())
+                                ) {
+                                    throw new AssertionError(
+                                        "v1.1.12+ dry river bank became a water fringe at " +
+                                        (baseX + localX) + "," +
+                                        (baseZ + localZ)
+                                    );
+                                }
                                 shallowFringes++;
                                 stable++;
                                 continue;
@@ -511,10 +564,25 @@ public final class GeoWorldV26ShorelineVerifier {
                                     "dry shore below adjacent source water at " +
                                     (baseX + localX) + "," +
                                     (baseZ + localZ) +
-                                    ": ground=" +
+                                    ": original=" +
+                                    column.originalGroundBoundary() +
+                                    " ground=" +
                                     column.groundBoundary() +
                                     " water=" +
-                                    column.shoreWaterBoundary()
+                                    column.shoreWaterBoundary() +
+                                    " distance=" +
+                                    column.shoreDistance() +
+                                    " shoreKind=" +
+                                    column.shoreWaterKind() +
+                                    " sampleWater=" +
+                                    column.sample().waterKind() +
+                                    " rules=" +
+                                    runtime.manifest().generationRulesVersion() +
+                                    diagnosticNeighborhood(
+                                        runtime,
+                                        baseX + localX,
+                                        baseZ + localZ
+                                    )
                                 );
                             }
                             stable++;
@@ -674,12 +742,22 @@ public final class GeoWorldV26ShorelineVerifier {
             runtime.manifest().generationRulesVersion();
         int maxAllowedRiverRaise =
             (
-                "geoworld-rules-v1.1.6".equals(generationRulesVersion) ||
-                "geoworld-rules-v1.1.7".equals(generationRulesVersion) ||
-                "geoworld-rules-v1.1.8".equals(generationRulesVersion) ||
-                "geoworld-rules-v1.1.9".equals(generationRulesVersion) ||
-                "geoworld-rules-v1.1.10".equals(generationRulesVersion)
-            ) ? 4 : 2;
+                "geoworld-rules-v1.1.12".equals(generationRulesVersion) ||
+                "geoworld-rules-v1.1.13".equals(generationRulesVersion) ||
+                "geoworld-rules-v1.1.14".equals(generationRulesVersion) ||
+                ("geoworld-rules-v1.1.15".equals(generationRulesVersion) || "geoworld-rules-v1.1.16".equals(generationRulesVersion))
+            )
+                ? 1
+                : (
+                    (
+                        "geoworld-rules-v1.1.6".equals(generationRulesVersion) ||
+                        "geoworld-rules-v1.1.7".equals(generationRulesVersion) ||
+                        "geoworld-rules-v1.1.8".equals(generationRulesVersion) ||
+                        "geoworld-rules-v1.1.9".equals(generationRulesVersion) ||
+                        "geoworld-rules-v1.1.10".equals(generationRulesVersion) ||
+                        "geoworld-rules-v1.1.11".equals(generationRulesVersion)
+                    ) ? 4 : 2
+                );
         if (
             maxRaiseByKind.getOrDefault("River", 0) >
                 maxAllowedRiverRaise ||
@@ -747,6 +825,41 @@ public final class GeoWorldV26ShorelineVerifier {
             waterKinds
         );
         cleanupCache(isolatedCache);
+    }
+
+    private static String diagnosticNeighborhood(
+        GeoWorldV1 runtime,
+        int centerX,
+        int centerZ
+    ) {
+        StringBuilder out = new StringBuilder("\n3x3 runtime:");
+        for (int dz = -1; dz <= 1; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                int x = centerX + dx;
+                int z = centerZ + dz;
+                GeoWorldV1.RuntimeSample sample = runtime.sample(x, z);
+                int ground = HEIGHTS.boundaryY(sample.groundHeight());
+                out.append("\n  ")
+                    .append(x).append(',').append(z)
+                    .append(" kind=").append(sample.waterKind())
+                    .append(" ground=").append(ground)
+                    .append(" gN=").append(sample.groundHeight());
+                if (
+                    sample.waterSurfaceDefined() &&
+                    sample.waterSurfaceElevation() != null
+                ) {
+                    out.append(" waterN=")
+                        .append(sample.waterSurfaceElevation())
+                        .append(" floor=")
+                        .append(HEIGHTS.boundaryYFloor(sample.waterSurfaceElevation()))
+                        .append(" round=")
+                        .append(HEIGHTS.boundaryY(sample.waterSurfaceElevation()))
+                        .append(" ceil=")
+                        .append(HEIGHTS.boundaryYCeil(sample.waterSurfaceElevation()));
+                }
+            }
+        }
+        return out.toString();
     }
 
     private static void verifyReportedIslandCoast(
@@ -929,11 +1042,16 @@ public final class GeoWorldV26ShorelineVerifier {
             for (int offset = 1; offset <= 2; offset++) {
                 GeoWorldShorelinePlanner.Column bank =
                     SHORELINE.planModel(runtime, right + offset, z);
+                boolean naturalHighBank =
+                    bank.groundBoundary() -
+                        bank.shoreWaterBoundary() >= 2 &&
+                    bank.originalGroundBoundary() -
+                        bank.shoreWaterBoundary() >= 2;
                 if (
                     !"None".equals(bank.sample().waterKind()) ||
                     !"River".equals(bank.shoreWaterKind()) ||
                     bank.shoreDistance() > 2 ||
-                    bank.surfaceOverride() == null
+                    (bank.surfaceOverride() == null && !naturalHighBank)
                 ) {
                     throw new AssertionError(
                         "reported riverbank lost continuous two-block material " +
@@ -941,6 +1059,14 @@ public final class GeoWorldV26ShorelineVerifier {
                         ": water=" + bank.sample().waterKind() +
                         " shore=" + bank.shoreWaterKind() +
                         " distance=" + bank.shoreDistance() +
+                        " original=" + bank.originalGroundBoundary() +
+                        " ground=" + bank.groundBoundary() +
+                        " waterBoundary=" + bank.shoreWaterBoundary() +
+                        " offset=" +
+                            (bank.groundBoundary() -
+                             bank.shoreWaterBoundary()) +
+                        " profile=" + bank.sample().surfaceProfile() +
+                        " biome=" + bank.sample().biomeFamily() +
                         " material=" + bank.surfaceOverride()
                     );
                 }
@@ -1822,6 +1948,10 @@ public final class GeoWorldV26ShorelineVerifier {
                             "None".equals(column.sample().waterKind()) &&
                             "River".equals(column.shoreWaterKind()) &&
                             column.shoreDistance() == 1 &&
+                            column.groundBoundary() -
+                                column.shoreWaterBoundary() <= 1 &&
+                            column.originalGroundBoundary() -
+                                column.shoreWaterBoundary() < 2 &&
                             column.surfaceOverride() == null
                         ) {
                             count++;

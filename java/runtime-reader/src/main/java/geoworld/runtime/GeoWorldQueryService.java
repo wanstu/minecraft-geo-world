@@ -86,7 +86,63 @@ public final class GeoWorldQueryService {
         DISTANCE_TO_OCEAN,
         GEOLOGICAL_REGION,
         ORE_PROVINCE,
-        SPAWN_SUITABILITY
+        SPAWN_SUITABILITY,
+        SETTLEMENT_BUILDABILITY,
+        FRESH_WATER_ACCESS,
+        FLOOD_RISK,
+        AGRICULTURE_SUITABILITY,
+        CLIMATE_COMFORT,
+        TRANSPORT_ACCESS,
+        RESOURCE_ACCESS,
+        SETTLEMENT_SUITABILITY,
+        NEAREST_RIVER_HALF_WIDTH,
+        NEAREST_RIVER_GRADIENT,
+        WATERWAY_NAVIGABILITY,
+        PORT_SUITABILITY,
+        NAVIGATION_BOTTLENECK_RISK,
+        WATERWAY_CLASS,
+        PORT_TYPE,
+        MINING_SUITABILITY,
+        SURFACE_MINING_SUITABILITY,
+        SHALLOW_MINING_SUITABILITY,
+        DEEP_MINING_SUITABILITY,
+        INDUSTRIAL_MINERAL_VALUE,
+        MINERAL_RESOURCE_DIVERSITY,
+        DOMINANT_MINERAL_RESOURCE,
+        MINING_DISTRICT_CLASS,
+        MINERAL_RESOURCE_PROFILE,
+        CIVILIZATION_AGRICULTURAL_SETTLEMENT_SUITABILITY,
+        CIVILIZATION_PORT_CITY_SUITABILITY,
+        CIVILIZATION_MINING_TOWN_SUITABILITY,
+        CIVILIZATION_TRANSPORT_NODE_SUITABILITY,
+        CIVILIZATION_NODE_SUITABILITY,
+        CIVILIZATION_SPECIALIZATION_STRENGTH,
+        CIVILIZATION_NODE_CLASS,
+        REGIONAL_BUILDING_ADVANTAGE,
+        REGIONAL_AGRICULTURE_ADVANTAGE,
+        REGIONAL_PORT_ADVANTAGE,
+        REGIONAL_MINING_ADVANTAGE,
+        REGIONAL_TRANSPORT_ADVANTAGE,
+        REGIONAL_SPECIALIZATION_STRENGTH,
+        REGIONAL_ADVANTAGE_OVERLAP_RISK,
+        REGIONAL_HIGH_ADVANTAGE_COUNT,
+        REGIONAL_DOMINANT_ADVANTAGE,
+        REGIONAL_ADVANTAGE_CLASS,
+        REGIONAL_REGION_KEY,
+        REGIONAL_REGION_CELL_COUNT,
+        REGIONAL_REGION_AREA_BLOCKS2,
+        REGIONAL_REGION_CENTROID_X,
+        REGIONAL_REGION_CENTROID_Z,
+        NATURAL_CORRIDOR_SUITABILITY,
+        RIVER_VALLEY_CORRIDOR,
+        HILL_PASS_CORRIDOR,
+        MOUNTAIN_PASS_CORRIDOR,
+        PLATEAU_ACCESS_CORRIDOR,
+        BASIN_GATEWAY_CORRIDOR,
+        LOW_DIVIDE_CORRIDOR,
+        STRAIT_ISTHMUS_POTENTIAL,
+        TRANSPORT_CHOKEPOINT_STRENGTH,
+        NATURAL_CORRIDOR_CLASS
     }
 
     public record QueryRequest(
@@ -179,7 +235,7 @@ public final class GeoWorldQueryService {
         long xBits,
         long zBits,
         Resolution resolution,
-        long fieldMask
+        Set<NaturalField> fields
     ) {}
 
     private static final class LocalCacheKey {
@@ -240,6 +296,7 @@ public final class GeoWorldQueryService {
     private final AtomicLong climateQueries = new AtomicLong();
     private final AtomicLong hydrologyQueries = new AtomicLong();
     private final AtomicLong naturalFeatureQueries = new AtomicLong();
+    private final GeoWorldRegionalAdvantageRegions regionalAdvantageRegions;
 
     public GeoWorldQueryService(GeoWorldV1 model) {
         this(model, 8192);
@@ -273,6 +330,11 @@ public final class GeoWorldQueryService {
                 }
             }
         );
+        this.regionalAdvantageRegions =
+            new GeoWorldRegionalAdvantageRegions(
+                model.manifest().geometry(),
+                this::regionalAdvantageAtMacroNode
+            );
     }
 
     public GeoWorldV1 model() {
@@ -283,12 +345,11 @@ public final class GeoWorldQueryService {
         Objects.requireNonNull(request, "request");
         double x = quantize(request.worldX(), request.resolution().blocks());
         double z = quantize(request.worldZ(), request.resolution().blocks());
-        long mask = fieldMask(request.fields());
         CacheKey key = new CacheKey(
             Double.doubleToLongBits(x),
             Double.doubleToLongBits(z),
             request.resolution(),
-            mask
+            request.fields()
         );
 
         NaturalResult cached = cache.get(key);
@@ -455,6 +516,71 @@ public final class GeoWorldQueryService {
             naturalFeatureQueries.incrementAndGet();
             features = model.sampleNaturalFeatures(x, z);
         }
+        GeoWorldSettlementSuitability.Score settlement = null;
+        if (needsSettlement(fields)) {
+            settlement = GeoWorldSettlementSuitability.evaluate(
+                sample,
+                slopeAt(x, z, Math.max(4, resolution.blocks())),
+                climate,
+                features
+            );
+        }
+        GeoWorldV1.NavigationFeatureSample navigationFeatures = null;
+        if (needsNavigationFeatures(fields)) {
+            navigationFeatures = model.sampleNavigationFeatures(x, z);
+        }
+        GeoWorldNavigationSuitability.Score navigation = null;
+        if (needsNavigationScore(fields)) {
+            navigation = GeoWorldNavigationSuitability.evaluate(
+                sample,
+                features,
+                navigationFeatures,
+                settlement
+            );
+        }
+        GeoWorldTransportGeography.Score transportGeography = null;
+        if (needsTransportGeography(fields)) {
+            transportGeography = GeoWorldTransportGeography.evaluate(
+                model,
+                sample,
+                hydrology,
+                settlement,
+                navigation,
+                x,
+                z
+            );
+        }
+        GeoWorldMiningDistrict.Score mining = null;
+        if (needsMining(fields)) {
+            mining = GeoWorldMiningDistrict.evaluate(
+                model,
+                sample,
+                x,
+                z
+            );
+        }
+        GeoWorldCivilizationSuitability.Score civilization = null;
+        if (needsCivilization(fields)) {
+            civilization = GeoWorldCivilizationSuitability.evaluate(
+                sample,
+                settlement,
+                navigation,
+                mining
+            );
+        }
+        GeoWorldRegionalAdvantage.Score regionalAdvantage = null;
+        if (needsRegionalAdvantage(fields)) {
+            regionalAdvantage = GeoWorldRegionalAdvantage.evaluate(
+                sample,
+                settlement,
+                navigation,
+                mining
+            );
+        }
+        GeoWorldRegionalAdvantageRegions.Membership regionalRegion = null;
+        if (needsRegionalRegion(fields)) {
+            regionalRegion = regionalAdvantageRegions.membershipAt(x, z);
+        }
 
         for (NaturalField field : fields) {
             switch (field) {
@@ -593,6 +719,251 @@ public final class GeoWorldQueryService {
                     field,
                     spawnSuitability(sample, x, z, resolution.blocks())
                 );
+                case SETTLEMENT_BUILDABILITY -> values.put(
+                    field,
+                    settlement.buildability()
+                );
+                case FRESH_WATER_ACCESS -> values.put(
+                    field,
+                    settlement.freshWaterAccess()
+                );
+                case FLOOD_RISK -> values.put(
+                    field,
+                    settlement.floodRisk()
+                );
+                case AGRICULTURE_SUITABILITY -> values.put(
+                    field,
+                    settlement.agricultureSuitability()
+                );
+                case CLIMATE_COMFORT -> values.put(
+                    field,
+                    settlement.climateComfort()
+                );
+                case TRANSPORT_ACCESS -> values.put(
+                    field,
+                    settlement.transportAccess()
+                );
+                case RESOURCE_ACCESS -> values.put(
+                    field,
+                    settlement.resourceAccess()
+                );
+                case SETTLEMENT_SUITABILITY -> values.put(
+                    field,
+                    settlement.settlementSuitability()
+                );
+                case NEAREST_RIVER_HALF_WIDTH -> {
+                    if (
+                        navigationFeatures != null &&
+                        navigationFeatures.available() &&
+                        navigationFeatures.riverHalfWidth() != null
+                    ) {
+                        values.put(
+                            field,
+                            navigationFeatures.riverHalfWidth()
+                        );
+                    } else {
+                        unavailable.add(field);
+                    }
+                }
+                case NEAREST_RIVER_GRADIENT -> {
+                    if (
+                        navigationFeatures != null &&
+                        navigationFeatures.available() &&
+                        navigationFeatures.riverGradient() != null
+                    ) {
+                        values.put(
+                            field,
+                            navigationFeatures.riverGradient()
+                        );
+                    } else {
+                        unavailable.add(field);
+                    }
+                }
+                case WATERWAY_NAVIGABILITY -> values.put(
+                    field,
+                    navigation.waterwayNavigability()
+                );
+                case PORT_SUITABILITY -> values.put(
+                    field,
+                    navigation.portSuitability()
+                );
+                case NAVIGATION_BOTTLENECK_RISK -> values.put(
+                    field,
+                    navigation.navigationBottleneckRisk()
+                );
+                case WATERWAY_CLASS -> values.put(
+                    field,
+                    navigation.waterwayClass()
+                );
+                case PORT_TYPE -> values.put(
+                    field,
+                    navigation.portType()
+                );
+                case MINING_SUITABILITY -> values.put(
+                    field,
+                    mining.miningSuitability()
+                );
+                case SURFACE_MINING_SUITABILITY -> values.put(
+                    field,
+                    mining.surfaceMiningSuitability()
+                );
+                case SHALLOW_MINING_SUITABILITY -> values.put(
+                    field,
+                    mining.shallowMiningSuitability()
+                );
+                case DEEP_MINING_SUITABILITY -> values.put(
+                    field,
+                    mining.deepMiningSuitability()
+                );
+                case INDUSTRIAL_MINERAL_VALUE -> values.put(
+                    field,
+                    mining.industrialValue()
+                );
+                case MINERAL_RESOURCE_DIVERSITY -> values.put(
+                    field,
+                    mining.resourceDiversity()
+                );
+                case DOMINANT_MINERAL_RESOURCE -> values.put(
+                    field,
+                    mining.dominantResource()
+                );
+                case MINING_DISTRICT_CLASS -> values.put(
+                    field,
+                    mining.miningClass()
+                );
+                case MINERAL_RESOURCE_PROFILE -> values.put(
+                    field,
+                    mining.resourceProfile()
+                );
+                case CIVILIZATION_AGRICULTURAL_SETTLEMENT_SUITABILITY ->
+                    values.put(
+                        field,
+                        civilization.agriculturalSettlementSuitability()
+                    );
+                case CIVILIZATION_PORT_CITY_SUITABILITY -> values.put(
+                    field,
+                    civilization.portCitySuitability()
+                );
+                case CIVILIZATION_MINING_TOWN_SUITABILITY -> values.put(
+                    field,
+                    civilization.miningTownSuitability()
+                );
+                case CIVILIZATION_TRANSPORT_NODE_SUITABILITY -> values.put(
+                    field,
+                    civilization.transportNodeSuitability()
+                );
+                case CIVILIZATION_NODE_SUITABILITY -> values.put(
+                    field,
+                    civilization.nodeSuitability()
+                );
+                case CIVILIZATION_SPECIALIZATION_STRENGTH -> values.put(
+                    field,
+                    civilization.specializationStrength()
+                );
+                case CIVILIZATION_NODE_CLASS -> values.put(
+                    field,
+                    civilization.nodeClass()
+                );
+                case REGIONAL_BUILDING_ADVANTAGE -> values.put(
+                    field,
+                    regionalAdvantage.buildingAdvantage()
+                );
+                case REGIONAL_AGRICULTURE_ADVANTAGE -> values.put(
+                    field,
+                    regionalAdvantage.agricultureAdvantage()
+                );
+                case REGIONAL_PORT_ADVANTAGE -> values.put(
+                    field,
+                    regionalAdvantage.portAdvantage()
+                );
+                case REGIONAL_MINING_ADVANTAGE -> values.put(
+                    field,
+                    regionalAdvantage.miningAdvantage()
+                );
+                case REGIONAL_TRANSPORT_ADVANTAGE -> values.put(
+                    field,
+                    regionalAdvantage.transportAdvantage()
+                );
+                case REGIONAL_SPECIALIZATION_STRENGTH -> values.put(
+                    field,
+                    regionalAdvantage.specializationStrength()
+                );
+                case REGIONAL_ADVANTAGE_OVERLAP_RISK -> values.put(
+                    field,
+                    regionalAdvantage.advantageOverlapRisk()
+                );
+                case REGIONAL_HIGH_ADVANTAGE_COUNT -> values.put(
+                    field,
+                    regionalAdvantage.highAdvantageCount()
+                );
+                case REGIONAL_DOMINANT_ADVANTAGE -> values.put(
+                    field,
+                    regionalAdvantage.dominantAdvantage()
+                );
+                case REGIONAL_ADVANTAGE_CLASS -> values.put(
+                    field,
+                    regionalAdvantage.regionalClass()
+                );
+                case REGIONAL_REGION_KEY -> values.put(
+                    field,
+                    regionalRegion.key()
+                );
+                case REGIONAL_REGION_CELL_COUNT -> values.put(
+                    field,
+                    regionalRegion.cellCount()
+                );
+                case REGIONAL_REGION_AREA_BLOCKS2 -> values.put(
+                    field,
+                    regionalRegion.areaBlocks2()
+                );
+                case REGIONAL_REGION_CENTROID_X -> values.put(
+                    field,
+                    regionalRegion.centroidX()
+                );
+                case REGIONAL_REGION_CENTROID_Z -> values.put(
+                    field,
+                    regionalRegion.centroidZ()
+                );
+                case NATURAL_CORRIDOR_SUITABILITY -> values.put(
+                    field,
+                    transportGeography.corridorSuitability()
+                );
+                case RIVER_VALLEY_CORRIDOR -> values.put(
+                    field,
+                    transportGeography.riverValleyCorridor()
+                );
+                case HILL_PASS_CORRIDOR -> values.put(
+                    field,
+                    transportGeography.hillPassCorridor()
+                );
+                case MOUNTAIN_PASS_CORRIDOR -> values.put(
+                    field,
+                    transportGeography.mountainPassCorridor()
+                );
+                case PLATEAU_ACCESS_CORRIDOR -> values.put(
+                    field,
+                    transportGeography.plateauAccessCorridor()
+                );
+                case BASIN_GATEWAY_CORRIDOR -> values.put(
+                    field,
+                    transportGeography.basinGatewayCorridor()
+                );
+                case LOW_DIVIDE_CORRIDOR -> values.put(
+                    field,
+                    transportGeography.lowDivideCorridor()
+                );
+                case STRAIT_ISTHMUS_POTENTIAL -> values.put(
+                    field,
+                    transportGeography.straitIsthmusPotential()
+                );
+                case TRANSPORT_CHOKEPOINT_STRENGTH -> values.put(
+                    field,
+                    transportGeography.chokepointStrength()
+                );
+                case NATURAL_CORRIDOR_CLASS -> values.put(
+                    field,
+                    transportGeography.corridorClass()
+                );
                 default -> unavailable.add(field);
             }
         }
@@ -631,14 +1002,16 @@ public final class GeoWorldQueryService {
             fields.contains(NaturalField.ANNUAL_PRECIP_MM) ||
             fields.contains(NaturalField.MONSOON_INDEX) ||
             fields.contains(NaturalField.WIND_X) ||
-            fields.contains(NaturalField.WIND_Z);
+            fields.contains(NaturalField.WIND_Z) ||
+            needsSettlement(fields);
     }
 
     private boolean needsHydrology(Set<NaturalField> fields) {
         return fields.contains(NaturalField.WATERSHED_ID) ||
             fields.contains(NaturalField.FLOW_ACCUMULATION) ||
             fields.contains(NaturalField.RIVER_ORDER) ||
-            fields.contains(NaturalField.NATURAL_FLOW_DIRECTION);
+            fields.contains(NaturalField.NATURAL_FLOW_DIRECTION) ||
+            needsTransportGeography(fields);
     }
 
     private boolean needsNaturalFeatures(Set<NaturalField> fields) {
@@ -646,7 +1019,138 @@ public final class GeoWorldQueryService {
             fields.contains(NaturalField.DISTANCE_TO_RIVER) ||
             fields.contains(NaturalField.DISTANCE_TO_LAKE) ||
             fields.contains(NaturalField.DISTANCE_TO_COAST) ||
-            fields.contains(NaturalField.DISTANCE_TO_OCEAN);
+            fields.contains(NaturalField.DISTANCE_TO_OCEAN) ||
+            needsSettlement(fields);
+    }
+
+    private boolean needsSettlement(Set<NaturalField> fields) {
+        return fields.contains(NaturalField.SETTLEMENT_BUILDABILITY) ||
+            fields.contains(NaturalField.FRESH_WATER_ACCESS) ||
+            fields.contains(NaturalField.FLOOD_RISK) ||
+            fields.contains(NaturalField.AGRICULTURE_SUITABILITY) ||
+            fields.contains(NaturalField.CLIMATE_COMFORT) ||
+            fields.contains(NaturalField.TRANSPORT_ACCESS) ||
+            fields.contains(NaturalField.RESOURCE_ACCESS) ||
+            fields.contains(NaturalField.SETTLEMENT_SUITABILITY) ||
+            needsNavigationScore(fields) ||
+            needsCivilization(fields) ||
+            needsRegionalAdvantage(fields) ||
+            needsTransportGeography(fields);
+    }
+
+    private boolean needsNavigationFeatures(Set<NaturalField> fields) {
+        return fields.contains(NaturalField.NEAREST_RIVER_HALF_WIDTH) ||
+            fields.contains(NaturalField.NEAREST_RIVER_GRADIENT) ||
+            needsNavigationScore(fields);
+    }
+
+    private boolean needsNavigationScore(Set<NaturalField> fields) {
+        return fields.contains(NaturalField.WATERWAY_NAVIGABILITY) ||
+            fields.contains(NaturalField.PORT_SUITABILITY) ||
+            fields.contains(NaturalField.NAVIGATION_BOTTLENECK_RISK) ||
+            fields.contains(NaturalField.WATERWAY_CLASS) ||
+            fields.contains(NaturalField.PORT_TYPE) ||
+            needsCivilization(fields) ||
+            needsRegionalAdvantage(fields) ||
+            needsTransportGeography(fields);
+    }
+
+    private boolean needsMining(Set<NaturalField> fields) {
+        return fields.contains(NaturalField.MINING_SUITABILITY) ||
+            fields.contains(NaturalField.SURFACE_MINING_SUITABILITY) ||
+            fields.contains(NaturalField.SHALLOW_MINING_SUITABILITY) ||
+            fields.contains(NaturalField.DEEP_MINING_SUITABILITY) ||
+            fields.contains(NaturalField.INDUSTRIAL_MINERAL_VALUE) ||
+            fields.contains(NaturalField.MINERAL_RESOURCE_DIVERSITY) ||
+            fields.contains(NaturalField.DOMINANT_MINERAL_RESOURCE) ||
+            fields.contains(NaturalField.MINING_DISTRICT_CLASS) ||
+            fields.contains(NaturalField.MINERAL_RESOURCE_PROFILE) ||
+            needsCivilization(fields) ||
+            needsRegionalAdvantage(fields);
+    }
+
+    private boolean needsCivilization(Set<NaturalField> fields) {
+        return fields.contains(
+            NaturalField.CIVILIZATION_AGRICULTURAL_SETTLEMENT_SUITABILITY
+        ) ||
+            fields.contains(NaturalField.CIVILIZATION_PORT_CITY_SUITABILITY) ||
+            fields.contains(NaturalField.CIVILIZATION_MINING_TOWN_SUITABILITY) ||
+            fields.contains(NaturalField.CIVILIZATION_TRANSPORT_NODE_SUITABILITY) ||
+            fields.contains(NaturalField.CIVILIZATION_NODE_SUITABILITY) ||
+            fields.contains(NaturalField.CIVILIZATION_SPECIALIZATION_STRENGTH) ||
+            fields.contains(NaturalField.CIVILIZATION_NODE_CLASS);
+    }
+
+    private boolean needsRegionalAdvantage(Set<NaturalField> fields) {
+        return fields.contains(NaturalField.REGIONAL_BUILDING_ADVANTAGE) ||
+            fields.contains(NaturalField.REGIONAL_AGRICULTURE_ADVANTAGE) ||
+            fields.contains(NaturalField.REGIONAL_PORT_ADVANTAGE) ||
+            fields.contains(NaturalField.REGIONAL_MINING_ADVANTAGE) ||
+            fields.contains(NaturalField.REGIONAL_TRANSPORT_ADVANTAGE) ||
+            fields.contains(NaturalField.REGIONAL_SPECIALIZATION_STRENGTH) ||
+            fields.contains(NaturalField.REGIONAL_ADVANTAGE_OVERLAP_RISK) ||
+            fields.contains(NaturalField.REGIONAL_HIGH_ADVANTAGE_COUNT) ||
+            fields.contains(NaturalField.REGIONAL_DOMINANT_ADVANTAGE) ||
+            fields.contains(NaturalField.REGIONAL_ADVANTAGE_CLASS);
+    }
+
+    private boolean needsRegionalRegion(Set<NaturalField> fields) {
+        return fields.contains(NaturalField.REGIONAL_REGION_KEY) ||
+            fields.contains(NaturalField.REGIONAL_REGION_CELL_COUNT) ||
+            fields.contains(NaturalField.REGIONAL_REGION_AREA_BLOCKS2) ||
+            fields.contains(NaturalField.REGIONAL_REGION_CENTROID_X) ||
+            fields.contains(NaturalField.REGIONAL_REGION_CENTROID_Z);
+    }
+
+    private boolean needsTransportGeography(Set<NaturalField> fields) {
+        return fields.contains(NaturalField.NATURAL_CORRIDOR_SUITABILITY) ||
+            fields.contains(NaturalField.RIVER_VALLEY_CORRIDOR) ||
+            fields.contains(NaturalField.HILL_PASS_CORRIDOR) ||
+            fields.contains(NaturalField.MOUNTAIN_PASS_CORRIDOR) ||
+            fields.contains(NaturalField.PLATEAU_ACCESS_CORRIDOR) ||
+            fields.contains(NaturalField.BASIN_GATEWAY_CORRIDOR) ||
+            fields.contains(NaturalField.LOW_DIVIDE_CORRIDOR) ||
+            fields.contains(NaturalField.STRAIT_ISTHMUS_POTENTIAL) ||
+            fields.contains(NaturalField.TRANSPORT_CHOKEPOINT_STRENGTH) ||
+            fields.contains(NaturalField.NATURAL_CORRIDOR_CLASS);
+    }
+
+    private GeoWorldRegionalAdvantage.Score regionalAdvantageAtMacroNode(
+        int gridX,
+        int gridZ
+    ) {
+        GeoWorldV1.Geometry geometry = model.manifest().geometry();
+        double x = geometry.originX() + gridX * geometry.spacingX();
+        double z = geometry.originZ() + gridZ * geometry.spacingZ();
+        GeoWorldV1.RuntimeSample sample = model.sample(x, z);
+        GeoWorldV1.ClimateSample climate = model.sampleClimate(x, z);
+        GeoWorldV1.NaturalFeatureSample features =
+            model.sampleNaturalFeatures(x, z);
+        int slopeStep = Math.max(4, (int)Math.round(geometry.cellSize()));
+        GeoWorldSettlementSuitability.Score settlement =
+            GeoWorldSettlementSuitability.evaluate(
+                sample,
+                slopeAt(x, z, slopeStep),
+                climate,
+                features
+            );
+        GeoWorldV1.NavigationFeatureSample navigationFeatures =
+            model.sampleNavigationFeatures(x, z);
+        GeoWorldNavigationSuitability.Score navigation =
+            GeoWorldNavigationSuitability.evaluate(
+                sample,
+                features,
+                navigationFeatures,
+                settlement
+            );
+        GeoWorldMiningDistrict.Score mining =
+            GeoWorldMiningDistrict.evaluate(model, sample, x, z);
+        return GeoWorldRegionalAdvantage.evaluate(
+            sample,
+            settlement,
+            navigation,
+            mining
+        );
     }
 
     private double slopeAt(double x, double z, int step) {
@@ -693,11 +1197,4 @@ public final class GeoWorldQueryService {
             resolution * 0.5;
     }
 
-    private static long fieldMask(Set<NaturalField> fields) {
-        long mask = 0L;
-        for (NaturalField field : fields) {
-            mask |= 1L << field.ordinal();
-        }
-        return mask;
-    }
 }

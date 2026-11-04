@@ -42,6 +42,223 @@ public final class GeoWorldV26SurfaceBiomeVerifier {
             seed, GeoWorldCreationConfig.defaults()
         ).model();
 
+        var fastGeometry = runtime.manifest().geometry();
+        int fastFamilyHits = 0;
+        int fastFamilyChecks = 0;
+        int potentialOceanChecks = 0;
+        int guaranteedOceanHits = 0;
+        int guaranteedDryLandHits = 0;
+        int waterImpossibleHits = 0;
+        int biomeClimateChecks = 0;
+        int surfaceFastPathChecks = 0;
+        for (int iz = 0; iz < 32; iz++) {
+            double z = fastGeometry.originZ() +
+                fastGeometry.spanZBlocks() * (iz + 0.5) / 32.0;
+            for (int ix = 0; ix < 48; ix++) {
+                double x = fastGeometry.originX() +
+                    fastGeometry.spanXBlocks() * (ix + 0.5) / 48.0;
+                fastFamilyChecks++;
+
+                var fullClimate = runtime.sampleClimate(x, z);
+                var biomeClimate = runtime.sampleBiomeClimate(x, z);
+                double fastTemperature =
+                    runtime.sampleBiomeTemperature(x, z, 12.0);
+                if (
+                    fullClimate.available() != biomeClimate.available() ||
+                    (fullClimate.available() &&
+                        (
+                            Double.compare(
+                                fullClimate.annualMeanTempC(),
+                                biomeClimate.annualMeanTempC()
+                            ) != 0 ||
+                            Double.compare(
+                                fullClimate.annualPrecipMM(),
+                                biomeClimate.annualPrecipMM()
+                            ) != 0 ||
+                            Double.compare(
+                                fullClimate.monsoonIndex(),
+                                biomeClimate.monsoonIndex()
+                            ) != 0 ||
+                            Double.compare(
+                                fullClimate.annualMeanTempC(),
+                                fastTemperature
+                            ) != 0
+                        ))
+                ) {
+                    throw new AssertionError(
+                        "biome climate fast path diverged at " +
+                        x + "," + z
+                    );
+                }
+                biomeClimateChecks++;
+
+                if ((ix & 3) == 0 && (iz & 3) == 0) {
+                    int blockX = (int)Math.floor(x);
+                    int blockZ = (int)Math.floor(z);
+                    var surfaceColumn = SHORELINE.planModel(
+                        runtime, blockX, blockZ
+                    );
+                    int surfaceY = surfaceColumn.groundBoundary() - 1;
+                    var surfaceSample = surfaceColumn.sample();
+                    String generalSurface = BIOMES.biomeIdFromSample(
+                        runtime, blockX, surfaceY, blockZ, surfaceSample
+                    );
+                    String fastSurface = BIOMES.surfaceBiomeIdFromSample(
+                        runtime, blockX, surfaceY, blockZ, surfaceSample
+                    );
+                    if (!generalSurface.equals(fastSurface)) {
+                        throw new AssertionError(
+                            "surface biome fast path diverged at " +
+                            blockX + "," + surfaceY + "," + blockZ +
+                            ": general=" + generalSurface +
+                            " fast=" + fastSurface
+                        );
+                    }
+                    surfaceFastPathChecks++;
+                }
+                if (!runtime.couldHaveWaterAt(x, z)) {
+                    waterImpossibleHits++;
+                    var dryWaterCheck = runtime.sample(x, z);
+                    if (!"None".equals(dryWaterCheck.waterKind())) {
+                        throw new AssertionError(
+                            "water-impossible fast path diverged at " +
+                            x + "," + z + ": full=" +
+                            dryWaterCheck.waterKind()
+                        );
+                    }
+                }
+                if (runtime.couldBeOceanAt(x, z)) {
+                    potentialOceanChecks++;
+                    if (runtime.oceanGuaranteedAt(x, z)) {
+                        guaranteedOceanHits++;
+                        var oceanFull = runtime.sample(x, z);
+                        if (!"Ocean".equals(oceanFull.waterKind())) {
+                            throw new AssertionError(
+                                "guaranteed ocean fast path diverged at " +
+                                x + "," + z + ": full=" +
+                                oceanFull.waterKind()
+                            );
+                        }
+                    }
+                }
+                String dryGuaranteed =
+                    runtime.guaranteedDryLandBiomeFamilyAt(x, z);
+                if (dryGuaranteed != null) {
+                    guaranteedDryLandHits++;
+                    var dryFull = runtime.sample(x, z);
+                    if (
+                        !dryFull.sourceLand() ||
+                        !"None".equals(dryFull.waterKind()) ||
+                        !dryGuaranteed.equals(dryFull.biomeFamily())
+                    ) {
+                        throw new AssertionError(
+                            "guaranteed dry-land fast path diverged at " +
+                            x + "," + z + ": fast=" + dryGuaranteed +
+                            " full=" + dryFull.biomeFamily() +
+                            " water=" + dryFull.waterKind() +
+                            " sourceLand=" + dryFull.sourceLand()
+                        );
+                    }
+                }
+                String guaranteed = runtime.guaranteedLandBiomeFamilyAt(x, z);
+                if (guaranteed == null) {
+                    continue;
+                }
+                fastFamilyHits++;
+                var full = runtime.sample(x, z);
+                if (
+                    !full.sourceLand() ||
+                    !guaranteed.equals(full.biomeFamily())
+                ) {
+                    throw new AssertionError(
+                        "guaranteed biome-family fast path diverged at " +
+                        x + "," + z + ": fast=" + guaranteed +
+                        " full=" + full.biomeFamily() +
+                        " sourceLand=" + full.sourceLand()
+                    );
+                }
+            }
+        }
+        System.out.printf(
+            "GeoWorld exact land-family fast path: %d/%d (%.1f%%)%n",
+            fastFamilyHits,
+            fastFamilyChecks,
+            fastFamilyChecks == 0
+                ? 0.0
+                : 100.0 * fastFamilyHits / fastFamilyChecks
+        );
+        System.out.printf(
+            "GeoWorld exact ocean fast path: %d/%d potential (%.1f%%)%n",
+            guaranteedOceanHits,
+            potentialOceanChecks,
+            potentialOceanChecks == 0
+                ? 0.0
+                : 100.0 * guaranteedOceanHits / potentialOceanChecks
+        );
+        System.out.printf(
+            "GeoWorld exact water-impossible fast path: %d/%d (%.1f%%)%n",
+            waterImpossibleHits,
+            fastFamilyChecks,
+            fastFamilyChecks == 0
+                ? 0.0
+                : 100.0 * waterImpossibleHits / fastFamilyChecks
+        );
+        System.out.printf(
+            "GeoWorld exact dry-land fast path: %d/%d (%.1f%%)%n",
+            guaranteedDryLandHits,
+            fastFamilyChecks,
+            fastFamilyChecks == 0
+                ? 0.0
+                : 100.0 * guaranteedDryLandHits / fastFamilyChecks
+        );
+        System.out.printf(
+            "GeoWorld biome-climate fast path equivalence: %d samples%n",
+            biomeClimateChecks
+        );
+        System.out.printf(
+            "GeoWorld surface-biome fast path equivalence: %d columns%n",
+            surfaceFastPathChecks
+        );
+
+        for (var landscape : runtime.specialLandscapes()) {
+            String kind = landscape.kind();
+            String expected = null;
+            if (
+                "basin_cherry".equals(kind) ||
+                "volcanic_crater_cherry".equals(kind)
+            ) {
+                expected = "minecraft:cherry_grove";
+            } else if (
+                "basin_snow".equals(kind) ||
+                "volcanic_crater_snow".equals(kind)
+            ) {
+                expected = "minecraft:frozen_peaks";
+            }
+            if (expected == null) continue;
+
+            boolean found = false;
+            for (int ai = 0; ai < 16 && !found; ai++) {
+                double angle = 2.0 * Math.PI * ai / 16.0;
+                for (int ri = 0; ri < 10; ri++) {
+                    double fraction = 0.45 + 0.05 * ri;
+                    double x = landscape.centerX() +
+                        Math.cos(angle) * landscape.radiusX() * fraction;
+                    double z = landscape.centerZ() +
+                        Math.sin(angle) * landscape.radiusZ() * fraction;
+                    if (expected.equals(BIOMES.biomeId(runtime, x, z))) {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (!found) {
+                throw new AssertionError(
+                    "themed carved wall did not realize expected biome: " +
+                    kind + " -> " + expected
+                );
+            }
+        }
+
         Set<String> required = BIOMES.requiredBiomeIds();
         Set<String> catalog = PROFILE.biomeCatalog().candidateBiomeIds();
         if (!required.containsAll(catalog) || required.isEmpty()) {
@@ -209,6 +426,74 @@ public final class GeoWorldV26SurfaceBiomeVerifier {
                 }
             }
         }
+        // v1.1.11 no longer fabricates Mushroom Fields or Pale Garden
+        // through the generic biome-coverage reserve. Verify those biomes at
+        // their persisted special-island centers instead.
+        int specialSurfacePatches = 0;
+        for (var landscape : runtime.specialLandscapes()) {
+            String expectedBiome = switch (landscape.kind()) {
+                case "mushroom_island" -> "minecraft:mushroom_fields";
+                case "pale_garden_island" ->
+                    required.contains("minecraft:pale_garden")
+                        ? "minecraft:pale_garden"
+                        : "minecraft:dark_forest";
+                default -> null;
+            };
+            if (expectedBiome == null || checked.contains(expectedBiome)) {
+                continue;
+            }
+
+            int x = (int)Math.round(landscape.centerX());
+            int z = (int)Math.round(landscape.centerZ());
+            var sample = runtime.sample(x, z);
+            int groundY = HEIGHTS.boundaryY(sample.groundHeight()) - 1;
+            String actualBiome = BIOMES.biomeId(runtime, x, groundY, z);
+            if (!expectedBiome.equals(actualBiome)) {
+                throw new AssertionError(
+                    "special landscape biome missing " + expectedBiome +
+                    " at " + x + "," + groundY + "," + z +
+                    " got " + actualBiome +
+                    " kind=" + landscape.kind()
+                );
+            }
+            String expectedTop = GeoWorldV26SurfaceMaterials.top(
+                expectedBiome,
+                sample.surfaceProfile(),
+                null
+            );
+            String actualTop = GeoWorldV26SurfaceMaterials.top(
+                actualBiome,
+                sample.surfaceProfile(),
+                null
+            );
+            if (!expectedTop.equals(actualTop)) {
+                throw new AssertionError(
+                    "special landscape surface mismatch " + expectedBiome +
+                    " at " + x + "," + z +
+                    " got=" + actualTop +
+                    " expected=" + expectedTop
+                );
+            }
+            String underneath = GeoWorldV26SurfaceMaterials.below(
+                actualBiome,
+                sample.surfaceProfile(),
+                null,
+                x,
+                groundY - 2,
+                z,
+                2
+            );
+            if (underneath == null) {
+                throw new AssertionError(
+                    "missing special landscape subsoil " + expectedBiome
+                );
+            }
+            checked.add(expectedBiome);
+            specialSurfacePatches++;
+            columns++;
+            materials += 2;
+        }
+
         if (!checked.equals(required)) {
             var missing = new HashSet<>(required);
             missing.removeAll(checked);
@@ -218,11 +503,13 @@ public final class GeoWorldV26SurfaceBiomeVerifier {
             GeoWorldV26SurfaceMaterials.Cover.CAVE, 0
         );
         int expectedSurfacePatches = required.size() - expectedCavePatches;
-        if (surfacePatches != expectedSurfacePatches ||
+        if (surfacePatches + specialSurfacePatches != expectedSurfacePatches ||
             cavePatches != expectedCavePatches) {
             throw new AssertionError(
                 "unexpected surface/cave distribution " +
-                surfacePatches + "/" + cavePatches +
+                (surfacePatches + specialSurfacePatches) + "/" + cavePatches +
+                " (coverage=" + surfacePatches +
+                ", special=" + specialSurfacePatches + ")" +
                 " expected " + expectedSurfacePatches + "/" + expectedCavePatches
             );
         }

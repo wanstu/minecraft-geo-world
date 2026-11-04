@@ -8,6 +8,7 @@ version = project.mod_version
 
 repositories {
     maven { url 'https://maven.fabricmc.net/' }
+    maven { url 'https://maven.terraformersmc.com/releases/' }
     mavenCentral()
 }
 
@@ -15,13 +16,35 @@ dependencies {
     minecraft 'com.mojang:minecraft:' + project.minecraft_version
     implementation 'net.fabricmc:fabric-loader:' + project.loader_version
     implementation 'net.fabricmc.fabric-api:fabric-api:' + project.fabric_api_version
+    compileOnly 'com.terraformersmc:modmenu:21.0.0'
 }
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 base.archivesName = 'geoworld'
 
+def geoWorldDevBuild = providers.gradleProperty('geoworldDevBuild')
+    .map { it.toBoolean() }
+    .orElse(false)
+def geoWorldBuildInfoResources = layout.buildDirectory.dir(
+    'generated/geoworldBuildInfoResources'
+)
+def generateGeoWorldBuildInfo = tasks.register('generateGeoWorldBuildInfo') {
+    def output = geoWorldBuildInfoResources.map {
+        it.file('geoworld-build.properties')
+    }
+    inputs.property 'devBuild', geoWorldDevBuild
+    outputs.file output
+    doLast {
+        def file = output.get().asFile
+        file.parentFile.mkdirs()
+        file.text = "devBuild=${geoWorldDevBuild.get()}\n"
+    }
+}
+sourceSets.main.resources.srcDir geoWorldBuildInfoResources
+
 tasks.named('processResources', ProcessResources) {
+    dependsOn generateGeoWorldBuildInfo
     inputs.property 'version', project.version
     filesMatching('fabric.mod.json') {
         expand(version: project.version)
@@ -31,7 +54,26 @@ tasks.named('processResources', ProcessResources) {
 // Minecraft 26.3 implementation shared by NeoForge and Fabric.
 sourceSets.main.java.srcDir '../../runtime-reader/src/main/java'
 sourceSets.main.java.srcDir '../../minecraft-common/src/main/java'
+// Keep one client implementation while adapting Mojang's resource-id rename.
+def geoWorldClientCommonSources = layout.buildDirectory.dir(
+    'generated/sources/geoworldClientCommon'
+)
+def generateGeoWorldClientCommonSources = tasks.register(
+    'generateGeoWorldClientCommonSources', Sync
+) {
+    from '../../minecraft-client-common/src/main/java'
+    into geoWorldClientCommonSources
+    filteringCharset = 'UTF-8'
+    filter { line -> line.replaceAll(/\bResourceLocation\b/, 'Identifier') }
+}
+sourceSets.main.java.srcDir geoWorldClientCommonSources
+tasks.named('compileJava') {
+    dependsOn generateGeoWorldClientCommonSources
+}
 sourceSets.main.java.srcDir '../../minecraft-v26-common/src/main/java'
+sourceSets.main.java.exclude 'geoworld/minecraft/v26common/client/GeoWorldV26PresetScreen.java'
+sourceSets.main.java.exclude 'geoworld/minecraft/v26common/client/GeoWorldV26CreationSession.java'
+sourceSets.main.java.exclude 'geoworld/minecraft/v26common/client/GeoWorldV26PreviewScreen.java'
 sourceSets.main.java.srcDir '../../minecraft-v26_3-common/src/main/java'
 
 sourceSets.main.resources.srcDir '../../minecraft-v26-common/src/main/resources'
@@ -164,6 +206,48 @@ tasks.register('verifyGeoWorldEngineBridge', JavaExec) {
     }
 }
 
+tasks.register('verifyGeoWorldWebUiLaunch', JavaExec) {
+    group = 'verification'
+    description = 'Starts the embedded GeoWorld WebUI and verifies dynamic-port launch readiness.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.fabric.client.GeoWorldWebUiLaunchVerifier'
+}
+
+tasks.register('verifyGeoWorldDynamicWebUiPort', JavaExec) {
+    group = 'verification'
+    description = 'Occupies port 8788 and verifies the in-game WebUI starts on a different dynamic port.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.fabric.client.GeoWorldWebUiLaunchVerifier'
+    args '--expect-fallback'
+}
+
+
+tasks.register('verifyGeoWorldBasinRivers', JavaExec) {
+    group = 'verification'
+    description = 'Verifies basin rivers stay incised below dry banks through final voxel planning.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.minecraft.v26common.worldgen.GeoWorldV26BasinRiverVerifier'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+}
+tasks.named('check') {
+    dependsOn tasks.named('verifyGeoWorldBasinRivers')
+}
+
+tasks.register('verifyGeoWorldSpecialLandscapes', JavaExec) {
+    group = 'verification'
+    description = 'Generates a fresh v1.1.11 model and verifies persisted special landscapes through the Java runtime reader.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir) + sourceSets.main.compileClasspath
+    mainClass = 'geoworld.minecraft.common.verification.GeoWorldSpecialLandscapeVerifier'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+    systemProperty 'geoworld.cache.dir', layout.buildDirectory.dir('special-landscape-verifier-cache').get().asFile.absolutePath
+    doFirst {
+        delete layout.buildDirectory.dir('special-landscape-verifier-cache')
+    }
+}
+
 tasks.register('verifyGeoWorldParameterEffects', JavaExec) {
     group = 'verification'
     description = 'Verifies PARAM-03 by generating same-Seed high/low parameter models through the embedded engine.'
@@ -195,6 +279,14 @@ tasks.register('verifyGeoWorldPreviewModel', JavaExec) {
     args file('../../../internal/goldenvectors/testdata/runtime-v1.geoworld').absolutePath
 }
 
+tasks.register('verifyGeoWorldStructureAdaptation', JavaExec) {
+    group = 'verification'
+    description = 'Verifies that locked structure_influence values causally control bounded local Vanilla structure terrain concessions.'
+    dependsOn tasks.named('compileJava')
+    classpath = sourceSets.main.output.classesDirs + sourceSets.main.compileClasspath
+    mainClass = 'geoworld.minecraft.v26common.worldgen.GeoWorldV26StructureAdaptationVerifier'
+}
+
 tasks.register('verifyGeoWorldSpawn', JavaExec) {
     group = 'verification'
     description = 'Verifies SPAWN-01/02/03: parameterized deterministic habitable-mainland spawn selection.'
@@ -202,6 +294,9 @@ tasks.register('verifyGeoWorldSpawn', JavaExec) {
     classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir) + sourceSets.main.compileClasspath
     mainClass = 'geoworld.minecraft.v26_3common.worldgen.GeoWorldSpawnVerifier'
     systemProperty 'geoworld.engine.embeddedOnly', 'true'
+    if (project.hasProperty('geoWorldSpawnSeed')) {
+        args project.property('geoWorldSpawnSeed').toString()
+    }
 }
 
 tasks.register('verifyGeoWorldShoreline', JavaExec) {
@@ -220,6 +315,20 @@ tasks.register('verifyGeoWorldSurfaceBiome', JavaExec) {
     classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir) + sourceSets.main.compileClasspath
     mainClass = 'geoworld.minecraft.v26_3common.worldgen.GeoWorldSurfaceBiomeVerifier'
     systemProperty 'geoworld.engine.embeddedOnly', 'true'
+}
+
+tasks.register('probeGeoWorldShorelinePoint', JavaExec) {
+    group = 'geoworld'
+    description = 'Loads a saved World Model and prints the shoreline profile around one coordinate.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir) + sourceSets.main.compileClasspath
+    mainClass = 'geoworld.minecraft.v26_3common.worldgen.GeoWorldShorelinePointProbe'
+    args(
+        providers.gradleProperty('model').get(),
+        providers.gradleProperty('x').get(),
+        providers.gradleProperty('z').get(),
+        providers.gradleProperty('radius').getOrElse('48')
+    )
 }
 
 tasks.register('exportGeoWorldStructureSnapshot', JavaExec) {
@@ -271,6 +380,15 @@ tasks.register('verifyGeoWorldStrongholdPreview', JavaExec) {
     systemProperty 'geoworld.engine.embeddedOnly', 'true'
 }
 
+tasks.register('benchmarkGeoWorldChunkPlanning', JavaExec) {
+    group = 'verification'
+    description = 'Benchmarks model-side shoreline, biome, and mineral planning without client rendering.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.minecraft.v26_3common.worldgen.GeoWorldChunkPlanningBenchmark'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+}
+
 tasks.register('verifyGeoWorldSurfaceOutcrops', JavaExec) {
     group = 'verification'
     description = 'Checks rare high mountain ore outcrops in exposed vanilla stone and seam continuity.'
@@ -312,12 +430,52 @@ tasks.register('fingerprintGeoWorldBiomeDecisions', JavaExec) {
     }
 }
 
+
+tasks.register('verifyGeoWorldClientLayering') {
+    group = 'verification'
+    description = 'Guards the shared client architecture and rejects duplicated product UI.'
+    dependsOn tasks.named('jar')
+    doLast {
+        def privateWebUi = file('src/main/java/geoworld/fabric/client/GeoWorldGameWebUi.java')
+        def privateSettings = file('src/main/java/geoworld/fabric/client/GeoWorldWebUiSettingsScreen.java')
+        if (privateWebUi.exists() || privateSettings.exists()) {
+            throw new GradleException(
+                'GeoWorld WebUI product screens must stay in minecraft-client-common; Fabric may only provide thin loader/API bridges.'
+            )
+        }
+        def jarFile = tasks.named('jar').get().archiveFile.get().asFile
+        def zip = new java.util.zip.ZipFile(jarFile)
+        try {
+            if (zip.getEntry('geoworld/minecraft/client/GeoWorldGameWebUi.class') == null ||
+                zip.getEntry('geoworld/minecraft/client/GeoWorldWebUiSettingsScreen.class') == null ||
+                zip.getEntry('geoworld/minecraft/client/GeoWorldPresetScreenBase.class') == null ||
+                zip.getEntry('geoworld/minecraft/client/GeoWorldCreationSession.class') == null) {
+                throw new GradleException('Shared GeoWorld client product classes are missing from the finalized Fabric JAR.')
+            }
+            if (zip.getEntry('geoworld/fabric/client/GeoWorldGameWebUi.class') != null) {
+                throw new GradleException('Fabric-private GeoWorldGameWebUi must not be packaged.')
+            }
+            if (zip.getEntry('geoworld/minecraft/v26common/client/GeoWorldV26PreviewScreen.class') != null ||
+                zip.getEntry('geoworld/minecraft/v26common/client/GeoWorldV26PresetScreen.class') != null ||
+                zip.getEntry('geoworld/minecraft/v26common/client/GeoWorldV26CreationSession.class') != null) {
+                throw new GradleException('Retired or duplicated GeoWorld client product UI must not be packaged in the active 26.3 build.')
+            }
+        } finally {
+            zip.close()
+        }
+    }
+}
 tasks.named('check') {
+    dependsOn tasks.named('verifyGeoWorldClientLayering')
     dependsOn tasks.named('verifyGeoWorldAdapter')
     dependsOn tasks.named('verifyGeoWorldEngineBridge')
+    dependsOn tasks.named('verifyGeoWorldWebUiLaunch')
+    dependsOn tasks.named('verifyGeoWorldDynamicWebUiPort')
+    dependsOn tasks.named('verifyGeoWorldSpecialLandscapes')
     dependsOn tasks.named('verifyGeoWorldModelQuery')
     dependsOn tasks.named('verifyGeoWorldCreationConfig')
     dependsOn tasks.named('verifyGeoWorldPreviewModel')
+    dependsOn tasks.named('verifyGeoWorldStructureAdaptation')
     dependsOn tasks.named('verifyGeoWorldSpawn')
     dependsOn tasks.named('verifyGeoWorldShoreline')
     dependsOn tasks.named('verifyGeoWorldSurfaceBiome')

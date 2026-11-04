@@ -150,6 +150,7 @@ func (s *appState) handleMineralBodies(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.RLock()
 	active := s.active
+	oreFamilies := append([]string(nil), s.gameSession.OreFamilies...)
 	s.mu.RUnlock()
 	if active == nil {
 		writeError(w, http.StatusConflict, errors.New("generate or load a world first"))
@@ -199,7 +200,7 @@ func (s *appState) handleMineralBodies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	maxSpan := 9000
+	maxSpan := 60000
 	if mode == "all" {
 		maxSpan = 4200
 	}
@@ -214,12 +215,15 @@ func (s *appState) handleMineralBodies(w http.ResponseWriter, r *http.Request) {
 
 	limit := parseBoundedInt(r.URL.Query().Get("limit"), 1600, 100, 5000)
 	javaExecutable := strings.TrimSpace(os.Getenv("GEOWORLD_JAVA"))
-	jarPath := strings.TrimSpace(os.Getenv("GEOWORLD_TOOL_JAR"))
-	if javaExecutable == "" || jarPath == "" {
+	classpath := strings.TrimSpace(os.Getenv("GEOWORLD_TOOL_CLASSPATH"))
+	if classpath == "" {
+		classpath = strings.TrimSpace(os.Getenv("GEOWORLD_TOOL_JAR"))
+	}
+	if javaExecutable == "" || classpath == "" {
 		writeError(
 			w,
 			http.StatusServiceUnavailable,
-			errors.New("exact mineral preview is available from the executable GeoWorld JAR"),
+			errors.New("exact mineral preview requires the GeoWorld Java planner bridge"),
 		)
 		return
 	}
@@ -227,8 +231,8 @@ func (s *appState) handleMineralBodies(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("java runtime unavailable: %w", err))
 		return
 	}
-	if _, err := os.Stat(jarPath); err != nil {
-		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("GeoWorld JAR unavailable: %w", err))
+	if _, err := os.Stat(classpath); err != nil {
+		writeError(w, http.StatusServiceUnavailable, fmt.Errorf("GeoWorld planner classpath unavailable: %w", err))
 		return
 	}
 
@@ -240,7 +244,7 @@ func (s *appState) handleMineralBodies(w http.ResponseWriter, r *http.Request) {
 
 	output, err := sharedMineralPlanner.run(
 		javaExecutable,
-		jarPath,
+		classpath,
 		modelPath,
 		strconv.Itoa(minX),
 		strconv.Itoa(maxX),
@@ -248,6 +252,7 @@ func (s *appState) handleMineralBodies(w http.ResponseWriter, r *http.Request) {
 		strconv.Itoa(maxZ),
 		mode,
 		strconv.Itoa(limit),
+		strings.Join(oreFamilies, ","),
 	)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Errorf("mineral planner bridge: %w", err))

@@ -22,11 +22,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public final class GeoWorldEngineBridge {
-    private static final String CACHE_FORMAT_VERSION = "v20";
+    private static final String CACHE_FORMAT_VERSION = "v24";
     private static final String EXPECTED_WORLD_PROFILE_VERSION =
         "geoworld-profile-v1.1";
     private static final String EXPECTED_GENERATION_RULES_VERSION =
-        "geoworld-rules-v1.1.10";
+        "geoworld-rules-v1.1.16";
     private static final String EXPECTED_WORLD_MODEL_VERSION =
         "geoworld-model-v1";
     private static final Duration GENERATION_TIMEOUT = Duration.ofMinutes(5);
@@ -74,7 +74,8 @@ public final class GeoWorldEngineBridge {
             throw new IllegalArgumentException(errors.get(0));
         }
 
-        String cacheKey = cacheKey(seed, config);
+        MineralContext mineralContext = resolveMineralContext();
+        String cacheKey = cacheKey(seed, config, mineralContext);
         Path output = resolveCacheRoot().resolve(cacheKey + ".geoworld");
         if (!Files.isRegularFile(output)) {
             return Optional.empty();
@@ -109,7 +110,8 @@ public final class GeoWorldEngineBridge {
         }
 
         Path engine = resolveEngine();
-        String cacheKey = cacheKey(seed, config);
+        MineralContext mineralContext = resolveMineralContext();
+        String cacheKey = cacheKey(seed, config, mineralContext);
         Path cacheRoot = resolveCacheRoot();
         Files.createDirectories(cacheRoot);
         Path output = cacheRoot.resolve(cacheKey + ".geoworld");
@@ -135,6 +137,9 @@ public final class GeoWorldEngineBridge {
             "--separation", format(config.continentSeparation()),
             "--profile", config.worldPreset().id(),
             "--parameters", config.parameters().toCsv(),
+            "--mineral-dictionary", String.join(",", mineralContext.dictionary()),
+            "--available-minerals", String.join(",", mineralContext.available()),
+            "--surface-ore-pile=" + Boolean.toString(config.surfaceOrePile()),
             "--output", output.toString(),
             "--force"
         );
@@ -304,7 +309,8 @@ public final class GeoWorldEngineBridge {
 
     private static String cacheKey(
         long seed,
-        GeoWorldCreationConfig config
+        GeoWorldCreationConfig config,
+        MineralContext mineralContext
     ) {
         String canonical = String.join(
             "|",
@@ -321,7 +327,10 @@ public final class GeoWorldEngineBridge {
             format(config.continentFragmentation()),
             format(config.continentSeparation()),
             config.worldPreset().id(),
-            config.parameters().toCsv()
+            config.parameters().toCsv(),
+            Boolean.toString(config.surfaceOrePile()),
+            String.join(",", mineralContext.dictionary()),
+            String.join(",", mineralContext.available())
         );
         try {
             byte[] digest = MessageDigest
@@ -333,11 +342,30 @@ public final class GeoWorldEngineBridge {
         }
     }
 
+    private static MineralContext resolveMineralContext() {
+        GeoWorldMineralContext.Snapshot snapshot =
+            GeoWorldMineralContext.snapshot();
+        return new MineralContext(
+            snapshot.dictionary(),
+            snapshot.available()
+        );
+    }
+
+    private record MineralContext(
+        List<String> dictionary,
+        List<String> available
+    ) {}
+
     private static void validateModel(
         long seed,
         GeoWorldCreationConfig config,
         GeoWorldV1 model
     ) {
+        if (model.mineralDistrictAssignments().isEmpty()) {
+            throw new IllegalArgumentException(
+                "GeoWorld cache has no frozen mineral district assignments"
+            );
+        }
         if (model.manifest().seed() != seed) {
             throw new IllegalArgumentException(
                 "GeoWorld cache seed mismatch: model=" +
@@ -381,6 +409,13 @@ public final class GeoWorldEngineBridge {
             throw new IllegalArgumentException(
                 "GeoWorld cache preset mismatch: model=" + model.manifest().preset() +
                 " expected=" + config.worldPreset().id()
+            );
+        }
+        if (model.surfaceOrePileEnabled() != config.surfaceOrePile()) {
+            throw new IllegalArgumentException(
+                "GeoWorld cache surface-ore-pile mismatch: model=" +
+                model.surfaceOrePileEnabled() + " expected=" +
+                config.surfaceOrePile()
             );
         }
         double[] modelParameters = model.worldProfile().parameters().values();

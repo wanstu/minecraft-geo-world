@@ -1,0 +1,13 @@
+# GeoWorld Acceptance Supplement v1.1.11
+# Later-added deterministic visual checkpoints; canonical v1.1 registry remains unchanged.
+# id	generation_rules	seed	requirement	inspection	name	x	y	z	pass_standard	method
+SPECIAL-01	geoworld-rules-v1.1.11	123456	CORE	POINT	蘑菇岛	-1088	160	1856	独立岛屿完整位于海洋中，中心为蘑菇岛生态；不得被普通陆地群系穿插。	空中俯视后下降人工检查
+SPECIAL-02	geoworld-rules-v1.1.11	123456	CORE	POINT	苍白森林岛	-4800	160	3008	独立苍白森林岛仅生成于海洋，不得生成在大湖或普通森林池中。	空中俯视后下降人工检查
+SPECIAL-03	geoworld-rules-v1.1.11	123456	CORE	POINT	樱花岛	-5312	160	-1728	独立樱花岛与周边水体边界自然；同时不影响普通森林池继续生成樱花林。	空中俯视后下降人工检查
+SPECIAL-04	geoworld-rules-v1.1.11	123456	CORE	POINT	天坑 A	1984	160	-576	天坑为局部特殊地貌，边缘与周围自然地形连续，不形成规则人工圆坑。	空中俯视后下降人工检查
+SPECIAL-05	geoworld-rules-v1.1.11	123456	CORE	POINT	天坑 B	-1088	160	-1344	第二处天坑用于确认同类特殊地貌并非固定单一形状，边缘仍应自然连续。	空中俯视后下降人工检查
+SPECIAL-06	geoworld-rules-v1.1.11	123456	CORE	POINT	火山口樱花	4544	160	-1088	火山口宏观轮廓可辨识，内部樱花生态与周围地形自然过渡，不应退化成普通樱花林斑块。	空中俯视后下降人工检查
+NAVIGATION-01	geoworld-rules-v1.1.11	123456	CORE	POINT	主干可航河流	8032	140	-711	航运图层应显示高可航行性、低瓶颈风险；实地河面应宽阔连续，适合作为主干水路。	WebUI 航运港口图层核对后实地人工检查
+NAVIGATION-02	geoworld-rules-v1.1.11	123456	CORE	POINT	航运瓶颈河段	5957	107	3360	航运图层应显示低可航行性和高瓶颈风险；实地应可观察到窄河或明显坡降形成的航运限制。	WebUI 航运港口图层核对后实地人工检查
+NAVIGATION-03	geoworld-rules-v1.1.11	123456	CORE	POINT	优质河港候选	3520	140	-2624	陆地港址应靠近宽阔河道且建设、洪水条件合理；港口适宜度应明显较高，但不得生成任何 Core 港口建筑。	WebUI 航运港口图层核对后实地人工检查
+NAVIGATION-04	geoworld-rules-v1.1.11	123456	CORE	POINT	优质海港候选	-14272	108	-7616	陆地港址应靠近海岸且建设条件良好；港口适宜度应高，水面自身港口适宜度必须为零且不得生成 Core 港口建筑。	WebUI 航运港口图层核对后实地人工检查

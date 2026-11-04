@@ -1,0 +1,7 @@
+# GeoWorld Mining Support Acceptance v1
+# Deterministic mining-district checkpoints derived from the locked Natural Model and shared mineral affinity.
+# id	generation_rules	seed	requirement	inspection	name	x	y	z	pass_standard	method
+MINING-01	geoworld-rules-v1.1.11	123456	CORE	POINT	高山露天矿区	-11968	274	-5184	应显示为 surface_district，露天采矿潜力显著高于浅层/深层；主导资源应偏铁，实地为高山/裸露岩体环境。	WebUI 矿区潜力图层核对三层评分与资源画像后进入游戏俯视
+MINING-02	geoworld-rules-v1.1.11	123456	CORE	POINT	平原浅层矿区	13888	107	4544	应显示为 shallow_district，浅层采矿潜力最高；资源画像应明显偏煤并兼有铁，证明沉积型地形不会被误判为露天山地矿区。	WebUI 点选核对浅层评分、煤/铁画像并进入游戏观察地形
+MINING-03	geoworld-rules-v1.1.11	123456	CORE	POINT	高原深层矿区	13376	172	-1472	应显示为 deep_district；深层战略矿物价值足以形成深层型矿区，同时地表潜力低于深层，证明深层分类真实可出现。	WebUI 点选核对深层评分、资源画像并进入游戏观察高原地形
+MINING-04	geoworld-rules-v1.1.11	123456	CORE	POINT	丘陵复合矿区	3648	151	8384	应显示为 mixed_district，地表/浅层/深层三类潜力接近且工业矿产价值较高；Core 不应因此生成任何矿山建筑。	WebUI 点选核对三层评分接近与工业价值后进入游戏观察丘陵环境

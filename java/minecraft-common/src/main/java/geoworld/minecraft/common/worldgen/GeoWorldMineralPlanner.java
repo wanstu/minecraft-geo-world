@@ -67,7 +67,20 @@ public final class GeoWorldMineralPlanner {
         return "geoworld-rules-v1.1.7".equals(rules) ||
             "geoworld-rules-v1.1.8".equals(rules) ||
             "geoworld-rules-v1.1.9".equals(rules) ||
-            "geoworld-rules-v1.1.10".equals(rules);
+            "geoworld-rules-v1.1.10".equals(rules) ||
+            "geoworld-rules-v1.1.11".equals(rules) ||
+            "geoworld-rules-v1.1.12".equals(rules) ||
+            "geoworld-rules-v1.1.13".equals(rules) ||
+            "geoworld-rules-v1.1.14".equals(rules) ||
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules));
+    }
+
+    private static boolean usesV115MiningDistricts(GeoWorldV1 model) {
+        return ("geoworld-rules-v1.1.15".equals(
+            model.manifest().generationRulesVersion()
+        ) || "geoworld-rules-v1.1.16".equals(
+            model.manifest().generationRulesVersion()
+        ));
     }
 
     public void planSurfaceOutcrops(
@@ -202,6 +215,7 @@ public final class GeoWorldMineralPlanner {
                     regionalization,
                     provinceStrength,
                     modernMinerals,
+                    !usesV115MiningDistricts(model),
                     BodySource.OUTCROP,
                     bodyConsumer
                 );
@@ -456,6 +470,7 @@ public final class GeoWorldMineralPlanner {
                                 regionalization,
                                 provinceStrength,
                                 modernMinerals,
+                                true,
                                 BodySource.GUARANTEE,
                                 bodyConsumer
                             );
@@ -518,6 +533,7 @@ public final class GeoWorldMineralPlanner {
                             regionalization,
                             provinceStrength,
                             modernMinerals,
+                            true,
                             BodySource.VEIN,
                             bodyConsumer
                         );
@@ -629,6 +645,7 @@ public final class GeoWorldMineralPlanner {
             1.0,
             0.5,
             true,
+            true,
             BodySource.VEIN,
             null
         );
@@ -649,6 +666,7 @@ public final class GeoWorldMineralPlanner {
         double regionalization,
         double provinceStrength,
         boolean modernMinerals,
+        boolean allowLarge,
         BodySource source,
         Consumer<Body> bodyConsumer
     ) {
@@ -683,7 +701,11 @@ public final class GeoWorldMineralPlanner {
                 )
             );
         }
-        boolean large = random.nextDouble() < largeChance;
+        boolean compactOutcrop =
+            modernMinerals &&
+            source == BodySource.OUTCROP &&
+            !allowLarge;
+        boolean large = random.nextDouble() < largeChance && allowLarge;
         double majorLengthScale = !large
             ? 1.0
             : modernMinerals
@@ -720,6 +742,12 @@ public final class GeoWorldMineralPlanner {
             majorRadiusScale *
             (rockyOutcrop ? 1.12 : 1.0) *
             Math.sqrt(bodyScale);
+        if (compactOutcrop) {
+            // v1.1.15 outcrops are surface clues for a mining region, not a
+            // second giant deposit painted across the terrain surface.
+            length *= 0.58;
+            radius *= 0.55;
+        }
 
         long bodySalt = random.nextLong();
         double angle = random.nextDouble() * Math.PI * 2;
@@ -766,8 +794,9 @@ public final class GeoWorldMineralPlanner {
                 0.19 * Math.sin(t * Math.PI) +
                 0.14 * (random.nextDouble() - 0.5);
             double r = radius * lobe;
-            double verticalRadius =
-                rockyOutcrop ? r * 1.70 : r * 1.10;
+            double verticalRadius = rockyOutcrop
+                ? r * (compactOutcrop ? 1.35 : 1.70)
+                : r * 1.10;
             if (placementConsumer == null) continue;
 
             int left = Math.max(minX, (int) Math.floor(cx - r));

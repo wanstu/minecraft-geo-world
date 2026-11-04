@@ -1,0 +1,8 @@
+# GeoWorld Civilization Support Acceptance v1
+# Deterministic civilization-node checkpoints derived from settlement, navigation and mining suitability.
+# id	generation_rules	seed	requirement	inspection	name	x	y	z	pass_standard	method
+CIVILIZATION-01	geoworld-rules-v1.1.11	123456	CORE	POINT	农业聚落候选	10560	160	-2240	应显示为 agricultural_settlement，农业聚落潜力为主要角色之一且综合节点适宜度高；Core 不应因此生成村庄或建筑。	WebUI 文明节点图层核对角色评分和候选节点后进入游戏观察自然地理
+CIVILIZATION-02	geoworld-rules-v1.1.11	123456	CORE	POINT	港口城市候选	6464	99	10944	应显示为 port_city，港口城市潜力显著，附近水系与陆地建设条件共同支撑该角色；关系线仅代表自然走廊。	WebUI 文明节点图层核对港口城市评分、邻近关系后进入游戏观察海岸或水路条件
+CIVILIZATION-03	geoworld-rules-v1.1.11	123456	CORE	POINT	矿业城镇候选	6080	143	-4672	应显示为 mining_town，矿业城镇潜力高于港口与交通角色，证明矿区潜力能进入文明节点分析但不会生成矿山建筑。	WebUI 文明节点图层核对矿业城镇评分并对照矿区潜力图层
+CIVILIZATION-04	geoworld-rules-v1.1.11	123456	CORE	POINT	交通节点候选	8896	141	-192	应显示为 transport_node，交通节点潜力为最高角色，适合作为自然交通枢纽候选；不得自动生成道路。	WebUI 文明节点图层核对交通节点评分和关系线后进入游戏观察地形通达性
+CIVILIZATION-05	geoworld-rules-v1.1.11	123456	CORE	POINT	多角色枢纽候选	2496	102	-6464	应显示为 multi_role_hub，农业与港口等多个角色评分接近且综合适宜度高，体现复合型文明核心候选。	WebUI 文明节点图层核对多角色评分接近、专业化强度较低和网络关系

@@ -17,6 +17,76 @@ type FluvialAcceptanceCandidate struct {
 	Strength float64
 }
 
+// DeltaAcceptanceRoutePoint is one point on a single deterministic delta route.
+// Stage is diagnostic metadata for acceptance tooling; it does not affect
+// generation or Runtime sampling.
+type DeltaAcceptanceRoutePoint struct {
+	Stage    string
+	X        float64
+	Z        float64
+	Strength float64
+}
+
+// AcceptanceDeltaRoute returns points from one strongest real delta only.
+// It deliberately never combines candidates from unrelated ocean mouths.
+func (m *Model) AcceptanceDeltaRoute() []DeltaAcceptanceRoutePoint {
+	if m == nil {
+		return nil
+	}
+	bestID := -1
+	bestStrength := 0.0
+	for i, seg := range m.Rivers {
+		strength := riverDeltaStrength(seg)
+		if strength > bestStrength {
+			bestID = i
+			bestStrength = strength
+		}
+	}
+	if bestID < 0 {
+		return nil
+	}
+	seg := m.Rivers[bestID]
+	count := riverDeltaBranchCount(seg)
+	if count <= 0 {
+		return nil
+	}
+
+	out := make([]DeltaAcceptanceRoutePoint, 0, 6)
+	addMain := func(stage string, t float64) {
+		x, z, _, _ := RiverCenterFrame(seg, t)
+		out = append(out, DeltaAcceptanceRoutePoint{
+			Stage: stage, X: x, Z: z, Strength: bestStrength,
+		})
+	}
+	addBranch := func(stage string, branch int, t float64) bool {
+		offset, _, _, ok := riverDeltaBranchGeometry(seg, t, branch)
+		if !ok {
+			return false
+		}
+		cx, cz, nx, nz := RiverCenterFrame(seg, t)
+		out = append(out, DeltaAcceptanceRoutePoint{
+			Stage:    stage,
+			X:        cx + nx*offset,
+			Z:        cz + nz*offset,
+			Strength: bestStrength,
+		})
+		return true
+	}
+
+	// Before t=0.46 the parent is still a single channel.
+	addMain("main-entry", 0.38)
+	if !addBranch("split", 0, 0.56) {
+		addMain("split", 0.56)
+	}
+	_ = addBranch("branch-a-mid", 0, 0.76)
+	_ = addBranch("branch-a-mouth", 0, 0.94)
+	if count > 1 {
+		_ = addBranch("branch-b-mid", 1, 0.76)
+		_ = addBranch("branch-b-mouth", 1, 0.94)
+	}
+	return out
+}
+
 // AcceptanceFluvialCandidates returns bounded deterministic candidate points
 // for implemented v1.1.7 floodplain/terrace/levee/oxbow features.
 func (m *Model) AcceptanceFluvialCandidates() []FluvialAcceptanceCandidate {
@@ -45,6 +115,26 @@ func (m *Model) AcceptanceFluvialCandidates() []FluvialAcceptanceCandidate {
 		if seg.MouthExpansionVersion < 5 {
 			continue
 		}
+
+		if deltaStrength := riverDeltaStrength(seg); deltaStrength > 0 {
+			for branch := 0; branch < riverDeltaBranchCount(seg); branch++ {
+				for _, t := range []float64{0.58, 0.76, 0.94} {
+					offset, _, _, ok := riverDeltaBranchGeometry(seg, t, branch)
+					if !ok {
+						continue
+					}
+					cx, cz, nx, nz := RiverCenterFrame(seg, t)
+					x := cx + nx*offset
+					z := cz + nz*offset
+					sample := m.Sample(x, z)
+					if sample.WaterKind != reconcile.WaterRiver {
+						continue
+					}
+					add("delta", x, z, deltaStrength)
+				}
+			}
+		}
+
 		strength := riverFluvialDetailStrength(seg)
 		if strength <= 0 {
 			continue

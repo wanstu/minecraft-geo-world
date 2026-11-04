@@ -2,7 +2,10 @@ package geoworld.minecraft.v1_21_1common.runtime;
 
 import geoworld.minecraft.v26common.runtime.GeoWorldV26WorldService;
 import geoworld.minecraft.v1_21_1common.Minecraft1_21_1Profile;
+import geoworld.minecraft.common.worldgen.GeoWorldSpawnPlanner;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.Optional;
 
@@ -29,5 +32,45 @@ public final class GeoWorldWorldService {
 
     public static boolean isActive(MinecraftServer server) {
         return CORE.isActive(server);
+    }
+
+    public static void ensureSafeSpawn(MinecraftServer server) {
+        CORE.active(server).ifPresent(active -> {
+            if (!active.dynamicWorldgen()) {
+                return;
+            }
+
+            var overworld = server.overworld();
+            BlockPos current = overworld.getSharedSpawnPos();
+            if (
+                Math.floorDiv(current.getX(), 16) != 0 ||
+                Math.floorDiv(current.getZ(), 16) != 0
+            ) {
+                return;
+            }
+
+            var model = active.model();
+            var candidate = GeoWorldSpawnPlanner.find(
+                model,
+                model.worldProfile().parameters().spawnPreference()
+            );
+            if (candidate.chunkX() == 0 && candidate.chunkZ() == 0) {
+                return;
+            }
+
+            // Minecraft 26.3 consumes the planner result as a ChunkPos and
+            // persists that chunk's block origin as the shared spawn.
+            // Mirror that final behavior on 1.21.1 instead of using the
+            // planner's center sample directly.
+            int x = candidate.chunkX() * 16;
+            int z = candidate.chunkZ() * 16;
+            int y = overworld.getHeight(
+                Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                x,
+                z
+            );
+            BlockPos spawn = new BlockPos(x, y, z);
+            overworld.setDefaultSpawnPos(spawn, 0.0F);
+        });
     }
 }

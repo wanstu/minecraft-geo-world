@@ -2,9 +2,7 @@ package geoworld.minecraft.common.worldgen;
 
 import geoworld.runtime.GeoWorldV1;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 public class GeoWorldShorelinePlanner {
     public static final int MAX_SHORE_DISTANCE = ShorelineRules.MAX_SHORE_DISTANCE;
@@ -17,30 +15,99 @@ public class GeoWorldShorelinePlanner {
         ShorelineRules.MAX_ADAPTIVE_BANK_DISTANCE;
 
     private final HeightMapping heights;
-    private record AdaptiveSearchKey(GeoWorldV1 runtime, int chunkX, int chunkZ) {}
-    private record ChunkPlanKey(GeoWorldV1 runtime, int baseX, int baseZ) {}
-    private final Map<AdaptiveSearchKey, Integer> adaptiveSearchDistanceCache =
-        Collections.synchronizedMap(
-            new LinkedHashMap<>(256, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(
-                    Map.Entry<AdaptiveSearchKey, Integer> eldest
+    private final DirectCache<Integer> adaptiveSearchDistanceCache =
+        new DirectCache<>(2048);
+    private final DirectCache<ChunkPlan> chunkPlanCache =
+        new DirectCache<>(512);
+
+    private record CacheEntry<V>(
+        GeoWorldV1 runtime,
+        long key,
+        V value
+    ) {}
+
+    /**
+     * Fixed-capacity lock-free 4-way memoization. Collisions can evict only
+     * cached values; runtime identity and packed coordinates are verified on
+     * every hit, so replacement can never alter world-generation results.
+     */
+    private static final class DirectCache<V> {
+        private static final int WAYS = 4;
+
+        private final AtomicReferenceArray<CacheEntry<V>> slots;
+        private final int setMask;
+
+        private DirectCache(int capacity) {
+            if (capacity < WAYS || Integer.bitCount(capacity) != 1) {
+                throw new IllegalArgumentException(
+                    "cache capacity must be a power of two >= 4"
+                );
+            }
+            this.slots = new AtomicReferenceArray<>(capacity);
+            this.setMask = capacity / WAYS - 1;
+        }
+
+        private V get(GeoWorldV1 runtime, long key) {
+            long hash = hash(runtime, key);
+            int base = (((int)hash) & setMask) * WAYS;
+            for (int way = 0; way < WAYS; way++) {
+                CacheEntry<V> entry = slots.get(base + way);
+                if (
+                    entry != null &&
+                    entry.runtime() == runtime &&
+                    entry.key() == key
                 ) {
-                    return size() > 2048;
+                    return entry.value();
                 }
             }
-        );
-    private final Map<ChunkPlanKey, ChunkPlan> chunkPlanCache =
-        Collections.synchronizedMap(
-            new LinkedHashMap<>(128, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(
-                    Map.Entry<ChunkPlanKey, ChunkPlan> eldest
+            return null;
+        }
+
+        private void put(GeoWorldV1 runtime, long key, V value) {
+            long hash = hash(runtime, key);
+            int base = (((int)hash) & setMask) * WAYS;
+            CacheEntry<V> replacement =
+                new CacheEntry<>(runtime, key, value);
+
+            for (int way = 0; way < WAYS; way++) {
+                int slot = base + way;
+                CacheEntry<V> entry = slots.get(slot);
+                if (
+                    entry != null &&
+                    entry.runtime() == runtime &&
+                    entry.key() == key
                 ) {
-                    return size() > 512;
+                    slots.set(slot, replacement);
+                    return;
+                }
+                if (
+                    entry == null &&
+                    slots.compareAndSet(slot, null, replacement)
+                ) {
+                    return;
                 }
             }
-        );
+
+            int victim = base + (int)((hash >>> 32) & (WAYS - 1));
+            slots.set(victim, replacement);
+        }
+
+        private long hash(GeoWorldV1 runtime, long key) {
+            long h = key ^
+                ((long)System.identityHashCode(runtime) *
+                    0x9E3779B97F4A7C15L);
+            h ^= h >>> 33;
+            h *= 0xFF51AFD7ED558CCDL;
+            h ^= h >>> 33;
+            h *= 0xC4CEB9FE1A85EC53L;
+            h ^= h >>> 33;
+            return h;
+        }
+    }
+
+    private static long coordinateKey(int x, int z) {
+        return ((long)x << 32) ^ (z & 0xFFFFFFFFL);
+    }
 
     public record Column(
         GeoWorldV1.RuntimeSample sample,
@@ -79,12 +146,17 @@ public class GeoWorldShorelinePlanner {
         GeoWorldV1.RuntimeSample sample(int dx, int dz);
     }
 
+    private interface WaterPotential {
+        boolean couldHaveWater(int dx, int dz);
+    }
+
     private static final class SampleCache {
         private final GeoWorldV1 runtime;
         private final int originX;
         private final int originZ;
         private final int stride;
         private final GeoWorldV1.RuntimeSample[] samples;
+        private final byte[] waterPotential;
 
         private SampleCache(
             GeoWorldV1 runtime,
@@ -97,6 +169,7 @@ public class GeoWorldShorelinePlanner {
             this.originZ = originZ;
             this.stride = stride;
             this.samples = new GeoWorldV1.RuntimeSample[stride * stride];
+            this.waterPotential = new byte[stride * stride];
         }
 
         private GeoWorldV1.RuntimeSample sample(int x, int z) {
@@ -111,7 +184,44 @@ public class GeoWorldShorelinePlanner {
                 sample = runtime.sample(originX + x, originZ + z);
                 samples[index] = sample;
             }
+            if (waterPotential[index] == 0) {
+                waterPotential[index] = (byte)(
+                    sampleCanContainWater(sample) ? 2 : 1
+                );
+            }
             return sample;
+        }
+
+        private boolean couldHaveWater(int x, int z) {
+            if (x < 0 || x >= stride || z < 0 || z >= stride) {
+                throw new IllegalArgumentException(
+                    "shoreline water-potential outside cache: " + x + "," + z
+                );
+            }
+            int index = z * stride + x;
+            byte cached = waterPotential[index];
+            if (cached != 0) {
+                return cached == 2;
+            }
+            GeoWorldV1.RuntimeSample sample = samples[index];
+            if (sample != null) {
+                boolean result = sampleCanContainWater(sample);
+                waterPotential[index] = (byte)(result ? 2 : 1);
+                return result;
+            }
+            boolean result = runtime.couldHaveWaterAt(
+                originX + x,
+                originZ + z
+            );
+            waterPotential[index] = (byte)(result ? 2 : 1);
+            return result;
+        }
+        private static boolean sampleCanContainWater(
+            GeoWorldV1.RuntimeSample sample
+        ) {
+            return !"None".equals(sample.waterKind()) &&
+                sample.waterSurfaceDefined() &&
+                sample.waterSurfaceElevation() != null;
         }
     }
 
@@ -128,7 +238,12 @@ public class GeoWorldShorelinePlanner {
             "geoworld-rules-v1.1.7".equals(rules) ||
             "geoworld-rules-v1.1.8".equals(rules) ||
             "geoworld-rules-v1.1.9".equals(rules) ||
-            "geoworld-rules-v1.1.10".equals(rules);
+            "geoworld-rules-v1.1.10".equals(rules) ||
+            "geoworld-rules-v1.1.11".equals(rules) ||
+            "geoworld-rules-v1.1.12".equals(rules) ||
+            "geoworld-rules-v1.1.13".equals(rules) ||
+            "geoworld-rules-v1.1.14".equals(rules) ||
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules));
     }
 
     private static boolean sealHighRiverBanks(GeoWorldV1 runtime) {
@@ -137,13 +252,30 @@ public class GeoWorldShorelinePlanner {
             "geoworld-rules-v1.1.7".equals(rules) ||
             "geoworld-rules-v1.1.8".equals(rules) ||
             "geoworld-rules-v1.1.9".equals(rules) ||
-            "geoworld-rules-v1.1.10".equals(rules);
+            "geoworld-rules-v1.1.10".equals(rules) ||
+            "geoworld-rules-v1.1.11".equals(rules) ||
+            "geoworld-rules-v1.1.12".equals(rules) ||
+            "geoworld-rules-v1.1.13".equals(rules) ||
+            "geoworld-rules-v1.1.14".equals(rules) ||
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules));
     }
 
     private static boolean adaptiveGentleBanks(GeoWorldV1 runtime) {
-        return "geoworld-rules-v1.1.10".equals(
-            runtime.manifest().generationRulesVersion()
-        );
+        String rules = runtime.manifest().generationRulesVersion();
+        return "geoworld-rules-v1.1.10".equals(rules) ||
+            "geoworld-rules-v1.1.11".equals(rules) ||
+            "geoworld-rules-v1.1.12".equals(rules) ||
+            "geoworld-rules-v1.1.13".equals(rules) ||
+            "geoworld-rules-v1.1.14".equals(rules) ||
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules));
+    }
+
+    private static boolean strictRiverContainment(GeoWorldV1 runtime) {
+        String rules = runtime.manifest().generationRulesVersion();
+        return "geoworld-rules-v1.1.12".equals(rules) ||
+            "geoworld-rules-v1.1.13".equals(rules) ||
+            "geoworld-rules-v1.1.14".equals(rules) ||
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules));
     }
 
     private int adaptiveSearchDistanceForChunk(
@@ -156,8 +288,8 @@ public class GeoWorldShorelinePlanner {
         }
         int chunkX = Math.floorDiv(baseX, 16);
         int chunkZ = Math.floorDiv(baseZ, 16);
-        AdaptiveSearchKey key = new AdaptiveSearchKey(runtime, chunkX, chunkZ);
-        Integer cached = adaptiveSearchDistanceCache.get(key);
+        long key = coordinateKey(chunkX, chunkZ);
+        Integer cached = adaptiveSearchDistanceCache.get(runtime, key);
         if (cached != null) {
             return cached;
         }
@@ -176,10 +308,16 @@ public class GeoWorldShorelinePlanner {
         if (features.distanceToOcean() != null) {
             nearest = Math.min(nearest, features.distanceToOcean());
         }
+        // Natural-feature distances are measured to the actual river bank,
+        // lake edge, and ocean coast. Planned columns extend only three
+        // blocks beyond this chunk; even the legacy 14-block bank search
+        // cannot reach water when the chunk center is more than 32 + 16
+        // blocks from every modeled water boundary. Skip that provably empty
+        // search entirely. Non-adaptive rules keep their fixed radius above.
         int computed = nearest <= MAX_ADAPTIVE_BANK_DISTANCE + 16.0
             ? MAX_ADAPTIVE_BANK_DISTANCE
-            : MAX_GENTLE_BANK_DISTANCE;
-        adaptiveSearchDistanceCache.put(key, computed);
+            : 0;
+        adaptiveSearchDistanceCache.put(runtime, key, computed);
         return computed;
     }
 
@@ -198,13 +336,13 @@ public class GeoWorldShorelinePlanner {
         int baseX,
         int baseZ
     ) {
-        ChunkPlanKey key = new ChunkPlanKey(runtime, baseX, baseZ);
-        ChunkPlan cached = chunkPlanCache.get(key);
+        long key = coordinateKey(baseX, baseZ);
+        ChunkPlan cached = chunkPlanCache.get(runtime, key);
         if (cached != null) {
             return cached;
         }
         ChunkPlan computed = computeChunkModel(runtime, baseX, baseZ);
-        chunkPlanCache.put(key, computed);
+        chunkPlanCache.put(runtime, key, computed);
         return computed;
     }
 
@@ -220,7 +358,8 @@ public class GeoWorldShorelinePlanner {
             baseX,
             baseZ
         );
-        final int radius = bankSearchDistance + fringe;
+        final int radius =
+            Math.max(bankSearchDistance, 4) + fringe;
         final int stride = 16 + radius * 2;
         SampleCache samples = new SampleCache(
             runtime,
@@ -235,6 +374,7 @@ public class GeoWorldShorelinePlanner {
         long seed = runtime.manifest().seed();
         boolean modernRiverBank = smoothRiverBanks(runtime);
         boolean sealedHighRiverBank = sealHighRiverBanks(runtime);
+        boolean strictRiverContainment = strictRiverContainment(runtime);
         for (int localZ = -fringe; localZ < 16 + fringe; localZ++) {
             for (int localX = -fringe; localX < 16 + fringe; localX++) {
                 preliminary[
@@ -250,6 +390,7 @@ public class GeoWorldShorelinePlanner {
                     baseZ + localZ,
                     modernRiverBank,
                     sealedHighRiverBank,
+                    strictRiverContainment,
                     adaptiveBank,
                     bankSearchDistance
                 );
@@ -268,7 +409,8 @@ public class GeoWorldShorelinePlanner {
                     preliminary[index + 1],
                     preliminary[index - plannedStride],
                     preliminary[index + plannedStride],
-                    sealedHighRiverBank
+                    sealedHighRiverBank,
+                    adaptiveBank
                 );
             }
         }
@@ -335,7 +477,8 @@ public class GeoWorldShorelinePlanner {
                             bankClosed[index + 1],
                             bankClosed[index - plannedStride],
                             bankClosed[index + plannedStride],
-                            sealedHighRiverBank
+                            sealedHighRiverBank,
+                            true
                         );
                         grooves[index] = closed;
                         if (closed != bankClosed[index]) cleanupChanged = true;
@@ -498,6 +641,7 @@ public class GeoWorldShorelinePlanner {
         long seed = runtime.manifest().seed();
         boolean modernRiverBank = smoothRiverBanks(runtime);
         boolean sealedHighRiverBank = sealHighRiverBanks(runtime);
+        boolean strictRiverContainment = strictRiverContainment(runtime);
         for (int dz = -localRadius; dz <= localRadius; dz++) {
             for (int dx = -localRadius; dx <= localRadius; dx++) {
                 preliminary[
@@ -513,6 +657,7 @@ public class GeoWorldShorelinePlanner {
                     worldZ + dz,
                     modernRiverBank,
                     sealedHighRiverBank,
+                    strictRiverContainment,
                     false,
                     MAX_GENTLE_BANK_DISTANCE
                 );
@@ -531,7 +676,8 @@ public class GeoWorldShorelinePlanner {
                     preliminary[index + 1],
                     preliminary[index - localStride],
                     preliminary[index + localStride],
-                    sealedHighRiverBank
+                    sealedHighRiverBank,
+                    false
                 );
             }
         }
@@ -614,6 +760,7 @@ public class GeoWorldShorelinePlanner {
         int worldZ,
         boolean modernRiverBank,
         boolean sealedHighRiverBank,
+        boolean strictRiverContainment,
         boolean adaptiveBank,
         int bankSearchDistance
     ) {
@@ -621,14 +768,18 @@ public class GeoWorldShorelinePlanner {
             samples.sample(centerX, centerZ);
         Neighborhood neighborhood = (dx, dz) ->
             samples.sample(centerX + dx, centerZ + dz);
+        WaterPotential waterPotential = (dx, dz) ->
+            samples.couldHaveWater(centerX + dx, centerZ + dz);
         return planColumn(
             center,
             neighborhood,
+            waterPotential,
             seed,
             worldX,
             worldZ,
             modernRiverBank,
             sealedHighRiverBank,
+            strictRiverContainment,
             adaptiveBank,
             bankSearchDistance
         );
@@ -638,6 +789,26 @@ public class GeoWorldShorelinePlanner {
         GeoWorldV1.RuntimeSample sample,
         int groundBoundary
     ) {
+        return waterBoundaryModel(sample, groundBoundary, false);
+    }
+
+    public int waterBoundaryModel(
+        GeoWorldV1 runtime,
+        GeoWorldV1.RuntimeSample sample,
+        int groundBoundary
+    ) {
+        return waterBoundaryModel(
+            sample,
+            groundBoundary,
+            strictRiverContainment(runtime)
+        );
+    }
+
+    private int waterBoundaryModel(
+        GeoWorldV1.RuntimeSample sample,
+        int groundBoundary,
+        boolean strictRiverContainment
+    ) {
         if (
             !sample.waterSurfaceDefined() ||
             sample.waterSurfaceElevation() == null
@@ -645,9 +816,14 @@ public class GeoWorldShorelinePlanner {
             return groundBoundary;
         }
 
-        int mapped = "River".equals(sample.waterKind())
-            ? this.heights.boundaryYCeil(sample.waterSurfaceElevation())
-            : this.heights.boundaryY(sample.waterSurfaceElevation());
+        int mapped;
+        if ("River".equals(sample.waterKind())) {
+            mapped = strictRiverContainment
+                ? this.heights.boundaryYFloor(sample.waterSurfaceElevation())
+                : this.heights.boundaryYCeil(sample.waterSurfaceElevation());
+        } else {
+            mapped = this.heights.boundaryY(sample.waterSurfaceElevation());
+        }
 
         // A river's free surface belongs to the hydrology model. Do not raise
         // it merely because voxel quantization maps a shallow riverbed onto
@@ -663,16 +839,22 @@ public class GeoWorldShorelinePlanner {
     private Column planColumn(
         GeoWorldV1.RuntimeSample center,
         Neighborhood neighborhood,
+        WaterPotential waterPotential,
         long seed,
         int worldX,
         int worldZ,
         boolean modernRiverBank,
         boolean sealedHighRiverBank,
+        boolean strictRiverContainment,
         boolean adaptiveBank,
         int bankSearchDistance
     ) {
         int originalGround = this.heights.boundaryY(center.groundHeight());
-        int ownWater = waterBoundaryModel(center, originalGround);
+        int ownWater = waterBoundaryModel(
+            center,
+            originalGround,
+            strictRiverContainment
+        );
 
         if (isWater(center)) {
             int waterGround = originalGround;
@@ -738,7 +920,9 @@ public class GeoWorldShorelinePlanner {
 
         WaterNeighbor shore = findNearestWater(
             neighborhood,
-            bankSearchDistance
+            waterPotential,
+            bankSearchDistance,
+            strictRiverContainment
         );
         if (!adaptiveBank && shore != null &&
             shore.distance() > MAX_SHORE_DISTANCE &&
@@ -791,17 +975,28 @@ public class GeoWorldShorelinePlanner {
                 sealedHighRiverBank &&
                 "River".equals(shore.waterKind())
             ) {
-                int gap = shore.waterBoundary() - adjustedGround;
-                final int maxSolidRaise = 4;
-                if (gap <= maxSolidRaise) {
-                    adjustedGround = shore.waterBoundary();
+                if (strictRiverContainment) {
+                    // v1.1.12 never turns a dry bank column into river water.
+                    // The profile is bank-capped upstream; this is only a
+                    // voxel-quantization containment fallback.
+                    adjustedGround = Math.min(
+                        shore.waterBoundary(),
+                        adjustedGround + 1
+                    );
                     shallowFringe = false;
                 } else {
-                    adjustedGround = Math.min(
-                        shore.waterBoundary() - 1,
-                        adjustedGround + maxSolidRaise
-                    );
-                    shallowFringe = true;
+                    int gap = shore.waterBoundary() - adjustedGround;
+                    final int maxSolidRaise = 4;
+                    if (gap <= maxSolidRaise) {
+                        adjustedGround = shore.waterBoundary();
+                        shallowFringe = false;
+                    } else {
+                        adjustedGround = Math.min(
+                            shore.waterBoundary() - 1,
+                            adjustedGround + maxSolidRaise
+                        );
+                        shallowFringe = true;
+                    }
                 }
             } else {
                 adjustedGround = Math.min(
@@ -822,6 +1017,8 @@ public class GeoWorldShorelinePlanner {
         // terrain. Older locked worlds retain the historical river backing.
         if (
             adaptiveBank &&
+            (!strictRiverContainment ||
+             !"River".equals(shore.waterKind())) &&
             shore.distance() >= 2 &&
             originalGround < shore.waterBoundary() &&
             shore.waterBoundary() - originalGround <=
@@ -845,6 +1042,7 @@ public class GeoWorldShorelinePlanner {
                 shallowFringe = false;
             }
         } else if (
+            !strictRiverContainment &&
             sealedHighRiverBank &&
             "River".equals(shore.waterKind()) &&
             shore.distance() >= 2 &&
@@ -1193,7 +1391,9 @@ public class GeoWorldShorelinePlanner {
 
     private WaterNeighbor findNearestWater(
         Neighborhood neighborhood,
-        int maxDistance
+        WaterPotential waterPotential,
+        int maxDistance,
+        boolean strictRiverContainment
     ) {
         for (int distance = 1; distance <= maxDistance; distance++) {
             WaterNeighbor best = null;
@@ -1201,12 +1401,20 @@ public class GeoWorldShorelinePlanner {
                 int dzAbs = distance - Math.abs(dx);
                 best = betterWater(
                     best,
-                    waterAt(neighborhood, dx, dzAbs, distance)
+                    waterAt(
+                        neighborhood, waterPotential,
+                        dx, dzAbs, distance,
+                        strictRiverContainment
+                    )
                 );
                 if (dzAbs != 0) {
                     best = betterWater(
                         best,
-                        waterAt(neighborhood, dx, -dzAbs, distance)
+                        waterAt(
+                            neighborhood, waterPotential,
+                            dx, -dzAbs, distance,
+                            strictRiverContainment
+                        )
                     );
                 }
             }
@@ -1219,16 +1427,25 @@ public class GeoWorldShorelinePlanner {
 
     private WaterNeighbor waterAt(
         Neighborhood neighborhood,
+        WaterPotential waterPotential,
         int dx,
         int dz,
-        int distance
+        int distance,
+        boolean strictRiverContainment
     ) {
+        if (!waterPotential.couldHaveWater(dx, dz)) {
+            return null;
+        }
         GeoWorldV1.RuntimeSample sample = neighborhood.sample(dx, dz);
         if (!isWater(sample)) {
             return null;
         }
         int ground = this.heights.boundaryY(sample.groundHeight());
-        int water = waterBoundaryModel(sample, ground);
+        int water = waterBoundaryModel(
+            sample,
+            ground,
+            strictRiverContainment
+        );
         if (
             water <= ground &&
             !"River".equals(sample.waterKind())
@@ -1402,7 +1619,8 @@ public class GeoWorldShorelinePlanner {
         Column east,
         Column north,
         Column south,
-        boolean blendRepairMaterial
+        boolean blendRepairMaterial,
+        boolean adaptiveBank
     ) {
         if (
             !"None".equals(center.sample().waterKind()) ||
@@ -1431,7 +1649,9 @@ public class GeoWorldShorelinePlanner {
         // block or above the low bank cap, so broad valleys and drainage
         // swales remain untouched.
         target = Math.min(target, center.groundBoundary() + 1);
-        target = Math.min(target, center.shoreWaterBoundary() + 1);
+        int waterCap = center.shoreWaterBoundary() +
+            (adaptiveBank ? Math.max(1, center.shoreDistance()) : 1);
+        target = Math.min(target, waterCap);
         if (target <= center.groundBoundary()) {
             return center;
         }

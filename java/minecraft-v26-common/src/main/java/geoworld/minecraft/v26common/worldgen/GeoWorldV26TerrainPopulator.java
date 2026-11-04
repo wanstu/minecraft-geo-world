@@ -5,10 +5,14 @@ import geoworld.minecraft.common.worldgen.GeoWorldShorelinePlanner;
 import geoworld.minecraft.common.worldgen.HeightMapping;
 import geoworld.runtime.GeoWorldV1;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.levelgen.Heightmap;
 
+import java.util.EnumSet;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -92,6 +96,11 @@ public final class GeoWorldV26TerrainPopulator {
 
         int baseX = chunk.getPos().getMinBlockX();
         int baseZ = chunk.getPos().getMinBlockZ();
+        String generationRulesVersion =
+            runtime.manifest().generationRulesVersion();
+        BlockState bedrockState = Blocks.BEDROCK.defaultBlockState();
+        BlockState deepslateState = Blocks.DEEPSLATE.defaultBlockState();
+        BlockState stoneState = Blocks.STONE.defaultBlockState();
 
         GeoWorldShorelinePlanner.ChunkPlan shoreline =
             shorelinePlanner.planChunkModel(runtime, baseX, baseZ);
@@ -105,6 +114,33 @@ public final class GeoWorldV26TerrainPopulator {
         Heightmap worldSurface = chunk.getOrCreateHeightmapUnprimed(
             Heightmap.Types.WORLD_SURFACE_WG
         );
+        var autoHeightmaps = chunk.getPersistedStatus().heightmapsAfter();
+        boolean autoOceanFloor = autoHeightmaps.contains(
+            Heightmap.Types.OCEAN_FLOOR_WG
+        );
+        boolean autoWorldSurface = autoHeightmaps.contains(
+            Heightmap.Types.WORLD_SURFACE_WG
+        );
+        boolean fastTerrainWrite =
+            chunk.getPersistedStatus() == ChunkStatus.BIOMES &&
+            autoOceanFloor &&
+            autoWorldSurface;
+        LevelChunkSection[] sections =
+            fastTerrainWrite ? chunk.getSections() : null;
+        int acquiredSectionCount = 0;
+        boolean[] touchedSections =
+            fastTerrainWrite ? new boolean[sections.length] : null;
+
+        try {
+            if (fastTerrainWrite) {
+                for (
+                    ;
+                    acquiredSectionCount < sections.length;
+                    acquiredSectionCount++
+                ) {
+                    sections[acquiredSectionCount].acquire();
+                }
+            }
 
         for (int localZ = 0; localZ < 16; localZ++) {
             for (int localX = 0; localX < 16; localX++) {
@@ -136,7 +172,82 @@ public final class GeoWorldV26TerrainPopulator {
                     Math.max(groundBoundary, waterBoundary)
                 );
 
-                for (int y = heights.minY(); y < maxBoundary; y++) {
+                int minY = heights.minY();
+                int deepEndExclusive = Math.max(
+                    minY,
+                    Math.min(
+                        maxBoundary,
+                        groundBoundary - (terracottaStrata ? 51 : 4)
+                    )
+                );
+
+                // Below the surface-material corridor the resolver is exactly
+                // bedrock/deepslate/stone. Write those states directly and
+                // reserve blockAt() for the shallow material and water layers.
+                if (fastTerrainWrite) {
+                    // Hold every chunk section once for the terrain fill
+                    // so each column can use the unchecked write overload
+                    // without repeating threading-detector acquire/release.
+                    int y = minY;
+                    while (y < maxBoundary) {
+                        int sectionIndex = chunk.getSectionIndex(y);
+                        LevelChunkSection section = sections[sectionIndex];
+                        touchedSections[sectionIndex] = true;
+                        int sectionEnd = Math.min(
+                            maxBoundary,
+                            (y & ~15) + 16
+                        );
+                        for (; y < sectionEnd; y++) {
+                            BlockState state;
+                            if (y < deepEndExclusive) {
+                                state = y == minY
+                                    ? bedrockState
+                                    : (y < 0
+                                        ? deepslateState
+                                        : stoneState);
+                            } else {
+                                state = blockResolver.blockAt(
+                                    column,
+                                    y,
+                                    surfaceBiome,
+                                    terracottaStrata,
+                                    worldX,
+                                    worldZ,
+                                    generationRulesVersion
+                                );
+                                if (state.isAir()) {
+                                    continue;
+                                }
+                            }
+                            section.getStates()
+                                .getAndSetUnchecked(
+                                    localX,
+                                    y & 15,
+                                    localZ,
+                                    state
+                                );
+                        }
+                    }
+                } else {
+                    for (int y = minY; y < deepEndExclusive; y++) {
+                    BlockState state = y == minY
+                        ? bedrockState
+                        : (y < 0 ? deepslateState : stoneState);
+
+                    blockSetter.set(
+                        chunk,
+                        pos.set(localX, y, localZ),
+                        state
+                    );
+                    if (!autoOceanFloor) {
+                        oceanFloor.update(localX, y, localZ, state);
+                    }
+                    if (!autoWorldSurface) {
+                        worldSurface.update(localX, y, localZ, state);
+                    }
+                }
+
+                for (int y = deepEndExclusive; y < maxBoundary; y++) {
                     BlockState state = blockResolver.blockAt(
                         column,
                         y,
@@ -144,7 +255,7 @@ public final class GeoWorldV26TerrainPopulator {
                         terracottaStrata,
                         worldX,
                         worldZ,
-                        runtime.manifest().generationRulesVersion()
+                        generationRulesVersion
                     );
                     if (state.isAir()) continue;
 
@@ -153,15 +264,45 @@ public final class GeoWorldV26TerrainPopulator {
                         pos.set(localX, y, localZ),
                         state
                     );
-                    oceanFloor.update(localX, y, localZ, state);
-                    worldSurface.update(localX, y, localZ, state);
+                    if (!autoOceanFloor) {
+                        oceanFloor.update(localX, y, localZ, state);
+                    }
+                    if (!autoWorldSurface) {
+                        worldSurface.update(localX, y, localZ, state);
+                    }
                 }
             }
         }
 
+        }
+        } finally {
+            if (fastTerrainWrite) {
+                for (int i = 0; i < sections.length; i++) {
+                    if (touchedSections[i]) {
+                        sections[i].recalcBlockCounts();
+                    }
+                }
+                for (int i = acquiredSectionCount - 1; i >= 0; i--) {
+                    sections[i].release();
+                }
+            }
+        }
+
+        if (fastTerrainWrite) {
+            Heightmap.primeHeightmaps(
+                chunk,
+                EnumSet.of(
+                    Heightmap.Types.OCEAN_FLOOR_WG,
+                    Heightmap.Types.WORLD_SURFACE_WG
+                )
+            );
+        }
+
         final long voxelReady = measure ? System.nanoTime() : 0L;
         structurePopulator.populate(chunk, runtime, seed, shoreline);
+        final long structuresReady = measure ? System.nanoTime() : 0L;
         cavePopulator.populate(chunk, runtime, seed, shoreline);
+        final long cavesReady = measure ? System.nanoTime() : 0L;
         mineralPopulator.populate(chunk, runtime, seed, shoreline);
         final long mineralsReady = measure ? System.nanoTime() : 0L;
         amethystPopulator.populate(chunk, runtime, seed, shoreline);
@@ -172,8 +313,11 @@ public final class GeoWorldV26TerrainPopulator {
                 shoreReady - modelReady,
                 biomeNanos,
                 Math.max(0L, voxelReady - shoreReady - biomeNanos),
-                mineralsReady - voxelReady,
-                System.nanoTime() - mineralsReady
+                structuresReady - voxelReady,
+                cavesReady - structuresReady,
+                mineralsReady - cavesReady,
+                System.nanoTime() - mineralsReady,
+                fastTerrainWrite
             );
         }
 

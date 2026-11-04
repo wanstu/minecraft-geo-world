@@ -13,6 +13,7 @@ import (
 
 	"geoworld/internal/generator"
 	"geoworld/internal/runtimeprofile"
+	"geoworld/internal/specialfeatures"
 	"geoworld/internal/world"
 	"geoworld/internal/worldmodelio"
 )
@@ -320,9 +321,26 @@ func collectSamples(m *generator.WorldModel) []sampleCheck {
 
 	checks := make([]sampleCheck, 0, len(points))
 	for _, p := range points {
+		expected := m.RuntimeProfile.Sample(p[0], p[1])
+		rules := m.Config.WorldProfile.GenerationRulesVersion
+		if (rules == "geoworld-rules-v1.1.11" ||
+			rules == "geoworld-rules-v1.1.12" ||
+			rules == "geoworld-rules-v1.1.13" ||
+			rules == "geoworld-rules-v1.1.14" ||
+			rules == "geoworld-rules-v1.1.15") &&
+			len(m.SpecialFeatures) > 0 {
+			expected = specialfeatures.Apply(
+				m.SpecialFeatures,
+				expected,
+				m.Config.SeaLevelNormalized,
+				p[0],
+				p[1],
+				rules,
+			)
+		}
 		checks = append(checks, sampleCheck{
 			X: p[0], Z: p[1],
-			Expected: m.RuntimeProfile.Sample(p[0], p[1]),
+			Expected: expected,
 		})
 	}
 	return checks

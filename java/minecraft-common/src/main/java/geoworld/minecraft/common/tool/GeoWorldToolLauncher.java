@@ -2,6 +2,8 @@ package geoworld.minecraft.common.tool;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -32,7 +34,16 @@ public final class GeoWorldToolLauncher {
         String resource =
             "/geoworld/tool/native/" + platform.id() + "/" + executableName;
 
-        Path tempDir = Files.createTempDirectory("geoworld-tool-");
+        // Keep native children in GeoWorld's own writable runtime directory.
+        // Some Windows environments deny Java-created executables in the
+        // global Temp directory even when the identical binary runs here.
+        String explicitCache = System.getProperty("geoworld.cache.dir");
+        Path cacheRoot = explicitCache != null && !explicitCache.isBlank()
+            ? Path.of(explicitCache)
+            : Path.of(System.getProperty("user.dir"), "geoworld-cache");
+        Path toolRoot = cacheRoot.toAbsolutePath().normalize().resolve("tool");
+        Files.createDirectories(toolRoot);
+        Path tempDir = Files.createTempDirectory(toolRoot, "run-");
         Path executable = tempDir.resolve(executableName);
         boolean started = false;
         try {
@@ -53,14 +64,22 @@ public final class GeoWorldToolLauncher {
             }
 
             ProcessBuilder builder = new ProcessBuilder(command).inheritIO();
-            Path launcher = Path.of(
-                GeoWorldToolLauncher.class.getProtectionDomain()
-                    .getCodeSource().getLocation().toURI()
-            ).toAbsolutePath().normalize();
-            if (Files.isRegularFile(launcher)) {
+            Path plannerClasspath = resolvePlannerClasspath();
+            if (plannerClasspath != null) {
                 builder.environment().put(
-                    "GEOWORLD_TOOL_JAR",
-                    launcher.toString()
+                    "GEOWORLD_TOOL_CLASSPATH",
+                    plannerClasspath.toString()
+                );
+                if (Files.isRegularFile(plannerClasspath)) {
+                    builder.environment().put(
+                        "GEOWORLD_TOOL_JAR",
+                        plannerClasspath.toString()
+                    );
+                }
+            } else {
+                System.err.println(
+                    "GeoWorld Web Tool warning: unable to resolve Java planner " +
+                    "classpath; exact minerals/strongholds will be unavailable"
                 );
             }
             Path javaExecutable = Path.of(
@@ -80,6 +99,64 @@ public final class GeoWorldToolLauncher {
             if (!started) {
                 deleteTree(tempDir);
             }
+        }
+    }
+
+    private static Path resolvePlannerClasspath() {
+        try {
+            URL location = GeoWorldToolLauncher.class.getProtectionDomain()
+                .getCodeSource().getLocation();
+            if (location != null && "file".equalsIgnoreCase(location.getProtocol())) {
+                Path direct = Path.of(location.toURI()).toAbsolutePath().normalize();
+                if (Files.exists(direct)) {
+                    return direct;
+                }
+            }
+        } catch (Exception ignored) {
+            // NeoForge may expose transformed classes through a union filesystem.
+        }
+
+        URL resource = GeoWorldToolLauncher.class.getResource(
+            "GeoWorldToolLauncher.class"
+        );
+        Path physicalJar = resolvePhysicalJarFromLocation(
+            resource == null ? null : resource.toExternalForm()
+        );
+        if (physicalJar != null && Files.isRegularFile(physicalJar)) {
+            return physicalJar;
+        }
+        return null;
+    }
+
+    static Path resolvePhysicalJarFromLocation(String location) {
+        if (location == null || location.isBlank()) {
+            return null;
+        }
+        String candidate = location.trim();
+        while (candidate.startsWith("jar:")) {
+            candidate = candidate.substring(4);
+        }
+        int jarEnd = candidate.toLowerCase(Locale.ROOT).indexOf(".jar");
+        if (jarEnd < 0) {
+            return null;
+        }
+        candidate = candidate.substring(0, jarEnd + 4);
+
+        while (candidate.startsWith("union:")) {
+            candidate = candidate.substring("union:".length());
+        }
+        try {
+            if (candidate.startsWith("file:")) {
+                return Path.of(URI.create(candidate))
+                    .toAbsolutePath().normalize();
+            }
+            if (!candidate.startsWith("/")) {
+                candidate = "/" + candidate;
+            }
+            return Path.of(URI.create("file:" + candidate))
+                .toAbsolutePath().normalize();
+        } catch (Exception ignored) {
+            return null;
         }
     }
 
@@ -169,6 +246,21 @@ public final class GeoWorldToolLauncher {
 
         public boolean isAlive() {
             return process.isAlive();
+        }
+
+        public long pid() {
+            return process.pid();
+        }
+
+        public Integer exitCodeIfExited() {
+            if (process.isAlive()) {
+                return null;
+            }
+            try {
+                return process.exitValue();
+            } catch (IllegalThreadStateException ignored) {
+                return null;
+            }
         }
 
         public int waitFor() throws InterruptedException {

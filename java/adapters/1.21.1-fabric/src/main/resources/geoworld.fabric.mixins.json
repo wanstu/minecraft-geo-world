@@ -5,8 +5,7 @@
     "MinecraftServerLifecycleMixin"
   ],
   "client": [
-    "WorldCreationUiStateMixin",
-    "PauseScreenMixin"
+    "WorldCreationUiStateMixin"
   ],
   "injectors": {
     "defaultRequire": 1

@@ -1,4 +1,5 @@
 {
+  "license": "BSD-3-Clause",
   "schemaVersion": 1,
   "id": "geoworld",
   "version": "${version}",
@@ -11,6 +12,9 @@
     ],
     "client": [
       "geoworld.fabric.client.GeoWorldFabricClientMod"
+    ],
+    "modmenu": [
+      "geoworld.fabric.client.GeoWorldModMenuApi"
     ]
   },
   "mixins": [
@@ -21,5 +25,8 @@
     "fabric-api": "*",
     "minecraft": "26.3",
     "java": ">=25"
+  },
+  "suggests": {
+    "modmenu": ">=21.0.0"
   }
 }

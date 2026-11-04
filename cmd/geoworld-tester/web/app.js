@@ -7,12 +7,20 @@ let busy=false;
 let serviceOnline=true;
 let mapLoadToken=0;
 let mapObjectURL=null;
+let mapAbortController=null;
 let renderedSeed=null;
+const mapLayerBlobCache=new Map();
+let mapLayerCacheWorldKey='';
 let modelNameTouched=false;
 let exportNameTouched=false;
 let lastExport=null;
 const MAX_MAP_ZOOM=1024;
-const FULL_DETAIL_ZOOM=MAX_MAP_ZOOM;
+const MINERAL_OVERVIEW_ZOOM=3;
+const MINERAL_DETAIL_ZOOM=10;
+const MINERAL_FULL_VIEW_MAX_SPAN=4000;
+const SPECIAL_DETAIL_ZOOM=16;
+const PEAK_DETAIL_ZOOM=16;
+const STRUCTURE_DETAIL_ZOOM=64;
 let mapZoom=1;
 let mapPanX=0;
 let mapPanY=0;
@@ -33,13 +41,20 @@ let structureCandidates=null;
 let structureLoadToken=0;
 let structureRefreshTimer=null;
 let featureRenderTimer=null;
+let densityCanvasHits=[];
+let mapOverlayFramePending=false;
 let touchPoints=new Map();
 let pinchStartDistance=0;
 let pinchStartZoom=1;
 let acceptanceData=null;
 let gameSession=null;
+let gameControlLocal=false;
 let gameSessionRevision=0;
 let syncingGameSession=false;
+let chunkSelectMode=false;
+let chunkRegionSelection=null;
+let chunkRegionDrag=null;
+let chunkCommandBusy=false;
 let inspectorTab='layers';
 let currentPage='world';
 
@@ -164,12 +179,34 @@ function clampMapZoom(v){
   return Math.max(1,Math.min(MAX_MAP_ZOOM,v));
 }
 
+function overlayInteractionBusy(){
+  return mapDragging||touchPoints.size>0;
+}
+
 function scheduleFeatureRender(delay=120){
   if(featureRenderTimer)clearTimeout(featureRenderTimer);
   featureRenderTimer=setTimeout(()=>{
     featureRenderTimer=null;
+    if(overlayInteractionBusy()){
+      scheduleFeatureRender(120);
+      return;
+    }
     renderFeatureOverlay();
   },delay);
+}
+
+function scheduleMapOverlayFrame(){
+  if(mapOverlayFramePending)return;
+  mapOverlayFramePending=true;
+  requestAnimationFrame(()=>{
+    mapOverlayFramePending=false;
+    renderExportOverlay();
+    renderChunkRegionOverlay();
+    renderCursorOverlay();
+    renderPlayerMarker();
+    positionFeatureOverlay();
+    renderDensityCanvas();
+  });
 }
 
 function applyMapTransform(){
@@ -179,14 +216,12 @@ function applyMapTransform(){
   wrap.classList.toggle('zoomed',mapZoom>1.001);
   $('mapZoomLabel').textContent=(mapZoom>=100?Math.round(mapZoom):mapZoom.toFixed(1))+'×';
   updateActionState();
-  requestAnimationFrame(()=>{
-    renderExportOverlay();
-    renderCursorOverlay();
-    positionFeatureOverlay();
-  });
-  scheduleFeatureRender();
-  scheduleMineralRefresh(180);
-  scheduleStructureRefresh(200);
+  scheduleMapOverlayFrame();
+  if(!overlayInteractionBusy()){
+    scheduleFeatureRender();
+    scheduleMineralRefresh(180);
+    scheduleStructureRefresh(200);
+  }
 }
 
 function resetMapView(){
@@ -224,6 +259,89 @@ function zoomMapCentered(factor){
     wrap.top+wrap.height/2,
     mapZoom*factor
   );
+}
+
+function renderPlayerMarker(){
+  const marker=$('playerMarker');
+  const player=gameSession?.state==='bound' ? gameSession.player : null;
+  if(!marker||!active||!player||$('mapWrap').classList.contains('empty')){
+    if(marker)marker.hidden=true;
+    return;
+  }
+  const g=active.geometry;
+  const fx=(Number(player.x)-g.OriginX)/g.SpanXBlocks;
+  const fz=(Number(player.z)-g.OriginZ)/g.SpanZBlocks;
+  if(!Number.isFinite(fx)||!Number.isFinite(fz)||fx<0||fx>1||fz<0||fz>1){
+    marker.hidden=true;
+    return;
+  }
+  const imgRect=$('map').getBoundingClientRect();
+  const wrapRect=$('mapWrap').getBoundingClientRect();
+  if(imgRect.width<=0||imgRect.height<=0){
+    marker.hidden=true;
+    return;
+  }
+  const yaw=Number.isFinite(Number(player.yaw))?Number(player.yaw):0;
+  marker.hidden=false;
+  marker.style.transition=overlayInteractionBusy()?'none':'left 180ms linear, top 180ms linear';
+  marker.style.left=(imgRect.left-wrapRect.left+fx*imgRect.width)+'px';
+  marker.style.top=(imgRect.top-wrapRect.top+fz*imgRect.height)+'px';
+  // Minecraft yaw: 0=south(+Z), 90=west(-X). The CSS arrow points north.
+  marker.style.transform='translate(-50%,-50%) rotate('+(yaw+180)+'deg)';
+  marker.title=
+    '玩家 '+Math.round(player.x)+', '+Math.round(player.y)+', '+Math.round(player.z)+
+    ' · yaw '+yaw.toFixed(1)+'°';
+}
+
+function playerDirectionLabel(yaw){
+  const normalized=((Number(yaw)||0)%360+360)%360;
+  const dirs=['南','西南','西','西北','北','东北','东','东南'];
+  return dirs[Math.round(normalized/45)%8];
+}
+
+function alignChunkRegion(a,b){
+  const minX=Math.floor(Math.min(a.x,b.x)/16)*16;
+  const minZ=Math.floor(Math.min(a.z,b.z)/16)*16;
+  const maxX=Math.floor(Math.max(a.x,b.x)/16)*16+15;
+  const maxZ=Math.floor(Math.max(a.z,b.z)/16)*16+15;
+  const chunksX=Math.max(1,Math.round((maxX-minX+1)/16));
+  const chunksZ=Math.max(1,Math.round((maxZ-minZ+1)/16));
+  return {x1:minX,z1:minZ,x2:maxX,z2:maxZ,chunksX,chunksZ,totalChunks:chunksX*chunksZ};
+}
+
+function renderChunkRegionOverlay(){
+  const el=$('chunkRegionSelection');
+  if(!el)return;
+  const region=chunkRegionSelection;
+  if(!active||!region||$('mapWrap').classList.contains('empty')){
+    el.hidden=true;
+    return;
+  }
+  const g=active.geometry;
+  const fx0=(region.x1-g.OriginX)/g.SpanXBlocks;
+  const fx1=((region.x2+1)-g.OriginX)/g.SpanXBlocks;
+  const fz0=(region.z1-g.OriginZ)/g.SpanZBlocks;
+  const fz1=((region.z2+1)-g.OriginZ)/g.SpanZBlocks;
+  if(fx1<=0||fx0>=1||fz1<=0||fz0>=1){
+    el.hidden=true;
+    return;
+  }
+  const imgRect=$('map').getBoundingClientRect();
+  const wrapRect=$('mapWrap').getBoundingClientRect();
+  if(imgRect.width<=0||imgRect.height<=0){
+    el.hidden=true;
+    return;
+  }
+  const left=Math.max(0,Math.min(1,fx0));
+  const right=Math.max(0,Math.min(1,fx1));
+  const top=Math.max(0,Math.min(1,fz0));
+  const bottom=Math.max(0,Math.min(1,fz1));
+  el.hidden=false;
+  el.style.left=(imgRect.left-wrapRect.left+left*imgRect.width)+'px';
+  el.style.top=(imgRect.top-wrapRect.top+top*imgRect.height)+'px';
+  el.style.width=Math.max(2,(right-left)*imgRect.width)+'px';
+  el.style.height=Math.max(2,(bottom-top)*imgRect.height)+'px';
+  el.title='Chunky 运行时预生成：'+region.totalChunks+' Chunks';
 }
 
 function renderCursorOverlay(){
@@ -306,6 +424,10 @@ function renderExportOverlay(){
 
 function updateActionState(){
   const gameBound=Boolean(gameSession&&gameSession.managed&&gameSession.state==='bound');
+  document.querySelectorAll('.controls .panel-body input,.controls .panel-body select,.controls .panel-body button')
+    .forEach(el=>{el.disabled=gameBound});
+  const controls=document.querySelector('.controls');
+  if(controls)controls.classList.toggle('game-bound-readonly',gameBound);
   $('generate').disabled=busy||!serviceOnline||gameBound;
   $('save').disabled=busy||!serviceOnline||!active||active.source!=='generated';
   $('load').disabled=busy||!serviceOnline||!$('models').value||gameBound;
@@ -339,6 +461,204 @@ function stageLabel(stage){
   return stageNames[stage]||stage||'准备';
 }
 
+function chunkStateLabel(state){
+  return ({
+    idle:'空闲',
+    existing:'检测到已有任务',
+    pending:'等待 Minecraft',
+    running:'正在预生成',
+    paused:'已暂停',
+    complete:'已完成',
+    canceled:'已取消',
+    failed:'执行失败'
+  })[state]||state||'空闲';
+}
+
+function formatChunkDuration(ms){
+  const seconds=Math.max(0,Math.floor((Number(ms)||0)/1000));
+  if(seconds<60)return seconds+' 秒';
+  const minutes=Math.floor(seconds/60);
+  const rest=seconds%60;
+  return minutes+' 分 '+rest+' 秒';
+}
+
+async function sendChunkCommand(action){
+  if(chunkCommandBusy)return;
+  const region=chunkRegionSelection;
+  if(action==='start'&&!region)return;
+  if(action==='start'&&region.totalChunks>50000){
+    if(!confirm('该区域包含 '+region.totalChunks.toLocaleString()+' 个 Chunk，运行时预生成可能持续较久并占用大量磁盘。仍然开始吗？'))return;
+  }
+  chunkCommandBusy=true;
+  renderChunkGenerationPanel(gameSession);
+  try{
+    const payload={action};
+    if(action==='start'){
+      Object.assign(payload,{x1:region.x1,z1:region.z1,x2:region.x2,z2:region.z2});
+    }
+    const result=await api('/api/game/chunks',{
+      method:'POST',
+      body:JSON.stringify(payload)
+    });
+    if(gameSession&&result.chunkGeneration){
+      gameSession={...gameSession,chunkGeneration:result.chunkGeneration};
+      renderGameSession(gameSession);
+    }
+  }catch(e){
+    setMapNotice(e.message,'error');
+  }finally{
+    chunkCommandBusy=false;
+    renderChunkGenerationPanel(gameSession);
+  }
+}
+
+function renderChunkGenerationPanel(session){
+  const panel=$('chunkGenerationPanel');
+  if(!panel)return;
+  const bound=session?.state==='bound'&&gameControlLocal;
+  panel.hidden=!bound;
+  if(!bound){
+    chunkSelectMode=false;
+    $('mapWrap')?.classList.remove('chunk-select-mode');
+    return;
+  }
+  const chunk=session.chunkGeneration||{state:'idle',available:false};
+  const state=chunk.state||'idle';
+  if(
+    !chunkRegionSelection &&
+    Number.isFinite(Number(chunk.x1)) &&
+    Number.isFinite(Number(chunk.z1)) &&
+    Number.isFinite(Number(chunk.x2)) &&
+    Number.isFinite(Number(chunk.z2)) &&
+    Number(chunk.x2)>=Number(chunk.x1) &&
+    Number(chunk.z2)>=Number(chunk.z1) &&
+    (state==='pending'||state==='running'||state==='paused'||state==='existing')
+  ){
+    const chunksX=Math.floor((Number(chunk.x2)-Number(chunk.x1)+1)/16);
+    const chunksZ=Math.floor((Number(chunk.z2)-Number(chunk.z1)+1)/16);
+    chunkRegionSelection={
+      x1:Number(chunk.x1),z1:Number(chunk.z1),
+      x2:Number(chunk.x2),z2:Number(chunk.z2),
+      chunksX,chunksZ,totalChunks:Number(chunk.totalChunks)||chunksX*chunksZ
+    };
+    renderChunkRegionOverlay();
+  }
+
+  const status=$('chunkGenerationStatus');
+  status.textContent=chunk.available===false&&state==='idle'
+    ?'Chunky 未检测到'
+    :chunkStateLabel(state);
+
+  const selection=$('chunkGenerationSelection');
+  const region=chunkRegionSelection;
+  if(region){
+    selection.textContent=
+      'X '+region.x1+' ～ '+region.x2+
+      ' · Z '+region.z1+' ～ '+region.z2+
+      ' · '+region.chunksX+'×'+region.chunksZ+
+      ' = '+region.totalChunks.toLocaleString()+' Chunks';
+  }else if(state==='existing'){
+    selection.textContent='检测到 Chunky 已保存/运行中的任务，可继续或取消；不会自动覆盖。';
+  }else{
+    selection.textContent='在地图上框选矩形区域，自动对齐到 16×16 Chunk。';
+  }
+
+  const processed=Math.max(0,Number(chunk.processedChunks)||0);
+  const total=Math.max(0,Number(chunk.totalChunks)||0);
+  const reportedPercent=Math.max(0,Math.min(100,Number(chunk.percent)||0));
+  const percent=reportedPercent>0
+    ?reportedPercent
+    :(total>0?Math.max(0,Math.min(100,processed/total*100)):0);
+  const rate=Math.max(0,Number(chunk.rate)||0);
+  const currentX=Number(chunk.currentChunkX);
+  const currentZ=Number(chunk.currentChunkZ);
+  const hasCurrent=Number.isFinite(currentX)&&Number.isFinite(currentZ)&&
+    (rate>0||state==='running');
+  const progress=$('chunkGenerationProgress');
+  const bar=progress?.querySelector('span');
+  const progressActive=processed>0||state==='running'||state==='paused'||
+    state==='complete'||state==='existing';
+  if(progress){
+    progress.hidden=!progressActive;
+    if(bar)bar.style.width=percent+'%';
+    const pieces=[
+      total>0
+        ?processed.toLocaleString()+' / '+total.toLocaleString()+' Chunks'
+        :processed.toLocaleString()+' Chunks',
+      percent.toFixed(1)+'%',
+      formatChunkDuration(chunk.elapsedMillis)
+    ];
+    if(rate>0)pieces.push(rate.toFixed(1)+' cps');
+    if(hasCurrent)pieces.push('Chunk '+currentX+', '+currentZ);
+    progress.title=pieces.join(' · ');
+  }
+
+  if(status&&progressActive){
+    const pieces=[
+      chunkStateLabel(state),
+      total>0
+        ?processed.toLocaleString()+' / '+total.toLocaleString()
+        :'已处理 '+processed.toLocaleString()+' Chunks'
+    ];
+    if(percent>0||total>0)pieces.push(percent.toFixed(1)+'%');
+    if(rate>0)pieces.push(rate.toFixed(1)+' cps');
+    if(hasCurrent)pieces.push('Chunk '+currentX+', '+currentZ);
+    pieces.push(formatChunkDuration(chunk.elapsedMillis));
+    status.textContent=pieces.join(' · ');
+  }
+
+  const activeTask=state==='running'||state==='paused'||state==='existing'||state==='pending';
+  const select=$('chunkSelectRegion');
+  const start=$('chunkStart');
+  const pause=$('chunkPause');
+  const resume=$('chunkContinue');
+  const cancel=$('chunkCancel');
+  const clear=$('chunkClearRegion');
+  if(select){
+    select.disabled=chunkCommandBusy||activeTask;
+    select.textContent=chunkSelectMode?'拖动地图框选…':'框选区域';
+    select.onclick=()=>{
+      if(activeTask||chunkCommandBusy)return;
+      chunkSelectMode=!chunkSelectMode;
+      chunkRegionDrag=null;
+      $('mapWrap').classList.toggle('chunk-select-mode',chunkSelectMode);
+      select.textContent=chunkSelectMode?'拖动地图框选…':'框选区域';
+      setMapNotice(chunkSelectMode?'在地图上按住左键拖出需要预生成的矩形区域。':'');
+    };
+  }
+  if(start){
+    start.disabled=chunkCommandBusy||activeTask||!region||!chunk.available;
+    start.onclick=()=>void sendChunkCommand('start');
+  }
+  if(pause){
+    pause.hidden=state!=='running';
+    pause.disabled=chunkCommandBusy;
+    pause.onclick=()=>void sendChunkCommand('pause');
+  }
+  if(resume){
+    resume.hidden=!(state==='paused'||state==='existing');
+    resume.disabled=chunkCommandBusy||!chunk.available;
+    resume.onclick=()=>void sendChunkCommand('continue');
+  }
+  if(cancel){
+    cancel.hidden=!(state==='running'||state==='paused'||state==='existing');
+    cancel.disabled=chunkCommandBusy||!chunk.available;
+    cancel.onclick=()=>{
+      if(confirm('取消当前 Chunky 任务？已经生成的区块会保留，只删除任务本身。')){
+        void sendChunkCommand('cancel');
+      }
+    };
+  }
+  if(clear){
+    clear.disabled=chunkCommandBusy||activeTask||!region;
+    clear.onclick=()=>{
+      chunkRegionSelection=null;
+      renderChunkRegionOverlay();
+      renderChunkGenerationPanel(gameSession);
+    };
+  }
+}
+
 function renderGameSession(session){
   const card=$('gameSessionCard');
   if(!session||!session.managed){
@@ -357,15 +677,34 @@ function renderGameSession(session){
   })[session.state]||'已连接';
   const detail=$('gameSessionDetail');
   if(session.state==='bound'){
+    syncMineralFilterOptions(session.oreFamilies||[]);
+    const player=session.player;
+    const playerHtml=player
+      ?'<div class="game-player-position"><b>玩家位置</b><code>'+
+        Math.round(player.x)+', '+Math.round(player.y)+', '+Math.round(player.z)+
+        '</code><span class="game-player-facing">朝向 '+playerDirectionLabel(player.yaw)+'</span>'+
+        '<button id="gameLocatePlayer" type="button">地图定位</button></div>'
+      :'<div class="game-player-position waiting">等待玩家位置…</div>';
     detail.innerHTML=
       '<b>'+escapeHtml(session.worldName||'GeoWorld 世界')+'</b>'+
       ' · Seed '+escapeHtml(String(session.seed))+'<br>'+
       'Minecraft '+escapeHtml(session.minecraftVersion||'—')+
       ' · '+escapeHtml(session.generationRulesVersion||'—')+
       '<br>'+escapeHtml(session.worldModelVersion||'—')+
-      (session.dynamicWorldgen?' · 动态世界生成':' · 已绑定世界模型');
+      (session.dynamicWorldgen?' · 动态世界生成':' · 已绑定世界模型')+
+      (!gameControlLocal?'<br><span class="muted">远程浏览模式 · 传送控制仅本机可用</span>':'')+
+      playerHtml;
+    const locate=$('gameLocatePlayer');
+    if(locate&&player){
+      locate.onclick=()=>{
+        centerMapOnWorld(player.x,player.z,Math.max(mapZoom,16));
+        void focusWorldPoint(player.x,player.z);
+      };
+    }
+    renderChunkGenerationPanel(session);
   }else{
     detail.textContent=session.message||'当前没有已绑定的 GeoWorld 世界。';
+    $('chunkGenerationPanel').hidden=true;
   }
 }
 
@@ -381,6 +720,13 @@ function clearGameWorldView(session){
   clearExportResult();
   lastFocusPoint=null;
   renderedSeed=null;
+  mapLayerBlobCache.clear();
+  mapLayerCacheWorldKey='';
+  chunkSelectMode=false;
+  chunkRegionDrag=null;
+  chunkRegionSelection=null;
+  $('mapWrap').classList.remove('chunk-select-mode');
+  renderChunkRegionOverlay();
   if(mapObjectURL){
     URL.revokeObjectURL(mapObjectURL);
     mapObjectURL=null;
@@ -402,7 +748,20 @@ function clearGameWorldView(session){
 }
 
 async function applyGameWorld(next,session){
+  const previous=active;
+  const sameWorld=Boolean(
+    previous&&
+    previous.seed===next.seed&&
+    previous.geometry&&next.geometry&&
+    previous.geometry.Width===next.geometry.Width&&
+    previous.geometry.Height===next.geometry.Height&&
+    previous.geometry.OriginX===next.geometry.OriginX&&
+    previous.geometry.OriginZ===next.geometry.OriginZ&&
+    previous.geometry.SpanXBlocks===next.geometry.SpanXBlocks&&
+    previous.geometry.SpanZBlocks===next.geometry.SpanZBlocks
+  );
   active=next;
+  if($('aboutRules'))$('aboutRules').textContent=active.generationRulesVersion||'—';
   acceptanceData=null;
   previewFeatures=null;
   resetMineralPreview();
@@ -410,7 +769,7 @@ async function applyGameWorld(next,session){
   clearAcceptanceView();
   clearExportResult();
   clearSample();
-  resetMapView();
+  if(!sameWorld)resetMapView();
 
   $('seed').value=active.seed;
   $('width').value=active.geometry.Width;
@@ -457,6 +816,8 @@ async function applyGameWorld(next,session){
 async function syncGameSessionStatus(status){
   const session=status?.gameSession||null;
   gameSession=session;
+  gameControlLocal=Boolean(status?.localGameControl);
+  renderPlayerMarker();
   renderGameSession(session);
   updateActionState();
   if(!session||!session.managed)return;
@@ -614,6 +975,7 @@ $('generate').onclick=async()=>{
       parameters:$('worldPreset').value==='custom' ? $('parameterCsv').value.trim() : ''
     })});
     active=next;
+    if($('aboutRules'))$('aboutRules').textContent=active.generationRulesVersion||'—';
     acceptanceData=null;
     previewFeatures=null;
     resetMineralPreview();
@@ -664,15 +1026,42 @@ document.querySelectorAll('.layer').forEach(btn=>btn.onclick=()=>{
   selectLayer(btn.dataset.layer);
 });
 
+function mapLayerWorldKey(){
+  if(!active)return '';
+  const g=active.geometry||{};
+  return [
+    active.seed,
+    active.modelPath||'',
+    active.parameterSnapshotSha256||active.parameterSnapshotSHA256||'',
+    g.Width||0,g.Height||0,g.OriginX||0,g.OriginZ||0,
+    g.SpanXBlocks||0,g.SpanZBlocks||0
+  ].join('|');
+}
+
+function ensureMapLayerCacheWorld(){
+  const key=mapLayerWorldKey();
+  if(key!==mapLayerCacheWorldKey){
+    mapLayerBlobCache.clear();
+    mapLayerCacheWorldKey=key;
+  }
+  return key;
+}
+
 function mapRenderSize(){
-  const wrap=$('mapWrap').getBoundingClientRect();
   const aspect=Math.max(.2,active.geometry.SpanXBlocks/active.geometry.SpanZBlocks);
-  const dpr=Math.min(2,window.devicePixelRatio||1);
-  let width=Math.round(Math.max(1200,wrap.width*dpr*1.7));
-  width=Math.min(2400,width);
-  let height=Math.round(width/aspect);
-  if(height>1600){height=1600;width=Math.min(2400,Math.round(height*aspect));}
-  if(height<600){height=600;width=Math.min(2400,Math.round(height*aspect));}
+  // The base map comes from the World Model grid. Rendering a 2400px image
+  // from a 320x200 model only repeats identical grid lookups and burns CPU.
+  // Keep roughly two image pixels per model node; vector/canvas overlays carry
+  // the fine zoomed detail.
+  const gridWidth=Math.max(16,Number(active.geometry.Width)||320);
+  const gridHeight=Math.max(16,Number(active.geometry.Height)||200);
+  // Do not oversample the raster beyond the World Model grid. Browser zoom
+  // handles display scaling, while overlays provide fine-grained interaction.
+  let width=Math.min(960,Math.max(320,Math.round(gridWidth)));
+  let height=Math.min(640,Math.max(200,Math.round(gridHeight)));
+  if(Math.abs(width/height-aspect)>0.02){
+    height=Math.max(200,Math.min(640,Math.round(width/aspect)));
+  }
   return {width,height};
 }
 
@@ -681,15 +1070,39 @@ async function loadMap(){
   const token=++mapLoadToken;
   const targetSeed=active.seed;
   const oldSeed=renderedSeed;
+  const size=mapRenderSize();
+  const worldKey=ensureMapLayerCacheWorld();
+  const cacheKey=`${worldKey}|${layer}|${size.width}x${size.height}`;
+  const cachedBlob=mapLayerBlobCache.get(cacheKey);
+  if(cachedBlob){
+    const nextURL=URL.createObjectURL(cachedBlob);
+    if(mapObjectURL)URL.revokeObjectURL(mapObjectURL);
+    mapObjectURL=nextURL;
+    $('map').src=nextURL;
+    $('mapWrap').classList.remove('empty');
+    renderedSeed=targetSeed;
+    setMapNotice('');
+    return;
+  }
   setMapNotice(`正在渲染 ${layerName(layer)}…`,'warn');
+  if(mapAbortController)mapAbortController.abort();
+  const controller=new AbortController();
+  mapAbortController=controller;
+  const timeout=setTimeout(()=>controller.abort(),20000);
   let r;
   try{
-    const size=mapRenderSize();
-    r=await fetch(`/api/layer?name=${encodeURIComponent(layer)}&width=${size.width}&height=${size.height}&t=${Date.now()}`);
+    r=await fetch(`/api/layer?name=${encodeURIComponent(layer)}&width=${size.width}&height=${size.height}`,{signal:controller.signal});
   }catch(err){
+    if(err?.name==='AbortError'){
+      if(token===mapLoadToken)setMapNotice('地图渲染超时，请重试或切换图层。','error');
+      return;
+    }
     updateBackend(false);
     setMapNotice(oldSeed===null?'地图加载失败：后端已断开。':`地图加载失败；当前仍显示 Seed ${oldSeed} 的旧地图。`,'error');
     return;
+  }finally{
+    clearTimeout(timeout);
+    if(mapAbortController===controller)mapAbortController=null;
   }
   updateBackend(true);
   if(!r.ok){
@@ -699,6 +1112,7 @@ async function loadMap(){
   }
   const blob=await r.blob();
   if(token!==mapLoadToken)return;
+  mapLayerBlobCache.set(cacheKey,blob);
   const nextURL=URL.createObjectURL(blob);
   if(mapObjectURL)URL.revokeObjectURL(mapObjectURL);
   mapObjectURL=nextURL;
@@ -716,8 +1130,102 @@ function layerName(v){
     water:'水体',
     surface:'地表',
     minerals:'矿产分区',
+    settlement:'建城推荐',
+    navigation:'航运与港口',
+    mining:'矿业选址',
+    civilization:'聚落角色',
+    transport:'地形通道',
+    advantage:'区域用途',
     tectonic:'地质构造'
   })[v]||v;
+}
+
+function layerLegendConfig(name){
+  return {
+    settlement:{
+      title:'建城推荐',
+      hint:'只高亮中高适宜度区域；没有着色的地方保留真实地形。',
+      items:[
+        ['#44bc7d','优先建城','综合条件优秀'],
+        ['#5b9759','适合建城','整体条件较好'],
+        ['#aba25b','可考虑','有优点但需要取舍']
+      ]
+    },
+    navigation:{
+      title:'航运与港口',
+      hint:'水面看航行条件，陆地只突出较好的港口候选。',
+      items:[
+        ['#2a97c6','易航水道','河宽/坡降条件较好'],
+        ['#b14d3e','航运瓶颈','狭窄、坡降或连接风险较高'],
+        ['#4cb07e','港口候选','靠水且建设条件较好']
+      ]
+    },
+    mining:{
+      title:'矿业选址',
+      hint:'颜色表示适合建设哪类矿区；真实矿体仍看“真实规划矿体”图标。',
+      items:[
+        ['#a57240','表层矿区','适合露天/近地表开发'],
+        ['#917848','浅层矿区','适合浅层矿业'],
+        ['#695c7e','深层矿区','深部资源潜力更好'],
+        ['#97874e','综合矿区','多种深度或资源组合']
+      ]
+    },
+    civilization:{
+      title:'聚落角色',
+      hint:'表示“这里最适合发展成什么”，不是已经生成了城市。',
+      items:[
+        ['#5ba95c','农业聚落','耕作与居住条件好'],
+        ['#3e8fbc','港口城市','航运与港口条件好'],
+        ['#ae7444','矿业城镇','矿业条件突出'],
+        ['#c1a14d','交通节点','自然通道汇集'],
+        ['#9c66b7','综合枢纽','多种优势重合']
+      ]
+    },
+    transport:{
+      title:'地形通道',
+      hint:'看天然好走的路线和关键瓶颈，不代表自动生成道路。',
+      items:[
+        ['#509986','河谷走廊','沿河谷较容易通行'],
+        ['#b18959','山口通道','穿越山地的低成本入口'],
+        ['#a17ea3','盆地出口','盆地对外连接位置'],
+        ['#4ea0bc','海峡/地峡','水陆交通瓶颈']
+      ]
+    },
+    advantage:{
+      title:'区域用途',
+      hint:'每个区域按最突出的自然优势分类，适合做长期建设分区。',
+      items:[
+        ['#7d97ab','建设区','地形适合大规模建设'],
+        ['#5ca95b','农业区','耕作条件突出'],
+        ['#3d8fbe','港口区','岸线与航运优势突出'],
+        ['#b17442','矿业区','资源开发优势突出'],
+        ['#c7a44a','交通区','自然交通优势突出'],
+        ['#9b68b6','综合区','多种优势同时较高']
+      ]
+    }
+  }[name]||null;
+}
+
+function updateLayerLegend(){
+  const el=$('mapLegend');
+  if(!el)return;
+  const cfg=layerLegendConfig(layer);
+  if(!cfg){
+    el.hidden=true;
+    el.innerHTML='';
+    return;
+  }
+  el.hidden=false;
+  el.innerHTML=
+    '<div class="map-legend-title">'+escapeHtml(cfg.title)+'</div>'+
+    '<div class="map-legend-hint">'+escapeHtml(cfg.hint)+'</div>'+
+    '<div class="map-legend-items">'+cfg.items.map(item=>
+      '<div class="map-legend-row">'+
+        '<span class="map-legend-swatch" style="background:'+item[0]+'"></span>'+
+        '<b>'+escapeHtml(item[1])+'</b>'+
+        '<span>'+escapeHtml(item[2])+'</span>'+
+      '</div>'
+    ).join('')+'</div>';
 }
 
 function updateLayerHelp(){
@@ -728,9 +1236,16 @@ function updateLayerHelp(){
     water:'水体：显示海洋、湖泊与河流的最终 Runtime 判定；河流/湖泊几何还会作为独立要素覆盖在地图上。',
     surface:'地表：显示森林土壤、草地、沙漠、湿地、裸岩、雪地等最终地表方案。',
     minerals:'矿产分区：按地形和生态条件显示各区域的主要矿产倾向；这是地质分区，不伪装成单个矿脉坐标。',
+    settlement:'建城推荐：只高亮值得优先查看的建城区域；点地图可看淡水、农业、坡度、洪水、交通和资源等具体原因。',
+    navigation:'航运与港口：直接看可航水道、航运瓶颈和港口候选；没有着色的陆地仍按真实地形显示。',
+    mining:'矿业选址：突出有明显矿业优势的区域；真实矿体位置仍由“真实规划矿体”图标单独显示。',
+    civilization:'聚落角色：表示一个位置更适合农业聚落、港口城市、矿业城镇、交通节点还是综合枢纽；节点和关系线比底色更重要。',
+    transport:'地形通道：突出河谷、山口、高原入口、盆地出口、低分水岭和海峡/地峡等天然好走路线，不代表自动生成道路。',
+    advantage:'区域用途：把大区域直接归纳成建设、农业、港口、矿业、交通或综合优势区，适合做长期城市与产业布局。',
     tectonic:'地质构造：显示 GeoWorld 自身的造山带、裂谷、岛弧、海沟、洋中脊等构造场。'
   };
   $('layerHelp').textContent=help[layer]||'';
+  updateLayerLegend();
 }
 
 $('mapZoomIn').onclick=()=>zoomMapCentered(1.25);
@@ -770,17 +1285,40 @@ function centerMapOnWorld(x,z,targetZoom=Math.max(4,mapZoom)){
   applyMapTransform();
 }
 
+function parseWorldCoordinates(raw){
+  const text=String(raw||'').trim();
+  if(!text)return null;
+  const values=text
+    .replace(/,/g,' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter(token=>/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(token))
+    .map(Number);
+  if(values.length>=3){
+    const [x,y,z]=values.slice(-3);
+    return Number.isFinite(x)&&Number.isFinite(y)&&Number.isFinite(z)?{x,y,z}:null;
+  }
+  if(values.length===2){
+    const [x,z]=values;
+    return Number.isFinite(x)&&Number.isFinite(z)?{x,y:null,z}:null;
+  }
+  return null;
+}
+
 $('jumpToCoord').onclick=async()=>{
   if(!active)return;
-  const x=Number($('jumpX').value);
-  const z=Number($('jumpZ').value);
-  if(!Number.isFinite(x)||!Number.isFinite(z))return;
-  centerMapOnWorld(x,z);
-  await focusWorldPoint(x,z);
+  const parsed=parseWorldCoordinates($('jumpCoord').value);
+  if(!parsed){
+    setMapNotice('无法解析坐标。支持：3648 139 7872、3648 7872、/tp @s 3648 139 7872。','error');
+    return;
+  }
+  setMapNotice('');
+  centerMapOnWorld(parsed.x,parsed.z);
+  await focusWorldPoint(parsed.x,parsed.z);
 };
-['jumpX','jumpZ'].forEach(id=>$(id).addEventListener('keydown',e=>{
+$('jumpCoord').addEventListener('keydown',e=>{
   if(e.key==='Enter')$('jumpToCoord').click();
-}));
+});
 
 $('mapWrap').addEventListener('wheel',e=>{
   if(!active||$('mapWrap').classList.contains('empty'))return;
@@ -811,6 +1349,17 @@ $('mapWrap').addEventListener('pointerdown',e=>{
   if(!active||$('mapWrap').classList.contains('empty'))return;
   if(e.pointerType==='mouse'&&e.button!==0)return;
   if(e.target.closest?.('.mobile-map-actions'))return;
+  if(chunkSelectMode){
+    const p=worldPointFromClient(e.clientX,e.clientY);
+    if(!p)return;
+    chunkRegionDrag={pointerId:e.pointerId,start:p,current:p};
+    chunkRegionSelection=alignChunkRegion(p,p);
+    try{$('mapWrap').setPointerCapture(e.pointerId)}catch(_){}
+    renderChunkRegionOverlay();
+    renderChunkGenerationPanel(gameSession);
+    e.preventDefault();
+    return;
+  }
   touchPoints.set(e.pointerId,{x:e.clientX,y:e.clientY});
   try{$('mapWrap').setPointerCapture(e.pointerId)}catch(_){}
   if(touchPoints.size>=2){
@@ -834,6 +1383,17 @@ $('mapWrap').addEventListener('pointerdown',e=>{
 });
 
 $('mapWrap').addEventListener('pointermove',e=>{
+  if(chunkRegionDrag&&chunkRegionDrag.pointerId===e.pointerId){
+    const p=worldPointFromClient(e.clientX,e.clientY);
+    if(p){
+      chunkRegionDrag.current=p;
+      chunkRegionSelection=alignChunkRegion(chunkRegionDrag.start,p);
+      renderChunkRegionOverlay();
+      renderChunkGenerationPanel(gameSession);
+    }
+    e.preventDefault();
+    return;
+  }
   if(touchPoints.has(e.pointerId))touchPoints.set(e.pointerId,{x:e.clientX,y:e.clientY});
   if(touchPoints.size>=2&&pinchStartDistance>0){
     const distance=pointerDistance();
@@ -856,6 +1416,20 @@ $('mapWrap').addEventListener('pointermove',e=>{
 });
 
 function finishMapPointer(e){
+  if(chunkRegionDrag&&chunkRegionDrag.pointerId===e.pointerId){
+    const finalPoint=worldPointFromClient(e.clientX,e.clientY)||chunkRegionDrag.current;
+    chunkRegionSelection=alignChunkRegion(chunkRegionDrag.start,finalPoint);
+    chunkRegionDrag=null;
+    chunkSelectMode=false;
+    $('mapWrap').classList.remove('chunk-select-mode');
+    try{$('mapWrap').releasePointerCapture(e.pointerId)}catch(_){}
+    suppressMapClick=true;
+    setTimeout(()=>{suppressMapClick=false},0);
+    renderChunkRegionOverlay();
+    renderChunkGenerationPanel(gameSession);
+    setMapNotice('已框选 '+chunkRegionSelection.totalChunks.toLocaleString()+' 个 Chunk，可开始运行时预生成。');
+    return;
+  }
   touchPoints.delete(e.pointerId);
   try{$('mapWrap').releasePointerCapture(e.pointerId)}catch(_){}
   if(touchPoints.size>=2){
@@ -880,6 +1454,9 @@ function finishMapPointer(e){
     setTimeout(()=>{suppressMapClick=false},0);
   }
   updateActionState();
+  scheduleFeatureRender(40);
+  scheduleMineralRefresh(80);
+  scheduleStructureRefresh(100);
 }
 $('mapWrap').addEventListener('pointerup',finishMapPointer);
 $('mapWrap').addEventListener('pointercancel',finishMapPointer);
@@ -888,6 +1465,16 @@ $('mapWrap').addEventListener('click',async e=>{
   if(e.target.closest?.('.mobile-map-actions'))return;
   if(suppressMapClick){
     suppressMapClick=false;
+    return;
+  }
+  const densityHit=densityCanvasHitAt(e.clientX,e.clientY);
+  if(densityHit){
+    if(densityHit.type==='mineral'){
+      showMineralDetail(densityHit.item);
+    }else if(densityHit.type==='structure'){
+      showStructureDetail(densityHit.item);
+    }
+    await focusWorldPoint(densityHit.item.x,densityHit.item.z,{preserveFeatureDetail:true});
     return;
   }
   const p=worldPointFromClient(e.clientX,e.clientY);
@@ -913,6 +1500,7 @@ $('load').onclick=async()=>{
   $('modelMessage').textContent='';
   try{
     active=await api('/api/load',{method:'POST',body:JSON.stringify({name})});
+    if($('aboutRules'))$('aboutRules').textContent=active.generationRulesVersion||'—';
     acceptanceData=null;
     previewFeatures=null;
     resetMineralPreview();
@@ -1058,12 +1646,22 @@ function renderStats(){
   if(!active)return;
   const g=active.geometry;
   const cell=g.Width>1?g.SpanXBlocks/(g.Width-1):0;
+  const scope=active.scopeBudget||null;
+  const regionalRegions=active.regionalRegions||null;
+  const scopeStatusZh={comfortable:'宽裕',adequate:'充足',crowded:'拥挤',insufficient:'不足',invalid:'无效'};
   $('stats').outerHTML=`<div id="stats">
     ${kv('来源',active.source==='generated'?'刚生成':active.source==='game'?'当前游戏世界':'模型重开')}
     ${kv('Seed',active.seed)}
     ${kv('网格',g.Width+' × '+g.Height)}
     ${kv('采样间距',Math.round(cell)+' 方块 / 点')}
     ${kv('世界范围',Math.round(g.SpanXBlocks)+' × '+Math.round(g.SpanZBlocks)+' 方块')}
+    ${scope?kv('MACRO-06 空间预算',(scope.macro06Satisfied?'通过':'失败')+' · '+(scopeStatusZh[scope.status]||scope.status)):''}
+    ${scope?kv('最大宏观尺度',Math.round(Number(scope.maxScaleBlocks||0))+' 方块 · '+String(scope.maxScaleName||'—')):''}
+    ${scope?kv('尺度容量',Number(scope.scaleCapacity||0).toFixed(2)+' ×'):''}
+    ${scope?kv('内部空间',(Number(scope.interiorFraction||0)*100).toFixed(1)+'%'):''}
+    ${regionalRegions?kv('连续优势区域',Number(regionalRegions.totalRegions||0).toLocaleString()):''}
+    ${regionalRegions?kv('最大区域占比',(Number(regionalRegions.largestRegionShare||0)*100).toFixed(1)+'%'):''}
+    ${regionalRegions?kv('小型优势区域',Number(regionalRegions.smallRegions||0).toLocaleString()):''}
     ${kv('板块数',active.plateCount)}
     ${kv('洋壳比例',Number(active.oceanFraction).toFixed(2))}
     ${kv('大陆破碎度',Number(active.continentFragmentation).toFixed(2))}
@@ -1137,11 +1735,125 @@ function renderSample(s){
   const water=s.waterSurfaceDefined
     ?`${waterKind} · 水面 ${f(s.waterSurfaceElevation)} · 深度 ${f(s.waterDepth)}`
     :waterKind;
+  const command=tpCommand(s.x,s.teleportY??s.y,s.z);
+  const gameBound=canControlGame();
+  const settlement=s.settlement||null;
+  const navigation=s.navigation||null;
+  const mining=s.mining||null;
+  const regionalAdvantage=s.regionalAdvantage||null;
+  const regionalRegion=s.regionalRegion||null;
+  const transportGeography=s.transportGeography||null;
+  const civilization=s.civilization||null;
+  const percent=v=>`${Math.round(Math.max(0,Math.min(1,Number(v)||0))*100)}%`;
+  const areaBlocks2=v=>`${Math.round(Math.max(0,Number(v)||0)).toLocaleString()} 方块²`;
+  const waterwayClassZh=v=>({none:'无',non_navigable:'不可航行',local_waterway:'地方水路',river:'可航河流',major_river:'主干航道',lake:'湖泊航道',shallow_lake:'浅湖水域',open_sea:'开放海域',shallow_sea:'浅海水域'})[String(v||'')]||String(v||'—');
+  const portTypeZh=v=>({none:'无',river:'河港',lake:'湖港',sea:'海港'})[String(v||'')]||String(v||'—');
+  const miningClassZh=v=>({none:'无',low_potential:'低潜力',surface_district:'露天矿区',shallow_district:'浅层矿区',deep_district:'深层矿区',mixed_district:'复合矿区'})[String(v||'')]||String(v||'—');
+  const mineralZh=v=>({coal:'煤',iron:'铁',copper:'铜',gold:'金',lapis:'青金石',redstone:'红石',diamond:'钻石',emerald:'绿宝石'})[String(v||'')]||String(v||'—');
+  const advantageZh=v=>({none:'无',building:'建设',agriculture:'农业',port:'港口',mining:'矿业',transport:'交通'})[String(v||'')]||String(v||'—');
+  const regionalClassZh=v=>({none:'无',low_potential:'低潜力区',building_region:'建设优势区',agriculture_region:'农业优势区',port_region:'港口优势区',mining_region:'矿业优势区',transport_region:'交通优势区',multi_advantage_region:'多优势重合区'})[String(v||'')]||String(v||'—');
+  const transportClassZh=v=>({none:'无',low_potential:'低潜力',river_valley:'河谷走廊',hill_pass:'丘陵通道',mountain_pass:'山口通道',plateau_access:'高原入口',basin_gateway:'盆地出口',low_divide:'低分水岭'})[String(v||'')]||String(v||'—');
+  const civilizationClassZh=v=>({none:'无',low_potential:'低潜力',agricultural_settlement:'农业聚落',port_city:'港口城市',mining_town:'矿业城镇',transport_node:'交通节点',multi_role_hub:'多角色枢纽'})[String(v||'')]||String(v||'—');
+  const settlementHtml=settlement?`
+    <div class="sample-section"><h3>文明建设条件</h3>
+      ${kv('聚落适宜度',percent(settlement.settlementSuitability))}
+      ${kv('建设便利度',percent(settlement.buildability))}
+      ${kv('淡水可达性',percent(settlement.freshWaterAccess))}
+      ${kv('洪水风险',percent(settlement.floodRisk))}
+      ${kv('农业适宜度',percent(settlement.agricultureSuitability))}
+      ${kv('气候舒适度',percent(settlement.climateComfort))}
+      ${kv('交通条件',percent(settlement.transportAccess))}
+      ${kv('资源可达性',percent(settlement.resourceAccess))}
+      <p class="hint">这是自然地理潜力评分，不表示此处已经生成聚落。</p>
+    </div>`:'';
+  const navigationHtml=navigation?`
+    <div class="sample-section"><h3>航运与港口条件</h3>
+      ${kv('水路等级',waterwayClassZh(navigation.waterwayClass))}
+      ${kv('可航行性',percent(navigation.waterwayNavigability))}
+      ${kv('航运瓶颈风险',percent(navigation.navigationBottleneckRisk))}
+      ${kv('港口类型',portTypeZh(navigation.portType))}
+      ${kv('港口适宜度',percent(navigation.portSuitability))}
+      <p class="hint">这是自然地理与水系条件评分，不表示此处已经生成码头、港口或航线。</p>
+    </div>`:'';
+  const miningProfile=mining&&mining.resourceProfile?Object.entries(mining.resourceProfile).sort((a,b)=>Number(b[1])-Number(a[1])).slice(0,4):[];
+  const miningHtml=mining?`
+    <div class="sample-section"><h3>矿区与资源条件</h3>
+      ${kv('矿区类型',miningClassZh(mining.miningClass))}
+      ${kv('矿区适宜度',percent(mining.miningSuitability))}
+      ${kv('露天采矿潜力',percent(mining.surfaceMiningSuitability))}
+      ${kv('浅层采矿潜力',percent(mining.shallowMiningSuitability))}
+      ${kv('深层采矿潜力',percent(mining.deepMiningSuitability))}
+      ${kv('工业矿产价值',percent(mining.industrialValue))}
+      ${kv('资源多样性',percent(mining.resourceDiversity))}
+      ${kv('主导矿物',mineralZh(mining.dominantResource))}
+      ${miningProfile.length?kv('主要资源',miningProfile.map(([k,v])=>mineralZh(k)+' '+percent(v)).join(' · ')):''}
+      <p class="hint">这是区域地质与矿脉规则聚合出的潜力，不表示当前方块一定存在矿石，也不会在 Core 中生成矿山建筑。</p>
+    </div>`:'';
+  const regionalAdvantageHtml=regionalAdvantage?`
+    <div class="sample-section"><h3>区域优势分工</h3>
+      ${kv('区域类型',regionalClassZh(regionalAdvantage.regionalClass))}
+      ${kv('主导优势',advantageZh(regionalAdvantage.dominantAdvantage))}
+      ${kv('建设优势',percent(regionalAdvantage.buildingAdvantage))}
+      ${kv('农业优势',percent(regionalAdvantage.agricultureAdvantage))}
+      ${kv('港口优势',percent(regionalAdvantage.portAdvantage))}
+      ${kv('矿业优势',percent(regionalAdvantage.miningAdvantage))}
+      ${kv('交通优势',percent(regionalAdvantage.transportAdvantage))}
+      ${kv('专业化强度',percent(regionalAdvantage.specializationStrength))}
+      ${kv('优势重合风险',percent(regionalAdvantage.advantageOverlapRisk))}
+      ${kv('高优势数量',regionalAdvantage.highAdvantageCount)}
+      <p class="hint">这是自然经济地理分工，不代表已经存在产业、道路、港口或城市。重合风险越高，表示多种优势越集中。</p>
+    </div>`:'';
+  const regionalRegionHtml=regionalRegion?`
+    <div class="sample-section"><h3>所属连续区域</h3>
+      ${kv('区域编号',regionalRegion.key||('#'+regionalRegion.id))}
+      ${kv('主导优势',advantageZh(regionalRegion.dominantAdvantage))}
+      ${kv('网格数量',Number(regionalRegion.cellCount||0).toLocaleString())}
+      ${kv('估算面积',areaBlocks2(regionalRegion.areaBlocks2))}
+      ${kv('区域中心',Math.round(regionalRegion.centroidX)+', '+Math.round(regionalRegion.centroidZ))}
+      ${kv('X 中心范围',Math.round(regionalRegion.minWorldX)+'～'+Math.round(regionalRegion.maxWorldX))}
+      ${kv('Z 中心范围',Math.round(regionalRegion.minWorldZ)+'～'+Math.round(regionalRegion.maxWorldZ))}
+      ${kv('平均专业化强度',percent(regionalRegion.meanSpecializationStrength))}
+      ${kv('平均优势重合风险',percent(regionalRegion.meanOverlapRisk))}
+      ${kv('高重合风险网格',percent(regionalRegion.highOverlapCellFraction))}
+      ${kv('多优势重合网格',percent(regionalRegion.multiAdvantageCellFraction))}
+      <p class="hint">区域由主导优势相同的四邻接宏观网格连通划分。面积和范围是网格估算值；区域编号对同一锁定模型保持稳定，不代表边界内每个方块都具有完全相同的地理条件。</p>
+    </div>`:'';
+  const transportGeographyHtml=transportGeography?`
+    <div class="sample-section"><h3>自然交通地理</h3>
+      ${kv('主导走廊',transportClassZh(transportGeography.corridorClass))}
+      ${kv('综合走廊潜力',percent(transportGeography.corridorSuitability))}
+      ${kv('河谷陆路',percent(transportGeography.riverValleyCorridor))}
+      ${kv('丘陵通道',percent(transportGeography.hillPassCorridor))}
+      ${kv('山口通道',percent(transportGeography.mountainPassCorridor))}
+      ${kv('高原入口',percent(transportGeography.plateauAccessCorridor))}
+      ${kv('盆地出口',percent(transportGeography.basinGatewayCorridor))}
+      ${kv('低分水岭',percent(transportGeography.lowDivideCorridor))}
+      ${kv('海峡 / 地峡潜力',percent(transportGeography.straitIsthmusPotential))}
+      ${kv('瓶颈强度',percent(transportGeography.chokepointStrength))}
+      <p class="hint">这是锁定自然模型推导出的通道与瓶颈潜力，不代表这里存在道路、桥梁、港口或城镇。</p>
+    </div>`:'';
+  const civilizationHtml=civilization?`
+    <div class="sample-section"><h3>文明节点潜力</h3>
+      ${kv('节点类型',civilizationClassZh(civilization.nodeClass))}
+      ${kv('综合节点适宜度',percent(civilization.nodeSuitability))}
+      ${kv('农业聚落潜力',percent(civilization.agriculturalSettlementSuitability))}
+      ${kv('港口城市潜力',percent(civilization.portCitySuitability))}
+      ${kv('矿业城镇潜力',percent(civilization.miningTownSuitability))}
+      ${kv('交通节点潜力',percent(civilization.transportNodeSuitability))}
+      ${kv('专业化强度',percent(civilization.specializationStrength))}
+      <p class="hint">这是只读地理候选。Core 不会据此自动生成城市、村庄、道路或建筑。</p>
+    </div>`:'';
   $('sample').innerHTML=`
     <div class="sample-section"><h3>位置与水体</h3>
-      ${kv('坐标',Math.round(s.x)+', '+Math.round(s.z))}
+      ${kv('坐标',Math.round(s.x)+', '+Math.round(s.teleportY??s.y)+', '+Math.round(s.z))}
+      ${kv('地表方块 Y',s.groundY)}
       ${kv('模型地面高度',f(s.groundHeight))}
       ${kv('水体',water)}
+      <code class="structure-tp-command">${escapeHtml(command)}</code>
+      <div class="structure-search-actions">
+        <button id="sampleCopyTp" type="button">复制 /tp</button>
+        ${gameBound?'<button id="sampleTeleport" class="primary" type="button">传送到这里</button>':''}
+      </div>
     </div>
     <div class="sample-section"><h3>生态与地表</h3>
       ${kv('生态区',sampleValueZh(s.ecoRegion))}
@@ -1150,6 +1862,13 @@ function renderSample(s){
       ${kv('地表方案',sampleValueZh(s.surfaceProfile))}
       ${kv('植被方案',sampleValueZh(s.vegetationProfile))}
     </div>
+    ${settlementHtml}
+    ${navigationHtml}
+    ${miningHtml}
+    ${regionalAdvantageHtml}
+    ${regionalRegionHtml}
+    ${transportGeographyHtml}
+    ${civilizationHtml}
     <details class="technical-detail"><summary>技术诊断</summary>
       ${kv('海洋判定权重',f(s.oceanEligibility))}
       ${kv('河流权重',f(s.riverWeight))}
@@ -1159,6 +1878,14 @@ function renderSample(s){
       ${kv('语义回退',s.semanticFallback?'<span class="error">是</span>':'<span class="ok">否</span>')}
       ${kv('语义冲突',s.semanticMismatch?'<span class="error">是</span>':'<span class="ok">否</span>')}
     </details>`;
+  const copy=$('sampleCopyTp');
+  if(copy)copy.onclick=async()=>{
+    const ok=await copyPlainText(command);
+    copy.textContent=ok?'已复制':'复制失败';
+    setTimeout(()=>{if(copy)copy.textContent='复制 /tp';},1200);
+  };
+  const teleport=$('sampleTeleport');
+  if(teleport)teleport.onclick=()=>void requestGameTeleport(s.x,s.teleportY??s.y,s.z,teleport);
 }
 
 function kv(k,v){return `<div class="kv"><span>${k}</span><b>${v}</b></div>`}
@@ -1343,7 +2070,7 @@ function resetMineralPreview(){
   const detail=$('mineralDetail');
   if(detail){detail.hidden=true;detail.textContent='';}
   const status=$('mineralStatus');
-  if(status)status.textContent='放大到 5× 后加载主要矿体；10× 后切换详细矿体。小型散布矿体数量很大时会按当前视野上限显示。';
+  if(status)status.textContent='矿区按主矿 + 伴生矿显示；普通矿脉需单独勾选并放大查看。';
 }
 
 function mineralViewportBounds(){
@@ -1381,15 +2108,17 @@ function scheduleMineralRefresh(delay=260){
 }
 
 async function refreshMineralBodies(){
-  const enabled=enabledFeatureKinds().has('minerals');
-  if(!active||!enabled||mineralBridgeUnavailable){
+  const enabled=enabledFeatureKinds();
+  const showDistricts=enabled.has('mineralDistricts');
+  const showVeins=enabled.has('minerals');
+  if(!active||(!showDistricts&&!showVeins)||mineralBridgeUnavailable){
     mineralBodies=null;
     renderFeatureOverlay();
     return;
   }
-  if(mapZoom<5){
+  if(showVeins&&!showDistricts&&mapZoom<MINERAL_DETAIL_ZOOM){
     mineralBodies=null;
-    $('mineralStatus').textContent='继续放大到 5× 后显示真实规划矿体。';
+    $('mineralStatus').textContent='普通矿脉保持原生成逻辑；请放大到 10× 后查看。';
     renderFeatureOverlay();
     return;
   }
@@ -1399,12 +2128,30 @@ async function refreshMineralBodies(){
   }
   const bounds=mineralViewportBounds();
   if(!bounds)return;
-  const mode=mapZoom>=10?'all':'major';
+  const viewportSpan=Math.max(
+    bounds.maxX-bounds.minX,
+    bounds.maxZ-bounds.minZ
+  );
+  const canLoadVeins=
+    showVeins&&
+    mapZoom>=MINERAL_DETAIL_ZOOM&&
+    viewportSpan<=MINERAL_FULL_VIEW_MAX_SPAN;
+  if(showVeins&&!showDistricts&&!canLoadVeins){
+    mineralBodies=null;
+    $('mineralStatus').textContent='普通矿脉视野仍太大，请继续放大后查看。';
+    renderFeatureOverlay();
+    return;
+  }
+  const mode=canLoadVeins?'all':'major';
   const limit=window.innerWidth<=900?900:1600;
   const token=++mineralLoadToken;
-  $('mineralStatus').textContent=mode==='all'
-    ? '正在加载当前视野的详细矿体…'
-    : '正在加载当前视野的主要矿体…';
+  if(showDistricts&&showVeins&&!canLoadVeins){
+    $('mineralStatus').textContent='正在加载矿区；普通矿脉需继续放大…';
+  }else{
+    $('mineralStatus').textContent=mode==='all'
+      ? '正在加载矿区与当前视野普通矿脉…'
+      : '正在加载当前视野矿区…';
+  }
   try{
     const q=new URLSearchParams({
       minX:String(bounds.minX),maxX:String(bounds.maxX),
@@ -1414,21 +2161,30 @@ async function refreshMineralBodies(){
     const data=await api('/api/minerals?'+q.toString());
     if(token!==mineralLoadToken)return;
     mineralBodies=data;
-    const suffix=data.truncated?'（数量较多，已从当前视野均匀抽样显示 '+Number(data.returned||0).toLocaleString()+' 个）':'';
-    $('mineralStatus').textContent=
-      (mode==='all'?'详细矿体 ':'主要矿体 ')+
-      Number(data.total||0).toLocaleString()+' 个'+suffix;
+    syncMineralFilterOptions(data.families||gameSession?.oreFamilies||[]);
+    const districtCount=Number((data.districts||[]).length);
+    const suffix=data.truncated?'（普通矿脉数量较多，当前视野已抽样）':'';
+    if(showDistricts&&showVeins){
+      $('mineralStatus').textContent=
+        '矿区 '+districtCount.toLocaleString()+' 个'+
+        (canLoadVeins?' · 普通矿体 '+Number(data.total||0).toLocaleString()+' 个':' · 普通矿脉继续放大后显示')+
+        suffix;
+    }else if(showDistricts){
+      $('mineralStatus').textContent='矿区 '+districtCount.toLocaleString()+' 个 · 主矿 + 伴生矿';
+    }else{
+      $('mineralStatus').textContent='普通矿体 '+Number(data.total||0).toLocaleString()+' 个'+suffix;
+    }
     renderFeatureOverlay();
   }catch(e){
     if(token!==mineralLoadToken)return;
     mineralBodies=null;
     if(e.status===503){
       mineralBridgeUnavailable=true;
-      $('mineralStatus').textContent='真实矿脉需要从可执行 GeoWorld JAR 启动 Web 工具。';
+      $('mineralStatus').textContent='当前 WebUI 未获得 GeoWorld Java 规划桥；请从游戏内 GeoWorld 或可执行 JAR 启动 WebUI。';
     }else if(e.status===413){
-      $('mineralStatus').textContent='当前视野仍太大，请继续放大后查看真实矿脉。';
+      $('mineralStatus').textContent='普通矿脉视野过大；矿区可直接查看，普通矿脉请继续放大。';
     }else{
-      $('mineralStatus').textContent='矿脉加载失败：'+e.message;
+      $('mineralStatus').textContent='矿产加载失败：'+e.message;
     }
     renderFeatureOverlay();
   }
@@ -1444,7 +2200,7 @@ function resetStructurePreview(){
   const detail=$('structureDetail');
   if(detail){detail.hidden=true;detail.textContent='';}
   const status=$('structureStatus');
-  if(status)status.textContent='低倍按空间区域聚合；缩放越大定位越精确；1024× 最大缩放才展开当前视野全部候选。';
+  if(status)status.textContent='低倍按空间区域聚合；缩放越大定位越精确；64× 后展开当前视野的单个结构候选。';
 }
 
 function scheduleStructureRefresh(delay=300){
@@ -1485,10 +2241,19 @@ async function refreshStructureCandidates(){
       ? '（共 '+Number(data.total||0).toLocaleString()+' 个，已按结构类别与视野位置均匀显示 '+Number(data.returned||0).toLocaleString()+' 个）'
       : Number(data.total||0).toLocaleString()+' 个';
     const visibleTypes=new Set((data.candidates||[]).map(candidate=>candidate.setId)).size;
+    const geoFiltered=Number(data.geoFiltered||0);
+    const geoPassed=Number(data.geoPassed||0);
+    const geoUnknown=Number(data.geoUnknown||0);
+    const exact=Number(data.exact||0);
     $('structureStatus').textContent=
-      structureSuffix+' · '+visibleTypes+' 种结构 · '+
-      (mapZoom>=FULL_DETAIL_ZOOM-.001
-        ? '最大缩放：当前视野全部展开'
+      structureSuffix+' · '+visibleTypes+' 种结构'+
+      (exact>0?' · 精确 '+exact.toLocaleString():'')+
+      (geoPassed>0?' · GeoWorld 通过 '+geoPassed.toLocaleString():'')+
+      (geoUnknown>0?' · 待确认 '+geoUnknown.toLocaleString():'')+
+      (geoFiltered>0?' · 已剔除 '+geoFiltered.toLocaleString()+' 个高置信不兼容候选':'')+
+      ' · '+
+      (mapZoom>=STRUCTURE_DETAIL_ZOOM-.001
+        ? '精细显示：当前视野单个候选全部展开'
         : mapZoom<4
           ? '概略显示：按空间区域显示少量真实代表位置'
           : '聚合显示：继续放大可逐步提高位置精度')+
@@ -1516,12 +2281,15 @@ async function refreshFeatures(){
     $('featureNote').textContent=(previewFeatures.note||'')+
       ' 河流 '+Number(c.rivers||0).toLocaleString()+
       ' · 湖泊 '+Number(c.lakes||0).toLocaleString()+
-      ' · 山峰 '+Number(c.peaks||0).toLocaleString();
+      ' · 山峰 '+Number(c.peaks||0).toLocaleString()+
+      ' · 特殊景观 '+Number(c.special||0).toLocaleString();
     $('mapFeatureSummary').textContent=
       '河流 '+Number(c.rivers||0).toLocaleString()+
       ' · 湖泊 '+Number(c.lakes||0).toLocaleString()+
-      ' · 山峰 '+Number(c.peaks||0).toLocaleString();
+      ' · 山峰 '+Number(c.peaks||0).toLocaleString()+
+      ' · 特殊 '+Number(c.special||0).toLocaleString();
     renderFeatureOverlay();
+    scheduleMineralRefresh(0);
   }catch(e){
     previewFeatures=null;
     $('featureNote').textContent='模型要素加载失败：'+e.message;
@@ -1542,17 +2310,68 @@ function worldToOverlay(x,z){
   };
 }
 
+const DEFAULT_MINERAL_FAMILIES=['coal','iron','copper','gold','lapis','redstone','diamond','emerald'];
+
+function normalizeMineralKey(kind){
+  return String(kind||'').trim().toLowerCase();
+}
+
 function mineralName(kind){
-  return ({
-    COAL:'煤矿',IRON:'铁矿',COPPER:'铜矿',GOLD:'金矿',
-    LAPIS:'青金石',REDSTONE:'红石',DIAMOND:'钻石',EMERALD:'绿宝石'
-  })[kind]||kind;
+  const key=normalizeMineralKey(kind);
+  const known={
+    coal:'煤矿',iron:'铁矿',copper:'铜矿',gold:'金矿',
+    lapis:'青金石',redstone:'红石',diamond:'钻石',emerald:'绿宝石',
+    zinc:'锌矿'
+  };
+  if(known[key])return known[key];
+  return key.split(/[_-]+/).filter(Boolean).map(v=>v.charAt(0).toUpperCase()+v.slice(1)).join(' ')||String(kind||'未知矿物');
+}
+
+function mineralIconData(kind){
+  const key=normalizeMineralKey(kind);
+  return String(gameSession?.oreIcons?.[key]||'');
+}
+
+function mineralColor(kind){
+  const key=normalizeMineralKey(kind);
+  const known={
+    coal:'#4d4d4d',iron:'#a88772',copper:'#bd6b34',gold:'#d3af37',
+    lapis:'#3468c0',redstone:'#c94141',diamond:'#339ebf',emerald:'#36b86d',
+    zinc:'#8aa2ad'
+  };
+  if(known[key])return known[key];
+  let hash=2166136261;
+  for(let i=0;i<key.length;i++){
+    hash=Math.imul(hash^key.charCodeAt(i),16777619);
+  }
+  const hue=Math.abs(hash)%360;
+  return 'hsl('+hue+' 55% 48%)';
+}
+
+function isDistrictMineralBody(body){
+  return String(body?.source||'').startsWith('DISTRICT_');
+}
+
+function syncMineralFilterOptions(families=[]){
+  const select=$('mineralFilter');
+  if(!select)return;
+  const current=normalizeMineralKey(select.value);
+  const unique=[];
+  for(const family of [...DEFAULT_MINERAL_FAMILIES,...(families||[])]){
+    const key=normalizeMineralKey(family);
+    if(key&&!unique.includes(key))unique.push(key);
+  }
+  select.innerHTML='<option value="">全部矿物</option>'+unique.map(key=>
+    '<option value="'+escapeHtml(key)+'">'+escapeHtml(mineralName(key))+'</option>'
+  ).join('');
+  if(current&&unique.includes(current))select.value=current;
 }
 
 function mineralSourceName(source){
   return ({
     VEIN:'常规矿体',GUARANTEE:'保底矿体',
-    SCATTER:'散布矿体',OUTCROP:'地表露头'
+    SCATTER:'散布矿体',OUTCROP:'地表露头',
+    DISTRICT_PRIMARY:'矿区主矿脉',DISTRICT_COMPANION:'矿区伴生矿脉'
   })[source]||source;
 }
 
@@ -1571,6 +2390,29 @@ function showMineralDetail(body){
       '<span>中心坐标</span><b>'+Math.round(body.x)+', '+Math.round(body.y)+', '+Math.round(body.z)+'</b>'+
       '<span>规模</span><b>长约 '+Number(body.length).toFixed(1)+' · 半径约 '+Number(body.radius).toFixed(1)+'</b>'+
       '<span>特征</span><b>'+((body.large?'大型矿体 · ':'')+(body.outcrop?'可形成露头':'地下矿体'))+'</b>'+
+    '</div>';
+}
+
+function showMiningDistrictDetail(district){
+  openDetailPane();
+  $('detailEmpty').hidden=true;
+  $('sample').hidden=true;
+  $('sample').innerHTML='';
+  $('structureDetail').hidden=true;
+  const el=$('mineralDetail');
+  el.hidden=false;
+  const primary=mineralName(district.primary);
+  const companion=mineralName(district.companion);
+  el.innerHTML=
+    '<div class="structure-detail-title">'+escapeHtml(primary)+'矿区</div>'+
+    '<div class="structure-detail-grid">'+
+      '<span>主矿</span><b>'+escapeHtml(primary)+'</b>'+
+      '<span>伴生矿</span><b>'+escapeHtml(companion)+'</b>'+
+      '<span>矿区中心</span><b>'+Math.round(district.x)+', '+Math.round(district.z)+'</b>'+
+      '<span>矿区半径</span><b>约 '+Math.round(district.radius)+' 格</b>'+
+      '<span>矿体结构</span><b>连续大型含矿岩体</b>'+
+      '<span>矿石比例</span><b>约 40%–70%，其余为围岩/废石</b>'+
+      '<span>矿物组成</span><b>主矿为主体，伴生矿呈成片/条带混入</b>'+
     '</div>';
 }
 
@@ -1719,6 +2561,26 @@ function openStructureInspector(){
   if(window.matchMedia('(max-width: 900px)').matches)setMobileSheet('features',true);
 }
 
+function structureGeoStatusLabel(candidate){
+  switch(candidate?.geoStatus){
+    case 'exact': return '精确结果';
+    case 'pass': return 'Placement 候选 · GeoWorld 条件通过';
+    case 'unknown': return 'Placement 候选 · GeoWorld 条件待确认';
+    default:
+      return candidate?.setId==='minecraft:strongholds'
+        ? '精确结果'
+        : '原版结构放置候选位置';
+  }
+}
+
+function structureGeoStatusNote(candidate){
+  if(candidate?.geoReason)return candidate.geoReason;
+  if(candidate?.setId==='minecraft:strongholds'){
+    return '使用 Minecraft 26.3 原版同心环规则与 GeoWorld 群系偏移规则，并经过原生实现逐点一致性校验。';
+  }
+  return '这里只确认原版 StructureSet placement 候选；最终是否实际生成仍取决于 Minecraft 的完整结构生成条件。';
+}
+
 function showStructureDetail(candidate){
   openDetailPane();
   $('detailEmpty').hidden=true;
@@ -1729,20 +2591,30 @@ function showStructureDetail(candidate){
   el.hidden=false;
   const meta=structureCandidates?.sets?.[candidate.setId]||{};
   const variants=(meta.structures||[]).map(structureVariantName).join(' / ');
-  const stronghold=candidate.setId==='minecraft:strongholds';
+  const command=structureTpCommand(candidate);
+  const gameBound=canControlGame();
   el.innerHTML=
     '<div class="structure-detail-title">'+escapeHtml(structureSetName(candidate.setId))+'</div>'+
     '<div class="structure-detail-grid">'+
-      '<span>坐标</span><b>'+escapeHtml(candidate.x+', '+candidate.z)+'</b>'+
+      '<span>坐标</span><b>'+escapeHtml(candidate.x+', '+candidate.y+', '+candidate.z)+'</b>'+
       '<span>区块坐标</span><b>'+escapeHtml(candidate.chunkX+', '+candidate.chunkZ)+'</b>'+
       (variants?'<span>具体结构</span><b>'+escapeHtml(variants)+'</b>':'')+
-      '<span>位置性质</span><b>'+(stronghold?'精确规划位置':'原版结构放置候选位置')+'</b>'+
+      '<span>位置性质</span><b>'+escapeHtml(structureGeoStatusLabel(candidate))+'</b>'+
     '</div>'+
-    '<div class="structure-detail-note">'+
-      (stronghold
-        ? '使用 Minecraft 26.3 原版同心环规则与 GeoWorld 群系偏移规则，并经过原生实现逐点一致性校验。'
-        : '这里表示原版结构放置候选位置；最终是否实际生成，还需要通过群系和结构生成条件检查。')+
+    '<div class="structure-detail-note">'+escapeHtml(structureGeoStatusNote(candidate))+'</div>'+
+    '<code class="structure-tp-command">'+escapeHtml(command)+'</code>'+
+    '<div class="structure-search-actions">'+
+      '<button id="structureDetailCopy" type="button">复制 /tp</button>'+
+      (gameBound?'<button id="structureDetailTeleport" class="primary" type="button">传送到这里</button>':'')+
     '</div>';
+  const copy=$('structureDetailCopy');
+  if(copy)copy.onclick=async()=>{
+    const ok=await copyPlainText(command);
+    copy.textContent=ok?'已复制':'复制失败';
+    setTimeout(()=>{if(copy)copy.textContent='复制 /tp';},1200);
+  };
+  const teleport=$('structureDetailTeleport');
+  if(teleport)teleport.onclick=()=>void requestGameTeleport(candidate.x,candidate.y,candidate.z,teleport);
   openStructureInspector();
 }
 
@@ -1800,26 +2672,78 @@ async function copyPlainText(text){
   return ok;
 }
 
+function tpCommand(x,y,z){
+  return '/tp @s '+Math.round(x)+' '+Math.round(y)+' '+Math.round(z);
+}
+
 function structureTpCommand(candidate){
-  return '/tp @s '+Math.round(candidate.x)+' ~ '+Math.round(candidate.z);
+  return tpCommand(candidate.x,candidate.y,candidate.z);
+}
+
+function canControlGame(){
+  return Boolean(
+    gameControlLocal &&
+    gameSession &&
+    gameSession.state==='bound'
+  );
+}
+
+async function waitForGameTeleport(commandId,timeoutMs=10000){
+  const deadline=Date.now()+timeoutMs;
+  while(Date.now()<deadline){
+    await new Promise(resolve=>setTimeout(resolve,200));
+    const status=await api('/api/status');
+    await syncGameSessionStatus(status);
+    const session=status?.gameSession;
+    if(Number(session?.teleportCommandId)!==Number(commandId))continue;
+    if(session.teleportState==='done')return session;
+    if(session.teleportState==='failed'){
+      throw new Error(session.teleportMessage||'Minecraft 执行传送失败');
+    }
+  }
+  throw new Error('Minecraft 未在 10 秒内确认传送执行');
+}
+
+async function requestGameTeleport(x,y,z,button=null){
+  if(button)button.disabled=true;
+  try{
+    const queued=await api('/api/game/teleport',{
+      method:'POST',
+      body:JSON.stringify({x:Number(x),y:Number(y),z:Number(z)})
+    });
+    const commandId=Number(queued?.command?.id||0);
+    if(!commandId)throw new Error('后端没有返回传送命令编号');
+    if(button)button.textContent='传送中…';
+    await waitForGameTeleport(commandId);
+    if(button){
+      button.textContent='已传送';
+      setTimeout(()=>{if(button){button.textContent='传送到这里';button.disabled=false;}},1200);
+    }
+    setMapNotice('Minecraft 已确认传送执行。','ok');
+  }catch(err){
+    if(button){button.textContent='传送失败';button.disabled=false;}
+    setMapNotice('传送失败：'+err.message,'error');
+  }
 }
 
 function renderStructureSearchResult(data){
   const el=$('structureSearchResult');
   const candidate=data.candidate;
   const command=structureTpCommand(candidate);
-  const exact=Boolean(data.exactStronghold);
+  const gameBound=canControlGame();
   el.hidden=false;
   el.innerHTML=
     '<b>'+escapeHtml(structureSetName(candidate.setId))+'</b>'+
-    '<div>坐标：'+escapeHtml(candidate.x+', '+candidate.z)+'</div>'+
+    '<div>坐标：'+escapeHtml(candidate.x+', '+candidate.y+', '+candidate.z)+'</div>'+
     '<div>区块：'+escapeHtml(candidate.chunkX+', '+candidate.chunkZ)+'</div>'+
     '<div>距离：约 '+Math.round(Number(data.distance||0)).toLocaleString()+' 方块</div>'+
-    '<div>'+(exact?'精确强要塞位置':'原版结构放置候选位置')+'</div>'+
+    '<div>'+escapeHtml(structureGeoStatusLabel(candidate))+'</div>'+
+    '<div class="structure-detail-note">'+escapeHtml(structureGeoStatusNote(candidate))+'</div>'+
     '<code class="structure-tp-command">'+escapeHtml(command)+'</code>'+
     '<div class="structure-search-actions">'+
       '<button id="structureSearchLocate" class="primary" type="button">地图定位</button>'+
       '<button id="structureSearchCopy" type="button">复制 /tp</button>'+
+      (gameBound?'<button id="structureSearchTeleport" type="button">传送到这里</button>':'')+
     '</div>';
   $('structureSearchLocate').onclick=()=>{
     centerMapOnWorld(candidate.x,candidate.z,Math.max(24,mapZoom));
@@ -1832,6 +2756,82 @@ function renderStructureSearchResult(data){
     button.textContent=ok?'已复制':'复制失败';
     setTimeout(()=>{if(button)button.textContent='复制 /tp';},1200);
   };
+  const teleport=$('structureSearchTeleport');
+  if(teleport)teleport.onclick=()=>void requestGameTeleport(candidate.x,candidate.y,candidate.z,teleport);
+}
+
+function renderBiomeSearchResult(data){
+  const el=$('biomeSearchResult');
+  const command=tpCommand(data.x,data.y,data.z);
+  const gameBound=canControlGame();
+  el.hidden=false;
+  el.innerHTML=
+    '<b>'+escapeHtml(data.label||data.biome||'群系')+'</b>'+
+    '<div>坐标：'+escapeHtml(Math.round(data.x)+', '+Math.round(data.y)+', '+Math.round(data.z))+'</div>'+
+    '<div>距离：约 '+Math.round(Number(data.distance||0)).toLocaleString()+' 方块</div>'+
+    '<div>'+(data.matchKind==='special_landscape'?'特殊景观规划位置':'GeoWorld 生态群系最近采样点')+'</div>'+
+    '<code class="structure-tp-command">'+escapeHtml(command)+'</code>'+
+    '<div class="structure-search-actions">'+
+      '<button id="biomeSearchLocate" class="primary" type="button">地图定位</button>'+
+      '<button id="biomeSearchCopy" type="button">复制 /tp</button>'+
+      (gameBound?'<button id="biomeSearchTeleport" type="button">传送到这里</button>':'')+
+    '</div>';
+  $('biomeSearchLocate').onclick=()=>{
+    centerMapOnWorld(data.x,data.z,Math.max(24,mapZoom));
+    void focusWorldPoint(data.x,data.z);
+  };
+  $('biomeSearchCopy').onclick=async()=>{
+    const button=$('biomeSearchCopy');
+    const ok=await copyPlainText(command);
+    button.textContent=ok?'已复制':'复制失败';
+    setTimeout(()=>{if(button)button.textContent='复制 /tp';},1200);
+  };
+  const teleport=$('biomeSearchTeleport');
+  if(teleport)teleport.onclick=()=>void requestGameTeleport(data.x,data.y,data.z,teleport);
+}
+
+async function searchNearestBiome(){
+  if(!active){
+    $('biomeSearchResult').hidden=false;
+    $('biomeSearchResult').textContent='请先生成或打开一个 World Model。';
+    return;
+  }
+  const x=Number($('biomeSearchX').value);
+  const z=Number($('biomeSearchZ').value);
+  if(!Number.isFinite(x)||!Number.isFinite(z)){
+    $('biomeSearchResult').hidden=false;
+    $('biomeSearchResult').textContent='请输入有效的 X / Z 坐标。';
+    return;
+  }
+  const button=$('biomeSearchButton');
+  button.disabled=true;
+  button.textContent='查找中…';
+  try{
+    const q=new URLSearchParams({
+      x:String(Math.round(x)),
+      z:String(Math.round(z)),
+      biome:$('biomeSearchType').value
+    });
+    const data=await api('/api/biome-search?'+q.toString());
+    renderBiomeSearchResult(data);
+  }catch(e){
+    $('biomeSearchResult').hidden=false;
+    $('biomeSearchResult').textContent=e.status===404
+      ?'当前 World Model 中没有找到这个群系 / 特殊景观。'
+      :'查找失败：'+e.message;
+  }finally{
+    button.disabled=false;
+    button.textContent='查找';
+  }
+}
+
+function usePlayerPositionForSearch(){
+  const player=gameSession?.player;
+  if(!player)return;
+  $('biomeSearchX').value=Math.round(player.x);
+  $('biomeSearchZ').value=Math.round(player.z);
+  $('structureSearchX').value=Math.round(player.x);
+  $('structureSearchZ').value=Math.round(player.z);
 }
 
 async function searchNearestStructure(){
@@ -2165,7 +3165,7 @@ function declutterOverlayClusters(clusters,minGapPx,priority=()=>0){
   return kept;
 }
 
-function appendClusterMarker(group,cluster,{className,title,targetZoom,radiusScale=1,glyphId='',onClick=null}){
+function appendClusterMarker(group,cluster,{className,title,targetZoom,radiusScale=1,glyphId='',imageHref='',onClick=null,fillColor=''}){
   const ns='http://www.w3.org/2000/svg';
   const scale=overlayUnitScale();
   const radiusPx=(cluster.count>=100?11:cluster.count>=10?10:9)*radiusScale;
@@ -2223,7 +3223,21 @@ function appendClusterMarker(group,cluster,{className,title,targetZoom,radiusSca
     halo.setAttribute('ry',radiusPx*scale.y);
   }
   halo.setAttribute('class','feature-cluster-bubble');
+  if(fillColor)halo.style.fill=fillColor;
   marker.appendChild(halo);
+
+  if(imageHref){
+    const image=document.createElementNS(ns,'image');
+    image.setAttribute('href',imageHref);
+    image.setAttribute('x',String(-radiusPx*.72*scale.x));
+    image.setAttribute('y',String(-radiusPx*.72*scale.y));
+    image.setAttribute('width',String(radiusPx*1.44*scale.x));
+    image.setAttribute('height',String(radiusPx*1.44*scale.y));
+    image.setAttribute('preserveAspectRatio','xMidYMid meet');
+    image.setAttribute('class','mineral-texture-icon');
+    image.style.imageRendering='pixelated';
+    marker.appendChild(image);
+  }
 
   if(glyphId){
     appendStructureGlyph(marker,glyphId,scale.x*.9,scale.y*.9);
@@ -2327,9 +3341,7 @@ function appendStructureSingleMarker(group,candidate){
   title.textContent=
     structureSetName(candidate.setId)+' · 坐标 '+candidate.x+', '+candidate.z+
     ' · 区块 '+candidate.chunkX+', '+candidate.chunkZ+
-    (candidate.setId==='minecraft:strongholds'
-      ? ' · 精确强要塞位置'
-      : ' · 原版结构放置候选位置');
+    ' · '+structureGeoStatusLabel(candidate);
   mark.appendChild(title);
   mark.addEventListener('click',e=>{
     e.stopPropagation();
@@ -2344,12 +3356,182 @@ function mineralClusterZoom(){
   return mapZoom<7?7.25:10.5;
 }
 
+function densityMineralColor(mineral){
+  return mineralColor(mineral);
+}
+
+function densityStructureColor(kind){
+  return {
+    settlement:'#d78b3d',ocean:'#3c91c8',underground:'#7666b8',
+    landmark:'#5da45d',portal:'#a65ac7',treasure:'#d4b23f',
+    stronghold:'#d64f79',mixed:'#65758b'
+  }[kind]||'#65758b';
+}
+
+function densityScreenPoint(worldX,worldZ,imgRect,wrapRect){
+  const p=worldToOverlay(worldX,worldZ);
+  if(!p)return null;
+  return {
+    x:imgRect.left-wrapRect.left+p.x/1000*imgRect.width,
+    y:imgRect.top-wrapRect.top+p.y/1000*imgRect.height
+  };
+}
+
+function clearDensityCanvas(){
+  const canvas=$('densityCanvas');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  if(ctx)ctx.clearRect(0,0,canvas.width,canvas.height);
+  canvas.style.display='none';
+  densityCanvasHits=[];
+}
+
+function renderDensityCanvas(){
+  const canvas=$('densityCanvas');
+  const wrap=$('mapWrap');
+  const img=$('map');
+  if(!canvas||!wrap||!img||!active||wrap.classList.contains('empty')){
+    clearDensityCanvas();
+    return;
+  }
+  const enabled=enabledFeatureKinds();
+  const drawOrdinaryVeins=enabled.has('minerals')&&mineralBodies&&mapZoom>=MINERAL_DETAIL_ZOOM-.001;
+  const drawMinerals=drawOrdinaryVeins;
+  const drawStructures=enabled.has('structures')&&structureCandidates&&mapZoom>=STRUCTURE_DETAIL_ZOOM-.001;
+  if(!drawMinerals&&!drawStructures){
+    clearDensityCanvas();
+    return;
+  }
+
+  const wrapRect=wrap.getBoundingClientRect();
+  const imgRect=img.getBoundingClientRect();
+  if(wrapRect.width<=0||wrapRect.height<=0||imgRect.width<=0||imgRect.height<=0){
+    clearDensityCanvas();
+    return;
+  }
+  const dpr=Math.max(1,Math.min(2,window.devicePixelRatio||1));
+  const width=Math.max(1,Math.round(wrapRect.width*dpr));
+  const height=Math.max(1,Math.round(wrapRect.height*dpr));
+  if(canvas.width!==width||canvas.height!==height){
+    canvas.width=width;
+    canvas.height=height;
+  }
+  canvas.style.display='block';
+  const ctx=canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,wrapRect.width,wrapRect.height);
+  densityCanvasHits=[];
+
+  const visible=(p,pad=20)=>p&&p.x>=-pad&&p.x<=wrapRect.width+pad&&p.y>=-pad&&p.y<=wrapRect.height+pad;
+
+  if(drawMinerals){
+    const mineralFilter=normalizeMineralKey($('mineralFilter')?.value||'');
+    ctx.lineCap='round';
+    ctx.lineJoin='round';
+    for(const body of mineralBodies.bodies||[]){
+      const districtBody=isDistrictMineralBody(body);
+      if(districtBody||!drawOrdinaryVeins)continue;
+      if(mineralFilter&&normalizeMineralKey(body.mineral)!==mineralFilter)continue;
+      const a=densityScreenPoint(body.startX,body.startZ,imgRect,wrapRect);
+      const m=densityScreenPoint(body.midX,body.midZ,imgRect,wrapRect);
+      const b=densityScreenPoint(body.endX,body.endZ,imgRect,wrapRect);
+      const c=densityScreenPoint(body.x,body.z,imgRect,wrapRect);
+      if(!visible(a,32)&&!visible(m,32)&&!visible(b,32)&&!visible(c,32))continue;
+      ctx.beginPath();
+      ctx.moveTo(a.x,a.y);
+      ctx.quadraticCurveTo(m.x,m.y,b.x,b.y);
+      ctx.strokeStyle=densityMineralColor(body.mineral);
+      ctx.globalAlpha=body.large?.92:.72;
+      ctx.lineWidth=body.large?3.2:1.9;
+      ctx.stroke();
+      if(visible(c,10)){
+        densityCanvasHits.push({type:'mineral',item:body,x:c.x,y:c.y,r:7});
+      }
+    }
+    ctx.globalAlpha=1;
+  }
+
+  if(drawStructures){
+    const structureFilter=selectedStructureFilter();
+    const groups=new Map();
+    let visibleCount=0;
+    for(const candidate of structureCandidates.candidates||[]){
+      if(structureFilter&&candidate.setId!==structureFilter)continue;
+      const p=densityScreenPoint(candidate.x,candidate.z,imgRect,wrapRect);
+      if(!visible(p,14))continue;
+      const kind=structureMarkerKind(candidate.setId);
+      if(!groups.has(kind))groups.set(kind,[]);
+      groups.get(kind).push({candidate,p});
+      visibleCount++;
+      densityCanvasHits.push({type:'structure',item:candidate,x:p.x,y:p.y,r:7});
+    }
+    const radius=visibleCount>5000?2.7:visibleCount>2000?3.4:4.8;
+    for(const [kind,entries] of groups){
+      ctx.beginPath();
+      for(const entry of entries){
+        ctx.moveTo(entry.p.x+radius,entry.p.y);
+        ctx.arc(entry.p.x,entry.p.y,radius,0,Math.PI*2);
+      }
+      ctx.fillStyle=densityStructureColor(kind);
+      ctx.globalAlpha=.9;
+      ctx.fill();
+      if(visibleCount<=2500){
+        ctx.strokeStyle='rgba(255,255,255,.88)';
+        ctx.lineWidth=1;
+        ctx.stroke();
+      }
+    }
+    const strongholds=groups.get('stronghold')||[];
+    if(strongholds.length){
+      ctx.beginPath();
+      for(const entry of strongholds){
+        ctx.moveTo(entry.p.x+radius+2.5,entry.p.y);
+        ctx.arc(entry.p.x,entry.p.y,radius+2.5,0,Math.PI*2);
+      }
+      ctx.strokeStyle='rgba(255,255,255,.92)';
+      ctx.lineWidth=1.2;
+      ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+}
+
+function densityCanvasHitAt(clientX,clientY){
+  const wrapRect=$('mapWrap').getBoundingClientRect();
+  const x=clientX-wrapRect.left;
+  const y=clientY-wrapRect.top;
+  let best=null;
+  let bestD=Infinity;
+  for(const hit of densityCanvasHits){
+    const d=Math.hypot(x-hit.x,y-hit.y);
+    if(d<=hit.r+5&&d<bestD){best=hit;bestD=d;}
+  }
+  return best;
+}
+
+function lakeSuperellipsePath(lake){
+  const steps=28;
+  const parts=[];
+  const radius=Math.max(1,Number(lake.outerRadius)||1);
+  for(let i=0;i<=steps;i++){
+    const a=i/steps*Math.PI*2;
+    const cx=Math.cos(a),sz=Math.sin(a);
+    const dx=Math.sign(cx)*Math.sqrt(Math.abs(cx))*radius;
+    const dz=Math.sign(sz)*Math.sqrt(Math.abs(sz))*radius;
+    const p=worldToOverlay(Number(lake.x)+dx,Number(lake.z)+dz);
+    if(!p)continue;
+    parts.push((parts.length?'L ':'M ')+p.x+' '+p.y);
+  }
+  return parts.length?parts.join(' ')+' Z':'';
+}
+
 function renderFeatureOverlay(){
   const svg=$('featureOverlay');
   if(!svg)return;
   svg.innerHTML='';
   if(!active||!previewFeatures||$('mapWrap').classList.contains('empty')){
     positionFeatureOverlay();
+    clearDensityCanvas();
     return;
   }
   const enabled=enabledFeatureKinds();
@@ -2380,69 +3562,238 @@ function renderFeatureOverlay(){
   if(enabled.has('lakes')){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-lakes');
-    const worldScale=(active.geometry.SpanXBlocks+active.geometry.SpanZBlocks)/2;
+    const lakeGroups=new Map();
     for(const lake of previewFeatures.lakes||[]){
-      const p=worldToOverlay(lake.x,lake.z);
-      if(p.x<0||p.x>1000||p.y<0||p.y>1000)continue;
-      const circle=document.createElementNS(ns,'circle');
-      circle.setAttribute('cx',p.x); circle.setAttribute('cy',p.y);
-      circle.setAttribute('r',Math.max(1.2,lake.outerRadius/worldScale*1800));
-      circle.setAttribute('class','lake-shape');
+      if(!lakeGroups.has(lake.lakeId))lakeGroups.set(lake.lakeId,[]);
+      lakeGroups.get(lake.lakeId).push(lake);
+    }
+    for(const [lakeId,nodes] of lakeGroups){
+      let d='';
+      let visible=false;
+      for(const lake of nodes){
+        const p=worldToOverlay(lake.x,lake.z);
+        if(p&&p.x>=-120&&p.x<=1120&&p.y>=-120&&p.y<=1120)visible=true;
+        d+=lakeSuperellipsePath(lake)+' ';
+      }
+      if(!visible||!d.trim())continue;
+      const shape=document.createElementNS(ns,'path');
+      shape.setAttribute('d',d.trim());
+      shape.setAttribute('class','lake-shape lake-union');
+      shape.setAttribute('fill-rule','nonzero');
       const title=document.createElementNS(ns,'title');
-      title.textContent='湖泊 #'+lake.lakeId+' · '+Math.round(lake.x)+', '+Math.round(lake.z);
-      circle.appendChild(title);
-      group.appendChild(circle);
+      const first=nodes[0];
+      title.textContent='湖泊 #'+lakeId+' · '+nodes.length+' 个水文单元 · '+Math.round(first.x)+', '+Math.round(first.z);
+      shape.appendChild(title);
+      group.appendChild(shape);
     }
     svg.appendChild(group);
   }
 
-  if(enabled.has('minerals')&&mineralBodies){
+  if(enabled.has('special')){
     const group=document.createElementNS(ns,'g');
-    group.setAttribute('class','feature-minerals');
-    const mineralFilter=$('mineralFilter')?.value||'';
-    const visibleMineralBodies=(mineralBodies.bodies||[]).filter(body=>
-      !mineralFilter||String(body.mineral||'')===mineralFilter
+    group.setAttribute('class','feature-special-landscapes');
+    const specialFilter=$('specialFilter')?.value||'';
+    const visibleSpecial=(previewFeatures.specialLandscapes||[]).filter(feature=>
+      (!specialFilter||feature.kind===specialFilter)&&
+      overlayPointVisible(worldToOverlay(feature.x,feature.z),40)
     );
-    if(mapZoom<FULL_DETAIL_ZOOM-.001){
-      const clusters=aggregateOverlayItemsByKey(visibleMineralBodies,{
-        point:body=>worldToOverlay(body.x,body.z),
-        key:body=>String(body.mineral||'UNKNOWN')
+    if(mapZoom<SPECIAL_DETAIL_ZOOM-.001){
+      const perKind=mapZoom<4?1:mapZoom<8?2:4;
+      const clusters=clusterOverlayItemsByKeyPrecision(visibleSpecial,{
+        point:feature=>worldToOverlay(feature.x,feature.z),
+        key:feature=>String(feature.kind||'special'),
+        perKey:perKind
       });
       for(const cluster of clusters){
-        cluster.approx=Boolean(mineralBodies.truncated);
-        const mineral=String(cluster.key||'unknown').toLowerCase();
+        const kind=String(cluster.key||'special').replace(/[^a-z0-9_-]/gi,'-');
         appendClusterMarker(group,cluster,{
-          className:'mineral-cluster mineral-'+mineral,
-          title:c=>mineralName(c.key)+' · 当前视野 '+c.count+' 个矿体 · 最大缩放后全部展开',
-          targetZoom:()=>Math.min(MAX_MAP_ZOOM,Math.max(mapZoom*1.8,mapZoom+2))
+          className:'special-cluster special-'+kind,
+          title:c=>(c.first?.name||c.key)+' · '+c.count+' 处 · 放大后显示实际范围',
+          targetZoom:()=>Math.min(
+            SPECIAL_DETAIL_ZOOM,
+            Math.max(mapZoom*2,mapZoom+2)
+          ),
+          radiusScale:.95
         });
       }
     }else{
-      const worldScale=(active.geometry.SpanXBlocks+active.geometry.SpanZBlocks)/2;
-      for(const body of visibleMineralBodies){
-        const a=worldToOverlay(body.startX,body.startZ);
-        const m=worldToOverlay(body.midX,body.midZ);
-        const b=worldToOverlay(body.endX,body.endZ);
-        const path=document.createElementNS(ns,'path');
-        path.setAttribute('d',`M ${a.x} ${a.y} Q ${m.x} ${m.y} ${b.x} ${b.y}`);
-        const mineral=String(body.mineral||'').toLowerCase();
-        const source=String(body.source||'').toLowerCase();
-        path.setAttribute('class',`mineral-body mineral-${mineral} source-${source}${body.large?' major':''}`);
-        path.setAttribute('stroke-width',Math.max(1.2/mapZoom,body.radius/worldScale*2000));
-        path.dataset.x=body.x;
-        path.dataset.z=body.z;
+      const markerScale=overlayUnitScale();
+      for(const feature of visibleSpecial){
+        const p=worldToOverlay(feature.x,feature.z);
+        const item=document.createElementNS(ns,'g');
+        const kind=String(feature.kind||'special').replace(/[^a-z0-9_-]/gi,'-');
+        item.setAttribute('class','special-landscape special-'+kind);
+        item.style.pointerEvents='all';
+        item.style.cursor='pointer';
+
+        const shape=document.createElementNS(ns,'ellipse');
+        shape.setAttribute('cx',p.x);
+        shape.setAttribute('cy',p.y);
+        shape.setAttribute('rx',Math.max(2,Number(feature.radiusX||0)/active.geometry.SpanXBlocks*1000));
+        shape.setAttribute('ry',Math.max(2,Number(feature.radiusZ||0)/active.geometry.SpanZBlocks*1000));
+        shape.setAttribute('class','special-landscape-shape');
+        item.appendChild(shape);
+
+        const mark=document.createElementNS(ns,'ellipse');
+        mark.setAttribute('cx',p.x);
+        mark.setAttribute('cy',p.y);
+        mark.setAttribute('rx',6*markerScale.x);
+        mark.setAttribute('ry',6*markerScale.y);
+        mark.setAttribute('class','special-landscape-mark');
+        item.appendChild(mark);
+
         const title=document.createElementNS(ns,'title');
-        title.textContent=
-          mineralName(body.mineral)+' · '+mineralSourceName(body.source)+
-          ' · '+Math.round(body.x)+', Y '+Math.round(body.y)+', '+Math.round(body.z);
-        path.appendChild(title);
-        path.addEventListener('click',e=>{
+        title.textContent=(feature.name||feature.kind)+' · '+Math.round(feature.x)+', '+Math.round(feature.z);
+        item.appendChild(title);
+        item.addEventListener('click',e=>{
           e.stopPropagation();
-          showMineralDetail(body);
-          void focusWorldPoint(body.x,body.z,{preserveFeatureDetail:true});
+          centerMapOnWorld(feature.x,feature.z,Math.max(mapZoom,SPECIAL_DETAIL_ZOOM));
+          void focusWorldPoint(feature.x,feature.z);
         });
-        group.appendChild(path);
+        group.appendChild(item);
       }
+    }
+    svg.appendChild(group);
+  }
+
+  const mineralFilter=normalizeMineralKey($('mineralFilter')?.value||'');
+
+  if(enabled.has('mineralDistricts')&&mineralBodies){
+    const group=document.createElementNS(ns,'g');
+    group.setAttribute('class','feature-mineral-districts');
+    for(const district of mineralBodies.districts||[]){
+      const primaryKey=normalizeMineralKey(district.primary);
+      const companionKey=normalizeMineralKey(district.companion);
+      if(mineralFilter&&primaryKey!==mineralFilter&&companionKey!==mineralFilter)continue;
+      const p=worldToOverlay(district.x,district.z);
+      const rx=Number(district.radius||0)/active.geometry.SpanXBlocks*1000;
+      const ry=Number(district.radius||0)/active.geometry.SpanZBlocks*1000;
+      if(!overlayPointVisible(p,Math.max(32,rx)))continue;
+
+      const item=document.createElementNS(ns,'g');
+      item.setAttribute('class','mineral-district');
+      item.style.pointerEvents='all';
+      item.style.cursor='pointer';
+
+      const area=document.createElementNS(ns,'ellipse');
+      area.setAttribute('cx',p.x);
+      area.setAttribute('cy',p.y);
+      area.setAttribute('rx',Math.max(4,rx));
+      area.setAttribute('ry',Math.max(4,ry));
+      area.setAttribute('class','mineral-district-area');
+      area.style.fill=mineralColor(district.primary);
+      area.style.stroke=mineralColor(district.primary);
+      item.appendChild(area);
+
+      const companionRing=document.createElementNS(ns,'ellipse');
+      companionRing.setAttribute('cx',p.x);
+      companionRing.setAttribute('cy',p.y);
+      companionRing.setAttribute('rx',Math.max(3,rx*.88));
+      companionRing.setAttribute('ry',Math.max(3,ry*.88));
+      companionRing.setAttribute('class','mineral-district-companion');
+      companionRing.style.stroke=mineralColor(district.companion);
+      item.appendChild(companionRing);
+
+      const core=document.createElementNS(ns,'ellipse');
+      const scale=overlayUnitScale();
+      core.setAttribute('cx',p.x);
+      core.setAttribute('cy',p.y);
+      core.setAttribute('rx',7*scale.x);
+      core.setAttribute('ry',7*scale.y);
+      core.setAttribute('class','mineral-district-core');
+      core.style.fill=mineralColor(district.primary);
+      item.appendChild(core);
+
+      const primaryIcon=mineralIconData(district.primary);
+      if(primaryIcon){
+        const image=document.createElementNS(ns,'image');
+        image.setAttribute('href',primaryIcon);
+        image.setAttribute('x',p.x-6*scale.x);
+        image.setAttribute('y',p.y-6*scale.y);
+        image.setAttribute('width',12*scale.x);
+        image.setAttribute('height',12*scale.y);
+        image.setAttribute('preserveAspectRatio','xMidYMid meet');
+        image.setAttribute('class','mineral-texture-icon');
+        image.style.imageRendering='pixelated';
+        item.appendChild(image);
+      }
+
+      const companionDot=document.createElementNS(ns,'ellipse');
+      companionDot.setAttribute('cx',p.x+5*scale.x);
+      companionDot.setAttribute('cy',p.y-5*scale.y);
+      companionDot.setAttribute('rx',3.4*scale.x);
+      companionDot.setAttribute('ry',3.4*scale.y);
+      companionDot.setAttribute('class','mineral-district-companion-dot');
+      companionDot.style.fill=mineralColor(district.companion);
+      item.appendChild(companionDot);
+
+      const companionIcon=mineralIconData(district.companion);
+      if(companionIcon){
+        const image=document.createElementNS(ns,'image');
+        image.setAttribute('href',companionIcon);
+        image.setAttribute('x',p.x+1.8*scale.x);
+        image.setAttribute('y',p.y-8.2*scale.y);
+        image.setAttribute('width',6.4*scale.x);
+        image.setAttribute('height',6.4*scale.y);
+        image.setAttribute('preserveAspectRatio','xMidYMid meet');
+        image.setAttribute('class','mineral-texture-icon mineral-companion-texture-icon');
+        image.style.imageRendering='pixelated';
+        item.appendChild(image);
+      }
+
+      if(mapZoom>=2){
+        const label=document.createElementNS(ns,'text');
+        label.setAttribute('x',p.x);
+        label.setAttribute('y',p.y+15*scale.y);
+        label.setAttribute('text-anchor','middle');
+        label.setAttribute('class','mineral-district-label');
+        label.textContent=mineralName(district.primary)+' + '+mineralName(district.companion);
+        item.appendChild(label);
+      }
+
+      const title=document.createElementNS(ns,'title');
+      title.textContent=
+        mineralName(district.primary)+'主矿 + '+
+        mineralName(district.companion)+'伴生矿 · 半径约 '+
+        Math.round(district.radius)+' 格';
+      item.appendChild(title);
+      item.addEventListener('click',e=>{
+        e.stopPropagation();
+        showMiningDistrictDetail(district);
+      });
+      group.appendChild(item);
+    }
+    svg.appendChild(group);
+  }
+
+  if(enabled.has('minerals')&&mineralBodies&&mapZoom>=MINERAL_DETAIL_ZOOM-.001){
+    const group=document.createElementNS(ns,'g');
+    group.setAttribute('class','feature-minerals');
+    const visibleMineralBodies=(mineralBodies.bodies||[]).filter(body=>{
+      if(isDistrictMineralBody(body))return false;
+      return !mineralFilter||normalizeMineralKey(body.mineral)===mineralFilter;
+    });
+    for(const body of visibleMineralBodies){
+      const p=worldToOverlay(body.x,body.z);
+      if(!overlayPointVisible(p,28))continue;
+      const mineral=String(body.mineral||'unknown').toLowerCase();
+      appendClusterMarker(group,{
+        key:body.mineral,
+        count:1,
+        x:p.x,
+        y:p.y,
+        worldX:Number(body.x),
+        worldZ:Number(body.z),
+        first:body
+      },{
+        className:'mineral-cluster mineral-'+mineral+' mineral-detail-marker',
+        title:()=>mineralName(body.mineral)+' · '+mineralSourceName(body.source)+' · '+Math.round(body.x)+', '+Math.round(body.z),
+        targetZoom:()=>mapZoom,
+        radiusScale:.78,
+        imageHref:mineralIconData(body.mineral),
+        fillColor:mineralColor(body.mineral),
+        onClick:()=>showMineralDetail(body)
+      });
     }
     svg.appendChild(group);
   }
@@ -2455,7 +3806,7 @@ function renderFeatureOverlay(){
       (!structureFilter||candidate.setId===structureFilter)&&
       overlayPointVisible(worldToOverlay(candidate.x,candidate.z),24)
     );
-    if(mapZoom<FULL_DETAIL_ZOOM-.001){
+    if(mapZoom<STRUCTURE_DETAIL_ZOOM-.001){
       let clusters=clusterStructureCandidatesBySpace(visibleCandidates,{
         cellPx:structureSpatialCellPx(),
         key:structureSpatialGroupingKey
@@ -2479,9 +3830,8 @@ function renderFeatureOverlay(){
         });
       }
     }else{
-      for(const candidate of visibleCandidates){
-        appendStructureSingleMarker(group,candidate);
-      }
+      // Detailed structure candidates are painted on densityCanvas. Click
+      // interaction is preserved through the canvas hit-test list.
     }
     svg.appendChild(group);
   }
@@ -2489,7 +3839,7 @@ function renderFeatureOverlay(){
   if(enabled.has('peaks')){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-peaks');
-    if(mapZoom<FULL_DETAIL_ZOOM-.001){
+    if(mapZoom<PEAK_DETAIL_ZOOM-.001){
       const bounds=mineralViewportBounds();
       const visiblePeaks=(previewFeatures.peaks||[]).filter(peak=>
         !bounds||(peak.x>=bounds.minX&&peak.x<=bounds.maxX&&peak.z>=bounds.minZ&&peak.z<=bounds.maxZ)
@@ -2501,7 +3851,7 @@ function renderFeatureOverlay(){
       for(const cluster of clusters){
         appendClusterMarker(group,cluster,{
           className:'peak-cluster',
-          title:c=>'山峰 · 当前视野 '+c.count+' 个 · 最大缩放后全部展开',
+          title:c=>'山峰 · 当前视野 '+c.count+' 个 · 16× 后展开单个山峰',
           targetZoom:()=>Math.min(MAX_MAP_ZOOM,Math.max(mapZoom*1.8,mapZoom+2)),
           radiusScale:.9
         });
@@ -2527,6 +3877,7 @@ function renderFeatureOverlay(){
     svg.appendChild(group);
   }
   positionFeatureOverlay();
+  renderDensityCanvas();
 }
 
 function positionFeatureOverlay(){
@@ -2569,7 +3920,7 @@ $('mobileCloseFeatures').onclick=()=>setMobileSheet('features',false);
 document.querySelectorAll('.inspector-tab').forEach(button=>button.addEventListener('click',()=>{
   setInspectorTab(button.dataset.inspectorTab);
 }));
-['riverFilter','mineralFilter'].forEach(id=>$(id).addEventListener('change',()=>renderFeatureOverlay()));
+['riverFilter','mineralFilter','specialFilter'].forEach(id=>$(id).addEventListener('change',()=>renderFeatureOverlay()));
 
 document.querySelectorAll('.nav-item,.route-button').forEach(btn=>btn.addEventListener('click',()=>navigatePage(btn.dataset.page)));
 document.querySelectorAll('input[name="acceptanceType"]').forEach(radio=>radio.addEventListener('change',()=>{
@@ -2582,19 +3933,25 @@ $('acceptanceGenerate').onclick=generateAcceptanceTable;
 $('acceptanceBigFilter').onchange=renderAcceptanceTable;
 document.querySelectorAll('.acceptance-download').forEach(btn=>btn.onclick=()=>downloadAcceptance(btn.dataset.format));
 $('structureFilter').onchange=()=>renderFeatureOverlay();
+$('biomeSearchButton').onclick=searchNearestBiome;
+$('biomeSearchUsePlayer').onclick=usePlayerPositionForSearch;
+['biomeSearchX','biomeSearchZ'].forEach(id=>$(id).addEventListener('keydown',e=>{
+  if(e.key==='Enter')$('biomeSearchButton').click();
+}));
 $('structureSearchButton').onclick=searchNearestStructure;
 ['structureSearchX','structureSearchZ'].forEach(id=>$(id).addEventListener('keydown',e=>{
   if(e.key==='Enter')$('structureSearchButton').click();
 }));
 
 document.querySelectorAll('.feature-toggle').forEach(input=>input.onchange=()=>{
-  if(input.dataset.feature==='minerals'){
-    if(input.checked){
+  if(input.dataset.feature==='minerals'||input.dataset.feature==='mineralDistricts'){
+    const enabled=enabledFeatureKinds();
+    if(enabled.has('minerals')||enabled.has('mineralDistricts')){
       scheduleMineralRefresh(0);
     }else{
       mineralBodies=null;
       mineralLoadToken++;
-      $('mineralStatus').textContent='真实规划矿体已隐藏。';
+      $('mineralStatus').textContent='矿产图层已隐藏。';
       $('mineralDetail').hidden=true;
     }
   }
@@ -2614,16 +3971,19 @@ document.querySelectorAll('.feature-toggle').forEach(input=>input.onchange=()=>{
 $('map').addEventListener('load',()=>{
   renderExportOverlay();
   renderCursorOverlay();
+  renderPlayerMarker();
   renderFeatureOverlay();
   updateActionState();
 });
 window.addEventListener('resize',()=>{
   renderExportOverlay();
   renderCursorOverlay();
+  renderPlayerMarker();
   renderFeatureOverlay();
 });
 window.addEventListener('beforeunload',()=>{if(mapObjectURL)URL.revokeObjectURL(mapObjectURL)});
 populateStructureSelectors();
+syncMineralFilterOptions([]);
 
 updateRangePreview();
 updateContinentLabels();
@@ -2637,4 +3997,10 @@ const initialPage=['home','world','acceptance','models','params','about'].includ
 navigatePage(initialPage);
 refreshModels();
 refreshStatus();
-setInterval(()=>{if(!poll)void refreshStatus()},2000);
+
+async function statusHeartbeat(){
+  if(!poll)await refreshStatus();
+  const fast=Boolean(gameSession&&gameSession.managed&&gameSession.state==='bound');
+  setTimeout(statusHeartbeat,fast?1000:2000);
+}
+setTimeout(statusHeartbeat,500);

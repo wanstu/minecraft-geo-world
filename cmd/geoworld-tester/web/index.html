@@ -70,21 +70,31 @@
             <button class="layer" data-layer="water">水体</button>
             <button class="layer" data-layer="surface">地表</button>
             <button class="layer" data-layer="minerals">矿产分区</button>
+            <button class="layer" data-layer="settlement">建城推荐</button>
+            <button class="layer" data-layer="navigation">航运与港口</button>
+            <button class="layer" data-layer="mining">矿业选址</button>
+            <button class="layer" data-layer="civilization">聚落角色</button>
+            <button class="layer" data-layer="transport">地形通道</button>
+            <button class="layer" data-layer="advantage">区域用途</button>
             <button class="layer" data-layer="tectonic">地质构造</button>
           </div>
           <div class="map-zoom-controls"><button id="mapZoomOut" aria-label="缩小">−</button><span id="mapZoomLabel">1.0×</span><button id="mapZoomIn" aria-label="放大">+</button><button id="mapZoomReset">复位</button></div>
         </div>
         <div class="map-location-bar">
-          <div class="coord-inputs"><input id="jumpX" type="number" placeholder="X"><input id="jumpZ" type="number" placeholder="Z"><button id="jumpToCoord">定位</button></div>
+          <div class="coord-inputs"><input id="jumpCoord" type="text" autocomplete="off" spellcheck="false" placeholder="坐标：3648 139 7872 / 3648 7872 / /tp @s 3648 139 7872"><button id="jumpToCoord">解析并定位</button></div>
           <div id="mapFeatureSummary" class="map-feature-summary">生成世界后显示完整模型要素</div>
         </div>
         <div id="mapWrap" class="map-wrap empty">
           <img id="map" alt="GeoWorld 世界模型地图">
+          <canvas id="densityCanvas" class="density-canvas" aria-label="高密度矿产与结构覆盖层"></canvas>
           <svg id="featureOverlay" class="feature-overlay" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label="模型要素覆盖层"></svg>
           <div id="emptyHint"><b>尚未生成世界</b><span>设置 Seed 后生成 World Model，即可像地图网站一样浏览。</span></div>
+          <div id="mapLegend" class="map-legend" hidden></div>
           <div id="mapNotice" class="map-notice" hidden></div>
           <div id="exportBounds" class="export-bounds" hidden></div>
+          <div id="chunkRegionSelection" class="chunk-region-selection" hidden></div>
           <div id="spawnMarker" class="spawn-marker" hidden title="Minecraft 出生点"></div>
+          <div id="playerMarker" class="player-marker" hidden title="Minecraft 玩家实时位置"><span class="player-arrow"></span></div>
           <div id="cursor"></div>
           <div class="mobile-map-actions">
             <button id="mobileOpenSettings" type="button">参数</button>
@@ -101,6 +111,19 @@
         <div id="gameSessionCard" class="game-session-card" hidden>
           <div class="game-session-head"><b>游戏联动</b><span id="gameSessionBadge">等待世界</span></div>
           <div id="gameSessionDetail" class="game-session-detail">Minecraft 已连接，当前尚未进入 GeoWorld 世界。</div>
+          <div id="chunkGenerationPanel" class="chunk-generation-panel" hidden>
+            <div class="chunk-generation-head"><b>运行时区块预生成</b><span id="chunkGenerationStatus">未选择区域</span></div>
+            <div id="chunkGenerationSelection" class="chunk-generation-selection">在地图上框选矩形区域，自动对齐到 16×16 Chunk。</div>
+            <div id="chunkGenerationProgress" class="chunk-generation-progress" hidden><span></span></div>
+            <div class="chunk-generation-actions">
+              <button id="chunkSelectRegion" type="button">框选区域</button>
+              <button id="chunkStart" type="button" disabled>开始预生成</button>
+              <button id="chunkPause" type="button" hidden>暂停</button>
+              <button id="chunkContinue" type="button" hidden>继续</button>
+              <button id="chunkCancel" type="button" hidden>取消任务</button>
+              <button id="chunkClearRegion" type="button" disabled>清除框选</button>
+            </div>
+          </div>
         </div>
 
         <div class="inspector-tabs">
@@ -123,10 +146,27 @@
           </div>
 
           <div class="filter-group">
+            <div class="filter-group-title">特殊景观</div>
+            <label class="filter-row"><input class="feature-toggle" type="checkbox" data-feature="special" checked><span class="marker-sample special"></span><span>特殊景观</span></label>
+            <label class="sub-filter-row"><span>景观类型</span><select id="specialFilter">
+              <option value="">全部特殊景观</option>
+              <option value="mushroom_island">蘑菇岛</option>
+              <option value="pale_garden_island">苍白森林岛</option>
+              <option value="cherry_island">樱花岛</option>
+              <option value="sinkhole">天坑</option>
+              <option value="volcanic_crater_snow">雪山火山坑</option>
+              <option value="volcanic_crater_cherry">樱花火山坑</option>
+              <option value="basin_cherry">樱花盆地</option>
+              <option value="basin_snow">雪山盆地</option>
+            </select></label>
+          </div>
+
+          <div class="filter-group">
             <div class="filter-group-title">矿产</div>
-            <label class="filter-row"><input class="feature-toggle" type="checkbox" data-feature="minerals" checked><span class="marker-sample mineral"></span><span>真实规划矿体</span></label>
+            <label class="filter-row"><input class="feature-toggle" type="checkbox" data-feature="mineralDistricts" checked><span class="marker-sample mineral-district"></span><span>矿区</span></label>
+            <label class="filter-row"><input class="feature-toggle" type="checkbox" data-feature="minerals"><span class="marker-sample mineral"></span><span>普通矿脉</span></label>
             <label class="sub-filter-row"><span>矿物类型</span><select id="mineralFilter"><option value="">全部矿物</option><option value="COAL">煤矿</option><option value="IRON">铁矿</option><option value="COPPER">铜矿</option><option value="GOLD">金矿</option><option value="LAPIS">青金石</option><option value="REDSTONE">红石</option><option value="DIAMOND">钻石</option><option value="EMERALD">绿宝石</option></select></label>
-            <div id="mineralStatus" class="filter-status">放大到 5× 后加载矿体。</div>
+            <div id="mineralStatus" class="filter-status">矿区按主矿 + 伴生矿显示；普通矿脉需单独勾选并放大查看。</div>
           </div>
 
           <div class="filter-group">
@@ -140,6 +180,47 @@
         </section>
 
         <section class="inspector-pane" data-inspector-pane="search">
+          <div class="tool-section">
+            <div class="tool-section-title">附近群系 / 特殊景观</div>
+            <p class="tool-section-help">查找当前 World Model 中距离指定坐标最近的群系。蘑菇岛、苍白森林岛等特殊景观直接使用持久化规划位置。</p>
+            <label class="tool-field"><span>群系 / 景观</span><select id="biomeSearchType">
+              <optgroup label="特殊景观">
+                <option value="special:mushroom_island">蘑菇岛</option>
+                <option value="special:pale_garden_island">苍白森林岛</option>
+                <option value="special:cherry_island">樱花岛</option>
+                <option value="special:sinkhole">天坑</option>
+                <option value="special:volcanic_crater_snow">雪山火山坑</option>
+                <option value="special:volcanic_crater_cherry">樱花火山坑</option>
+                <option value="special:basin_cherry">樱花盆地</option>
+                <option value="special:basin_snow">雪山盆地</option>
+              </optgroup>
+              <optgroup label="GeoWorld 生态群系">
+                <option value="family:Alpine">高山带</option>
+                <option value="family:Tundra">冻原</option>
+                <option value="family:Boreal Forest">北方针叶林</option>
+                <option value="family:Temperate Forest">温带森林</option>
+                <option value="family:Temperate Grassland">温带草原</option>
+                <option value="family:Temperate Desert">温带荒漠</option>
+                <option value="family:Mediterranean Shrubland">地中海灌丛</option>
+                <option value="family:Subtropical Forest">亚热带森林</option>
+                <option value="family:Hot Desert">炎热荒漠</option>
+                <option value="family:Savanna">稀树草原</option>
+                <option value="family:Tropical Monsoon Forest">热带季风林</option>
+                <option value="family:Tropical Rainforest">热带雨林</option>
+                <option value="family:Wetland">湿地</option>
+              </optgroup>
+            </select></label>
+            <div class="structure-search-coords">
+              <input id="biomeSearchX" type="number" placeholder="X" value="0">
+              <input id="biomeSearchZ" type="number" placeholder="Z" value="0">
+              <button id="biomeSearchButton" type="button">查找</button>
+            </div>
+            <div class="structure-search-actions">
+              <button id="biomeSearchUsePlayer" type="button">使用玩家位置</button>
+            </div>
+            <div id="biomeSearchResult" class="structure-search-result" hidden></div>
+          </div>
+
           <div class="tool-section">
             <div class="tool-section-title">附近结构</div>
             <p class="tool-section-help">从指定 X / Z 查找当前 World Model 内最近的结构候选。</p>
@@ -229,7 +310,7 @@
   <section id="page-about" class="page">
     <div class="page-head"><div><h1>版本信息</h1><p>GeoWorld 工具台与 Minecraft 模组共享同一 World Model 契约。</p></div></div>
     <div class="about-grid">
-      <section class="panel"><div class="panel-title">当前工具</div><div class="panel-body about-kv"><span>工具</span><b>GeoWorld Web Tool</b><span>Generation Rules</span><b id="aboutRules">v1.1.10</b><span>World Model</span><b>v1</b><span>默认监听</span><b>0.0.0.0:8788</b></div></section>
+      <section class="panel"><div class="panel-title">当前工具</div><div class="panel-body about-kv"><span>工具</span><b>GeoWorld Web Tool</b><span>Generation Rules</span><b id="aboutRules">—</b><span>World Model</span><b>v1</b><span>默认监听</span><b>0.0.0.0:8788</b></div></section>
       <section class="panel"><div class="panel-title">设计原则</div><div class="panel-body"><p>预览、Minecraft 生成、World Model Query 与验收都读取同一个锁定模型；任何自然世界结果变化必须通过 Generation Rules Version 显式版本化。</p></div></section>
     </div>
   </section>

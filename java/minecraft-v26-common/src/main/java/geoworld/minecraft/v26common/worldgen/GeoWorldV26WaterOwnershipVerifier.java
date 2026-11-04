@@ -215,7 +215,7 @@ public final class GeoWorldV26WaterOwnershipVerifier {
                 int worldZ = baseZ + localZ;
                 GeoWorldShorelinePlanner.Column center =
                     plan.column(localX, localZ);
-                auditColumn(center, worldX, worldZ, stats);
+                auditColumn(runtime, center, worldX, worldZ, stats);
 
                 if (localX < 15) {
                     auditFace(
@@ -273,6 +273,7 @@ public final class GeoWorldV26WaterOwnershipVerifier {
     }
 
     private static void auditColumn(
+        GeoWorldV1 runtime,
         GeoWorldShorelinePlanner.Column column,
         int worldX,
         int worldZ,
@@ -308,8 +309,10 @@ public final class GeoWorldV26WaterOwnershipVerifier {
             generatedWater &&
             "River".equals(owner)
         ) {
-            int expected = HEIGHTS.boundaryYCeil(
-                column.sample().waterSurfaceElevation()
+            int expected = SHORELINE.waterBoundaryModel(
+                runtime,
+                column.sample(),
+                column.originalGroundBoundary()
             );
             if (column.waterBoundary() != expected) {
                 stats.riverWaterBoundaryModelMismatches++;

@@ -25,29 +25,40 @@ public final class TaggedBiomeSelector {
         String fallback,
         BiPredicate<GeoWorldBiomeRegion, TaggedBiomeCandidate> allowCandidate
     ) {
-        ArrayList<Scored> scored = new ArrayList<>();
+        SelectorScratch scratch = SELECTOR_SCRATCH.get();
+        scratch.ensureCapacity(candidates.size());
+        int scoredCount = 0;
         double best = Double.NEGATIVE_INFINITY;
 
-        for (TaggedBiomeCandidate candidate : candidates) {
+        for (int i = 0, n = candidates.size(); i < n; i++) {
+            TaggedBiomeCandidate candidate = candidates.get(i);
             if (!allowCandidate.test(region, candidate)) continue;
-            double score = score(region, candidate);
-            if (!Double.isFinite(score)) continue;
-            scored.add(new Scored(candidate, score));
-            best = Math.max(best, score);
+            double candidateScore = score(region, candidate);
+            if (!Double.isFinite(candidateScore)) continue;
+            scratch.candidates[scoredCount] = candidate;
+            scratch.scores[scoredCount] = candidateScore;
+            scoredCount++;
+            best = Math.max(best, candidateScore);
         }
-        if (scored.isEmpty()) return fallback;
+        if (scoredCount == 0) return fallback;
 
         final double band = 1.65;
         final double sharpness = 1.35;
         double total = 0.0;
-        ArrayList<Scored> finalists = new ArrayList<>();
-        for (Scored item : scored) {
-            if (item.score() < best - band) continue;
-            finalists.add(item);
-            total += item.candidate().baseWeight() *
-                Math.exp((item.score() - best) * sharpness);
+        int finalistCount = 0;
+        TaggedBiomeCandidate lastFinalist = null;
+        for (int i = 0; i < scoredCount; i++) {
+            double candidateScore = scratch.scores[i];
+            if (candidateScore < best - band) continue;
+            TaggedBiomeCandidate candidate = scratch.candidates[i];
+            lastFinalist = candidate;
+            finalistCount++;
+            double weight = candidate.baseWeight() *
+                Math.exp((candidateScore - best) * sharpness);
+            scratch.weights[i] = weight;
+            total += weight;
         }
-        if (finalists.isEmpty() || total <= 0.0) return fallback;
+        if (finalistCount == 0 || total <= 0.0) return fallback;
 
         double chooser =
             0.72 * smoothValueNoise(
@@ -64,14 +75,33 @@ public final class TaggedBiomeSelector {
             );
         double target = clamp(chooser, 0.0, 1.0) * total;
         double cursor = 0.0;
-        for (Scored item : finalists) {
-            cursor += item.candidate().baseWeight() *
-                Math.exp((item.score() - best) * sharpness);
-            if (target <= cursor) return item.candidate().id();
+        for (int i = 0; i < scoredCount; i++) {
+            double candidateScore = scratch.scores[i];
+            if (candidateScore < best - band) continue;
+            TaggedBiomeCandidate candidate = scratch.candidates[i];
+            cursor += scratch.weights[i];
+            if (target <= cursor) return candidate.id();
         }
-        return finalists.get(finalists.size() - 1).candidate().id();
+        return lastFinalist == null ? fallback : lastFinalist.id();
     }
+    private static final ThreadLocal<SelectorScratch> SELECTOR_SCRATCH =
+        ThreadLocal.withInitial(SelectorScratch::new);
 
+    private static final class SelectorScratch {
+        TaggedBiomeCandidate[] candidates = new TaggedBiomeCandidate[16];
+        double[] scores = new double[16];
+        double[] weights = new double[16];
+
+        void ensureCapacity(int capacity) {
+            if (capacity <= candidates.length) {
+                return;
+            }
+            int next = Math.max(capacity, candidates.length * 2);
+            candidates = java.util.Arrays.copyOf(candidates, next);
+            scores = java.util.Arrays.copyOf(scores, next);
+            weights = java.util.Arrays.copyOf(weights, next);
+        }
+    }
     private static double score(
         GeoWorldBiomeRegion region,
         TaggedBiomeCandidate candidate
@@ -81,7 +111,7 @@ public final class TaggedBiomeSelector {
             return Double.NEGATIVE_INFINITY;
         }
         if (!candidate.requiredAny().isEmpty() &&
-            candidate.requiredAny().stream().noneMatch(tags::contains)) {
+            !containsAny(tags, candidate.requiredAny())) {
             return Double.NEGATIVE_INFINITY;
         }
 
@@ -106,6 +136,18 @@ public final class TaggedBiomeSelector {
             650.0
         );
         return score;
+    }
+
+    private static boolean containsAny(
+        Set<GeoWorldBiomeTag> tags,
+        Set<GeoWorldBiomeTag> requiredAny
+    ) {
+        for (GeoWorldBiomeTag tag : requiredAny) {
+            if (tags.contains(tag)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static double rangeScore(

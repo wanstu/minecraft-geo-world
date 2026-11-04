@@ -36,9 +36,11 @@ tasks.named('processResources', ProcessResources) {
 // Minecraft 1.21.1 implementation shared by NeoForge and Fabric.
 sourceSets.main.java.srcDir '../../runtime-reader/src/main/java'
 sourceSets.main.java.srcDir '../../minecraft-common/src/main/java'
+sourceSets.main.java.srcDir '../../minecraft-client-common/src/main/java'
 sourceSets.main.java.srcDir '../../minecraft-v26-common/src/main/java'
 sourceSets.main.java.srcDir '../../minecraft-v1_21_1-common/src/main/java'
 sourceSets.main.java.exclude 'geoworld/minecraft/v26common/client/GeoWorldV26PresetScreen.java'
+sourceSets.main.java.exclude 'geoworld/minecraft/v26common/client/GeoWorldV26CreationSession.java'
 sourceSets.main.java.exclude 'geoworld/minecraft/v26common/client/GeoWorldV26PreviewScreen.java'
 
 sourceSets.main.resources.srcDir '../../minecraft-v26-common/src/main/resources'

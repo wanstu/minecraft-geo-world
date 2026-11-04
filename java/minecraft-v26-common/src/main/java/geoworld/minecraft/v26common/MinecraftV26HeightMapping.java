@@ -29,6 +29,12 @@ public class MinecraftV26HeightMapping implements HeightMapping {
     }
 
     @Override
+    public int boundaryYFloor(double normalizedHeight) {
+        int y = (int)Math.floor(mappedHeight(normalizedHeight) + 1.0e-9);
+        return clampBoundary(y);
+    }
+
+    @Override
     public int boundaryYCeil(double normalizedHeight) {
         int y = (int)Math.ceil(mappedHeight(normalizedHeight) - 1.0e-9);
         return clampBoundary(y);

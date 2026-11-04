@@ -3,6 +3,9 @@ package geoworld.fabric;
 import com.mojang.serialization.MapCodec;
 import geoworld.minecraft.v26_3common.GeoWorldConstants;
 import geoworld.minecraft.v26_3common.platform.Minecraft26_3PlatformAdapter;
+import geoworld.minecraft.v26_3common.runtime.GeoWorldWorldService;
+import geoworld.minecraft.v26common.command.GeoWorldCommands;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -14,6 +17,16 @@ import net.minecraft.world.level.chunk.ChunkGenerator;
 import java.util.function.Consumer;
 
 public final class GeoWorldFabricPlatform implements Minecraft26_3PlatformAdapter {
+    public GeoWorldFabricPlatform() {
+        CommandRegistrationCallback.EVENT.register(
+            (dispatcher, registryAccess, environment) ->
+                GeoWorldCommands.register(
+                    dispatcher,
+                    GeoWorldWorldService::active
+                )
+        );
+    }
+
     @Override
     public void registerWorldgen(
         String id,

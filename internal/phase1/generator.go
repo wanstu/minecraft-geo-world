@@ -31,6 +31,13 @@ const (
 	coastRenderOceanScaleBlocks = 42 * DefaultReferenceCellSizeBlocks
 )
 
+// LargestStaticMacroTransitionBlocks exposes the widest built-in Phase 1
+// transition scale for world-scope audits. It is a read-only contract: callers
+// use it to detect cramped effective ranges, never to drive generation.
+func LargestStaticMacroTransitionBlocks() float64 {
+	return coastRenderOceanScaleBlocks
+}
+
 func Generate(cfg Config) *World {
 	w, err := GenerateChecked(cfg)
 	if err != nil {

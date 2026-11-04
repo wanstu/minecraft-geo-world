@@ -1,4 +1,5 @@
 {
+  "license": "BSD-3-Clause",
   "schemaVersion": 1,
   "id": "geoworld",
   "version": "${version}",

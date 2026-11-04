@@ -42,8 +42,16 @@ public final class GeoWorldV26ChunkPlanningBenchmark {
             positions[i][0] = (-32 + (i % 8) * 8) * 16;
             positions[i][1] = (-24 + (i / 8) * 8) * 16;
         }
+        // Warm the JVM on different chunks so the reported pass remains a
+        // true cold-chunk measurement instead of hitting ChunkPlanCache.
         for (int i = 0; i < 3; i++) {
-            measure(model, seed, positions, false);
+            int[][] warm = new int[positions.length][2];
+            int shift = 4096 * (i + 1);
+            for (int p = 0; p < positions.length; p++) {
+                warm[p][0] = positions[p][0] + shift;
+                warm[p][1] = positions[p][1] + shift;
+            }
+            measure(model, seed, warm, false);
         }
         measure(model, seed, positions, true);
     }

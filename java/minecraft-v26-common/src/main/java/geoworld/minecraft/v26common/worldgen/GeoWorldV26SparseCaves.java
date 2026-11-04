@@ -8,6 +8,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
+import java.util.BitSet;
 import java.util.SplittableRandom;
 
 /**
@@ -61,6 +62,7 @@ public final class GeoWorldV26SparseCaves {
         int lastCellY = Math.floorDiv(maxY, CELL_Y);
 
         final int[] carved = {0};
+        BitSet modifiedVoxels = new BitSet(heights.height() * 256);
         for (int cellZ = firstCellZ; cellZ <= lastCellZ; cellZ++) {
             for (int cellX = firstCellX; cellX <= lastCellX; cellX++) {
                 for (int cellY = firstCellY; cellY <= lastCellY; cellY++) {
@@ -120,7 +122,8 @@ public final class GeoWorldV26SparseCaves {
                             centerZ,
                             localRadius,
                             large ? localRadius * 0.72 : localRadius * 0.58,
-                            carved
+                            carved,
+                            modifiedVoxels
                         );
                     }
                 }
@@ -132,7 +135,12 @@ public final class GeoWorldV26SparseCaves {
             "geoworld-rules-v1.1.7".equals(rules) ||
             "geoworld-rules-v1.1.8".equals(rules) ||
             "geoworld-rules-v1.1.9".equals(rules) ||
-            "geoworld-rules-v1.1.10".equals(rules)
+            "geoworld-rules-v1.1.10".equals(rules) ||
+            "geoworld-rules-v1.1.11".equals(rules) ||
+            "geoworld-rules-v1.1.12".equals(rules) ||
+            "geoworld-rules-v1.1.13".equals(rules) ||
+            "geoworld-rules-v1.1.14".equals(rules) ||
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules))
         ) {
             carved[0] += populateUndergroundRivers(
                 chunk,
@@ -145,7 +153,8 @@ public final class GeoWorldV26SparseCaves {
                 maxX,
                 minZ,
                 maxZ,
-                richness
+                richness,
+                modifiedVoxels
             );
         }
         return carved[0];
@@ -162,7 +171,8 @@ public final class GeoWorldV26SparseCaves {
         int chunkMaxX,
         int chunkMinZ,
         int chunkMaxZ,
-        double caveRichness
+        double caveRichness,
+        BitSet modifiedVoxels
     ) {
         int firstCellX = Math.floorDiv(
             chunkMinX - RIVER_SEARCH_MARGIN,
@@ -288,7 +298,8 @@ public final class GeoWorldV26SparseCaves {
                         centerZ,
                         localRadiusXZ,
                         localRadiusY,
-                        waterTopY
+                        waterTopY,
+                        modifiedVoxels
                     );
                 }
             }
@@ -310,7 +321,8 @@ public final class GeoWorldV26SparseCaves {
         double centerZ,
         double radiusXZ,
         double radiusY,
-        int waterTopY
+        int waterTopY,
+        BitSet modifiedVoxels
     ) {
         int minX = Math.max(
             chunkMinX,
@@ -380,6 +392,12 @@ public final class GeoWorldV26SparseCaves {
                     if (horizontal + ny * ny > 1.0) {
                         continue;
                     }
+                    int voxel =
+                        ((y - heights.minY()) * 256) +
+                        localZ * 16 + localX;
+                    if (modifiedVoxels.get(voxel)) {
+                        continue;
+                    }
                     pos.set(localX, y, localZ);
                     BlockState host = chunk.getBlockState(pos);
                     if (
@@ -396,6 +414,7 @@ public final class GeoWorldV26SparseCaves {
                         pos,
                         replacement
                     );
+                    modifiedVoxels.set(voxel);
                     placed++;
                 }
             }
@@ -417,7 +436,8 @@ public final class GeoWorldV26SparseCaves {
         double centerZ,
         double radiusXZ,
         double radiusY,
-        int[] carved
+        int[] carved,
+        BitSet modifiedVoxels
     ) {
         int minX = Math.max(chunkMinX, (int)Math.floor(centerX - radiusXZ));
         int maxX = Math.min(chunkMaxX, (int)Math.ceil(centerX + radiusXZ));
@@ -466,12 +486,19 @@ public final class GeoWorldV26SparseCaves {
                         continue;
                     }
 
+                    int voxel =
+                        ((y - heights.minY()) * 256) +
+                        localZ * 16 + localX;
+                    if (modifiedVoxels.get(voxel)) {
+                        continue;
+                    }
                     pos.set(localX, y, localZ);
                     BlockState host = chunk.getBlockState(pos);
                     if (!host.is(Blocks.STONE) && !host.is(Blocks.DEEPSLATE)) {
                         continue;
                     }
                     blockSetter.set(chunk, pos, air);
+                    modifiedVoxels.set(voxel);
                     carved[0]++;
                 }
             }

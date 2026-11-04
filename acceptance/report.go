@@ -51,6 +51,212 @@ type Result struct {
 	Note        string          `json:"note,omitempty"`
 }
 
+type Macro05Evidence struct {
+	PotentialCells            int     `json:"potentialCells"`
+	RoleCoverage              int     `json:"roleCoverage"`
+	CoreTripleOverlapFraction float64 `json:"coreTripleOverlapFraction"`
+	CoreTripleOverlapLimit    float64 `json:"coreTripleOverlapLimit"`
+	Satisfied                 bool    `json:"satisfied"`
+}
+
+func ApplyMacro05Evidence(report Report, evidence Macro05Evidence) Report {
+	out := report
+	out.Results = append([]Result(nil), report.Results...)
+	for i := range out.Results {
+		if out.Results[i].ID != "MACRO-05" {
+			continue
+		}
+		status := StatusFail
+		if evidence.Satisfied {
+			status = StatusPass
+		}
+		out.Results[i].Status = status
+		out.Results[i].Observe = fmt.Sprintf(
+			"区域优势统计：候选=%d，主导分工=%d 类，建设+港口+矿业三重高优势占比=%.2f%%（上限 %.2f%%）。",
+			evidence.PotentialCells,
+			evidence.RoleCoverage,
+			evidence.CoreTripleOverlapFraction*100,
+			evidence.CoreTripleOverlapLimit*100,
+		)
+		out.Results[i].Note =
+			"MACRO-05 使用当前锁定 World Model 的区域分工网格自动统计；允许局部多优势重合，但不允许建设、港口、矿业等优势在世界中普遍集中于同一位置。"
+		return out
+	}
+	return out
+}
+
+type Macro06Evidence struct {
+	MinSpanBlocks            float64 `json:"minSpanBlocks"`
+	MaxScaleBlocks           float64 `json:"maxScaleBlocks"`
+	MaxScaleName             string  `json:"maxScaleName"`
+	ScaleCapacity            float64 `json:"scaleCapacity"`
+	InteriorFraction         float64 `json:"interiorFraction"`
+	RecommendedMinSpanBlocks float64 `json:"recommendedMinSpanBlocks"`
+	ShortfallBlocks          float64 `json:"shortfallBlocks"`
+	Satisfied                bool    `json:"satisfied"`
+}
+
+func ApplyMacro06Evidence(report Report, evidence Macro06Evidence) Report {
+	out := report
+	out.Results = append([]Result(nil), report.Results...)
+	for i := range out.Results {
+		if out.Results[i].ID != "MACRO-06" {
+			continue
+		}
+		status := StatusFail
+		if evidence.Satisfied {
+			status = StatusPass
+		}
+		out.Results[i].Status = status
+		out.Results[i].Observe = fmt.Sprintf(
+			"scope budget: min span %.0f blocks; max scale %s=%.0f blocks; capacity %.2fx; interior %.1f%%; recommended min span %.0f blocks.",
+			evidence.MinSpanBlocks,
+			evidence.MaxScaleName,
+			evidence.MaxScaleBlocks,
+			evidence.ScaleCapacity,
+			evidence.InteriorFraction*100,
+			evidence.RecommendedMinSpanBlocks,
+		)
+		if evidence.ShortfallBlocks > 0 {
+			out.Results[i].Note = fmt.Sprintf(
+				"MACRO-06 failed by about %.0f blocks on the shortest axis; expand effective world range before compressing macro transitions.",
+				evidence.ShortfallBlocks,
+			)
+		} else {
+			out.Results[i].Note =
+				"MACRO-06 audits the locked World Model's resolved physical scales; it does not mutate generation."
+		}
+		return out
+	}
+	return out
+}
+
+type NodeEvidence struct {
+	TotalCells        int     `json:"totalCells"`
+	TotalNodes        int     `json:"totalNodes"`
+	ConfluenceNodes   int     `json:"confluenceNodes"`
+	LakeOutletNodes   int     `json:"lakeOutletNodes"`
+	EstuaryNodes      int     `json:"estuaryNodes"`
+	MountainPassNodes int     `json:"mountainPassNodes"`
+	StraitNodes       int     `json:"straitNodes"`
+	IsthmusNodes      int     `json:"isthmusNodes"`
+	NodeFraction      float64 `json:"nodeFraction"`
+	NodeFractionLimit float64 `json:"nodeFractionLimit"`
+}
+
+func ApplyNodeEvidence(report Report, evidence NodeEvidence) Report {
+	out := report
+	out.Results = append([]Result(nil), report.Results...)
+	limit := evidence.NodeFractionLimit
+	if limit <= 0 {
+		limit = 0.01
+	}
+	for i := range out.Results {
+		var (
+			satisfied bool
+			observe   string
+		)
+		switch out.Results[i].ID {
+		case "NODE-01":
+			satisfied = evidence.ConfluenceNodes > 0
+			observe = fmt.Sprintf(
+				"自然交通模型识别到 %d 个汇流节点。",
+				evidence.ConfluenceNodes,
+			)
+		case "NODE-02":
+			satisfied = evidence.LakeOutletNodes > 0
+			observe = fmt.Sprintf(
+				"自然交通模型识别到 %d 个大湖出口节点。",
+				evidence.LakeOutletNodes,
+			)
+		case "NODE-03":
+			satisfied = evidence.EstuaryNodes > 0
+			observe = fmt.Sprintf(
+				"自然交通模型识别到 %d 个河口节点。",
+				evidence.EstuaryNodes,
+			)
+		case "NODE-04":
+			satisfied = evidence.MountainPassNodes > 0
+			observe = fmt.Sprintf(
+				"自然交通模型识别到 %d 个山口节点。",
+				evidence.MountainPassNodes,
+			)
+		case "NODE-05":
+			satisfied = evidence.StraitNodes+evidence.IsthmusNodes > 0
+			observe = fmt.Sprintf(
+				"自然交通模型识别到海峡 %d 个、地峡 %d 个。",
+				evidence.StraitNodes,
+				evidence.IsthmusNodes,
+			)
+		case "NODE-06":
+			satisfied = evidence.TotalCells > 0 &&
+				evidence.TotalNodes > 0 &&
+				evidence.NodeFraction <= limit
+			observe = fmt.Sprintf(
+				"自然交通节点=%d / 宏观网格=%d，节点占比=%.3f%%（上限 %.3f%%）。",
+				evidence.TotalNodes,
+				evidence.TotalCells,
+				evidence.NodeFraction*100,
+				limit*100,
+			)
+		default:
+			continue
+		}
+		out.Results[i].Status = StatusFail
+		if satisfied {
+			out.Results[i].Status = StatusPass
+		}
+		out.Results[i].Observe = observe
+		out.Results[i].Note =
+			"NODE 自动证据直接来自当前锁定 World Model 派生的自然交通节点；它只描述天然地理关系，不生成道路、桥梁、港口或聚落。"
+	}
+	return out
+}
+
+type CorridorClassEvidence struct {
+	Routes                int     `json:"routes"`
+	CompleteRoutes        int     `json:"completeRoutes"`
+	LongestCompleteBlocks float64 `json:"longestCompleteBlocks"`
+}
+
+type CorridorEvidence struct {
+	Classes map[string]CorridorClassEvidence `json:"classes"`
+}
+
+func ApplyCorridorEvidence(report Report, evidence CorridorEvidence) Report {
+	out := report
+	out.Results = append([]Result(nil), report.Results...)
+	classByID := map[string]string{
+		"CORRIDOR-01": "river_valley",
+		"CORRIDOR-02": "hill_pass",
+		"CORRIDOR-03": "mountain_pass",
+		"CORRIDOR-04": "plateau_access",
+		"CORRIDOR-05": "basin_gateway",
+		"CORRIDOR-06": "low_divide",
+	}
+	for i := range out.Results {
+		class, ok := classByID[out.Results[i].ID]
+		if !ok {
+			continue
+		}
+		item := evidence.Classes[class]
+		out.Results[i].Status = StatusFail
+		if item.CompleteRoutes > 0 {
+			out.Results[i].Status = StatusPass
+		}
+		out.Results[i].Observe = fmt.Sprintf(
+			"自然走廊 %s：候选路线=%d，语义完整=%d，最长完整路线=%.0f blocks。",
+			class,
+			item.Routes,
+			item.CompleteRoutes,
+			item.LongestCompleteBlocks,
+		)
+		out.Results[i].Note =
+			"CORRIDOR 自动证据来自当前锁定 World Model 的连续自然路径；完整路线必须满足最小连续长度和对应地理语义，不生成道路、桥梁或其它人工设施。"
+	}
+	return out
+}
+
 type Report struct {
 	RegistryVersion         string   `json:"registryVersion"`
 	Seed                    int64    `json:"seed"`
@@ -182,6 +388,14 @@ func assignPointRoles(entry Entry, points []Point) []Point {
 	}
 	out := append([]Point(nil), points...)
 	prefix := strings.SplitN(entry.ID, "-", 2)[0]
+	if entry.ID == "EST-03" {
+		for i := range out {
+			if out[i].Role == "" {
+				out[i].Role = fmt.Sprintf("三角洲路线 P%d", i+1)
+			}
+		}
+		return out
+	}
 	if entry.Inspection != InspectionRoute {
 		for i := range out {
 			out[i].Role = fmt.Sprintf("候选样本 P%d", i+1)
@@ -312,13 +526,40 @@ func buildCatalog(
 		add("CORRIDOR", riverPoints...)
 		add("NODE", riverPoints[len(riverPoints)-1])
 	}
+	for _, routePoint := range model.Waterbed.AcceptanceDeltaRoute() {
+		point := makePoint(
+			runtimeWorld,
+			routePoint.X,
+			routePoint.Z,
+			fmt.Sprintf(
+				"same real delta route stage=%s (signal=%.4f)",
+				routePoint.Stage,
+				routePoint.Strength,
+			),
+		)
+		switch routePoint.Stage {
+		case "main-entry":
+			point.Role = "P1 主河进入区"
+		case "split":
+			point.Role = "P2 分汊开始"
+		case "branch-a-mid":
+			point.Role = "P3 支汊 A 展开"
+		case "branch-a-mouth":
+			point.Role = "P4 支汊 A 近海口"
+		case "branch-b-mid":
+			point.Role = "P5 支汊 B 展开"
+		case "branch-b-mouth":
+			point.Role = "P6 支汊 B 近海口"
+		}
+		add("EST-03", point)
+	}
 	for _, candidate := range model.Waterbed.AcceptanceFluvialCandidates() {
 		point := makePoint(
 			runtimeWorld,
 			candidate.X,
 			candidate.Z,
 			fmt.Sprintf(
-				"v1.1.7 fluvial %s candidate from runtime generation rule (signal=%.4f)",
+				"runtime fluvial %s candidate from locked generation rule (signal=%.4f)",
 				candidate.Kind,
 				candidate.Strength,
 			),
@@ -332,6 +573,8 @@ func buildCatalog(
 			add("FLOOD-03", point)
 		case "levee":
 			add("FLOOD-04", point)
+		case "delta":
+			add("EST", point)
 		}
 	}
 	if mouth, ok := findOceanMouth(model, runtimeWorld); ok {

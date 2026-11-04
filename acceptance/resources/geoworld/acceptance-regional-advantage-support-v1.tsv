@@ -1,0 +1,9 @@
+# GeoWorld Regional Advantage Support Acceptance v1
+# Deterministic economic-geography checkpoints for MACRO-05 and readonly regional specialization.
+# id	generation_rules	seed	requirement	inspection	name	x	y	z	pass_standard	method
+ADVANTAGE-01	geoworld-rules-v1.1.11	123456	CORE	POINT	建设优势区	3648	139	7872	区域分工图层应显示 building_region；建设优势约 0.90，而港口优势显著较低，证明建设优势并不自动等同港口优势。	WebUI 区域分工图层核对五类优势和主导类型后进入游戏观察建设地形条件
+ADVANTAGE-02	geoworld-rules-v1.1.11	123456	CORE	POINT	农业优势区	10688	166	-2240	区域分工图层应显示 agriculture_region；农业优势为主要角色，并与港口、交通条件形成可辨识差异。	WebUI 区域分工图层核对农业/建设/港口/矿业/交通评分
+ADVANTAGE-03	geoworld-rules-v1.1.11	123456	CORE	POINT	矿业专业区	-13120	161	-6336	区域分工图层应显示 mining_region；矿业优势约 0.81、建设约 0.50、港口约 0.36，专业化强度高，作为 MACRO-05 的清晰分工正例。	WebUI 区域分工与矿区潜力图层交叉核对
+ADVANTAGE-04	geoworld-rules-v1.1.11	123456	CORE	POINT	交通枢纽优势区	7104	143	-960	区域分工图层应显示 transport_region；交通优势接近 0.97，允许同时拥有多种较高优势，但不得据此生成真实道路或城镇。	WebUI 区域分工图层核对交通主导和重合风险
+ADVANTAGE-05	geoworld-rules-v1.1.11	123456	CORE	POINT	多优势重合区	10560	160	-2240	区域分工图层应显示 multi_advantage_region；该点作为允许存在的高重合正例，证明 MACRO-05 限制的是“普遍重合”而不是禁止任何重合。	WebUI 核对高优势数量、低专业化强度和高重合风险
+ADVANTAGE-06	geoworld-rules-v1.1.11	123456	CORE	POINT	港口高值交通枢纽	-3520	101	-2752	港口优势应约 0.82 且原始港口适宜度较高，同时交通优势更高而归为 transport_region；港口高值不应被伪装成独立港口城市生成。	WebUI 区域分工与航运/港口图层交叉核对

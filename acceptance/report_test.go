@@ -104,6 +104,221 @@ func TestAcceptanceReportCoversEveryRegisteredID(t *testing.T) {
 	}
 }
 
+func TestApplyMacro05EvidenceUpdatesOnlyMacro05(t *testing.T) {
+	base := Report{
+		Seed: 123456,
+		Results: []Result{
+			{ID: "MACRO-04", Status: StatusManualRequired},
+			{ID: "MACRO-05", Status: StatusManualRequired},
+		},
+	}
+	passed := ApplyMacro05Evidence(base, Macro05Evidence{
+		PotentialCells:            19000,
+		RoleCoverage:              4,
+		CoreTripleOverlapFraction: 0.08,
+		CoreTripleOverlapLimit:    0.15,
+		Satisfied:                 true,
+	})
+	if passed.Results[0].Status != StatusManualRequired {
+		t.Fatalf("unrelated result changed: %+v", passed.Results[0])
+	}
+	if passed.Results[1].Status != StatusPass ||
+		passed.Results[1].Observe == "" ||
+		passed.Results[1].Note == "" {
+		t.Fatalf("MACRO-05 pass evidence not applied: %+v", passed.Results[1])
+	}
+	if base.Results[1].Status != StatusManualRequired {
+		t.Fatal("ApplyMacro05Evidence mutated the source report")
+	}
+
+	failed := ApplyMacro05Evidence(base, Macro05Evidence{
+		PotentialCells:            19000,
+		RoleCoverage:              2,
+		CoreTripleOverlapFraction: 0.22,
+		CoreTripleOverlapLimit:    0.15,
+		Satisfied:                 false,
+	})
+	if failed.Results[1].Status != StatusFail {
+		t.Fatalf("MACRO-05 failure evidence not applied: %+v", failed.Results[1])
+	}
+}
+
+func TestApplyMacro06EvidenceUpdatesOnlyMacro06(t *testing.T) {
+	base := Report{
+		Seed: 123456,
+		Results: []Result{
+			{ID: "MACRO-05", Status: StatusManualRequired},
+			{ID: "MACRO-06", Status: StatusManualRequired},
+		},
+	}
+	passed := ApplyMacro06Evidence(base, Macro06Evidence{
+		MinSpanBlocks:            25472,
+		MaxScaleBlocks:           5376,
+		MaxScaleName:             "phase1_macro_transition",
+		ScaleCapacity:            25472.0 / 5376.0,
+		InteriorFraction:         1 - 2*5376.0/25472.0,
+		RecommendedMinSpanBlocks: 21504,
+		ShortfallBlocks:          0,
+		Satisfied:                true,
+	})
+	if passed.Results[0].Status != StatusManualRequired {
+		t.Fatalf("unrelated result changed: %+v", passed.Results[0])
+	}
+	if passed.Results[1].Status != StatusPass ||
+		passed.Results[1].Observe == "" ||
+		passed.Results[1].Note == "" {
+		t.Fatalf("MACRO-06 pass evidence not applied: %+v", passed.Results[1])
+	}
+	if base.Results[1].Status != StatusManualRequired {
+		t.Fatal("ApplyMacro06Evidence mutated the source report")
+	}
+
+	failed := ApplyMacro06Evidence(base, Macro06Evidence{
+		MinSpanBlocks:            16000,
+		MaxScaleBlocks:           5376,
+		MaxScaleName:             "phase1_macro_transition",
+		ScaleCapacity:            16000.0 / 5376.0,
+		InteriorFraction:         1 - 2*5376.0/16000.0,
+		RecommendedMinSpanBlocks: 21504,
+		ShortfallBlocks:          5504,
+		Satisfied:                false,
+	})
+	if failed.Results[1].Status != StatusFail {
+		t.Fatalf("MACRO-06 failure evidence not applied: %+v", failed.Results[1])
+	}
+}
+
+func TestApplyNodeEvidenceUpdatesNodeAcceptance(t *testing.T) {
+	base := Report{
+		Seed: 123456,
+		Results: []Result{
+			{ID: "MACRO-06", Status: StatusManualRequired},
+			{ID: "NODE-01", Status: StatusManualRequired},
+			{ID: "NODE-02", Status: StatusManualRequired},
+			{ID: "NODE-03", Status: StatusManualRequired},
+			{ID: "NODE-04", Status: StatusManualRequired},
+			{ID: "NODE-05", Status: StatusManualRequired},
+			{ID: "NODE-06", Status: StatusManualRequired},
+		},
+	}
+	passed := ApplyNodeEvidence(base, NodeEvidence{
+		TotalCells:        64000,
+		TotalNodes:        72,
+		ConfluenceNodes:   3,
+		LakeOutletNodes:   2,
+		EstuaryNodes:      2,
+		MountainPassNodes: 5,
+		StraitNodes:       1,
+		IsthmusNodes:      1,
+		NodeFraction:      72.0 / 64000.0,
+		NodeFractionLimit: 0.01,
+	})
+	if passed.Results[0].Status != StatusManualRequired {
+		t.Fatalf("unrelated result changed: %+v", passed.Results[0])
+	}
+	for i := 1; i < len(passed.Results); i++ {
+		if passed.Results[i].Status != StatusPass ||
+			passed.Results[i].Observe == "" ||
+			passed.Results[i].Note == "" {
+			t.Fatalf("%s pass evidence not applied: %+v",
+				passed.Results[i].ID, passed.Results[i])
+		}
+	}
+	if base.Results[1].Status != StatusManualRequired {
+		t.Fatal("ApplyNodeEvidence mutated the source report")
+	}
+
+	failed := ApplyNodeEvidence(base, NodeEvidence{
+		TotalCells:        1000,
+		TotalNodes:        20,
+		ConfluenceNodes:   0,
+		LakeOutletNodes:   1,
+		EstuaryNodes:      1,
+		MountainPassNodes: 1,
+		StraitNodes:       0,
+		IsthmusNodes:      0,
+		NodeFraction:      0.02,
+		NodeFractionLimit: 0.01,
+	})
+	if failed.Results[1].Status != StatusFail {
+		t.Fatalf("NODE-01 missing confluence should fail: %+v", failed.Results[1])
+	}
+	if failed.Results[5].Status != StatusFail {
+		t.Fatalf("NODE-05 missing strait/isthmus should fail: %+v", failed.Results[5])
+	}
+	if failed.Results[6].Status != StatusFail {
+		t.Fatalf("NODE-06 dense nodes should fail: %+v", failed.Results[6])
+	}
+}
+
+func TestApplyNodeEvidenceUsesDefaultScarcityLimit(t *testing.T) {
+	report := Report{Results: []Result{
+		{ID: "NODE-06", Status: StatusManualRequired},
+	}}
+	result := ApplyNodeEvidence(report, NodeEvidence{
+		TotalCells:   10000,
+		TotalNodes:   50,
+		NodeFraction: 0.005,
+	})
+	if result.Results[0].Status != StatusPass {
+		t.Fatalf("default 1%% node fraction limit not applied: %+v", result.Results[0])
+	}
+}
+
+func TestApplyCorridorEvidenceUpdatesOnlyCorridors(t *testing.T) {
+	base := Report{
+		Results: []Result{
+			{ID: "NODE-06", Status: StatusManualRequired},
+			{ID: "CORRIDOR-01", Status: StatusManualRequired},
+			{ID: "CORRIDOR-02", Status: StatusManualRequired},
+			{ID: "CORRIDOR-03", Status: StatusManualRequired},
+			{ID: "CORRIDOR-04", Status: StatusManualRequired},
+			{ID: "CORRIDOR-05", Status: StatusManualRequired},
+			{ID: "CORRIDOR-06", Status: StatusManualRequired},
+		},
+	}
+	classes := map[string]CorridorClassEvidence{
+		"river_valley":   {Routes: 8, CompleteRoutes: 8, LongestCompleteBlocks: 17000},
+		"hill_pass":      {Routes: 8, CompleteRoutes: 8, LongestCompleteBlocks: 4200},
+		"mountain_pass":  {Routes: 8, CompleteRoutes: 3, LongestCompleteBlocks: 11900},
+		"plateau_access": {Routes: 8, CompleteRoutes: 3, LongestCompleteBlocks: 11000},
+		"basin_gateway":  {Routes: 8, CompleteRoutes: 8, LongestCompleteBlocks: 9000},
+		"low_divide":     {Routes: 8, CompleteRoutes: 8, LongestCompleteBlocks: 10000},
+	}
+	passed := ApplyCorridorEvidence(base, CorridorEvidence{Classes: classes})
+	if passed.Results[0].Status != StatusManualRequired {
+		t.Fatalf("unrelated result changed: %+v", passed.Results[0])
+	}
+	for i := 1; i < len(passed.Results); i++ {
+		if passed.Results[i].Status != StatusPass ||
+			passed.Results[i].Observe == "" ||
+			passed.Results[i].Note == "" {
+			t.Fatalf("%s pass evidence not applied: %+v",
+				passed.Results[i].ID, passed.Results[i])
+		}
+	}
+	if base.Results[1].Status != StatusManualRequired {
+		t.Fatal("ApplyCorridorEvidence mutated the source report")
+	}
+
+	failedClasses := make(map[string]CorridorClassEvidence, len(classes))
+	for class, item := range classes {
+		failedClasses[class] = item
+	}
+	failedClasses["mountain_pass"] = CorridorClassEvidence{
+		Routes:                8,
+		CompleteRoutes:        0,
+		LongestCompleteBlocks: 0,
+	}
+	failed := ApplyCorridorEvidence(
+		base,
+		CorridorEvidence{Classes: failedClasses},
+	)
+	if failed.Results[3].Status != StatusFail {
+		t.Fatalf("CORRIDOR-03 missing complete route should fail: %+v", failed.Results[3])
+	}
+}
+
 func TestRiverAcceptanceStationFollowsRenderedMeanderCenterline(t *testing.T) {
 	seg := waterbed.RiverSegment{
 		X0:            0,

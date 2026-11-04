@@ -217,6 +217,12 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 			hydro.LakeID[draft.edge.From] > 0 &&
 			hydro.LakeID[draft.edge.From] != hydro.LakeID[draft.edge.To]
 		mouthExpansionVersion := uint8(3)
+		// v1.1.13 / RiverGeometryVersion 5 finally enables the already
+		// implemented delta distributary geometry on real ocean mouths.
+		// Earlier locked rule versions keep OceanMouth at v3 exactly.
+		if cfg.RiverGeometryVersion >= 5 && oceanMouth {
+			mouthExpansionVersion = 5
+		}
 		if cfg.RiverGeometryVersion >= 3 && lakeMouth {
 			// v1.1.8 keeps large lake inlets proportional to the incoming river;
 			// the older fixed lake-mouth cap made the widest rivers form a
@@ -243,8 +249,10 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 			draft.halfWidth,
 			draft.meanderOffset,
 			mouthExpansionVersion,
+			cfg.RiverGeometryVersion,
 			cfg.RiverProfileStepBlocks,
 			cfg.MinRiverBedDepthNormalized*(1+1.5*widthT),
+			riverCenterDepth(cfg, draft.halfWidth),
 		)
 		rawProfileDrop := profile[0] - profile[len(profile)-1]
 		profile = terraceRiverProfile(
@@ -838,6 +846,16 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		worldX,
 		worldZ,
 	)
+	activeRiverBankSurface := math.Inf(-1)
+	if m.Config.RiverGeometryVersion >= 4 {
+		if surface, ok := m.riverBankProtectionSurfaceAt(
+			riverIDs,
+			worldX,
+			worldZ,
+		); ok {
+			activeRiverBankSurface = surface
+		}
+	}
 
 	riverDatumWeight := -1.0
 	riverDatumT := 2.0
@@ -857,14 +875,34 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			continue
 		}
 		bed := sampleRiverProfile(seg, t)
-		naturalSurface := bed + riverCenterDepth(m.Config, seg.HalfWidth)
+		centerDepth := riverCenterDepth(m.Config, seg.HalfWidth)
+		bankCeiling := math.Inf(1)
+		if m.Config.RiverGeometryVersion >= 4 {
+			bankCeiling = riverBankSurfaceCeiling(m.Base, seg, t)
+			// The persisted profile is sampled densely, but Runtime can query
+			// between those samples and mouth widening changes the true bank
+			// offset. Re-cap the local bed so the final free surface remains
+			// below the actual low bank at this exact coordinate.
+			bed = math.Min(
+				bed,
+				math.Max(0, bankCeiling-centerDepth),
+			)
+		}
+		naturalSurface := bed + centerDepth
 		surface := riverConnectionSurface(seg, t, naturalSurface)
+		if m.Config.RiverGeometryVersion >= 4 {
+			surface = math.Max(
+				naturalSurface,
+				math.Min(surface, bankCeiling),
+			)
+		}
 
 		if deltaInBank && !deltaInWater {
 			// Delta distributaries own a real dry bank corridor too. This keeps
 			// each branch connected to the surrounding floodplain without turning
 			// the split into a water trench cut through untouched terrain.
-			innerBank := math.Min(baseHeight, surface+0.0018)
+			bankSurface := math.Max(surface, activeRiverBankSurface)
+			innerBank := math.Min(baseHeight, bankSurface+0.0018)
 			bankWeight := 1 - smoothstep(
 				deltaHalfWidth,
 				deltaBankRadius,
@@ -886,7 +924,8 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			// the untouched broad surface instead of meeting water as a noisy
 			// staircase or vertical trench wall.
 			if distance < bankRadius {
-				innerBank := math.Min(baseHeight, surface+0.0022)
+				bankSurface := math.Max(surface, activeRiverBankSurface)
+				innerBank := math.Min(baseHeight, bankSurface+0.0022)
 				bankWeight := 1 - smoothstep(
 					halfWidth,
 					bankRadius,
@@ -1324,8 +1363,10 @@ func buildRiverProfile(
 	halfWidth,
 	meanderOffset float64,
 	mouthExpansionVersion uint8,
+	riverGeometryVersion uint8,
 	stepBlocks,
-	minBedDepthNormalized float64,
+	minBedDepthNormalized,
+	centerDepthNormalized float64,
 ) []float64 {
 	length := math.Hypot(x1-x0, z1-z0)
 	steps := maxInt(1, int(math.Ceil(length/stepBlocks)))
@@ -1366,6 +1407,18 @@ func buildRiverProfile(
 				0,
 				bankLow-minBedDepthNormalized,
 			)
+			if riverGeometryVersion >= 4 {
+				// v1.1.12: constrain the free surface, not merely the bed.
+				// Leaving only minBedDepth below a low bank allowed
+				// bed+waterDepth to sit above adjacent dry terrain, after which
+				// the voxel shoreline layer had to choose between an artificial
+				// retaining wall and a lateral water sheet.
+				const bankFreeboardNormalized = 0.0022
+				bankGuidedTrench = math.Max(
+					0,
+					bankLow-centerDepthNormalized-bankFreeboardNormalized,
+				)
+			}
 			v = math.Min(v, bankGuidedTrench)
 		}
 		if j > 0 && v > profile[j-1] {
@@ -1766,6 +1819,45 @@ func riverMeanderShapeForSegment(
 		-math.Pi * math.Pi * s
 }
 
+func riverBankSurfaceCeiling(
+	base *terrain.Model,
+	seg RiverSegment,
+	t float64,
+) float64 {
+	x, z, nx, nz := riverCenterAndNormalForSegment(seg, t)
+	halfWidth := riverMouthHalfWidth(seg, t)
+	// A curved/rasterized river edge can touch a low dry block slightly
+	// upstream or downstream from the exact perpendicular cross-section.
+	// Sample a short strip along both banks so that the entire local
+	// cross-section is lowered together instead of relying on voxel walls.
+	tx, tz := -nz, nx
+	lowestBank := math.Inf(1)
+	for _, margin := range [...]float64{0.75, 1.5, 3} {
+		bankOffset := halfWidth + margin
+		for _, along := range [...]float64{-1.5, 0, 1.5} {
+			bankX := x + tx*along
+			bankZ := z + tz*along
+			left := base.SampleNormalized(
+				bankX+nx*bankOffset,
+				bankZ+nz*bankOffset,
+			)
+			right := base.SampleNormalized(
+				bankX-nx*bankOffset,
+				bankZ-nz*bankOffset,
+			)
+			lowestBank = math.Min(
+				lowestBank,
+				math.Min(left, right),
+			)
+		}
+	}
+	const bankFreeboardNormalized = 0.0022
+	return math.Max(
+		0,
+		lowestBank-bankFreeboardNormalized,
+	)
+}
+
 func riverCenterAndNormalForSegment(
 	seg RiverSegment,
 	t float64,
@@ -2122,8 +2214,10 @@ func appendLakeConnectorPath(
 			halfWidth,
 			meander,
 			mouthExpansionVersion,
+			cfg.RiverGeometryVersion,
 			cfg.RiverProfileStepBlocks,
 			cfg.MinRiverBedDepthNormalized*(1+1.5*widthT),
+			riverCenterDepth(cfg, halfWidth),
 		)
 		profile = terraceRiverProfile(
 			profile,
@@ -2556,6 +2650,78 @@ func directReceiverSurface(
 	default:
 		return 0, false, nil
 	}
+}
+
+func (m *Model) NavigationSampleAt(
+	worldX, worldZ float64,
+) (RiverNavigationSample, bool) {
+	if m == nil || len(m.Rivers) == 0 {
+		return RiverNavigationSample{}, false
+	}
+	best := math.Inf(1)
+	out := RiverNavigationSample{}
+	for i, seg := range m.Rivers {
+		t, centerDistance := pointRiverSegment(worldX, worldZ, seg)
+		halfWidth := riverMouthHalfWidth(seg, t)
+		bankDistance := math.Max(0, centerDistance-halfWidth)
+		if bankDistance >= best {
+			continue
+		}
+		best = bankDistance
+		out = RiverNavigationSample{
+			RiverID:      i + 1,
+			BankDistance: bankDistance,
+			HalfWidth:    halfWidth,
+			Gradient:     riverLocalGradient(seg, t),
+			OceanMouth:   seg.OceanMouth,
+			LakeMouth:    seg.LakeMouth,
+			LakeOutlet:   seg.LakeOutlet,
+		}
+	}
+	return out, finite(best)
+}
+
+func (m *Model) DistanceToNearestRiverBank(worldX, worldZ float64) (float64, bool) {
+	sample, ok := m.NavigationSampleAt(worldX, worldZ)
+	if !ok {
+		return 0, false
+	}
+	return sample.BankDistance, true
+}
+
+func riverLocalGradient(seg RiverSegment, t float64) float64 {
+	const window = 0.08
+	t0 := clamp(t-window, 0, 1)
+	t1 := clamp(t+window, 0, 1)
+	if t1-t0 <= 1e-9 {
+		return 0
+	}
+	x0, z0 := RiverCenterPoint(seg, t0)
+	x1, z1 := RiverCenterPoint(seg, t1)
+	distance := math.Hypot(x1-x0, z1-z0)
+	if distance <= 1e-9 {
+		return 0
+	}
+	h0 := sampleRiverProfile(seg, t0)
+	h1 := sampleRiverProfile(seg, t1)
+	return math.Abs(h1-h0) / distance
+}
+
+func (m *Model) DistanceToNearestLakeShore(worldX, worldZ float64) (float64, bool) {
+	if m == nil || len(m.Lakes) == 0 {
+		return 0, false
+	}
+	best := math.Inf(1)
+	for _, lake := range m.Lakes {
+		distance := math.Max(
+			0,
+			lakeDistance(worldX-lake.X, worldZ-lake.Z)-lake.OuterRadius,
+		)
+		if distance < best {
+			best = distance
+		}
+	}
+	return best, finite(best)
 }
 
 func lakeDistance(dx, dz float64) float64 {
@@ -3503,6 +3669,49 @@ func (m *Model) Audit(samplesPerSegment int, epsilon float64) Diagnostics {
 		}
 	}
 	return d
+}
+
+func (m *Model) riverBankProtectionSurfaceAt(
+	ids []int,
+	worldX,
+	worldZ float64,
+) (float64, bool) {
+	highest := math.Inf(-1)
+	found := false
+	for _, id := range ids {
+		if id < 0 || id >= len(m.Rivers) {
+			continue
+		}
+		seg := m.Rivers[id]
+		t, distance := pointRiverSegment(worldX, worldZ, seg)
+		halfWidth := riverMouthHalfWidth(seg, t)
+		bankRadius := halfWidth + riverBankBlendBlocks(seg.HalfWidth)
+		_, deltaDistance, _, deltaBankRadius, deltaOK :=
+			riverDeltaPoint(seg, t, worldX, worldZ)
+		if distance >= bankRadius &&
+			!(deltaOK && deltaDistance < deltaBankRadius) {
+			continue
+		}
+
+		bed := sampleRiverProfile(seg, t)
+		centerDepth := riverCenterDepth(m.Config, seg.HalfWidth)
+		bankCeiling := riverBankSurfaceCeiling(m.Base, seg, t)
+		bed = math.Min(
+			bed,
+			math.Max(0, bankCeiling-centerDepth),
+		)
+		naturalSurface := bed + centerDepth
+		surface := riverConnectionSurface(seg, t, naturalSurface)
+		surface = math.Max(
+			naturalSurface,
+			math.Min(surface, bankCeiling),
+		)
+		if !found || surface > highest {
+			highest = surface
+			found = true
+		}
+	}
+	return highest, found
 }
 
 func riverBankProtectedAt(

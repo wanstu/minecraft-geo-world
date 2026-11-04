@@ -4,5 +4,6 @@ output/
 **/.gradle/
 **/geoworld-cache/
 *.log
+**/logs/
 .DS_Store
 Thumbs.db

@@ -3,13 +3,17 @@ package geoworld.neoforge;
 import com.mojang.serialization.MapCodec;
 import geoworld.minecraft.v1_21_1common.GeoWorldConstants;
 import geoworld.minecraft.v1_21_1common.platform.Minecraft1_21_1PlatformAdapter;
+import geoworld.minecraft.v1_21_1common.runtime.GeoWorldWorldService;
+import geoworld.minecraft.v26common.command.GeoWorldCommands;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -32,6 +36,13 @@ public final class GeoWorldNeoForgePlatform implements Minecraft1_21_1PlatformAd
 
     public GeoWorldNeoForgePlatform(IEventBus modEventBus) {
         this.modEventBus = modEventBus;
+        NeoForge.EVENT_BUS.addListener(
+            (RegisterCommandsEvent event) ->
+                GeoWorldCommands.register(
+                    event.getDispatcher(),
+                    GeoWorldWorldService::active
+                )
+        );
     }
 
     @Override
@@ -53,6 +64,10 @@ public final class GeoWorldNeoForgePlatform implements Minecraft1_21_1PlatformAd
     ) {
         NeoForge.EVENT_BUS.addListener(
             (ServerStartingEvent event) -> onReady.accept(event.getServer())
+        );
+        NeoForge.EVENT_BUS.addListener(
+            (ServerStartedEvent event) ->
+                GeoWorldWorldService.ensureSafeSpawn(event.getServer())
         );
         NeoForge.EVENT_BUS.addListener(
             (ServerStoppedEvent event) -> onStopped.accept(event.getServer())
