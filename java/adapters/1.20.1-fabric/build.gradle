@@ -36,7 +36,19 @@ tasks.named('processResources', ProcessResources) {
 // Minecraft 1.20.1 implementation shared by NeoForge and Fabric.
 sourceSets.main.java.srcDir '../../runtime-reader/src/main/java'
 sourceSets.main.java.srcDir '../../minecraft-common/src/main/java'
-sourceSets.main.java.srcDir '../../minecraft-v26-common/src/main/java'
+// Adapt the shared terrain pipeline to the pre-1.21 ChunkStatus API.
+def geoWorldLegacyCommonSources = layout.buildDirectory.dir('generated/sources/geoworldLegacyCommon')
+def generateGeoWorldLegacyCommonSources = tasks.register('generateGeoWorldLegacyCommonSources', Sync) {
+    from '../../minecraft-v26-common/src/main/java'
+    into geoWorldLegacyCommonSources
+    filteringCharset = 'UTF-8'
+    filter { line ->
+        line.replace('net.minecraft.world.level.chunk.status.ChunkStatus', 'net.minecraft.world.level.chunk.ChunkStatus')
+            .replace('.getPersistedStatus()', '.getStatus()')
+    }
+}
+sourceSets.main.java.srcDir geoWorldLegacyCommonSources
+tasks.named('compileJava') { dependsOn generateGeoWorldLegacyCommonSources }
 sourceSets.main.java.srcDir '../../minecraft-v1_20_1-common/src/main/java'
 sourceSets.main.java.exclude 'geoworld/minecraft/v26common/client/GeoWorldV26PresetScreen.java'
 sourceSets.main.java.exclude 'geoworld/minecraft/v26common/client/GeoWorldV26PreviewScreen.java'

@@ -934,7 +934,7 @@ public class GeoWorldV26PresetScreen extends Screen {
             .getUiState()
             .getSettings()
             .worldgenLoadContext()
-            .registryOrThrow(Registries.BLOCK);
+            .lookupOrThrow(Registries.BLOCK);
         var catalog = GeoWorldOreCatalog.scanWorldgenRegistry(blockRegistry);
         GeoWorldMineralContext.publish(
             catalog.dictionaryFamilies(),

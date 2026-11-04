@@ -142,7 +142,7 @@ public final class GeoWorldOreCatalog {
                 ? ores.stone()
                 : ores.deepslate();
             if (!candidates.isEmpty()) {
-                out.put(family, candidates.getFirst().id());
+                out.put(family, candidates.get(0).id());
             }
         });
         return Map.copyOf(out);
