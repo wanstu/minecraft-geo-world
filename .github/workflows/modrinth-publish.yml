@@ -14,12 +14,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: modrinth-${ github.event.inputs.tag || github.event.release.tag_name }
+  group: modrinth-${{ github.event.inputs.tag || github.event.release.tag_name }}
   cancel-in-progress: false
 
 jobs:
   publish:
-    name: Modrinth ${ matrix.minecraft } / ${ matrix.loader }
+    name: Modrinth ${{ matrix.minecraft }} / ${{ matrix.loader }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -36,7 +36,7 @@ jobs:
           - { minecraft: '1.21.1', loader: fabric }
           - { minecraft: '1.20.1', loader: fabric }
     env:
-      RELEASE_TAG: ${ github.event.inputs.tag || github.event.release.tag_name }
+      RELEASE_TAG: ${{ github.event.inputs.tag || github.event.release.tag_name }}
     steps:
       - name: Validate tag and release asset name
         id: target
@@ -48,9 +48,9 @@ jobs:
             exit 1
           fi
           version="${RELEASE_TAG#v}"
-          filename="GeoWorld-${version}-mc${ matrix.minecraft }-${ matrix.loader }.jar"
+          filename="GeoWorld-${version}-mc${{ matrix.minecraft }}-${{ matrix.loader }}.jar"
           echo "filename=$filename" >> "$GITHUB_OUTPUT"
-          echo "version_number=${version}-mc${ matrix.minecraft }-${ matrix.loader }" >> "$GITHUB_OUTPUT"
+          echo "version_number=${version}-mc${{ matrix.minecraft }}-${{ matrix.loader }}" >> "$GITHUB_OUTPUT"
           if [[ "$RELEASE_TAG" == *-rc.* ]]; then
             echo 'version_type=beta' >> "$GITHUB_OUTPUT"
           else
@@ -60,8 +60,8 @@ jobs:
       - name: Download and verify GitHub Release asset
         shell: bash
         env:
-          GH_TOKEN: ${ github.token }
-          FILENAME: ${ steps.target.outputs.filename }
+          GH_TOKEN: ${{ github.token }}
+          FILENAME: ${{ steps.target.outputs.filename }}
         run: |
           set -euo pipefail
           mkdir -p release-stage
@@ -77,10 +77,10 @@ jobs:
         id: existing
         shell: bash
         env:
-          MODRINTH_TOKEN: ${ secrets.MODRINTH_TOKEN }
-          MODRINTH_PROJECT_ID: ${ secrets.MODRINTH_PROJECT_ID }
-          VERSION_NUMBER: ${ steps.target.outputs.version_number }
-          FILENAME: ${ steps.target.outputs.filename }
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_PROJECT_ID: ${{ secrets.MODRINTH_PROJECT_ID }}
+          VERSION_NUMBER: ${{ steps.target.outputs.version_number }}
+          FILENAME: ${{ steps.target.outputs.filename }}
         run: |
           set -euo pipefail
           test -n "$MODRINTH_TOKEN"
@@ -107,15 +107,15 @@ jobs:
         if: steps.existing.outputs.exists == 'false'
         uses: Kira-NT/mc-publish@v3.3
         with:
-          modrinth-id: ${ secrets.MODRINTH_PROJECT_ID }
-          modrinth-token: ${ secrets.MODRINTH_TOKEN }
-          files: release-stage/${ steps.target.outputs.filename }
-          name: GeoWorld ${ github.event.inputs.tag || github.event.release.tag_name } for Minecraft ${ matrix.minecraft } (${ matrix.loader })
-          version: ${ steps.target.outputs.version_number }
-          version-type: ${ steps.target.outputs.version_type }
+          modrinth-id: ${{ secrets.MODRINTH_PROJECT_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: release-stage/${{ steps.target.outputs.filename }}
+          name: GeoWorld ${{ github.event.inputs.tag || github.event.release.tag_name }} for Minecraft ${{ matrix.minecraft }} (${{ matrix.loader }})
+          version: ${{ steps.target.outputs.version_number }}
+          version-type: ${{ steps.target.outputs.version_type }}
           changelog: 'GeoWorld release. CI-built JAR from the matching GitHub Release. See https://github.com/wanstu/minecraft-geo-world/releases for details.'
-          loaders: ${ matrix.loader }
-          game-versions: ${ matrix.minecraft }
+          loaders: ${{ matrix.loader }}
+          game-versions: ${{ matrix.minecraft }}
           game-version-filter: none
           environment: client | server
           retry-attempts: 2
@@ -124,10 +124,10 @@ jobs:
       - name: Verify Modrinth version and uploaded JAR
         shell: bash
         env:
-          MODRINTH_TOKEN: ${ secrets.MODRINTH_TOKEN }
-          MODRINTH_PROJECT_ID: ${ secrets.MODRINTH_PROJECT_ID }
-          VERSION_NUMBER: ${ steps.target.outputs.version_number }
-          FILENAME: ${ steps.target.outputs.filename }
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_PROJECT_ID: ${{ secrets.MODRINTH_PROJECT_ID }}
+          VERSION_NUMBER: ${{ steps.target.outputs.version_number }}
+          FILENAME: ${{ steps.target.outputs.filename }}
         run: |
           set -euo pipefail
           expected=$(sha512sum "release-stage/$FILENAME" | cut -d ' ' -f 1)
@@ -136,7 +136,7 @@ jobs:
             -H 'User-Agent: wanstu/minecraft-geo-world/1.0 (GitHub Actions)' \
             "https://api.modrinth.com/v2/project/$MODRINTH_PROJECT_ID/version/$VERSION_NUMBER" > published.json
           jq -e --arg filename "$FILENAME" --arg hash "$expected" \
-            --arg mc '${ matrix.minecraft }' --arg loader '${ matrix.loader }' \
+            --arg mc '${{ matrix.minecraft }}' --arg loader '${{ matrix.loader }}' \
             '(.files | any(.filename == $filename and .hashes.sha512 == $hash)) and
              (.game_versions | index($mc) != null) and
              (.loaders | index($loader) != null)' published.json > /dev/null
