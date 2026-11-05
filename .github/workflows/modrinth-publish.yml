@@ -69,7 +69,7 @@ jobs:
             --pattern "$FILENAME" --pattern 'SHA256SUMS.txt' --dir release-stage
           test -s "release-stage/$FILENAME"
           test -s release-stage/SHA256SUMS.txt
-          awk -v f="$FILENAME" '$2 == f {print}' release-stage/SHA256SUMS.txt > release-stage/selected-sha256.txt
+          awk -v f="$FILENAME" '{sub(/\r$/, ""); if ($2 == f) print}' release-stage/SHA256SUMS.txt > release-stage/selected-sha256.txt
           test -s release-stage/selected-sha256.txt
           (cd release-stage && sha256sum --check selected-sha256.txt)
 
