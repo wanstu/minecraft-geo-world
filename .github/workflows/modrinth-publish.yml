@@ -1,0 +1,143 @@
+name: Publish GeoWorld to Modrinth
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing GitHub Release tag (e.g. v0.1.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modrinth-${ github.event.inputs.tag || github.event.release.tag_name }
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Modrinth ${ matrix.minecraft } / ${ matrix.loader }
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - { minecraft: '26.3', loader: neoforge }
+          - { minecraft: '26.3', loader: fabric }
+          - { minecraft: '26.2', loader: neoforge }
+          - { minecraft: '26.2', loader: fabric }
+          - { minecraft: '26.1.2', loader: neoforge }
+          - { minecraft: '26.1.2', loader: fabric }
+          - { minecraft: '1.21.1', loader: neoforge }
+          - { minecraft: '1.21.1', loader: fabric }
+          - { minecraft: '1.20.1', loader: fabric }
+    env:
+      RELEASE_TAG: ${ github.event.inputs.tag || github.event.release.tag_name }
+    steps:
+      - name: Validate tag and release asset name
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
+            echo 'Invalid release tag' >&2
+            exit 1
+          fi
+          version="${RELEASE_TAG#v}"
+          filename="GeoWorld-${version}-mc${ matrix.minecraft }-${ matrix.loader }.jar"
+          echo "filename=$filename" >> "$GITHUB_OUTPUT"
+          echo "version_number=${version}-mc${ matrix.minecraft }-${ matrix.loader }" >> "$GITHUB_OUTPUT"
+          if [[ "$RELEASE_TAG" == *-rc.* ]]; then
+            echo 'version_type=beta' >> "$GITHUB_OUTPUT"
+          else
+            echo 'version_type=release' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download and verify GitHub Release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${ github.token }
+          FILENAME: ${ steps.target.outputs.filename }
+        run: |
+          set -euo pipefail
+          mkdir -p release-stage
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern "$FILENAME" --pattern 'SHA256SUMS.txt' --dir release-stage
+          test -s "release-stage/$FILENAME"
+          test -s release-stage/SHA256SUMS.txt
+          awk -v f="$FILENAME" '$2 == f {print}' release-stage/SHA256SUMS.txt > release-stage/selected-sha256.txt
+          test -s release-stage/selected-sha256.txt
+          (cd release-stage && sha256sum --check selected-sha256.txt)
+
+      - name: Validate destination and check existing version
+        id: existing
+        shell: bash
+        env:
+          MODRINTH_TOKEN: ${ secrets.MODRINTH_TOKEN }
+          MODRINTH_PROJECT_ID: ${ secrets.MODRINTH_PROJECT_ID }
+          VERSION_NUMBER: ${ steps.target.outputs.version_number }
+          FILENAME: ${ steps.target.outputs.filename }
+        run: |
+          set -euo pipefail
+          test -n "$MODRINTH_TOKEN"
+          test -n "$MODRINTH_PROJECT_ID"
+          api='https://api.modrinth.com/v2'
+          auth=(-H "Authorization: $MODRINTH_TOKEN" -H 'User-Agent: wanstu/minecraft-geo-world/1.0 (GitHub Actions)')
+          curl --fail --silent --show-error --retry 3 "${auth[@]}" \
+            "$api/project/$MODRINTH_PROJECT_ID" > project.json
+          jq -e '.slug == "geo-world"' project.json > /dev/null
+          code=$(curl --silent --show-error --retry 3 -o existing.json -w '%{http_code}' \
+            "${auth[@]}" "$api/project/$MODRINTH_PROJECT_ID/version/$VERSION_NUMBER")
+          case "$code" in
+            404) echo 'exists=false' >> "$GITHUB_OUTPUT" ;;
+            200)
+              expected=$(sha512sum "release-stage/$FILENAME" | cut -d ' ' -f 1)
+              jq -e --arg filename "$FILENAME" --arg hash "$expected" \
+                '.files | any(.filename == $filename and .hashes.sha512 == $hash)' existing.json > /dev/null
+              echo 'Already published with identical JAR; skipping duplicate upload'
+              echo 'exists=true' >> "$GITHUB_OUTPUT" ;;
+            *) echo "Modrinth version lookup failed: HTTP $code" >&2; cat existing.json >&2; exit 1 ;;
+          esac
+
+      - name: Upload to Modrinth
+        if: steps.existing.outputs.exists == 'false'
+        uses: Kira-NT/mc-publish@v3.3
+        with:
+          modrinth-id: ${ secrets.MODRINTH_PROJECT_ID }
+          modrinth-token: ${ secrets.MODRINTH_TOKEN }
+          files: release-stage/${ steps.target.outputs.filename }
+          name: GeoWorld ${ github.event.inputs.tag || github.event.release.tag_name } for Minecraft ${ matrix.minecraft } (${ matrix.loader })
+          version: ${ steps.target.outputs.version_number }
+          version-type: ${ steps.target.outputs.version_type }
+          changelog: 'GeoWorld release. CI-built JAR from the matching GitHub Release. See https://github.com/wanstu/minecraft-geo-world/releases for details.'
+          loaders: ${ matrix.loader }
+          game-versions: ${ matrix.minecraft }
+          game-version-filter: none
+          environment: client | server
+          retry-attempts: 2
+          fail-mode: fail
+
+      - name: Verify Modrinth version and uploaded JAR
+        shell: bash
+        env:
+          MODRINTH_TOKEN: ${ secrets.MODRINTH_TOKEN }
+          MODRINTH_PROJECT_ID: ${ secrets.MODRINTH_PROJECT_ID }
+          VERSION_NUMBER: ${ steps.target.outputs.version_number }
+          FILENAME: ${ steps.target.outputs.filename }
+        run: |
+          set -euo pipefail
+          expected=$(sha512sum "release-stage/$FILENAME" | cut -d ' ' -f 1)
+          curl --fail --silent --show-error --retry 5 --retry-all-errors \
+            -H "Authorization: $MODRINTH_TOKEN" \
+            -H 'User-Agent: wanstu/minecraft-geo-world/1.0 (GitHub Actions)' \
+            "https://api.modrinth.com/v2/project/$MODRINTH_PROJECT_ID/version/$VERSION_NUMBER" > published.json
+          jq -e --arg filename "$FILENAME" --arg hash "$expected" \
+            --arg mc '${ matrix.minecraft }' --arg loader '${ matrix.loader }' \
+            '(.files | any(.filename == $filename and .hashes.sha512 == $hash)) and
+             (.game_versions | index($mc) != null) and
+             (.loaders | index($loader) != null)' published.json > /dev/null
+          jq -r '"Verified Modrinth version ID: " + .id + " (" + .version_number + ")"' published.json
