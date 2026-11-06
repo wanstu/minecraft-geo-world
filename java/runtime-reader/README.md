@@ -25,7 +25,7 @@
 1. 用 javac --release 21 编译 reader；
 2. 加载 internal/goldenvectors/testdata/runtime-v1.geoworld；
 3. 读取 runtime-v1.json；
-4. 对 15 个 cross-language golden cases 逐字段比较；
+4. 对 18 个 cross-language golden cases 逐字段比较；
 5. 浮点字段使用 golden 文件中的 floatTolerance，离散字段要求完全一致。
 
 当前 golden 覆盖：
@@ -36,7 +36,14 @@
 - Macro node / Macro cell interior；
 - mixed coast；
 - River backwater；
-- Lake center。
+- Lake center；
+- 有限模型之外的远洋、极地海洋与稀疏海岛。
+
+验证全部已提交的新旧模型：
+
+    pwsh -NoProfile -File java/runtime-reader/verify-golden.ps1 -All
+
+`-All` 会编译一次 reader，然后对 `testdata/runtime-*.json` 及其同名 `.geoworld` 逐组验证。当前为 6 个模型、108 个样点；任一模型失败立即返回非零退出码。CI 在适配器构建和发布前执行此检查。指定 `-Model` / `-Golden` 的单模型验证方式保持可用，不能与 `-All` 同时使用。
 
 ## 设计目的
 

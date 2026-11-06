@@ -18,7 +18,7 @@ env:
 
 jobs:
   core-tests:
-    name: Core unit tests
+    name: Core and cross-language tests
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +28,13 @@ jobs:
           cache: true
       - name: Test all GeoWorld Go packages
         run: go test ./...
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify Java sampling against all committed Go golden models
+        shell: pwsh
+        run: ./java/runtime-reader/verify-golden.ps1 -All
 
   implemented-adapters:
     name: Verify ${{ matrix.minecraft }} / ${{ matrix.loader }}

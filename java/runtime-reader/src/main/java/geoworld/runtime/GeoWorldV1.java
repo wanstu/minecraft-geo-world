@@ -390,6 +390,7 @@ public final class GeoWorldV1 {
         double foothillAmplitude,
         double mountainAmplitude,
         double mountainStrengthScale,
+        double rareMacroStrength,
         double plateauAmplitude,
         double valleyDepth,
         double depositionLift,
@@ -5839,6 +5840,9 @@ public final class GeoWorldV1 {
             configObject.containsKey("MountainStrengthScale")
                 ? Json.doubleValue(configObject, "MountainStrengthScale")
                 : 0.0,
+            configObject.containsKey("RareMacroStrength")
+                ? Json.doubleValue(configObject, "RareMacroStrength")
+                : 0.0,
             Json.doubleValue(configObject, "PlateauAmplitude"),
             Json.doubleValue(configObject, "ValleyDepth"),
             Json.doubleValue(configObject, "DepositionLift"),
@@ -6331,6 +6335,76 @@ public final class GeoWorldV1 {
                 : fbm(config.seed() + 503, x, z, 2600, 2) *
                     config.plateauAmplitude();
 
+            // Mirror Go's rare macro terrain terms from the persisted config.
+            // Missing RareMacroStrength stays zero for older locked models.
+            double rareStrength = clamp(config.rareMacroStrength(), 0, 2.5);
+            double rarePeakLift = 0.0;
+            double rareEscarpment = 0.0;
+            double rareValleyCarve = 0.0;
+            if (rareStrength > 0) {
+                // Skip noise fields with zero support, just like the ordinary
+                // terrain detail above; ocean columns need none of these.
+                double isolatedPeakSupport = clamp(
+                    0.55 * hill + 0.85 * foothill + 0.28 * mountain,
+                    0,
+                    1
+                ) * (1 - 0.72 * plateau);
+                if (isolatedPeakSupport != 0.0) {
+                    double rarePeakField =
+                        cellularPeak(config.seed() + 1601, x, z, 5200);
+                    double rarePeakGate =
+                        0.35 + 0.65 * smoothstep(
+                            0.35,
+                            0.82,
+                            0.5 + 0.5 * valueNoise(config.seed() + 1627, x, z, 9200)
+                        );
+                    rarePeakLift =
+                        Math.pow(rarePeakField, 7.2) *
+                        rarePeakGate *
+                        isolatedPeakSupport *
+                        0.125 *
+                        rareStrength;
+                }
+
+                double rareFaultSupport = clamp(
+                    0.58 * plateau + 0.38 * foothill + 0.48 * mountain,
+                    0,
+                    1
+                );
+                if (rareFaultSupport != 0.0) {
+                    double rareFaultSignal =
+                        0.78 * valueNoise(config.seed() + 1709, x, z, 4200) +
+                        0.22 * valueNoise(config.seed() + 1723, x, z, 1500);
+                    double rareFaultRegion =
+                        0.5 + 0.5 * valueNoise(config.seed() + 1747, x, z, 8500);
+                    double rareFaultGate = smoothstep(0.72, 0.91, rareFaultRegion);
+                    double rareFaultStep =
+                        smoothstep(-0.015, 0.015, rareFaultSignal);
+                    rareEscarpment =
+                        (rareFaultStep - 0.5) *
+                        0.080 *
+                        rareFaultGate *
+                        rareFaultSupport *
+                        rareStrength;
+                }
+
+                if (valley != 0.0) {
+                    double rareValleyGate = smoothstep(
+                        0.68,
+                        0.90,
+                        0.5 + 0.5 * valueNoise(config.seed() + 1801, x, z, 7600)
+                    );
+                    double rareValleyRelief = 0.62 + 0.38 * clamp(
+                        0.40 * hill + 0.75 * foothill + mountain,
+                        0,
+                        1
+                    );
+                    rareValleyCarve =
+                        valley * rareValleyGate * rareValleyRelief *
+                        0.030 * rareStrength;
+                }
+            }
+
             double regionalDetail =
                 plain * plainDetail +
                 hill * hillDetail +
@@ -6401,7 +6475,9 @@ public final class GeoWorldV1 {
 
             double result = boundedAdd(
                 workingBase,
-                regionalDetail + orographicLift + depositionLift - valleyCarve - canyonCarve
+                regionalDetail + orographicLift + depositionLift +
+                rarePeakLift + rareEscarpment - valleyCarve - canyonCarve -
+                rareValleyCarve
             );
             if (heightCorrection != null) {
                 result = clamp(

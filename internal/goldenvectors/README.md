@@ -25,7 +25,16 @@ JSON 自身记录：
 - Macro Grid 精确节点与 Cell 内部；
 - mixed coast；
 - 带 receiver surface 的正式 River 下游段；
-- 正式 Lake 节点中心。
+- 正式 Lake 节点中心；
+- 模型范围外的远洋、极地海洋与稀疏海岛。
+
+当前每份 JSON 包含 18 个样点。Java 一次验证全部已提交模型（含历史规则）：
+
+```
+pwsh -NoProfile -File java/runtime-reader/verify-golden.ps1 -All
+```
+
+CI 在所有适配器构建和发布之前执行这项跨语言检查；只跑 Go 单测不能发现 Java 采样器漏实现持久化字段的问题。
 
 ## 跨语言验收
 
