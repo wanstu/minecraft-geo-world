@@ -15,6 +15,7 @@
   - `GeoWorld-0.1.1-dev-webui-dimensions-mc1.21.1-neoforge.jar`；SHA-256 `D7562FF70C8D4107CEF9FA66A9FEEC4C29C4E390B739F5C088A330A028B5336B`。
   - `GeoWorld-0.1.1-dev-webui-dimensions-mc26.3-fabric.jar`；SHA-256 `53752BC2CD44E7824929E76812633AB09E53966AEF8209354F2A6F0A7A549989`。
 - 尚待实机验收：更新后跨维度暂停/恢复、矿区方块与地表矿堆、图标显示和筛选交互性能。其余 7 个发布目标未在本轮本地重建；当前验证不等同于完整发布验收。
+- 地基 API 文档（仅文档，未改代码、未验证）：新增 `FOUNDATION_API.md`、`FACT_REGISTRY.md`（86 字段全量契约）、`QUERY_API_ACCEPTANCE.md`（QUERY-01~10 与门面切片 S1~S5），DECISIONS 追加 D-048~D-050，PRODUCT 增加“永不提供”清单，ARCHITECTURE 增加 Query 层。`geoworld-query-v1` 按 D-048 仍处于对外封控；现有 Verifier 仅引用 23 个字段。
 
 ## 历史目标与阶段（2026-10-03）
 最近里程碑：能实际生成、保存、重开，且地形、水体、群系一致的最小世界模型。

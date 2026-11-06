@@ -1162,3 +1162,230 @@ NeoForge 26.3 已确认 WORLD_PRESET registry 与 RegisterPresetEditorsEvent / P
 4. 固定回归 Seed `-1273393314970095624`：中心仍为 Warm Ocean，Planner 当前选择 Chunk (-28,-164)，方块中心约 (-440,-2616)，Biome=Tropical Rainforest；回归用于确保以后修改 Spawn 不改变世界本身。
 5. 动态 GeoWorld 世界首次启动后必须把实际使用的 `.geoworld` 复制到存档自己的 `data/geoworld/world.geoworld` 并写 binding；后续重开优先读取存档内模型，而不是依赖全局 cache 或重新生成。
 6. 旧 Vanilla QA Preview 允许存在 binding + vanilla generator；这种世界明确标记为 static Preview，不得被误报为动态 GeoWorld worldgen。
+
+## D-048：GeoWorld Query API 未登记，必须先定价再谈稳定
+
+状态：**本决定即为登记；实现状态为「已存在但未验收」**
+
+### 事实
+
+`java/runtime-reader/src/main/java/geoworld/runtime/GeoWorldQueryService.java` 已声明
+`API_VERSION = "geoworld-query-v1"`，并暴露 86 个 `NaturalField`。但：
+
+1. `docs/STATUS.md` 与 `docs/PROGRESS.md` 中**从未出现过 Query 相关条目**；
+2. `docs/ARCHITECTURE.md` 的 `minecraft-common` 接口清单**未包含**该服务；
+3. `java/runtime-reader/README.md` 只描述 `Go Model → Java Reader → Runtime sample(x,z)`，
+   **没有提到** QueryService、NaturalField、LocalRealityProvider、DynamicStateProvider；
+4. `docs/DECISIONS.md` 前 47 条均为地形/水文/持久化/落地相关，**没有一条涉及对外查询接口**。
+
+结论：这是一个**已写进代码、但没有经过评审、没有验收、没有文档的公共接口**。
+它的存在方式与 `D-034`（进度入口与历史记录分开）的纪律冲突。
+
+### 为什么这件事必须先处理
+
+D-001 已确定 GeoWorld 同时是工具与 Runtime。D-005 已承诺「未来独立季节 / 天气 Mod 可读取 GeoWorld API」。
+**但这个 API 至今没有被定义清楚**，因此 D-005 的承诺目前**无法履行**。
+
+如果继续在未登记状态下扩展该接口，会出现：
+
+- 后续模组依赖了一个没有稳定性承诺的 API；
+- 想修改时无法判断「这是破坏性变更还是内部实现细节」；
+- 无法回答「旧世界 / 旧版本玩法模组是否还能工作」。
+
+### 规则
+
+1. `geoworld-query-v1` 在完成 `FOUNDATION_API.md` 第 6 节 ① 之前，
+   **只能由 GeoWorld 自身（verifyGeoWorldModelQuery 等）消费**，
+   不得对外宣称可用，不得作为第三方依赖推荐。
+2. 该服务的登记入口固定为本文与 `docs/FOUNDATION_API.md`，
+   **不另建**独立 API 站点或版本目录。
+3. 任何对 `NaturalField` 的增删都必须同步更新 `docs/FACT_REGISTRY.md`，
+   否则 CI 阶段的文档检查（见 D-049 第 6 条）必须失败。
+4. `GeoWorldModelVerifier` 当前只覆盖 23 个 `NaturalField`，其余字段处于
+   **未验收**状态；`FOUNDATION_API.md` 的字段表必须逐字段标注「已验收 / 未验收」。
+
+### 与既有决定的关系
+
+- 补充 D-001：工具与 Runtime 的**共同真相源**是 World Model，不是 Query API。
+- 履行 D-005 的前置条件：Query API 必须先登记，才谈得上「未来季节 Mod 可读取」。
+- 强化 D-034：未登记的接口等于不存在于项目记忆中，必须纠正。
+
+
+## D-049：Query API 版本升级以「行为契约」为准，不以类结构为准
+
+状态：**已确定**（本文即策略定义；`FACT_REGISTRY.md` 尚未建立）
+
+### 背景
+
+`NaturalField` 是 Java `enum`。增加一个枚举常量，对**已编译的第三方模组**可能安全
+（除非其 `switch` 未写 `default`），对**源码依赖**必定安全；但语义变化对所有人都不安全。
+
+现有 `NaturalResult` 已带 `unavailableFields`、`worldProfileVersion`、
+`generationRulesVersion`、`worldModelVersion`，说明作者已经意识到兼容性问题。
+本决定把这种意识固化为可执行规则。
+
+### 三个独立的版本号，各管各的
+
+| 版本号 | 位置 | 管什么 | 由谁升级 |
+|---|---|---|---|
+| `API_VERSION` | `GeoWorldQueryService` 常量 | **查询语义契约** | 本决定第 2 节 |
+| `generationRulesVersion` | 模型 manifest | 世界生成的**结果**规则 | 生成算法变化时 |
+| `worldModelVersion` / `worldProfileVersion` | 模型 manifest | 存档 schema 与档案参数 | schema/档案变化时 |
+
+**三者不得互相替代。** 现有代码已正确分离，本决定确认该分离是**强制要求**。
+
+### 1. 什么不算 breaking（允许在同一 `API_VERSION` 内发生）
+
+- 新增 `NaturalField` 常量，且新字段在旧模型上允许出现在 `unavailableFields`；
+- 新增查询方法（`queryRegion` 等）且旧方法行为完全不变；
+- 内部缓存、`ComputationStats` 等**非返回值**的观测能力；
+- 修复「文档已明确描述、实现却有 bug」的行为（需在 `FACT_REGISTRY.md` 记录修正日期）。
+
+### 2. 什么算 breaking（必须提升 `API_VERSION`）
+
+- 已发布字段的**单位**变化（如 `mm/year` → `mm/month`）；
+- 已发布字段的**取值范围**收窄或改变（如 `0..1` → `0..100`）；
+- 已发布字段的**缺失条件**改变（例如从「海洋上不可用」变成「海洋上也返回 0」）；
+- `NaturalField` 常量**重命名或删除**；
+- `NaturalResult` 字段的语义变化（`unavailableFields` 的含义、版本号字段的含义）；
+- 单点查询与区域查询**在同一坐标同一解析度下结果不一致**；
+- 改变 `Resolution` 的几何含义（例如 `BLOCK_4` 从「4 方块网格」改成「4 方块半径」）。
+
+### 3. 版本号的形态与兼容声明
+
+保持 `geoworld-query-vN` 的字符串形态，**不引入语义化三段版本**。
+理由：查询契约只有「兼容 / 不兼容」两态，中间态（新增字段）已在第 1 节被定义为兼容。
+
+新增一条**兼容性声明**，暴露给调用方（不改变 `API_VERSION`）：
+
+```text
+apiVersion               当前契约
+minSupportedApiVersion   调用方可以兼容的最小版本
+```
+
+玩法模组需同时满足 `apiVersion >= 其要求` 且 `被要求版本 >= minSupportedApiVersion`。
+这样 GeoWorld 可以**同时声明**「我现在是 v2，但我仍兼容 v1 的调用方式」，
+而不必保留两套实现。
+
+### 4. 字段废弃流程
+
+```text
+stable  →  deprecated  →  removed
+           （≥ 1 个主版本，≥ 1 次实际发布）
+```
+
+- `deprecated` 字段**保留原语义**，不得在废弃期偷偷改行为；
+- 废弃必须在 `FACT_REGISTRY.md` 与 `STATUS.md` 同时记录；
+- `removed` 必须伴随 `API_VERSION` 提升。
+
+### 5. 与 `generationRulesVersion` 的联动（关键）
+
+玩法模组可能加载**旧世界**。旧世界的 `generationRulesVersion` 较低，某些字段可能不存在。
+
+**强制规则**：玩法模组不应假设字段一定可用。GeoWorld 必须保证：
+
+- 旧模型缺失的字段**必然**出现在 `unavailableFields`，**不得**返回 `null`、`0` 或默认值；
+- `NaturalResult` 的四个版本号字段必须**在所有适配器上非空填充**。
+
+这条规则是「宁可缺失，不可瞎猜」在 API 层的具体化。现有实现已具备该结构，
+但**尚未在任何文档中承诺**，本决定将其升级为强制契约。
+
+### 6. 检查点（都是人工可执行的，不依赖实现）
+
+1. 每次发布前，人工核对 `FACT_REGISTRY.md` 与 `NaturalField` 枚举是否同步；
+2. 每次 `API_VERSION` 变更，必须在本文追加一行变更记录（版本、日期、原因、影响字段）；
+3. 任何「改变缺失条件」的提交，必须同时修改 `FACT_REGISTRY.md`，否则视为未完成。
+
+
+## D-050：Query API 的暴露方式是单一门面 + 适配器自注册，不设分发层
+
+状态：**已确定**（`FOUNDATION_API.md` 第 9 节问题 2 的结论）
+
+### 背景
+
+当前 QueryService 的可用性依赖 Gradle **把源码目录塞进最终 JAR**：
+
+```groovy
+// java/adapters/26.3-fabric/build.gradle
+sourceSets.main.java.srcDir '../../runtime-reader/src/main/java'
+sourceSets.main.java.srcDir '../../minecraft-common/src/main/java'
+```
+
+这意味着：
+
+- `geoworld.runtime.*` 与 `geoworld.minecraft.common.*` **同处一个 JAR、同一个 classloader**；
+- 玩法模组只要在编译期依赖那个 JAR 就能 import 全部内容；
+- 但玩法模组**也**会因此连 `GeoWorldEngineBridge`、`GeoWorldToolLauncher`
+  （`Main-Class`）等**内部实现**一起看到；
+- 没有明确的「这是 API、那是实现」边界。
+
+同时存在一个更实际的问题：**玩法模组如何从世界里拿到 `GeoWorldQueryService` 实例？**
+现有代码只有 `GeoWorldQueryService.shared(GeoWorldV1 model)`，
+而 `GeoWorldV1 model` 由 `GeoWorldEngineBridge` 内部持有，**没有公开的取出路径**。
+
+### 决定
+
+采用**单一门面 + 适配器自注册**。具体三条：
+
+#### 1. 唯一入口：`geoworld.runtime.api.GeoWorldFacade`
+
+- 新增一个**极小**的静态门面类，只暴露：
+  - `apiVersion()` / `minSupportedApiVersion()`（D-049 第 3 节）；
+  - `currentWorld()` → `Optional<WorldFacts>`，当前绑定的世界事实视图；
+  - `supports(NaturalField)` → 是否在本世界可用；
+- **门面不持有业务逻辑**，只做「找到当前绑定世界 → 转交 QueryService」。
+- 所有文档、示例、第三方模组只引用门面，**不直接引用 `GeoWorldQueryService`**。
+- `GeoWorldQueryService` 保留 `public`，但标记为「实现类，仅 GeoWorld 内部与验收使用」。
+
+理由：门面只有 3 个方法，**升级成本永久可控**；而 QueryService 的 86 字段可以自由演进。
+这是用一层极薄的门面，换到了**实现与契约的物理分离**。
+
+#### 2. 适配器自注册，玩法模组不碰 classloader 细节
+
+- 每个适配器（9 个目标）在自己的入口处调用一次：
+  `GeoWorldFacade.bind(worldId, model)` / `GeoWorldFacade.unbind(worldId)`；
+- 门面内部用 `WeakHashMap`（与现有 `SHARED` 一致）保存绑定；
+- **玩法模组永远不调用 `bind`**，只调用 `currentWorld()`；
+- 世界未绑定 / 尚未加载完成时，`currentWorld()` 返回 `Optional.empty()`，
+  **不得抛异常、不得阻塞、不得触发世界生成**（继承 D-048 与现有 MODEL-03 的精神）。
+
+#### 3. 不设独立分发层
+
+**明确拒绝**以下方案：
+
+- ❌ 独立的 `geoworld-api.jar`（增加发布矩阵负担，9 个目标 × 2 个 jar）；
+- ❌ Maven 中央坐标（GeoWorld 不对 Minecraft 承诺任何稳定发布节奏）；
+- ❌ 服务发现 / SPI（`META-INF/services`）：玩法模组只需**读**，不需要**供**；
+- ❌ `minecraft-common` re-export 整个 `geoworld.runtime`（等于换名字的 classpath 依赖）。
+
+理由：GeoWorld 自己的发布纪律（`release.yml`：9 个目标、tag 必须指向 master、禁止本地产物上传）
+已经够重了。**再增加一个独立发布单元，会把发布成本翻倍，而收益接近于零**——
+因为玩法和地基本来就**必须同版本编译**（Java/Minecraft 版本矩阵已经绑定了两者）。
+
+### 兼容性承诺的措辞（对外）
+
+```text
+GeoWorld 的 API 稳定性承诺：
+  - geoworld.runtime.api.*   → 契约稳定，受 D-049 约束
+  - 其余 geoworld.* 包       → 内部实现，可在任何版本变更，不承诺兼容
+
+玩法模组只应 import geoworld.runtime.api.*。
+若你 import 了别的包，请视为你已选择跟随 GeoWorld 的内部实现演进。
+```
+
+### 未解决的遗留（必须显式记录，不得默默通过）
+
+1. `GeoWorldFacade` **尚不存在**，本决定是设计结论，不是已实现状态；
+2. `GeoWorldEngineBridge` 内部持有的 `GeoWorldV1 model` **尚无公开取出路径**，
+   这是落地 `currentWorld()` 的前提，需要单独切片；
+3. `GeoWorldModelVerifier` 与 `verifyGeoWorldModelQuery` 目前**直接构造** `GeoWorldQueryService`，
+   落地门面后应改为**同时**验证门面路径，否则门面会成为未验收代码；
+4. `queryLocalReality` 的 `LocalRealityProvider` 由谁实现、键名约定——留待玩法模组立项时再定，
+   GeoWorld 只保证「提供槽位」。
+
+### 与既有决定的关系
+
+- 落实 D-001：Tool 与 Runtime 共享 World Model；门面只是 World Model 的**只读视图**。
+- 补充 D-002（不绑定单一 Loader）：通过「适配器自注册 + 门面」实现，而非 classpath 约定。
+- 遵守 `ARCHITECTURE.md`「版本/Loader 层只提供薄桥接」：`bind/unbind` 就是那个薄桥接。
+- 不为 D-046/D-047 增加任何工作量：门面不参与世界创建、预览、出生点选择。

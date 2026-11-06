@@ -199,6 +199,22 @@ Go Generator -> 版本化 World Model -> Java reader/sampler -> 一个 Minecraft
 
 游戏内自主生成宏观模型的最终方案（JVM 模拟、预生成模型等）仍待性能和接入结果决定。外部导入世界不代表已经完成玩家在游戏内只输入 Seed 的产品流程。
 
+## 7. 对外事实查询层（Query API）
+
+```text
+GeoWorldV1（World Model，只读）
+      ↓
+GeoWorldQueryService（实现，geoworld-query-v1，86 个 NaturalField）
+      ↓
+geoworld.runtime.api.GeoWorldFacade（唯一稳定入口，待落地）
+      ↓
+玩法模组（Layer 3 Dynamic State 由其自行拥有）
+```
+
+- 数据分三层：Natural Facts（GeoWorld 拥有）/ Local Reality（适配器提供槽位）/ Dynamic State（玩法模组拥有）。
+- 字段语义以 `docs/FACT_REGISTRY.md` 为准；版本与暴露规则见 D-048 ~ D-050；验收与落地顺序见 `docs/QUERY_API_ACCEPTANCE.md`。
+- 门面只对应主世界、只在逻辑服务端提供；bind/unbind 位于版本族共享层，不在单个 Loader 适配器中重复实现。
+
 首次游戏验证提前到完整 Generator UI 和批量世界导出之前。调试中间场与 Runtime 持久化字段分开，避免全部 Lab 数组成为常驻模型。
 
 ## 7. 世界配置不可变性
