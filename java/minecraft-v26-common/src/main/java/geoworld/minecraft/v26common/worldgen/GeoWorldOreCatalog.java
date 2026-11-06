@@ -1,6 +1,7 @@
 package geoworld.minecraft.v26common.worldgen;
 
 import geoworld.minecraft.common.worldgen.GeoWorldMiningDistrictPlanner;
+import geoworld.minecraft.common.engine.GeoWorldMineralContext;
 import geoworld.runtime.GeoWorldV1;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
@@ -167,6 +168,24 @@ public final class GeoWorldOreCatalog {
      */
     public static CatalogView scanWorldgenRegistry(Registry<Block> registry) {
         Snapshot scanned = scan(registry);
+        return new CatalogView(
+            scanned.dictionaryFamilies(),
+            scanned.familyNames()
+        );
+    }
+
+    /**
+     * Resolve the live registry immediately before runtime model generation.
+     * Direct world creation and dedicated servers never open a preset editor,
+     * so the editor's generation context cannot be their source of truth.
+     */
+    public static CatalogView prepareGenerationContext() {
+        Snapshot scanned = scan(BuiltInRegistries.BLOCK);
+        snapshot = scanned;
+        GeoWorldMineralContext.publish(
+            scanned.dictionaryFamilies(),
+            scanned.familyNames()
+        );
         return new CatalogView(
             scanned.dictionaryFamilies(),
             scanned.familyNames()

@@ -2,6 +2,9 @@ package geoworld.minecraft.v26common.runtime;
 
 import geoworld.minecraft.common.creation.GeoWorldCreationConfig;
 import geoworld.minecraft.common.engine.GeoWorldEngineBridge;
+import geoworld.minecraft.v26common.worldgen.GeoWorldOreCatalog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import geoworld.runtime.GeoWorldV1;
 
 import java.io.IOException;
@@ -14,6 +17,8 @@ import java.util.function.Consumer;
  * Shared GeoWorld model lifecycle for Minecraft 26.x generators.
  */
 public final class GeoWorldV26GeneratorRuntime {
+    private static final Logger LOGGER =
+        LoggerFactory.getLogger(GeoWorldV26GeneratorRuntime.class);
     private final GeoWorldCreationConfig config;
     private final Consumer<GeoWorldV1> modelAttacher;
     private final Object modelLock = new Object();
@@ -63,6 +68,14 @@ public final class GeoWorldV26GeneratorRuntime {
             }
 
             try {
+                // Publish before resolving the cache key as well as before
+                // generation. Attached/persisted models return above and keep
+                // their frozen mineral assignments.
+                var minerals = GeoWorldOreCatalog.prepareGenerationContext();
+                LOGGER.info(
+                    "GeoWorld runtime generation mineral context: available={}",
+                    minerals.families()
+                );
                 GeoWorldEngineBridge.GeneratedModel generated =
                     GeoWorldEngineBridge.generate(seed, this.config);
                 attachModel(

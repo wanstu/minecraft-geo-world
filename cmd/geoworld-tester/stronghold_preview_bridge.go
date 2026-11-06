@@ -12,15 +12,16 @@ import (
 	"time"
 )
 
-const strongholdPreviewClass = "geoworld.minecraft.v26_3common.worldgen.GeoWorldV26_3StrongholdPreviewCli"
+const strongholdPreviewClass = "geoworld.minecraft.v26common.worldgen.GeoWorldStrongholdPreviewCli"
 
 type strongholdPreviewPayload struct {
-	Seed      int64  `json:"seed"`
-	SetID     string `json:"setId"`
-	Distance  int    `json:"distance"`
-	Spread    int    `json:"spread"`
-	Count     int    `json:"count"`
-	Positions []struct {
+	MinecraftVersion string `json:"minecraftVersion"`
+	Seed             int64  `json:"seed"`
+	SetID            string `json:"setId"`
+	Distance         int    `json:"distance"`
+	Spread           int    `json:"spread"`
+	Count            int    `json:"count"`
+	Positions        []struct {
 		Index  int `json:"index"`
 		ChunkX int `json:"chunkX"`
 		ChunkZ int `json:"chunkZ"`
@@ -59,6 +60,19 @@ func (s *appState) strongholdPreviewCandidates(
 	return append([]structureCandidate(nil), candidates...), nil
 }
 
+func (s *appState) strongholdMinecraftVersion() string {
+	s.mu.RLock()
+	version := strings.TrimSpace(s.gameSession.MinecraftVersion)
+	if version == "" {
+		version = strings.TrimSpace(s.gameMinecraftVersion)
+	}
+	s.mu.RUnlock()
+	if version == "" {
+		return "26.3"
+	}
+	return version
+}
+
 func (s *appState) loadStrongholdPreviewCandidates(
 	active *activeWorld,
 ) ([]structureCandidate, error) {
@@ -84,6 +98,7 @@ func (s *appState) loadStrongholdPreviewCandidates(
 		return nil, err
 	}
 
+	minecraftVersion := s.strongholdMinecraftVersion()
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 
@@ -94,6 +109,7 @@ func (s *appState) loadStrongholdPreviewCandidates(
 		classpath,
 		strongholdPreviewClass,
 		modelPath,
+		minecraftVersion,
 	)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
@@ -112,6 +128,10 @@ func (s *appState) loadStrongholdPreviewCandidates(
 	var payload strongholdPreviewPayload
 	if err := json.Unmarshal(bytes.TrimSpace(output), &payload); err != nil {
 		return nil, fmt.Errorf("stronghold planner returned invalid JSON: %w", err)
+	}
+	if payload.MinecraftVersion != minecraftVersion {
+		return nil, fmt.Errorf("stronghold planner Minecraft version mismatch: got %q want %q",
+			payload.MinecraftVersion, minecraftVersion)
 	}
 	if payload.Seed != active.seed {
 		return nil, fmt.Errorf(

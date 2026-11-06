@@ -169,6 +169,11 @@ type gameSessionState struct {
 	Revision               uint64                    `json:"revision"`
 }
 
+func (session gameSessionState) inOverworld() bool {
+	return session.State == "bound" && session.Player != nil &&
+		session.Player.Dimension == "minecraft:overworld"
+}
+
 func cloneStringMap(source map[string]string) map[string]string {
 	if len(source) == 0 {
 		return nil
@@ -505,6 +510,21 @@ func (s *appState) handleGameSession(w http.ResponseWriter, r *http.Request) {
 			Yaw: req.PlayerYaw, Pitch: req.PlayerPitch,
 			Dimension: strings.TrimSpace(req.Dimension),
 		}
+		if !s.gameSession.inOverworld() {
+			if s.pendingTeleport != nil {
+				s.gameSession.TeleportState = "failed"
+				s.gameSession.TeleportMessage = "已离开主世界，取消待执行的地图传送"
+				s.pendingTeleport = nil
+			}
+			if s.pendingChunky != nil &&
+				(s.pendingChunky.Action == "start" || s.pendingChunky.Action == "continue") {
+				if s.gameSession.ChunkGeneration != nil {
+					s.gameSession.ChunkGeneration.State = "failed"
+					s.gameSession.ChunkGeneration.Message = "已离开主世界，取消待执行的预生成操作"
+				}
+				s.pendingChunky = nil
+			}
+		}
 		session := s.gameSession
 		s.mu.Unlock()
 		writeJSON(w, http.StatusOK, map[string]any{"gameSession": session})
@@ -833,6 +853,11 @@ func (s *appState) handleGameTeleport(w http.ResponseWriter, r *http.Request) {
 		))
 		return
 	}
+	if !s.gameSession.inOverworld() {
+		s.mu.Unlock()
+		writeError(w, http.StatusConflict, errors.New("当前不在主世界，已暂停地图传送"))
+		return
+	}
 	s.teleportSeq++
 	command := &gameTeleportCommand{
 		ID: s.teleportSeq,
@@ -887,6 +912,10 @@ func (s *appState) handleGameChunks(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, errors.New(
 			"runtime chunk generation requires a bound GeoWorld game session",
 		))
+		return
+	}
+	if (action == "start" || action == "continue") && !s.gameSession.inOverworld() {
+		writeError(w, http.StatusConflict, errors.New("当前不在主世界，已暂停新的区块预生成操作"))
 		return
 	}
 	if s.pendingChunky != nil {

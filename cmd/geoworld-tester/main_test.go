@@ -166,6 +166,7 @@ func TestGameChunkRegionControl(t *testing.T) {
 		gameSession: gameSessionState{
 			Managed: true,
 			State:   "bound",
+			Player:  &gamePlayerPosition{Dimension: "minecraft:overworld"},
 			ChunkGeneration: &gameChunkGenerationState{
 				Available: true,
 				State:     "idle",

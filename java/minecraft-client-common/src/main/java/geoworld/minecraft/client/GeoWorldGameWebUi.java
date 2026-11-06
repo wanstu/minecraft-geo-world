@@ -3,6 +3,8 @@ package geoworld.minecraft.client;
 import geoworld.minecraft.common.tool.GeoWorldToolLauncher;
 import geoworld.minecraft.v26common.runtime.GeoWorldV26WorldService;
 import geoworld.minecraft.v26common.worldgen.GeoWorldOreCatalog;
+import geoworld.minecraft.v26common.GeoWorldMinecraftIds;
+import net.minecraft.world.level.Level;
 import geoworld.runtime.GeoWorldBinding;
 import geoworld.runtime.GeoWorldV1;
 import com.google.gson.JsonElement;
@@ -564,7 +566,8 @@ public final class GeoWorldGameWebUi {
                     player.getY(),
                     player.getZ(),
                     player.getYRot(),
-                    player.getXRot()
+                    player.getXRot(),
+                    GeoWorldMinecraftIds.resourceKeyId(player.level().dimension())
                 );
                 CONTROL.execute(() -> {
                     try {
@@ -837,6 +840,15 @@ public final class GeoWorldGameWebUi {
                 );
                 return;
             }
+            if (!Level.OVERWORLD.equals(player.level().dimension())) {
+                postSessionAsync(
+                    teleportResultPayload(
+                        commandId, false, "当前不在主世界，已暂停地图传送"
+                    ),
+                    4
+                );
+                return;
+            }
             try {
                 player.teleportTo(x, y, z);
                 LOGGER.info(
@@ -932,6 +944,14 @@ public final class GeoWorldGameWebUi {
         int x2,
         int z2
     ) {
+        if (action.equals("start") || action.equals("continue")) {
+            var owner = singleplayerOwner(server);
+            if (owner == null || !Level.OVERWORLD.equals(owner.level().dimension())) {
+                throw new IllegalStateException(
+                    "当前不在主世界，已暂停新的区块预生成操作"
+                );
+            }
+        }
         if (!chunkyAvailable()) {
             throw new IllegalStateException(
                 "Chunky 未安装或当前版本不可用"
@@ -1281,7 +1301,8 @@ public final class GeoWorldGameWebUi {
         double y,
         double z,
         double yaw,
-        double pitch
+        double pitch,
+        String dimension
     ) {
         return "{" +
             field("action", "player") + "," +
@@ -1290,7 +1311,8 @@ public final class GeoWorldGameWebUi {
             doubleField("playerY", y) + "," +
             doubleField("playerZ", z) + "," +
             doubleField("playerYaw", yaw) + "," +
-            doubleField("playerPitch", pitch) +
+            doubleField("playerPitch", pitch) + "," +
+            field("dimension", dimension) +
             "}";
     }
 

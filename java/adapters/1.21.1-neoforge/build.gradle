@@ -539,6 +539,19 @@ tasks.register('probeGeoWorldReportedCoast', JavaExec) {
 }
 
 
+
+tasks.register('verifyGeoWorldStrongholdPreview', JavaExec) {
+    group = 'verification'
+    description = 'Checks all standalone stronghold positions against Minecraft 1.21.1 native rings and biome bias.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.verification.GeoWorldStrongholdVerifierBootstrap'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+}
+tasks.named('check') {
+    dependsOn tasks.named('verifyGeoWorldStrongholdPreview')
+}
+
 tasks.register('verifyGeoWorldBasinRivers', JavaExec) {
     group = 'verification'
     description = 'Verifies basin rivers stay incised below dry banks through final voxel planning.'

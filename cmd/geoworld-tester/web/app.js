@@ -261,9 +261,37 @@ function zoomMapCentered(factor){
   );
 }
 
+function gameInOverworld(session=gameSession){
+  return session?.state==='bound'&&session.player?.dimension==='minecraft:overworld';
+}
+
+function gameDimensionNotice(session=gameSession){
+  if(session?.state!=='bound'||gameInOverworld(session))return '';
+  const dimension=session.player?.dimension;
+  const name=({'minecraft:the_nether':'下界','minecraft:the_end':'末地'})[dimension]||'其他维度';
+  return dimension
+    ?'当前位于'+name+'，此处仅显示主世界地图，实时联动已暂停。返回主世界后自动恢复。'
+    :'等待玩家维度信息，主世界实时联动暂未启用。';
+}
+
+function renderGameDimensionState(session){
+  const notice=$('gameDimensionNotice');
+  const message=gameDimensionNotice(session);
+  if(notice){
+    notice.hidden=!message;
+    notice.textContent=message;
+  }
+  if(!gameInOverworld(session)&&(chunkSelectMode||chunkRegionDrag)){
+    chunkSelectMode=false;
+    chunkRegionDrag=null;
+    $('mapWrap')?.classList.remove('chunk-select-mode');
+    renderChunkRegionOverlay();
+  }
+}
+
 function renderPlayerMarker(){
   const marker=$('playerMarker');
-  const player=gameSession?.state==='bound' ? gameSession.player : null;
+  const player=gameInOverworld() ? gameSession.player : null;
   if(!marker||!active||!player||$('mapWrap').classList.contains('empty')){
     if(marker)marker.hidden=true;
     return;
@@ -440,6 +468,11 @@ function updateActionState(){
   $('mobileZoomIn').disabled=mapDisabled||mapZoom>=MAX_MAP_ZOOM-.001;
   $('mobileZoomOut').disabled=mapDisabled||mapZoom<=1.001;
   $('jumpToCoord').disabled=mapDisabled;
+  $('biomeSearchUsePlayer').disabled=!gameInOverworld();
+  for(const id of ['sampleTeleport','structureDetailTeleport','structureSearchTeleport','biomeSearchTeleport']){
+    const button=$(id);
+    if(button)button.disabled=!canControlGame()||button.dataset.pending==='true';
+  }
   $('acceptanceGenerate').disabled=busy||!serviceOnline||!active;
   document.querySelectorAll('.acceptance-download').forEach(btn=>{btn.disabled=busy||!serviceOnline||!active});
 }
@@ -484,6 +517,10 @@ function formatChunkDuration(ms){
 
 async function sendChunkCommand(action){
   if(chunkCommandBusy)return;
+  if((action==='start'||action==='continue')&&!gameInOverworld()){
+    setMapNotice(gameDimensionNotice()||'请先进入主世界。','warn');
+    return;
+  }
   const region=chunkRegionSelection;
   if(action==='start'&&!region)return;
   if(action==='start'&&region.totalChunks>50000){
@@ -522,6 +559,7 @@ function renderChunkGenerationPanel(session){
     $('mapWrap')?.classList.remove('chunk-select-mode');
     return;
   }
+  const inOverworld=gameInOverworld(session);
   const chunk=session.chunkGeneration||{state:'idle',available:false};
   const state=chunk.state||'idle';
   if(
@@ -615,10 +653,10 @@ function renderChunkGenerationPanel(session){
   const cancel=$('chunkCancel');
   const clear=$('chunkClearRegion');
   if(select){
-    select.disabled=chunkCommandBusy||activeTask;
+    select.disabled=!inOverworld||chunkCommandBusy||activeTask;
     select.textContent=chunkSelectMode?'拖动地图框选…':'框选区域';
     select.onclick=()=>{
-      if(activeTask||chunkCommandBusy)return;
+      if(!gameInOverworld()||activeTask||chunkCommandBusy)return;
       chunkSelectMode=!chunkSelectMode;
       chunkRegionDrag=null;
       $('mapWrap').classList.toggle('chunk-select-mode',chunkSelectMode);
@@ -627,7 +665,7 @@ function renderChunkGenerationPanel(session){
     };
   }
   if(start){
-    start.disabled=chunkCommandBusy||activeTask||!region||!chunk.available;
+    start.disabled=!inOverworld||chunkCommandBusy||activeTask||!region||!chunk.available;
     start.onclick=()=>void sendChunkCommand('start');
   }
   if(pause){
@@ -637,7 +675,7 @@ function renderChunkGenerationPanel(session){
   }
   if(resume){
     resume.hidden=!(state==='paused'||state==='existing');
-    resume.disabled=chunkCommandBusy||!chunk.available;
+    resume.disabled=!inOverworld||chunkCommandBusy||!chunk.available;
     resume.onclick=()=>void sendChunkCommand('continue');
   }
   if(cancel){
@@ -670,7 +708,7 @@ function renderGameSession(session){
   card.classList.toggle('incompatible',session.state==='incompatible');
   const badge=$('gameSessionBadge');
   badge.textContent=({
-    bound:'已绑定',
+    bound:gameInOverworld(session)?'已绑定':'联动暂停',
     incompatible:'版本不兼容',
     non_geoworld:'非 GeoWorld 世界',
     menu:'等待世界'
@@ -679,11 +717,12 @@ function renderGameSession(session){
   if(session.state==='bound'){
     syncMineralFilterOptions(session.oreFamilies||[]);
     const player=session.player;
+    const inOverworld=gameInOverworld(session);
     const playerHtml=player
       ?'<div class="game-player-position"><b>玩家位置</b><code>'+
         Math.round(player.x)+', '+Math.round(player.y)+', '+Math.round(player.z)+
         '</code><span class="game-player-facing">朝向 '+playerDirectionLabel(player.yaw)+'</span>'+
-        '<button id="gameLocatePlayer" type="button">地图定位</button></div>'
+        (inOverworld?'<button id="gameLocatePlayer" type="button">地图定位</button>':'<span class="warn">主世界联动已暂停</span>')+'</div>'
       :'<div class="game-player-position waiting">等待玩家位置…</div>';
     detail.innerHTML=
       '<b>'+escapeHtml(session.worldName||'GeoWorld 世界')+'</b>'+
@@ -697,6 +736,7 @@ function renderGameSession(session){
     const locate=$('gameLocatePlayer');
     if(locate&&player){
       locate.onclick=()=>{
+        if(!gameInOverworld())return;
         centerMapOnWorld(player.x,player.z,Math.max(mapZoom,16));
         void focusWorldPoint(player.x,player.z);
       };
@@ -817,6 +857,7 @@ async function syncGameSessionStatus(status){
   const session=status?.gameSession||null;
   gameSession=session;
   gameControlLocal=Boolean(status?.localGameControl);
+  renderGameDimensionState(session);
   renderPlayerMarker();
   renderGameSession(session);
   updateActionState();
@@ -2257,7 +2298,7 @@ async function refreshStructureCandidates(){
         : mapZoom<4
           ? '概略显示：按空间区域显示少量真实代表位置'
           : '聚合显示：继续放大可逐步提高位置精度')+
-      (data.skippedStronghold?' · 强要塞不可用':' · 含强要塞');
+      (data.skippedStronghold?' · 要塞定位暂不可用':' · 含要塞');
     renderFeatureOverlay();
   }catch(e){
     if(token!==structureLoadToken)return;
@@ -2429,7 +2470,7 @@ function structureSetName(id){
   return ({
     'minecraft:abandoned_camp':'废弃营地',
     'minecraft:ancient_cities':'远古城市',
-    'minecraft:buried_treasures':'埋藏宝藏',
+    'minecraft:buried_treasures':'埋藏的宝藏',
     'minecraft:desert_pyramids':'沙漠神殿',
     'minecraft:igloos':'雪屋',
     'minecraft:jungle_temples':'丛林神庙',
@@ -2439,12 +2480,12 @@ function structureSetName(id){
     'minecraft:pillager_outposts':'掠夺者前哨站',
     'minecraft:ruined_portals':'废弃传送门',
     'minecraft:shipwrecks':'沉船',
-    'minecraft:swamp_huts':'沼泽小屋',
+    'minecraft:swamp_huts':'女巫小屋',
     'minecraft:trail_ruins':'古迹废墟',
     'minecraft:trial_chambers':'试炼密室',
     'minecraft:villages':'村庄',
     'minecraft:woodland_mansions':'林地府邸',
-    'minecraft:strongholds':'强要塞'
+    'minecraft:strongholds':'要塞'
   })[id]||id;
 }
 
@@ -2464,7 +2505,7 @@ function structureVariantName(id){
   const exact={
     'minecraft:ancient_city':'远古城市',
     'minecraft:bastion_remnant':'堡垒遗迹',
-    'minecraft:buried_treasure':'埋藏宝藏',
+    'minecraft:buried_treasure':'埋藏的宝藏',
     'minecraft:desert_pyramid':'沙漠神殿',
     'minecraft:end_city':'末地城',
     'minecraft:fortress':'下界要塞',
@@ -2487,8 +2528,8 @@ function structureVariantName(id){
     'minecraft:ruined_portal_swamp':'沼泽废弃传送门',
     'minecraft:shipwreck':'沉船',
     'minecraft:shipwreck_beached':'搁浅沉船',
-    'minecraft:stronghold':'强要塞',
-    'minecraft:swamp_hut':'沼泽小屋',
+    'minecraft:stronghold':'要塞',
+    'minecraft:swamp_hut':'女巫小屋',
     'minecraft:trail_ruins':'古迹废墟',
     'minecraft:trial_chambers':'试炼密室',
     'minecraft:village_desert':'沙漠村庄',
@@ -2505,7 +2546,7 @@ function structureVariantName(id){
       dappled_forest:'斑驳森林',flower_forest:'繁花森林',forest:'森林',
       meadow:'草甸',old_growth_birch_forest:'原始白桦林',
       old_growth_pine_taiga:'原始松木针叶林',old_growth_spruce_taiga:'原始云杉针叶林',
-      pale_garden:'苍白花园',savanna:'热带草原',snowy_taiga:'积雪针叶林',
+      pale_garden:'苍白之园',savanna:'热带草原',snowy_taiga:'积雪针叶林',
       sparse_jungle:'稀疏丛林',swamp:'沼泽',taiga:'针叶林',
       windswept_forest:'风袭森林',wooded_badlands:'繁茂恶地'
     })[biome]||'未知群系';
@@ -2684,7 +2725,7 @@ function canControlGame(){
   return Boolean(
     gameControlLocal &&
     gameSession &&
-    gameSession.state==='bound'
+    gameInOverworld()
   );
 }
 
@@ -2705,7 +2746,12 @@ async function waitForGameTeleport(commandId,timeoutMs=10000){
 }
 
 async function requestGameTeleport(x,y,z,button=null){
-  if(button)button.disabled=true;
+  if(!canControlGame()){
+    if(button)button.disabled=true;
+    setMapNotice(gameDimensionNotice()||'传送控制当前不可用。','warn');
+    return;
+  }
+  if(button){button.disabled=true;button.dataset.pending='true';}
   try{
     const queued=await api('/api/game/teleport',{
       method:'POST',
@@ -2717,12 +2763,14 @@ async function requestGameTeleport(x,y,z,button=null){
     await waitForGameTeleport(commandId);
     if(button){
       button.textContent='已传送';
-      setTimeout(()=>{if(button){button.textContent='传送到这里';button.disabled=false;}},1200);
+      setTimeout(()=>{if(button){button.textContent='传送到这里';button.disabled=!canControlGame();}},1200);
     }
     setMapNotice('Minecraft 已确认传送执行。','ok');
   }catch(err){
-    if(button){button.textContent='传送失败';button.disabled=false;}
+    if(button){button.textContent='传送失败';button.disabled=!canControlGame();}
     setMapNotice('传送失败：'+err.message,'error');
+  }finally{
+    if(button)delete button.dataset.pending;
   }
 }
 
@@ -2826,6 +2874,7 @@ async function searchNearestBiome(){
 }
 
 function usePlayerPositionForSearch(){
+  if(!gameInOverworld())return;
   const player=gameSession?.player;
   if(!player)return;
   $('biomeSearchX').value=Math.round(player.x);
@@ -2859,7 +2908,7 @@ async function searchNearestStructure(){
   }catch(e){
     $('structureSearchResult').hidden=false;
     $('structureSearchResult').textContent=
-      e.status===503?'当前启动方式无法精确查询强要塞，请从可执行 GeoWorld JAR 启动 Web 工具。':
+      e.status===503?'当前 Minecraft 版本的要塞定位暂不可用，请查看后端错误信息。':
       '查找失败：'+e.message;
   }finally{
     button.disabled=false;

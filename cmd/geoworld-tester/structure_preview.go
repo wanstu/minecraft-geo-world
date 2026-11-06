@@ -322,9 +322,9 @@ func (s *appState) handleStructureCandidates(w http.ResponseWriter, r *http.Requ
 
 	note := "普通结构点与 Minecraft 26.3 原版 StructureSet placement 候选 chunk 同源；已按 GeoWorld 当前水体/生态剔除可高置信判断为不兼容的候选，复杂地下或多条件结构仍保持候选身份。"
 	if strongholdErr == nil {
-		note += " 强要塞使用 Minecraft 26.3 concentric-rings 规则与 GeoWorld 群系偏移搜索，构建时会与 Minecraft 原生实现逐点校验。"
+		note += " 要塞使用 Minecraft " + s.strongholdMinecraftVersion() + " 同心环规则与 GeoWorld 群系偏移搜索，构建时与 Minecraft 原生实现逐点校验。"
 	} else {
-		note += " 强要塞精确预览需要从可执行 GeoWorld JAR 启动 Web 工具。"
+		note += " 要塞定位暂不可用：当前 Java 定位组件不可用或不支持此 Minecraft 版本。"
 	}
 
 	writeJSON(w, http.StatusOK, structurePreviewResponse{
