@@ -10,10 +10,10 @@ public final class GeoWorldBiomeDecisionFingerprint {
     public static void main(String[] args) throws Exception {
         GeoWorldV26BiomeDecisionFingerprint.run(
             Minecraft26_2Profile.INSTANCE,
-            // Current-rule baselines; v1.1.15/v1.1.16 comparisons are identical.
+            // Locked to independently observed pre-Query 386aace and candidate results.
             java.util.Map.of(
-                123456L, 0xef19ea2e85ece8eaL,
-                -563659577384754347L, 0x40e63264bc16545dL
+                123456L, 0x6eff9f92530b16e6L,
+                -563659577384754347L, 0xdf976bd29eaf4429L
             ),
             args
         );

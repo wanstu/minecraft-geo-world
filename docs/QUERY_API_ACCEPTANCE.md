@@ -195,3 +195,18 @@ QUERY-02 ~ QUERY-04 一旦通过，`FACT_REGISTRY.md` 中被覆盖字段的验�
 第 5 节全部勾选后完成 S5：D-048 记录 2026-11-07 解封及验收实现提交 `e9098ad7970de132b8c3d4767584ef600b67c36c`；[runtime-reader README](../java/runtime-reader/README.md#query-api) 的对外说明定稿，字段表、架构、状态和交接同步。此结论是 Query API v1 的接口验收；本轮没有推送、打 tag 或发布模组。
 
 S5 文档验证：发布检查表 9/9、字段表 86/86 V、DECISIONS 的 CRLF、文档相对链接、两份日志与安装包哈希全部通过；README Java 示例已使用 JDK 21、`--release 21` 和本轮 NeoForge 验收 JAR 实际编译通过。
+
+## 8. 完整发布矩阵补充（2026-11-07）
+
+`v0.1.2` 标签流水线 [42328096662](https://github.com/wanstu/minecraft-geo-world/actions/runs/42328096662) 的 Go / 全量 golden 和 5 个适配器通过，26.1.2 / 26.2 的两个 Loader 均在旧群系指纹常量处失败，Release 被阻止。保留该失败标签，后续修正使用 `v0.1.3`。
+
+已核对临时源码快照与 `386aace` 的生成相关源码一致（比较时只归一化换行）；使用此前独立编译的原始快照与候选类，在与各版本相同的 MinecraftV26Profile 能力参数下复算。每个版本每个 Seed 24,576 点，结果如下；[结构化证据](../acceptance/evidence/release-biome-fingerprints-20261107.json) 已保存。
+
+| Minecraft | Seed | 原始 386aace 与候选共同 FNV64 |
+|---|---|---|
+| 26.1.2 | `123456` | `599b1ee71dc2825c` |
+| 26.1.2 | `-563659577384754347` | `f3ebcfafda40fdd8` |
+| 26.2 | `123456` | `6eff9f92530b16e6` |
+| 26.2 | `-563659577384754347` | `df976bd29eaf4429` |
+
+只更新两个版本的指纹测试常量及说明，不跳过检查、不改变生成算法、既有 golden、字段或规则版本。其余 5 个目标的成功也包括 1.20.1 Fabric 的 Java 17 实际构建。

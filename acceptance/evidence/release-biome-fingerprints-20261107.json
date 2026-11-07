@@ -1,0 +1,42 @@
+{
+  "format": "geoworld-release-biome-fingerprint-comparison",
+  "version": 1,
+  "date": "2026-11-07",
+  "baseline_commit": "386aace",
+  "candidate_commit": "320b245b23b0421d94e6c1cf67764ee58721d28a",
+  "note": "Independent compiled baseline and candidate use matching MinecraftV26Profile capability flags; compare 24576 positions per seed. No generation changes.",
+  "observations": [
+    {
+      "minecraft": "26.1.2",
+      "seed": "123456",
+      "points": 24576,
+      "baseline_fnv64": "599b1ee71dc2825c",
+      "candidate_fnv64": "599b1ee71dc2825c",
+      "result": "PASS"
+    },
+    {
+      "minecraft": "26.1.2",
+      "seed": "-563659577384754347",
+      "points": 24576,
+      "baseline_fnv64": "f3ebcfafda40fdd8",
+      "candidate_fnv64": "f3ebcfafda40fdd8",
+      "result": "PASS"
+    },
+    {
+      "minecraft": "26.2",
+      "seed": "123456",
+      "points": 24576,
+      "baseline_fnv64": "6eff9f92530b16e6",
+      "candidate_fnv64": "6eff9f92530b16e6",
+      "result": "PASS"
+    },
+    {
+      "minecraft": "26.2",
+      "seed": "-563659577384754347",
+      "points": 24576,
+      "baseline_fnv64": "df976bd29eaf4429",
+      "candidate_fnv64": "df976bd29eaf4429",
+      "result": "PASS"
+    }
+  ]
+}
