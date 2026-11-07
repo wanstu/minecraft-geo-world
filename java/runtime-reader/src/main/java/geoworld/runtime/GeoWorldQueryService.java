@@ -15,7 +15,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Stable, read-only query facade over the locked GeoWorld natural model.
+ * Internal, read-only query implementation over the locked natural model.
+ *
+ * Consumers enter through geoworld.runtime.api.GeoWorldFacade. The four nested
+ * v1 request/result value types remain part of the Query API contract.
  *
  * The service deliberately does not know how to load Minecraft chunks. Natural
  * queries are model-only; Local Reality and Dynamic State require caller
