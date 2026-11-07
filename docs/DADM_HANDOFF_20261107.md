@@ -47,3 +47,5 @@ bash scripts/check-dev-prereqs.sh
   - GOMAXPROCS=2 go test -p 2 ./... 全仓通过。
 - 上述验收未发现当前基线的岛屿粘大陆/湖岸问题，因此**没有修改生成算法，也没有提升 rules version**。
 - geoworld-river-navigation-audit 的额外严格统计不能单独作为当前 Minecraft 缺陷证据；正式 WaterOwnership / Shoreline 等验收已覆盖既有河道修复，不得据此重复开启历史问题。
+- 兼容/性能基线已在 dadm 实测：1.21.1 NeoForge 的 48 个冷 Chunk 规划平均耗时 shoreline=1.102ms、biomes=0.172ms、minerals=0.181ms；Engine Bridge 受控 cache miss 为 720ms，随后相同 cacheKey 命中为 371ms。
+- 模型范围外并非简单 clamp：Go / Java Runtime 当前均已通过 sampleOuterOcean 做边缘→深海平滑过渡，并带稀疏外海岛与极区抑制；旧 STATUS 中“模型外无限深海/平滑扩展仍未设计”的描述已经过时。
