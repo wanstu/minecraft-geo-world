@@ -166,7 +166,8 @@ public record GeoWorldCreationConfig(
             ContinentPreset.DEFAULT.separation(),
             ContinentPreset.DEFAULT,
             WorldPreset.STANDARD,
-            Parameters.standard()
+            Parameters.standard(),
+            true
         );
     }
 

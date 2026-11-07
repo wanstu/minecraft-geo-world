@@ -90,6 +90,26 @@ public final class GeoWorldCreationConfigVerifier {
             config.worldPreset() == GeoWorldCreationConfig.WorldPreset.STANDARD,
             "default world preset is not Standard"
         );
+        require(
+            config.surfaceOrePile(),
+            "surface ore pile must be enabled by default for new worlds"
+        );
+        GeoWorldCreationConfig legacyCompatible = new GeoWorldCreationConfig(
+            config.width(),
+            config.height(),
+            config.cellSizeBlocks(),
+            config.plateCount(),
+            config.oceanFraction(),
+            config.continentFragmentation(),
+            config.continentSeparation(),
+            config.continentPreset(),
+            config.worldPreset(),
+            config.parameters()
+        );
+        require(
+            !legacyCompatible.surfaceOrePile(),
+            "legacy compatibility constructor must keep surface ore piles disabled"
+        );
         double[] values = config.parameters().values();
         require(values.length == 25, "default parameter count=" + values.length + " want=25");
         for (int i = 0; i < values.length; i++) {

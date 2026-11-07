@@ -24,15 +24,14 @@ public final class GeoWorldV26MiningDistrictVerifier {
         long seed = args.length > 0
             ? Long.parseLong(args[0])
             : 123456L;
-        if (GeoWorldCreationConfig.defaults().surfaceOrePile()) {
+        if (!GeoWorldCreationConfig.defaults().surfaceOrePile()) {
             throw new AssertionError(
-                "surface ore pile must be disabled by default"
+                "surface ore pile must be enabled by default"
             );
         }
         GeoWorldV1 model = GeoWorldEngineBridge.generate(
             seed,
             GeoWorldCreationConfig.defaults()
-                .withSurfaceOrePile(true)
         ).model();
         if (!model.surfaceOrePileEnabled()) {
             throw new AssertionError(
