@@ -821,7 +821,7 @@ public class GeoWorldPresetScreenBase extends Screen {
                     )
                 );
             } else {
-                this.doneButton.active = false;
+                this.doneButton.active = !this.previewGenerating;
                 this.setViewMapActive(false);
                 if (!this.previewGenerating) {
                     this.statusText.setMessage(
@@ -1075,42 +1075,86 @@ public class GeoWorldPresetScreenBase extends Screen {
                     value.config().equals(config)
                 );
             if (generated.isEmpty()) {
-                this.validateForm();
+                this.generateAndApply(config, seed);
                 return;
             }
 
-            GeoWorldEngineBridge.GeneratedModel ready = generated.get();
-            LOGGER.info(
-                "GeoWorld create settings accepted: worldSeed={}, modelSeed={}, model={}",
-                seed,
-                ready.model().manifest().seed(),
-                ready.path()
-            );
-            GeoWorldCreationSession.setGenerated(
-                this.parent.getUiState(),
-                ready
-            );
-
-            this.parent.getUiState().updateDimensions(
-                (registryAccess, dimensions) -> {
-                    ChunkGenerator generator =
-                        this.worldgenAdapter.create(
-                            registryAccess.lookupOrThrow(Registries.BIOME),
-                            config,
-                            seed,
-                            ready
-                        );
-                    return dimensions.replaceOverworldGenerator(
-                        registryAccess,
-                        generator
-                    );
-                }
-            );
-
-            this.onClose();
+            this.applyGeneratedAndClose(config, seed, generated.get());
         } catch (NumberFormatException e) {
             this.validateForm();
         }
+    }
+
+    private void generateAndApply(GeoWorldCreationConfig config, long seed) {
+        GeoWorldCreationSession.set(this.parent.getUiState(), config);
+        GeoWorldCreationSession.invalidateGenerated(this.parent.getUiState());
+
+        int serial = ++this.generationSerial;
+        this.previewGenerating = true;
+        this.previewButton.active = false;
+        this.setViewMapActive(false);
+        this.doneButton.active = false;
+        this.statusText.setMessage(
+            Component.translatable("geoworld.create.preview_generating")
+        );
+
+        this.prepareGenerationContext(this.parent.getUiState().getSettings());
+        GeoWorldEngineBridge
+            .generateAsync(seed, config)
+            .whenComplete((ready, error) -> {
+                if (this.minecraft == null) {
+                    return;
+                }
+                this.minecraft.execute(() -> {
+                    if (serial != this.generationSerial) {
+                        return;
+                    }
+                    this.previewGenerating = false;
+                    if (error != null) {
+                        this.previewButton.active = true;
+                        this.doneButton.active = true;
+                        this.statusText.setMessage(
+                            Component.translatable(
+                                "geoworld.create.preview_failed",
+                                rootMessage(error)
+                            )
+                        );
+                        return;
+                    }
+                    this.applyGeneratedAndClose(config, seed, ready);
+                });
+            });
+    }
+
+    private void applyGeneratedAndClose(
+        GeoWorldCreationConfig config,
+        long seed,
+        GeoWorldEngineBridge.GeneratedModel ready
+    ) {
+        LOGGER.info(
+            "GeoWorld create settings accepted: worldSeed={}, modelSeed={}, model={}",
+            seed,
+            ready.model().manifest().seed(),
+            ready.path()
+        );
+        GeoWorldCreationSession.setGenerated(this.parent.getUiState(), ready);
+
+        this.parent.getUiState().updateDimensions(
+            (registryAccess, dimensions) -> {
+                ChunkGenerator generator = this.worldgenAdapter.create(
+                    registryAccess.lookupOrThrow(Registries.BIOME),
+                    config,
+                    seed,
+                    ready
+                );
+                return dimensions.replaceOverworldGenerator(
+                    registryAccess,
+                    generator
+                );
+            }
+        );
+
+        this.onClose();
     }
 
     @Override
