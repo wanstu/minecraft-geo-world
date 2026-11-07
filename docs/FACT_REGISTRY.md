@@ -1,6 +1,6 @@
 # GeoWorld 事实字段契约表（FACT_REGISTRY）
 
-更新时间：2026-11-06
+更新时间：2026-11-07
 适用：`geoworld-query-v1`，`GeoWorldQueryService.NaturalField` 共 **86** 个常量（本表全覆盖）。
 约束来源：`DECISIONS.md` D-048 / D-049 / D-050；总体定位见 `FOUNDATION_API.md`。
 
@@ -200,7 +200,7 @@ TRANSPORT_GEOGRAPHY ← SETTLEMENT + NAVIGATION_SCORE + HYDROLOGY
 
 ## 附录 C：自动验收证据与剩余发布条件
 
-2026-11-07 已通过：QUERY-01～09 与现有 24 项 MODEL/RUNTIME/PROFILE/PARAM 验收，合计 33/33 项，覆盖 6 个已提交模型。
+2026-11-07 已通过：QUERY-01～10 与现有 24 项 MODEL/RUNTIME/PROFILE/PARAM 验收，合计 34/34 项，覆盖 6 个已提交模型。
 
 - 每个模型：32×32 网格 + 18 个 golden 特殊点，共 1,042 点；全模型合计 6,252 点。
 - QUERY-01：86 个字段逐行登记，与枚举一一对应。
@@ -212,4 +212,4 @@ TRANSPORT_GEOGRAPHY ← SETTLEMENT + NAVIGATION_SCORE + HYDROLOGY
 
 按代码事实修正的文档偏差：展开合并字段行；补全水域 `none` 与 `open_sea / shallow_sea / lake / shallow_lake` 分类；区分外围海岛和海洋；注明当前 Query 矿业评分仍为 8 类原版矿物。没有改变查询返回值或世界生成。
 
-QUERY-10、门面生命周期及两个 Loader 的实机切换仍是发布前置条件。D-048 封控保持，不能据本表宣称 Query API 已对外开放。
+QUERY-10 已在全部 6 个模型上验证门面与直接查询等价，`supports` 与版本信息也一致；门面生命周期黑盒检查已通过。两个 Loader 的实机切换仍是发布前置条件。D-048 封控保持，不能据本表宣称 Query API 已对外开放。

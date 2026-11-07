@@ -1,0 +1,36 @@
+// Shared by all release targets. No Minecraft classes are used by these checks.
+def geoworldQueryRepo = project.file(project.projectDir.name == 'neoforge-mod' ? '../..' : '../../..')
+
+if (tasks.findByName('verifyGeoWorldModelQuery') == null) {
+    tasks.register('verifyGeoWorldModelQuery', JavaExec)
+}
+tasks.named('verifyGeoWorldModelQuery', JavaExec).configure {
+    group = 'verification'
+    description = 'Verifies World Model and Query API contracts on every committed runtime golden model.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir)
+    mainClass = 'geoworld.runtime.GeoWorldModelVerifier'
+    setArgs([
+        new File(geoworldQueryRepo, 'internal/goldenvectors/testdata').absolutePath,
+        layout.buildDirectory.file('query-api-evidence.json').get().asFile.absolutePath,
+        new File(geoworldQueryRepo, 'docs/FACT_REGISTRY.md').absolutePath
+    ])
+    jvmArgs '-Xmx2g', '-XX:ActiveProcessorCount=2'
+    inputs.dir(new File(geoworldQueryRepo, 'internal/goldenvectors/testdata'))
+    inputs.file(new File(geoworldQueryRepo, 'docs/FACT_REGISTRY.md'))
+}
+
+tasks.register('verifyGeoWorldQueryLifecycle', JavaExec) {
+    group = 'verification'
+    description = 'Verifies Query facade bind/unbind, world replacement and concurrent immutable reads.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir)
+    mainClass = 'geoworld.runtime.GeoWorldFacadeLifecycleVerifier'
+    args new File(geoworldQueryRepo, 'internal/goldenvectors/testdata').absolutePath
+    jvmArgs '-Xmx1g', '-XX:ActiveProcessorCount=2'
+}
+
+tasks.named('check').configure {
+    dependsOn tasks.named('verifyGeoWorldModelQuery')
+    dependsOn tasks.named('verifyGeoWorldQueryLifecycle')
+}

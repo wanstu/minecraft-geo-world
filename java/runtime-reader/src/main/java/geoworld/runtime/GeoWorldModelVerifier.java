@@ -48,7 +48,7 @@ public final class GeoWorldModelVerifier {
         "PROFILE-04",
         "PARAM-05",
         "QUERY-01", "QUERY-02", "QUERY-03", "QUERY-04", "QUERY-05",
-        "QUERY-06", "QUERY-07", "QUERY-08", "QUERY-09"
+        "QUERY-06", "QUERY-07", "QUERY-08", "QUERY-09", "QUERY-10"
     );
 
     public static void main(String[] args) throws Exception {

@@ -1378,10 +1378,9 @@ NaturalField、Resolution、QueryRequest、NaturalResult；它们同样受 D-049
 
 ### 原设计遗留与 S1 调查结论（2026-11-07）
 
-1. `GeoWorldFacade` **尚不存在**，本决定是设计结论，不是已实现状态；
+1. S2 已实现 `geoworld.runtime.api.GeoWorldFacade / WorldFacts`（`d694678`）；适配器写入钩子为内部包的 `GeoWorldFactsBinding`，门面本身只有三个读取方法。D-048 对外封控仍保持，存在实现不等于已经完成发布验收；
 2. S1 已确认：`GeoWorldEngineBridge.GeneratedModel` 只是生成/缓存加载的返回值，**不是活动世界的权威持有者**；无需向它增加全局模型 getter。权威实例由 `GeoWorldV26GeneratorRuntime.model` 持有，经 `attachModel` 绑定到生成器；世界服务的 `ActiveWorld.model` 保存同一个实例。
-3. `GeoWorldModelVerifier` 与 `verifyGeoWorldModelQuery` 目前**直接构造** `GeoWorldQueryService`，
-   落地门面后应改为**同时**验证门面路径，否则门面会成为未验收代码；
+3. S4 已用 QUERY-10 同时验证门面与直接查询，并新增 `GeoWorldFacadeLifecycleVerifier`；9 个发布目标统一应用 `java/query-api-verification.gradle`，两个检查都进入 `check`；
 4. `queryLocalReality` 的 `LocalRealityProvider` 由谁实现、键名约定——留待玩法模组立项时再定，
    GeoWorld 只保证「提供槽位」。
 
@@ -1412,3 +1411,10 @@ Fabric 的就绪回调对应 `SERVER_STARTED`；NeoForge 对应 `ServerStartingE
 - 遵守 `ARCHITECTURE.md`「版本/Loader 层只提供薄桥接」：`bind/unbind` 就是那个薄桥接。
 - 不为 D-046/D-047 增加任何工作量：门面不参与世界创建、预览、出生点选择。
 
+
+
+### 2026-11-07 实现记录（封控未解除）
+
+S1、S2 已完成；S3 的共享生命周期接入已完成，实机记录待补；S4 的 QUERY-01～10、生命周期、双目标自动检查已通过，详情见 `QUERY_API_ACCEPTANCE.md`。本轮 API_VERSION、generationRulesVersion、worldModelVersion、世界缓存版本和已提交 golden 文件均未改变。v1 的字段、单位、取值域、缺失条件及量化行为保持不变；没有 D-049 breaking 变更。
+
+D-048 的封控必须等两个 Loader 的“进入 A → 标题 → 进入 B”实机结果齐全后另行解除。不得把本节当成封控解除记录。

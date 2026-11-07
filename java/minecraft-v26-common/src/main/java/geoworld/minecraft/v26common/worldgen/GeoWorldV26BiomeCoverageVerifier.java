@@ -81,14 +81,26 @@ public final class GeoWorldV26BiomeCoverageVerifier {
             String atCenter = realizer.biomeId(
                 model, habitat.x(), habitat.y(), habitat.z()
             );
+            // Surface continuity follows the local surface, not a fixed
+            // horizontal Y plane that may enter a hillside. Cave habitats
+            // deliberately retain their representative underground height.
+            double nearbyY = habitat.y();
+            boolean cave = habitat.biome().endsWith("_caves") ||
+                habitat.biome().endsWith("deep_dark");
+            if (!cave) {
+                int ground = profile.heightMapping().boundaryY(
+                    model.sample(habitat.x() + 32, habitat.z()).groundHeight()
+                ) - 1;
+                nearbyY = Math.min(profile.heightMapping().maxYExclusive() - 1, ground + 3);
+            }
             String atNearby = realizer.biomeId(
-                model, habitat.x() + 32, habitat.y(), habitat.z()
+                model, habitat.x() + 32, nearbyY, habitat.z()
             );
             if (!habitat.biome().equals(atCenter) ||
                 !habitat.biome().equals(atNearby)) {
                 throw new AssertionError(
                     "habitat was not continuous: " + habitat +
-                    " center=" + atCenter + " nearby=" + atNearby
+                    " center=" + atCenter + " nearby=" + atNearby + " nearbyY=" + nearbyY
                 );
             }
         }

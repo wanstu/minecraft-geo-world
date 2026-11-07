@@ -206,7 +206,7 @@ GeoWorldV1（World Model，只读）
       ↓
 GeoWorldQueryService（实现，geoworld-query-v1，86 个 NaturalField）
       ↓
-geoworld.runtime.api.GeoWorldFacade（唯一稳定入口，待落地）
+geoworld.runtime.api.GeoWorldFacade / WorldFacts（已实现；实机解封待验）
       ↓
 玩法模组（Layer 3 Dynamic State 由其自行拥有）
 ```
@@ -214,6 +214,9 @@ geoworld.runtime.api.GeoWorldFacade（唯一稳定入口，待落地）
 - 数据分三层：Natural Facts（GeoWorld 拥有）/ Local Reality（适配器提供槽位）/ Dynamic State（玩法模组拥有）。
 - 字段语义以 `docs/FACT_REGISTRY.md` 为准；版本与暴露规则见 D-048 ~ D-050；验收与落地顺序见 `docs/QUERY_API_ACCEPTANCE.md`。
 - 门面只对应主世界、只在逻辑服务端提供；bind/unbind 位于版本族共享层，不在单个 Loader 适配器中重复实现。
+- 绑定钩子 `GeoWorldFactsBinding` 位于内部包；26.x、1.21.1、1.20.1 委托同一个 `GeoWorldV26WorldService`。稳定门面只读取原子快照，动态 GeoWorld 世界激活后才可用；普通世界、静态 Preview、未就绪/关闭返回 empty。
+- v1 方法签名沿用的四个嵌套值类型（NaturalField / Resolution / QueryRequest / NaturalResult）同样受 D-049 约束；实现类本体不作为第三方入口。
+- 9 个目标统一应用 `java/query-api-verification.gradle`，执行 QUERY-01～10 和生命周期黑盒检查；发布封控与人工检查进度见验收主文档。
 
 首次游戏验证提前到完整 Generator UI 和批量世界导出之前。调试中间场与 Runtime 持久化字段分开，避免全部 Lab 数组成为常驻模型。
 

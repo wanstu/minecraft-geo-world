@@ -184,15 +184,6 @@ tasks.register('verifyGeoWorldAdapter') {
         }
     }
 }
-tasks.register('verifyGeoWorldModelQuery', JavaExec) {
-    group = 'verification'
-    description = 'Runs black-box World Model/API acceptance checks against the locked v1.1 golden model.'
-    dependsOn tasks.named('compileJava')
-    classpath = sourceSets.main.output.classesDirs
-    mainClass = 'geoworld.runtime.GeoWorldModelVerifier'
-    args file('../../../internal/goldenvectors/testdata/runtime-v1.geoworld').absolutePath
-}
-
 tasks.register('verifyGeoWorldEngineBridge', JavaExec) {
     group = 'verification'
     description = 'Generates a fresh model through the embedded engine and verifies locked profile/rules/model identity.'
@@ -472,7 +463,6 @@ tasks.named('check') {
     dependsOn tasks.named('verifyGeoWorldWebUiLaunch')
     dependsOn tasks.named('verifyGeoWorldDynamicWebUiPort')
     dependsOn tasks.named('verifyGeoWorldSpecialLandscapes')
-    dependsOn tasks.named('verifyGeoWorldModelQuery')
     dependsOn tasks.named('verifyGeoWorldCreationConfig')
     dependsOn tasks.named('verifyGeoWorldPreviewModel')
     dependsOn tasks.named('verifyGeoWorldStructureAdaptation')
@@ -486,3 +476,6 @@ tasks.named('check') {
     dependsOn tasks.named('verifyGeoWorldMinerals')
     dependsOn tasks.named('fingerprintGeoWorldBiomeDecisions')
 }
+
+// Shared Query API contract and lifecycle acceptance.
+apply from: '../../query-api-verification.gradle'

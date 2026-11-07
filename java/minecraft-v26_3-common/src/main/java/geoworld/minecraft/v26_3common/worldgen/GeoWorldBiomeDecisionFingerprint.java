@@ -11,9 +11,9 @@ public final class GeoWorldBiomeDecisionFingerprint {
         GeoWorldV26BiomeDecisionFingerprint.run(
             Minecraft26_3Profile.INSTANCE,
             java.util.Map.of(
-                // Current baseline also matches v1.1.15 at all 24,576 sites.
-                123456L, 0x261671873169ae5cL,
-                -563659577384754347L, 0x8e74d3a605e736faL
+                // Verified against pre-Query baseline 386aace at all 24,576 sites.
+                123456L, 0x7cad8c0a851e21bcL,
+                -563659577384754347L, 0x1d630f1f82c93fb8L
             ),
             args
         );

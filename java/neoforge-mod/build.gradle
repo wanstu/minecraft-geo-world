@@ -580,3 +580,5 @@ tasks.named('check') {
     dependsOn tasks.named('verifyGeoWorldBasinRivers')
     dependsOn tasks.named('verifyGeoWorldEngine')
 }
+// Shared Query API contract and lifecycle acceptance.
+apply from: '../query-api-verification.gradle'

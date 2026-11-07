@@ -4,6 +4,7 @@ import geoworld.runtime.GeoWorldQueryService.NaturalField;
 import geoworld.runtime.GeoWorldQueryService.NaturalResult;
 import geoworld.runtime.GeoWorldQueryService.QueryRequest;
 import geoworld.runtime.GeoWorldQueryService.Resolution;
+import geoworld.runtime.api.GeoWorldFacade;
 
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -32,7 +33,7 @@ import java.util.regex.Pattern;
 final class GeoWorldQueryContractVerifier {
     static final List<String> IDS = List.of(
         "QUERY-01", "QUERY-02", "QUERY-03", "QUERY-04", "QUERY-05",
-        "QUERY-06", "QUERY-07", "QUERY-08", "QUERY-09"
+        "QUERY-06", "QUERY-07", "QUERY-08", "QUERY-09", "QUERY-10"
     );
     private record Point(double x, double z) {}
     private static final Set<NaturalField> REGION = EnumSet.of(
@@ -182,8 +183,45 @@ final class GeoWorldQueryContractVerifier {
             // without changing a golden or claiming generator coverage.
             verifyNegativeScoreFixture(model, nearRiverNodes, landRisk / landCount);
         }
+        verifyFacade(model, service, points);
         System.out.printf("Query samples: model=%s points=%d availableFields=%d repeatedRegions=%d floodplain=%d land=%d%n",
             path.getFileName(), points.size(), observed.size(), repeatedRegions, floodCount, landCount);
+    }
+
+    private void verifyFacade(GeoWorldV1 model, GeoWorldQueryService direct, List<Point> points) {
+        Object owner = new Object();
+        GeoWorldFactsBinding.bind(owner, model);
+        try {
+            var facts = GeoWorldFacade.currentWorld().orElseThrow();
+            for (Point point : points) {
+                QueryRequest request = QueryRequest.all(point.x, point.z, Resolution.BLOCK_4);
+                NaturalResult actual = facts.queryNatural(request);
+                check("QUERY-10", direct.queryNatural(request).equals(actual), point.x, point.z,
+                    "facade result", actual, "equals direct GeoWorldQueryService result");
+            }
+            var g = model.manifest().geometry();
+            NaturalResult center = direct.queryNatural(QueryRequest.all(
+                g.originX() + g.spanXBlocks() * 0.5, g.originZ() + g.spanZBlocks() * 0.5, Resolution.BLOCK_16));
+            Set<NaturalField> conditional = EnumSet.of(
+                NaturalField.WATER_SURFACE_ELEVATION, NaturalField.WATERSHED_ID,
+                NaturalField.NATURAL_FLOW_DIRECTION, NaturalField.RIVER_ID,
+                NaturalField.DISTANCE_TO_RIVER, NaturalField.DISTANCE_TO_LAKE,
+                NaturalField.DISTANCE_TO_COAST, NaturalField.DISTANCE_TO_OCEAN,
+                NaturalField.NEAREST_RIVER_HALF_WIDTH, NaturalField.NEAREST_RIVER_GRADIENT
+            );
+            for (NaturalField field : NaturalField.values()) {
+                boolean expected = !center.unavailableFields().contains(field) || conditional.contains(field);
+                check("QUERY-10", facts.supports(field) == expected, center.sampleX(), center.sampleZ(),
+                    "supports(" + field + ")", facts.supports(field), expected);
+            }
+            check("QUERY-10", facts.worldProfileVersion().equals(center.worldProfileVersion()) &&
+                facts.generationRulesVersion().equals(center.generationRulesVersion()) &&
+                facts.worldModelVersion().equals(center.worldModelVersion()), center.sampleX(), center.sampleZ(),
+                "facade versions", facts.worldProfileVersion() + "/" + facts.generationRulesVersion() + "/" + facts.worldModelVersion(),
+                "direct query identity");
+        } finally { GeoWorldFactsBinding.unbind(owner); }
+        check("QUERY-10", GeoWorldFacade.currentWorld().isEmpty(), 0, 0,
+            "currentWorld after verification", GeoWorldFacade.currentWorld(), "empty");
     }
 
     private void verifyNegativeScoreFixture(

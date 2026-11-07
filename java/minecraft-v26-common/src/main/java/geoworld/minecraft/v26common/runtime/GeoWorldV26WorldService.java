@@ -133,7 +133,8 @@ public final class GeoWorldV26WorldService {
         );
         GeoWorldFactsBinding.bind(server, model);
         LOGGER.info(
-            "GeoWorld Query bound Overworld facts: seed={}, profile={}, rules={}, model={}",
+            "GeoWorld Query bound Overworld facts: currentWorld={}, seed={}, profile={}, rules={}, model={}",
+            GeoWorldFactsBinding.currentWorld().isPresent(),
             model.manifest().seed(), model.worldProfile().worldProfileVersion(),
             model.worldProfile().generationRulesVersion(), model.worldProfile().worldModelVersion()
         );
@@ -209,8 +210,9 @@ public final class GeoWorldV26WorldService {
         ActiveWorld removed = this.active.remove(server);
         if (removed != null) {
             LOGGER.info(
-                "Released GeoWorld model and Query facts for {}",
-                removed.worldDirectory()
+                "Released GeoWorld model and Query facts for {}; currentWorld={}",
+                removed.worldDirectory(),
+                GeoWorldFactsBinding.currentWorld().isPresent()
             );
         }
     }

@@ -493,3 +493,6 @@ tasks.named('check').configure {
     dependsOn tasks.named('verifyGeoWorldShoreline')
     dependsOn tasks.named('probeGeoWorldReportedCoast')
 }
+
+// Shared Query API contract and lifecycle acceptance.
+apply from: '../../query-api-verification.gradle'

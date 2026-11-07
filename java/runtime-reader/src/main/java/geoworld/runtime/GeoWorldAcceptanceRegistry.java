@@ -169,7 +169,8 @@ public final class GeoWorldAcceptanceRegistry {
             {"QUERY-06", "Coordinate quantization", "All offsets in one 1/4/16 block cell return the same result and sample coordinates"},
             {"QUERY-07", "Version identity", "Nonempty result versions match the persisted model manifest"},
             {"QUERY-08", "Outer model semantics", "Outer distances are unavailable except zero distance to ocean on ocean"},
-            {"QUERY-09", "Negative score direction", "Near-river floodplain risk mean exceeds dry land mean with nonempty samples"}
+            {"QUERY-09", "Negative score direction", "Near-river floodplain risk mean exceeds dry land mean with nonempty samples"},
+            {"QUERY-10", "Facade equivalence", "Facade results, support flags and identity equal direct query results"}
         };
         ArrayList<Entry> entries = new ArrayList<>();
         for (String[] row : rows) {

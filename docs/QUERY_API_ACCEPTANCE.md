@@ -1,7 +1,7 @@
 # GeoWorld Query API 验收与门面落地指导
 
-更新时间：2026-11-06
-状态：**指导文档**。本文只规定做什么、按什么顺序做、怎样算完成，不包含实现代码。
+更新时间：2026-11-07
+状态：**自动验收与 S1～S4 实现已落地；S3 实机记录和 S5 解封尚待完成**。本文件同时保存执行规则与本轮验证记录。
 上游文档：`DECISIONS.md` 中的 D-048 / D-049 / D-050、`FACT_REGISTRY.md`、`FOUNDATION_API.md`
 
 ---
@@ -140,8 +140,40 @@ QUERY-02 ~ QUERY-04 一旦通过，`FACT_REGISTRY.md` 中被覆盖字段的验�
 
 ## 5. 发布检查表（每次涉及 Query 的发布都要过一遍）
 
-- [ ] `NaturalField` 数量与 `FACT_REGISTRY.md` 一致（QUERY-01 自动检查）
-- [ ] QUERY-01 ~ QUERY-10、MODEL-01 ~ MODEL-04 全部通过
-- [ ] 如果字段的语义、单位、取值域或缺失条件有变化：已按 D-049 第 2 节判断是否属于 breaking 变更，属于的话 `API_VERSION` 已提升，并在 D-049 下追加了变更记录
-- [ ] `FACT_REGISTRY.md` 的更新时间与本次发布一致
-- [ ] `STATUS.md` 记录了本次 Query 相关改动，并且区分了「已验证」和「未验证」
+- [x] `NaturalField` 数量与 `FACT_REGISTRY.md` 一致（QUERY-01 自动检查）
+- [x] QUERY-01 ~ QUERY-10、MODEL-01 ~ MODEL-04 全部通过
+- [x] 如果字段的语义、单位、取值域或缺失条件有变化：已按 D-049 第 2 节判断是否属于 breaking 变更，属于的话 `API_VERSION` 已提升，并在 D-049 下追加了变更记录
+- [x] `FACT_REGISTRY.md` 的更新时间与本次发布一致
+- [x] `STATUS.md` 记录了本次 Query 相关改动，并且区分了「已验证」和「未验证」
+
+- [x] 1.21.1 NeoForge 完整 `check`（JDK 21）
+- [x] 26.3 Fabric 完整 `check`（JDK 25）
+- [ ] 1.21.1 NeoForge 实机：进入 A → 返回标题 → 进入 B，记录 `currentWorld` 为 true → false → true 与 A/B Seed
+- [ ] 26.3 Fabric 实机：同上
+
+## 6. 2026-11-07 实现与自动验收记录
+
+| 切片 | 当前结论 |
+|---|---|
+| QUERY-01～09 | `47f1c03`，6 个模型、每模型 1,042 点；86 字段全部出现 |
+| S1 | `3d9472a`，模型持有者与三个版本族的共同生命周期已核实，详见 D-050 |
+| S2 | `d694678`，`GeoWorldFacade / WorldFacts` 已实现，绑定与模型本体留在内部包 |
+| S3 | `8e74df5`，共享 `GeoWorldV26WorldService` 在动态主世界激活后 bind，关闭/失败/重新激活时 unbind；后续补充日志打印实际 `currentWorld` 状态。实机记录待补 |
+| S4 | QUERY-10、生命周期黑盒检查、所有 9 个发布目标共用的 Gradle 检查已接入 |
+| S5 | **未执行，未解除封控**；不能以自动验收替代两个目标的实机切换 |
+
+自动结果：QUERY-01～10 与现有 24 项验收合计 34/34，在 6 个模型上通过；生命周期覆盖 A→empty→B、迟到关闭、同 owner 重新绑定、保留旧视图、不可变结果、4 个线程读取与并发切换。Go 全仓测试与 6 个模型共 108 个 Java/Go golden 样点通过。最初 Gradle 运行误用了系统默认 JDK 27；实际验证固定为上表的 JDK 21 / 25。
+
+完整检查中修正了两项既有验收基线问题，**没有修改生成算法或既有 golden 文件**：
+
+1. 群系连续性检查在邻点沿用中心 Y，坡地上会落入地下。原始 `386aace` 也复现 `stony_shore → taiga` 断言；现让地表群系的邻点跟随当地地表高度，地下群系仍保留固定代表高度，连续性断言本身保留。
+2. 26.3 指纹常量仍引用旧版结果。已分别编译未改动的 `386aace` 源码快照和 Query 候选，在相同两 Seed、各 24,576 个样点上独立重算，确认二者一致后，将测试常量锁定到本轮开始前就已存在的结果：
+
+| Seed | 原始 `386aace` | Query 候选 |
+|---|---|---|
+| `123456` | `7cad8c0a851e21bc` | `7cad8c0a851e21bc` |
+| `-563659577384754347` | `1d630f1f82c93fb8` | `1d630f1f82c93fb8` |
+
+验收证据输出在两个目标各自的 `build/query-api-evidence.json`；原有 177 项 Go 验收表未改，新增 QUERY 项登记在 Java 补充表并写入证据的 `queryPassedIds`。
+
+实机操作只使用验收候选包。两个版本分别进入两个不同 Seed 的动态 GeoWorld 存档：进入时日志应出现 `GeoWorld Query bound Overworld facts: currentWorld=true, seed=...`；返回标题后应出现 `Released GeoWorld model and Query facts ... currentWorld=false`；进入 B 后再次为 true 且 Seed 对应 B。记录日志后再完成 S5；自动检查不能填这两个人工勾选项。
