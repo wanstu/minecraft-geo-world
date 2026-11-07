@@ -76,12 +76,20 @@ public final class GeoWorldAcceptanceRegistry {
     }
 
     private static final List<Entry> ENTRIES = buildEntries();
-    private static final Map<String, Entry> BY_ID = index(ENTRIES);
+    // Query acceptance supplements, rather than changes, the canonical 177 IDs.
+    private static final List<Entry> QUERY_ENTRIES = buildQueryEntries();
+    private static final Map<String, Entry> BY_ID = index(
+        java.util.stream.Stream.concat(ENTRIES.stream(), QUERY_ENTRIES.stream()).toList()
+    );
 
     private GeoWorldAcceptanceRegistry() {}
 
     public static List<Entry> entries() {
         return ENTRIES;
+    }
+
+    public static List<Entry> queryEntries() {
+        return QUERY_ENTRIES;
     }
 
     public static Entry require(String id) {
@@ -149,6 +157,26 @@ public final class GeoWorldAcceptanceRegistry {
             }
         }
         return Map.copyOf(out);
+    }
+
+    private static List<Entry> buildQueryEntries() {
+        String[][] rows = {
+            {"QUERY-01", "Exact field registration", "NaturalField and FACT_REGISTRY contain the same unique field names"},
+            {"QUERY-02", "String value domains", "Every sampled classification belongs to its documented domain"},
+            {"QUERY-03", "Unavailable and finite values", "Values and unavailable fields partition the request without null or nonfinite values"},
+            {"QUERY-04", "Numeric ranges", "Normalized scores, distances, angles and counts obey their documented bounds"},
+            {"QUERY-05", "Regional identity", "Repeated nonempty region keys have identical count, area and centroid"},
+            {"QUERY-06", "Coordinate quantization", "All offsets in one 1/4/16 block cell return the same result and sample coordinates"},
+            {"QUERY-07", "Version identity", "Nonempty result versions match the persisted model manifest"},
+            {"QUERY-08", "Outer model semantics", "Outer distances are unavailable except zero distance to ocean on ocean"},
+            {"QUERY-09", "Negative score direction", "Near-river floodplain risk mean exceeds dry land mean with nonempty samples"}
+        };
+        ArrayList<Entry> entries = new ArrayList<>();
+        for (String[] row : rows) {
+            entries.add(new Entry(row[0], RequirementKind.CORE, row[1],
+                InspectionKind.API, row[2], "GeoWorldModelVerifier"));
+        }
+        return List.copyOf(entries);
     }
 
     private static List<Entry> buildEntries() {

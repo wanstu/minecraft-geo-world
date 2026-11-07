@@ -47,7 +47,7 @@
 
 ### 2.1 通用要求
 
-- 验收入口沿用 `GeoWorldModelVerifier`，新编号加进 `VERIFIED_IDS`，同时在 `GeoWorldAcceptanceRegistry` 中登记；
+- 验收入口沿用 `GeoWorldModelVerifier`，新编号加进 `VERIFIED_IDS`，同时在 `GeoWorldAcceptanceRegistry.queryEntries()` 补充表中登记（保留既有 177 项原始表；证据文件用 `queryPassedIds` 单列）；
 - 数据源是 `internal/goldenvectors/testdata/` 下全部已提交模型（目前 6 个），与 `verify-golden.ps1 -All` 保持一致；
 - 采样集固定为两部分：
   - **网格点**：每个模型在模型范围内取 32×32 的均匀网格；
@@ -60,15 +60,17 @@
 | ID | 检查内容 | 通过标准 |
 |---|---|---|
 | **QUERY-01** 字段登记同步 | `NaturalField.values()` 与 `FACT_REGISTRY.md` 的字段集合是否一致 | 数量相同（目前 86），名字逐一对应。实现方式：Verifier 读取 md 文件，用正则提取反引号里的大写字段名做比较 |
-| **QUERY-02** 字符串取值域 | 附录 A 中所有字符串字段的返回值 | 每个值都在附录 A 的集合内；`GEOLOGICAL_REGION` 匹配 `^(oceanic-crust\|orogenic-belt\|uplifted-block\|exposed-crust\|sedimentary-basin\|continental-interior):[0-9a-f]+$`；`ORE_PROVINCE` 匹配 `^ore-[0-7]-[0-9a-f]+$`；`DOMINANT_MINERAL_RESOURCE` 是 `none` 或当前矿物字典里的一项 |
+| **QUERY-02** 字符串取值域 | 附录 A 中所有字符串字段的返回值 | 每个值都在附录 A 的集合内；`GEOLOGICAL_REGION` 匹配 `^(oceanic-crust\|orogenic-belt\|uplifted-block\|exposed-crust\|sedimentary-basin\|continental-interior):[0-9a-f]+$`；`ORE_PROVINCE` 匹配 `^ore-[0-7]-[0-9a-f]+$`；`DOMINANT_MINERAL_RESOURCE` 是 `none` 或当前 Query 矿物家族（`GeoWorldMineralAffinity.MINERALS`）里的一项 |
 | **QUERY-03** 缺失语义 | `values` 与 `unavailableFields` 的关系 | 两者没有交集；两者的并集等于请求的字段集；`values` 里没有 `null`；所有 double 都是有限值（不是 NaN/Inf） |
 | **QUERY-04** 数值范围 | 数值字段的取值范围 | 所有标注为 0..1 的字段 ∈ [0,1]；所有距离字段 ≥ 0；`ASPECT_DEGREES` ∈ [0,360)；`ANNUAL_PRECIP_MM` ≥ 0；`ANNUAL_MEAN_TEMP_C` ∈ [-60,60]；`MONSOON_INDEX` ∈ [0,1]；`RIVER_ORDER` ≥ 0；`REGIONAL_HIGH_ADVANTAGE_COUNT` ∈ [0,5] |
 | **QUERY-05** 区域一致性 | 同一个 `REGIONAL_REGION_KEY` 下的各点 | `CELL_COUNT`、`AREA_BLOCKS2`、`CENTROID_X`、`CENTROID_Z` 完全相等；每个区域至少找到 2 个采样点才参与判定 |
 | **QUERY-06** 量化一致性 | 同一个 `Resolution` 格内的不同偏移 | 返回的 `sampleX/sampleZ` 等于量化后的坐标；同一格内的偏移请求返回完全相同的 `NaturalResult` |
 | **QUERY-07** 版本字段 | 结果中的版本信息 | `apiVersion`、`worldProfileVersion`、`generationRulesVersion`、`worldModelVersion` 都不为空，并且与模型 manifest 一致 |
-| **QUERY-08** 模型外行为 | 模型外的特殊点 | 符合 `FACT_REGISTRY.md` 第 5 节：河流/湖泊/海岸距离类字段缺失；海洋点上 `DISTANCE_TO_OCEAN` = 0；`WATER_KIND` = `Ocean` |
+| **QUERY-08** 模型外行为 | 模型外的特殊点 | 符合 `FACT_REGISTRY.md` 第 5 节：河流/湖泊/海岸距离类字段缺失；海洋点上 `DISTANCE_TO_OCEAN` = 0；外围稀疏海岛可为陆地，此时该距离也缺失，不强制把海岛当成海洋 |
 | **QUERY-09** 负向字段方向 | 抽查洪泛区 | 在 `TERRAIN_VARIANT ∈ {Floodplain, Alluvial Plain}` 且靠近河流的点上，`FLOOD_RISK` 的均值要**高于**全体陆地点的均值；只做方向性断言，不断言具体数值 |
 | **QUERY-10** 门面等价 | 门面查询与直接查询 | 对同一模型、同一请求，通过 `GeoWorldFacade` 得到的结果与直接调用 `GeoWorldQueryService` 的结果 `equals` 相同。这一项依赖第 3 节的 S4 |
+
+QUERY-09 的样本补充：已提交的 6 个旧 golden 没有 `Floodplain / Alluvial Plain` 节点。若固定网格与特殊点没有符合条件的陆地点，验收器会从同一模型选择两个不同的近河干陆节点，仅在临时测试副本中分别指定这两个地形标签，再经持久化加载与真实 QueryService 检查洪水风险方向；原文件的字节必须不变。输出明确区分真实洪泛样点与受控输入，这不代表世界生成器已产生或验证洪泛平原。
 
 现有的 MODEL-01 ~ MODEL-04（确定性、重开一致、不强制加载、Local Reality 在未加载时停止）继续保留，不重复建项。
 

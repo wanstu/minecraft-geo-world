@@ -46,7 +46,9 @@ public final class GeoWorldModelVerifier {
         "PROFILE-01",
         "PROFILE-02",
         "PROFILE-04",
-        "PARAM-05"
+        "PARAM-05",
+        "QUERY-01", "QUERY-02", "QUERY-03", "QUERY-04", "QUERY-05",
+        "QUERY-06", "QUERY-07", "QUERY-08", "QUERY-09"
     );
 
     public static void main(String[] args) throws Exception {
@@ -59,6 +61,9 @@ public final class GeoWorldModelVerifier {
             throw new AssertionError("no .geoworld models found under " + input);
         }
 
+        Path registry = args.length >= 3
+            ? Path.of(args[2])
+            : findRegistry(input);
         Map<String, List<String>> failures = new LinkedHashMap<>();
         for (String id : VERIFIED_IDS) {
             failures.put(id, new ArrayList<>());
@@ -71,9 +76,11 @@ public final class GeoWorldModelVerifier {
                 failures.get(failure.id).add(path + ": " + failure.getMessage());
             } catch (Throwable failure) {
                 for (String id : VERIFIED_IDS) {
+                    if (id.startsWith("QUERY-")) continue;
                     failures.get(id).add(path + ": unexpected verifier failure: " + failure);
                 }
             }
+            GeoWorldQueryContractVerifier.verify(path, registry, failures);
         }
 
         int passed = 0;
@@ -104,6 +111,16 @@ public final class GeoWorldModelVerifier {
         }
     }
 
+    private static Path findRegistry(Path input) {
+        Path start = input.toAbsolutePath().normalize();
+        if (!Files.isDirectory(start)) start = start.getParent();
+        for (Path dir = start; dir != null; dir = dir.getParent()) {
+            Path candidate = dir.resolve("docs/FACT_REGISTRY.md");
+            if (Files.isRegularFile(candidate)) return candidate;
+        }
+        throw new IllegalArgumentException("cannot locate docs/FACT_REGISTRY.md from " + input);
+    }
+
     private static void writeEvidence(Path output, int modelCount)
         throws IOException {
         Path parent = output.toAbsolutePath().getParent();
@@ -116,14 +133,22 @@ public final class GeoWorldModelVerifier {
         json.append("  \"version\": 1,\n");
         json.append("  \"modelCount\": ").append(modelCount).append(",\n");
         json.append("  \"passedIds\": [\n");
-        for (int i = 0; i < VERIFIED_IDS.size(); i++) {
-            json.append("    \"").append(VERIFIED_IDS.get(i)).append("\"");
-            if (i + 1 < VERIFIED_IDS.size()) {
+        // Preserve the original 177-item Go report schema. Query acceptance
+        // has its own supplementary IDs, recorded separately in this evidence.
+        List<String> evidenceIds = VERIFIED_IDS.stream()
+            .filter(id -> !id.startsWith("QUERY-")).toList();
+        for (int i = 0; i < evidenceIds.size(); i++) {
+            json.append("    \"").append(evidenceIds.get(i)).append("\"");
+            if (i + 1 < evidenceIds.size()) {
                 json.append(",");
             }
             json.append("\n");
         }
-        json.append("  ]\n");
+        json.append("  ],\n");
+        json.append("  \"queryPassedIds\": [");
+        json.append(String.join(", ", GeoWorldQueryContractVerifier.IDS.stream()
+            .map(id -> "\"" + id + "\"").toList()));
+        json.append("]\n");
         json.append("}\n");
         Files.writeString(output, json.toString(), StandardCharsets.UTF_8);
         System.out.println("Verifier evidence: " + output);
