@@ -153,6 +153,14 @@ func main() {
 		got := reopened.Sample(c.X, c.Z)
 		if !reflect.DeepEqual(got, c.Expected) {
 			mismatches++
+			fmt.Fprintf(
+				os.Stderr,
+				"MISMATCH x=%.3f z=%.3f\nexpected=%+v\nactual=%+v\n",
+				c.X,
+				c.Z,
+				c.Expected,
+				got,
+			)
 		}
 	}
 
@@ -323,12 +331,7 @@ func collectSamples(m *generator.WorldModel) []sampleCheck {
 	for _, p := range points {
 		expected := m.RuntimeProfile.Sample(p[0], p[1])
 		rules := m.Config.WorldProfile.GenerationRulesVersion
-		if (rules == "geoworld-rules-v1.1.11" ||
-			rules == "geoworld-rules-v1.1.12" ||
-			rules == "geoworld-rules-v1.1.13" ||
-			rules == "geoworld-rules-v1.1.14" ||
-			rules == "geoworld-rules-v1.1.15") &&
-			len(m.SpecialFeatures) > 0 {
+		if len(m.SpecialFeatures) > 0 {
 			expected = specialfeatures.Apply(
 				m.SpecialFeatures,
 				expected,

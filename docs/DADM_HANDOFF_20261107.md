@@ -49,3 +49,5 @@ bash scripts/check-dev-prereqs.sh
 - geoworld-river-navigation-audit 的额外严格统计不能单独作为当前 Minecraft 缺陷证据；正式 WaterOwnership / Shoreline 等验收已覆盖既有河道修复，不得据此重复开启历史问题。
 - 兼容/性能基线已在 dadm 实测：1.21.1 NeoForge 的 48 个冷 Chunk 规划平均耗时 shoreline=1.102ms、biomes=0.172ms、minerals=0.181ms；Engine Bridge 受控 cache miss 为 720ms，随后相同 cacheKey 命中为 371ms。
 - 模型范围外并非简单 clamp：Go / Java Runtime 当前均已通过 sampleOuterOcean 做边缘→深海平滑过渡，并带稀疏外海岛与极区抑制；旧 STATUS 中“模型外无限深海/平滑扩展仍未设计”的描述已经过时。
+- Model 持久化审计补漏：geoworld-model-audit 原先保存前 expected 的 SpecialFeature overlay 只认到 v1.1.15，导致当前 v1.1.16 的苍白之园岛被误报为 Save→Load mismatch。现改为只要模型实际包含 SpecialFeatures 就按其锁定 rules 计算 expected，并输出 mismatch 的坐标/期望/实际值便于定位。
+- 修正后 4 个固定 Seed（123456、-4852173505788415804、-563659577384754347、4034658472718554561）以 320×200 完整 Generate→Save→Load→Runtime 样点对拍均为 Mismatches=0；当前没有证据表明 WorldModel V1 重开语义漂移。
