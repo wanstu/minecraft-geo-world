@@ -281,8 +281,6 @@ public final class GeoWorldMiningDistrictPlanner {
             model.manifest().generationRulesVersion()
         ) || "geoworld-rules-v1.1.16".equals(
             model.manifest().generationRulesVersion()
-        ) || "geoworld-rules-v1.1.17".equals(
-            model.manifest().generationRulesVersion()
         ));
     }
 

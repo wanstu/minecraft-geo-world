@@ -1623,8 +1623,6 @@ public final class GeoWorldV1 {
                     this.worldProfile.generationRulesVersion()
                 ) && !"geoworld-rules-v1.1.16".equals(
                     this.worldProfile.generationRulesVersion()
-                ) && !"geoworld-rules-v1.1.17".equals(
-                    this.worldProfile.generationRulesVersion()
                 ))
             ) ||
             this.specialFeatures.isEmpty()
@@ -1671,9 +1669,9 @@ public final class GeoWorldV1 {
         String specialRulesVersion = this.worldProfile.generationRulesVersion();
         boolean carvedDepression =
             "geoworld-rules-v1.1.14".equals(specialRulesVersion) ||
-            ("geoworld-rules-v1.1.15".equals(specialRulesVersion) || "geoworld-rules-v1.1.16".equals(specialRulesVersion) || "geoworld-rules-v1.1.17".equals(specialRulesVersion));
+            ("geoworld-rules-v1.1.15".equals(specialRulesVersion) || "geoworld-rules-v1.1.16".equals(specialRulesVersion));
         boolean hydrologyConformingDepression =
-            ("geoworld-rules-v1.1.15".equals(specialRulesVersion) || "geoworld-rules-v1.1.16".equals(specialRulesVersion) || "geoworld-rules-v1.1.17".equals(specialRulesVersion));
+            ("geoworld-rules-v1.1.15".equals(specialRulesVersion) || "geoworld-rules-v1.1.16".equals(specialRulesVersion));
         if (carvedDepression && isCarvedDepression(kind)) {
             double dx = (x - selected.centerX()) /
                 Math.max(1.0, selected.radiusX());
@@ -1789,8 +1787,6 @@ public final class GeoWorldV1 {
                         this.worldProfile.generationRulesVersion()
                     ) || "geoworld-rules-v1.1.16".equals(
                         this.worldProfile.generationRulesVersion()
-                    ) || "geoworld-rules-v1.1.17".equals(
-                        this.worldProfile.generationRulesVersion()
                     ))
                 ) &&
                 selected.baseHeight() > 0.0 &&
@@ -1893,8 +1889,6 @@ public final class GeoWorldV1 {
                     ("geoworld-rules-v1.1.15".equals(
                         this.worldProfile.generationRulesVersion()
                     ) || "geoworld-rules-v1.1.16".equals(
-                        this.worldProfile.generationRulesVersion()
-                    ) || "geoworld-rules-v1.1.17".equals(
                         this.worldProfile.generationRulesVersion()
                     ))
                 ) &&
@@ -2068,8 +2062,6 @@ public final class GeoWorldV1 {
                         this.worldProfile.generationRulesVersion()
                     ) || "geoworld-rules-v1.1.16".equals(
                         this.worldProfile.generationRulesVersion()
-                    ) || "geoworld-rules-v1.1.17".equals(
-                        this.worldProfile.generationRulesVersion()
                     ))
                 ) &&
                 selected.baseHeight() > 0.0 &&
@@ -2095,10 +2087,7 @@ public final class GeoWorldV1 {
                 if (riverConforming) {
                     double depth = Math.max(base.waterDepth(), 0.002);
                     double surface = ground + depth;
-                    if (
-                        "geoworld-rules-v1.1.16".equals(specialRulesVersion) ||
-                        "geoworld-rules-v1.1.17".equals(specialRulesVersion)
-                    ) {
+                    if ("geoworld-rules-v1.1.16".equals(specialRulesVersion)) {
                         // Translate the shared water datum and preserve the
                         // bed's incision beneath it, just as in the Go sampler.
                         double datum = base.waterSurfaceDefined() &&
@@ -2687,7 +2676,7 @@ public final class GeoWorldV1 {
             !"geoworld-rules-v1.1.12".equals(generationRulesVersion) &&
             !"geoworld-rules-v1.1.13".equals(generationRulesVersion) &&
             !"geoworld-rules-v1.1.14".equals(generationRulesVersion) &&
-            (!"geoworld-rules-v1.1.15".equals(generationRulesVersion) && !"geoworld-rules-v1.1.16".equals(generationRulesVersion) && !"geoworld-rules-v1.1.17".equals(generationRulesVersion))
+            (!"geoworld-rules-v1.1.15".equals(generationRulesVersion) && !"geoworld-rules-v1.1.16".equals(generationRulesVersion))
         ) {
             return legacy;
         }
@@ -3648,7 +3637,7 @@ public final class GeoWorldV1 {
             "geoworld-rules-v1.1.12".equals(rulesVersion) ||
             "geoworld-rules-v1.1.13".equals(rulesVersion) ||
             "geoworld-rules-v1.1.14".equals(rulesVersion) ||
-            ("geoworld-rules-v1.1.15".equals(rulesVersion) || "geoworld-rules-v1.1.16".equals(rulesVersion) || "geoworld-rules-v1.1.17".equals(rulesVersion));
+            ("geoworld-rules-v1.1.15".equals(rulesVersion) || "geoworld-rules-v1.1.16".equals(rulesVersion));
         double activeRiverBankSurface = Double.NEGATIVE_INFINITY;
         boolean activeRiverBankProtected;
         if (boundedRiverBanks) {
@@ -3721,15 +3710,10 @@ public final class GeoWorldV1 {
                 naturalSurface
             );
             if (boundedRiverBanks) {
-                boolean receiverTransition =
-                    "geoworld-rules-v1.1.17".equals(rulesVersion) &&
-                    (segment.receiverSurfaceDefined() || segment.lakeOutlet());
-                if (!receiverTransition) {
-                    surface = Math.max(
-                        naturalSurface,
-                        Math.min(surface, bankCeiling)
-                    );
-                }
+                surface = Math.max(
+                    naturalSurface,
+                    Math.min(surface, bankCeiling)
+                );
             }
 
             if (deltaInBank && !deltaInWater) {

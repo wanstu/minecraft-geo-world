@@ -38,11 +38,11 @@ public final class GeoWorldV26MiningDistrictVerifier {
                 "surface ore pile option was not persisted into World Model"
             );
         }
-        if (!"geoworld-rules-v1.1.17".equals(
+        if (!"geoworld-rules-v1.1.16".equals(
             model.manifest().generationRulesVersion()
         )) {
             throw new AssertionError(
-                "mining district verifier requires v1.1.17, got " +
+                "mining district verifier requires v1.1.16, got " +
                 model.manifest().generationRulesVersion()
             );
         }

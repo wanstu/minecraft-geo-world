@@ -243,7 +243,7 @@ public class GeoWorldShorelinePlanner {
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || "geoworld-rules-v1.1.17".equals(rules));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules));
     }
 
     private static boolean sealHighRiverBanks(GeoWorldV1 runtime) {
@@ -257,7 +257,7 @@ public class GeoWorldShorelinePlanner {
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || "geoworld-rules-v1.1.17".equals(rules));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules));
     }
 
     private static boolean adaptiveGentleBanks(GeoWorldV1 runtime) {
@@ -267,7 +267,7 @@ public class GeoWorldShorelinePlanner {
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || "geoworld-rules-v1.1.17".equals(rules));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules));
     }
 
     private static boolean strictRiverContainment(GeoWorldV1 runtime) {
@@ -275,7 +275,7 @@ public class GeoWorldShorelinePlanner {
         return "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || "geoworld-rules-v1.1.17".equals(rules));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules));
     }
 
     private int adaptiveSearchDistanceForChunk(

@@ -338,9 +338,6 @@ public final class GeoWorldV26ShorelineVerifier {
                                         ) || "geoworld-rules-v1.1.16".equals(
                                             runtime.manifest()
                                                 .generationRulesVersion()
-                                        ) || "geoworld-rules-v1.1.17".equals(
-                                            runtime.manifest()
-                                                .generationRulesVersion()
                                         ))
                                     )
                                         ? heights.boundaryYFloor(
@@ -543,8 +540,6 @@ public final class GeoWorldV26ShorelineVerifier {
                                         ("geoworld-rules-v1.1.15".equals(
                                             runtime.manifest().generationRulesVersion()
                                         ) || "geoworld-rules-v1.1.16".equals(
-                                            runtime.manifest().generationRulesVersion()
-                                        ) || "geoworld-rules-v1.1.17".equals(
                                             runtime.manifest().generationRulesVersion()
                                         ))
                                     ) &&
@@ -750,7 +745,7 @@ public final class GeoWorldV26ShorelineVerifier {
                 "geoworld-rules-v1.1.12".equals(generationRulesVersion) ||
                 "geoworld-rules-v1.1.13".equals(generationRulesVersion) ||
                 "geoworld-rules-v1.1.14".equals(generationRulesVersion) ||
-                ("geoworld-rules-v1.1.15".equals(generationRulesVersion) || "geoworld-rules-v1.1.16".equals(generationRulesVersion) || "geoworld-rules-v1.1.17".equals(generationRulesVersion))
+                ("geoworld-rules-v1.1.15".equals(generationRulesVersion) || "geoworld-rules-v1.1.16".equals(generationRulesVersion))
             )
                 ? 1
                 : (
