@@ -2408,6 +2408,19 @@ function syncMineralFilterOptions(families=[]){
   if(current&&unique.includes(current))select.value=current;
 }
 
+function applyMineralFilterToOverlay(){
+  const svg=$('featureOverlay');
+  if(!svg)return;
+  const filter=normalizeMineralKey($('mineralFilter')?.value||'');
+  svg.querySelectorAll('.mineral-district').forEach(node=>{
+    const minerals=String(node.dataset.minerals||'').split(',');
+    node.style.display=!filter||minerals.includes(filter)?'':'none';
+  });
+  svg.querySelectorAll('.mineral-detail-marker').forEach(node=>{
+    node.style.display=!filter||node.dataset.mineral===filter?'':'none';
+  });
+}
+
 function mineralSourceName(source){
   return ({
     VEIN:'常规矿体',GUARANTEE:'保底矿体',
@@ -3705,15 +3718,12 @@ function renderFeatureOverlay(){
     svg.appendChild(group);
   }
 
-  const mineralFilter=normalizeMineralKey($('mineralFilter')?.value||'');
-
   if(enabled.has('mineralDistricts')&&mineralBodies){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-mineral-districts');
     for(const district of mineralBodies.districts||[]){
       const primaryKey=normalizeMineralKey(district.primary);
       const companionKey=normalizeMineralKey(district.companion);
-      if(mineralFilter&&primaryKey!==mineralFilter&&companionKey!==mineralFilter)continue;
       const p=worldToOverlay(district.x,district.z);
       const rx=Number(district.radius||0)/active.geometry.SpanXBlocks*1000;
       const ry=Number(district.radius||0)/active.geometry.SpanZBlocks*1000;
@@ -3721,6 +3731,7 @@ function renderFeatureOverlay(){
 
       const item=document.createElementNS(ns,'g');
       item.setAttribute('class','mineral-district');
+      item.dataset.minerals=primaryKey+','+companionKey;
       item.style.pointerEvents='all';
       item.style.cursor='pointer';
 
@@ -3818,14 +3829,12 @@ function renderFeatureOverlay(){
   if(enabled.has('minerals')&&mineralBodies&&mapZoom>=MINERAL_DETAIL_ZOOM-.001){
     const group=document.createElementNS(ns,'g');
     group.setAttribute('class','feature-minerals');
-    const visibleMineralBodies=(mineralBodies.bodies||[]).filter(body=>{
-      if(isDistrictMineralBody(body))return false;
-      return !mineralFilter||normalizeMineralKey(body.mineral)===mineralFilter;
-    });
+    const visibleMineralBodies=(mineralBodies.bodies||[]).filter(body=>!isDistrictMineralBody(body));
     for(const body of visibleMineralBodies){
       const p=worldToOverlay(body.x,body.z);
       if(!overlayPointVisible(p,28))continue;
       const mineral=String(body.mineral||'unknown').toLowerCase();
+      const mineralKey=normalizeMineralKey(body.mineral);
       appendClusterMarker(group,{
         key:body.mineral,
         count:1,
@@ -3843,6 +3852,8 @@ function renderFeatureOverlay(){
         fillColor:mineralColor(body.mineral),
         onClick:()=>showMineralDetail(body)
       });
+      const marker=group.lastElementChild;
+      if(marker)marker.dataset.mineral=mineralKey;
     }
     svg.appendChild(group);
   }
@@ -3926,6 +3937,7 @@ function renderFeatureOverlay(){
     svg.appendChild(group);
   }
   positionFeatureOverlay();
+  applyMineralFilterToOverlay();
   renderDensityCanvas();
 }
 
@@ -3969,7 +3981,11 @@ $('mobileCloseFeatures').onclick=()=>setMobileSheet('features',false);
 document.querySelectorAll('.inspector-tab').forEach(button=>button.addEventListener('click',()=>{
   setInspectorTab(button.dataset.inspectorTab);
 }));
-['riverFilter','mineralFilter','specialFilter'].forEach(id=>$(id).addEventListener('change',()=>renderFeatureOverlay()));
+['riverFilter','specialFilter'].forEach(id=>$(id).addEventListener('change',()=>renderFeatureOverlay()));
+$('mineralFilter').addEventListener('change',()=>{
+  applyMineralFilterToOverlay();
+  renderDensityCanvas();
+});
 
 document.querySelectorAll('.nav-item,.route-button').forEach(btn=>btn.addEventListener('click',()=>navigatePage(btn.dataset.page)));
 document.querySelectorAll('input[name="acceptanceType"]').forEach(radio=>radio.addEventListener('change',()=>{
