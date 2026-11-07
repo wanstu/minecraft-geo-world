@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import geoworld.minecraft.common.MinecraftVersionProfile;
 import org.slf4j.Logger;
 import geoworld.runtime.GeoWorldBinding;
+import geoworld.runtime.GeoWorldFactsBinding;
 import geoworld.runtime.GeoWorldV1;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.chunk.ChunkGenerator;
@@ -27,6 +28,7 @@ public final class GeoWorldV26WorldService {
     }
 
     public void activate(MinecraftServer server) {
+        GeoWorldFactsBinding.unbind(server);
         Path worldDirectory = server
             .getWorldPath(LevelResource.ROOT)
             .toAbsolutePath()
@@ -66,6 +68,7 @@ public final class GeoWorldV26WorldService {
                 worldDirectory
             );
         } catch (IOException | RuntimeException e) {
+            GeoWorldFactsBinding.unbind(server);
             this.active.remove(server);
             throw new IllegalStateException(
                 "Failed to activate GeoWorld world at " + worldDirectory,
@@ -127,6 +130,12 @@ public final class GeoWorldV26WorldService {
                 model,
                 true
             )
+        );
+        GeoWorldFactsBinding.bind(server, model);
+        LOGGER.info(
+            "GeoWorld Query bound Overworld facts: seed={}, profile={}, rules={}, model={}",
+            model.manifest().seed(), model.worldProfile().worldProfileVersion(),
+            model.worldProfile().generationRulesVersion(), model.worldProfile().worldModelVersion()
         );
         logActivated(model, binding, true);
     }
@@ -196,10 +205,11 @@ public final class GeoWorldV26WorldService {
     }
 
     public void deactivate(MinecraftServer server) {
+        GeoWorldFactsBinding.unbind(server);
         ActiveWorld removed = this.active.remove(server);
         if (removed != null) {
             LOGGER.info(
-                "Released GeoWorld model for {}",
+                "Released GeoWorld model and Query facts for {}",
                 removed.worldDirectory()
             );
         }
