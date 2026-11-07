@@ -1,0 +1,44 @@
+{
+  "format": "geoworld-webui-runtime-acceptance",
+  "version": 1,
+  "date": "2026-11-07",
+  "timezone": "Asia/Shanghai",
+  "source_commit": "8562fe6bed4daac2837b048a35a99852924b16d5",
+  "target": {
+    "minecraft": "1.21.1",
+    "loader": "neoforge",
+    "package": "GeoWorld-0.1.3-dev-webui-filter-mc1.21.1-neoforge.jar",
+    "sha256": "2604768A7C0194AA4637971DBBFB1FBBB2A6121434AC6648AAD08270EC6047A3"
+  },
+  "automatic_verification": {
+    "go_test": "PASS: go test -count=1 ./cmd/geoworld-tester",
+    "javascript_syntax": "PASS",
+    "dimension_state_machine": "PASS: nether/end/custom/unknown pause; overworld resumes without model reload",
+    "mineral_filter_fast_path": "PASS: mineral filter toggles cached SVG nodes and refreshes mineral canvas without full renderFeatureOverlay rebuild",
+    "neoforge_check_jar": {
+      "status": "PASS",
+      "tasks": 44,
+      "duration": "4m48s",
+      "result": "BUILD SUCCESSFUL"
+    },
+    "embedded_windows_webui": "PASS: packaged windows-x64 geoworld-tool contains applyMineralFilterToOverlay"
+  },
+  "manual_acceptance": {
+    "status": "passed",
+    "confirmed_at": "2026-11-07T14:47:00+08:00",
+    "confirmed_by": "user",
+    "checks": [
+      {
+        "name": "mineral icon and filter interaction",
+        "result": "PASS",
+        "expectation": "Switching all/zinc/iron/diamond/all keeps mineral icons correct and no longer causes a full-map redraw stall"
+      },
+      {
+        "name": "cross-dimension WebUI pause and resume",
+        "result": "PASS",
+        "expectation": "Entering Nether pauses Overworld linkage and disables unsafe actions; returning to Overworld restores linkage automatically without refreshing the WebUI"
+      }
+    ]
+  },
+  "conclusion": "WebUI cross-dimension behavior and mineral icon/filter interaction are fully accepted on the installed 1.21.1 NeoForge candidate."
+}

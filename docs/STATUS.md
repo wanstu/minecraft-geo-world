@@ -7,7 +7,7 @@
 - 2026-11-07 矿区材料与实机验收已完成：1.21.1 NeoForge / Fabric 原生方块放置检查均通过；受控 9 家族注册表覆盖 35 个矿区、140 次材料映射、86,762 个矿石方块、815 个矿堆方块（147 个在水下）和 3 个 5～8 格峰。随后在 1.21.1 NeoForge + Create、Seed `123456` 的真实新世界中读取锁定模型并实机核对锌主矿、锌伴生矿和水下矿区，模组矿物、主/伴生关系、矿堆形态、高度和水下放置均确认正常。完整记录见 [MINING_ACCEPTANCE.md](MINING_ACCEPTANCE.md)。
 - 新建世界的“矿区地表原矿堆”现改为默认开启；`GeoWorldCreationConfig.defaults()` 返回开启状态。为避免老世界行为变化，旧序列化配置缺失 `surface_ore_pile` 字段和兼容构造仍保持关闭语义。26.3 配置契约回归、1.21.1 NeoForge 矿区规划与原生材料回归均通过。
 - WebUI 矿物筛选性能已修复：此前切换矿物筛选会调用 `renderFeatureOverlay()`，导致河流、湖泊、特殊地形、结构、山峰和矿物 SVG 全部清空重建；现改为矿区/矿脉节点首次渲染后缓存，筛选时只切换目标矿物节点显示状态并刷新矿物 Canvas，不再重建整张叠加层。JavaScript 语法、快速筛选行为、跨维度页面状态机、`go test -count=1 ./cmd/geoworld-tester` 与 1.21.1 NeoForge 完整 `check jar`（44 tasks，4m48s）均通过；成品 JAR 内嵌 Windows x64 WebUI 已核对包含快速筛选实现。
-- 下一步仅剩实机确认：在 1.21.1 NeoForge 中快速切换“全部矿物 / 锌 / 铁 / 钻石”等筛选，确认图标正确且无整图重绘卡顿；再实际进出下界传送门，确认跨维度暂停与返回主世界自动恢复。测试包已安装为 `GeoWorld-0.1.3-dev-webui-filter-mc1.21.1-neoforge.jar`，SHA-256 `2604768A7C0194AA4637971DBBFB1FBBB2A6121434AC6648AAD08270EC6047A3`。
+- 2026-11-07 14:47（Asia/Shanghai）WebUI 最后两项实机验收通过：1.21.1 NeoForge 中快速切换“全部矿物 / 锌 / 铁 / 钻石 / 全部矿物”时图标显示正确，筛选不再触发整图重绘卡顿；实际进入下界后主世界联动暂停、玩家点与不安全操作正确禁用，返回主世界后无需刷新 WebUI 即自动恢复。测试包为 `GeoWorld-0.1.3-dev-webui-filter-mc1.21.1-neoforge.jar`，SHA-256 `2604768A7C0194AA4637971DBBFB1FBBB2A6121434AC6648AAD08270EC6047A3`；证据记录见 `acceptance/evidence/webui-runtime-acceptance-20261107.json`。
 - 2026-11-07 **已发布 `v0.1.3 / 4b190f6`**：[GitHub Release](https://github.com/wanstu/minecraft-geo-world/releases/tag/v0.1.3) 于 10:36:03（Asia/Shanghai）生成，9 个 Minecraft / Loader 目标完整检查全部通过；9 个正式 JAR 的 GitHub SHA-256 digest 与下载的 SHA256SUMS 全部一致。Modrinth 的 9 个版本也已上传并逐项通过 SHA-512、Minecraft 版本和 Loader 核验；项目状态为 `processing`、请求状态为 `approved`，正在等待平台审核，公开页面尚未开放。完整证据见 `acceptance/evidence/release-v0.1.3-20261107.json`。`v0.1.2` 是被旧指纹基线拦下的失败标签，未放出 Release；两版本两 Seed 独立复算证据保留，生成算法未改。
 - 2026-11-07 Query API：QUERY-01～10、现有 24 项验收全部通过（34/34），覆盖 6 个模型、每模型 1,042 点、86 字段；字段表已回填。统一入口 `GeoWorldFacade / WorldFacts` 已实现，内部弱绑定与原子快照只提供逻辑服务端动态主世界；三个版本族通过同一个共享世界服务 bind/unbind。生命周期黑盒检查覆盖进入/关闭/切换、迟到关闭、重新绑定、不可变视图和并发读取。9 个发布目标已接入统一 Query 检查，1.21.1 NeoForge（JDK 21）与 26.3 Fabric（JDK 25）完整 `check` 已通过；Go 全仓测试和 108 个 Java/Go golden 样点也通过。字段、生成算法、版本、缓存号与 golden 文件均未改。
 - Query 验收中的文档偏差已按代码事实纠正：展开合并字段，补全航运/水域字符串值，区分外围海岛与海洋，注明 Query 矿业评分当前仍为 8 类原版矿物。QUERY-09 的受控输入在临时模型副本中执行，原文件字节保持不变，不代表旧 golden 已覆盖真实生成的洪泛平原。
@@ -23,7 +23,7 @@
 - 已在确认 Minecraft 退出后替换两个 HMCL 试玩包；每个 mods 目录仅保留一个启用的 GeoWorld JAR。旧包备份在 `D:\games\hmcl\geoworld-backups\20261106-webui-dimensions\`：
   - `GeoWorld-0.1.1-dev-webui-dimensions-mc1.21.1-neoforge.jar`；SHA-256 `D7562FF70C8D4107CEF9FA66A9FEEC4C29C4E390B739F5C088A330A028B5336B`。
   - `GeoWorld-0.1.1-dev-webui-dimensions-mc26.3-fabric.jar`；SHA-256 `53752BC2CD44E7824929E76812633AB09E53966AEF8209354F2A6F0A7A549989`。
-- 尚待实机验收：更新后跨维度暂停/恢复，以及图标显示和筛选交互性能。矿区方块与地表矿堆已于 2026-11-07 实机验收通过。其余 7 个发布目标未在本轮本地重建；当前验证不等同于完整发布验收。
+- 2026-11-07 本轮真实客户端验收已全部完成：矿区方块、模组矿物、地表原矿堆、水下矿堆、WebUI 跨维度暂停/恢复、矿物图标与筛选交互性能均已通过。其余 7 个发布目标未在本轮重新做人工试玩；发布级完整矩阵仍以正式发版检查为准。
 - 地基 API 的最初文档基线为 `cd2e9fc`（当时只写文档、未验收）：新增 FOUNDATION / FACT_REGISTRY / QUERY_API_ACCEPTANCE，DECISIONS 登记 D-048～D-050，PRODUCT 与 ARCHITECTURE 同步。后续实现及验收已完成，当前状态以上述 2026-11-07 Query 条目为准。
 
 ## 历史目标与阶段（2026-10-03）
