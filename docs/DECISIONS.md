@@ -1332,7 +1332,7 @@ sourceSets.main.java.srcDir '../../minecraft-common/src/main/java'
 - 新增一个**极小**的静态门面类，只暴露：
   - `apiVersion()` / `minSupportedApiVersion()`（D-049 第 3 节）；
   - `currentWorld()` → `Optional<WorldFacts>`，当前绑定的世界事实视图；
-  - `supports(NaturalField)` → 是否在本世界可用；
+  - `supports(NaturalField)` 放在 `WorldFacts` 上，按该视图对应的世界判定；
 - **门面不持有业务逻辑**，只做「找到当前绑定世界 → 转交 QueryService」。
 - 所有文档、示例、第三方模组只引用门面，**不直接引用 `GeoWorldQueryService`**。
 - `GeoWorldQueryService` 保留 `public`，但标记为「实现类，仅 GeoWorld 内部与验收使用」。
@@ -1343,7 +1343,8 @@ sourceSets.main.java.srcDir '../../minecraft-common/src/main/java'
 #### 2. 适配器自注册，玩法模组不碰 classloader 细节
 
 - 每个适配器（9 个目标）在自己的入口处调用一次：
-  `GeoWorldFacade.bind(worldId, model)` / `GeoWorldFacade.unbind(worldId)`；
+  `GeoWorldFactsBinding.bind(worldId, model)` / `GeoWorldFactsBinding.unbind(worldId)`；
+  该适配器钩子位于内部 `geoworld.runtime` 包，稳定门面不暴露写入方法；
 - 门面内部用 `WeakHashMap`（与现有 `SHARED` 一致）保存绑定；
 - **玩法模组永远不调用 `bind`**，只调用 `currentWorld()`；
 - 世界未绑定 / 尚未加载完成时，`currentWorld()` 返回 `Optional.empty()`，
@@ -1369,19 +1370,40 @@ GeoWorld 的 API 稳定性承诺：
   - geoworld.runtime.api.*   → 契约稳定，受 D-049 约束
   - 其余 geoworld.* 包       → 内部实现，可在任何版本变更，不承诺兼容
 
-玩法模组只应 import geoworld.runtime.api.*。
-若你 import 了别的包，请视为你已选择跟随 GeoWorld 的内部实现演进。
+玩法模组从 geoworld.runtime.api.GeoWorldFacade 取得 WorldFacts。
+v1 请求/结果沿用既有 GeoWorldQueryService 的四个嵌套值类型：
+NaturalField、Resolution、QueryRequest、NaturalResult；它们同样受 D-049 约束。
+除这四个值类型外，不应依赖其他内部实现，更不应自行构造 QueryService。
 ```
 
-### 未解决的遗留（必须显式记录，不得默默通过）
+### 原设计遗留与 S1 调查结论（2026-11-07）
 
 1. `GeoWorldFacade` **尚不存在**，本决定是设计结论，不是已实现状态；
-2. `GeoWorldEngineBridge` 内部持有的 `GeoWorldV1 model` **尚无公开取出路径**，
-   这是落地 `currentWorld()` 的前提，需要单独切片；
+2. S1 已确认：`GeoWorldEngineBridge.GeneratedModel` 只是生成/缓存加载的返回值，**不是活动世界的权威持有者**；无需向它增加全局模型 getter。权威实例由 `GeoWorldV26GeneratorRuntime.model` 持有，经 `attachModel` 绑定到生成器；世界服务的 `ActiveWorld.model` 保存同一个实例。
 3. `GeoWorldModelVerifier` 与 `verifyGeoWorldModelQuery` 目前**直接构造** `GeoWorldQueryService`，
    落地门面后应改为**同时**验证门面路径，否则门面会成为未验收代码；
 4. `queryLocalReality` 的 `LocalRealityProvider` 由谁实现、键名约定——留待玩法模组立项时再定，
    GeoWorld 只保证「提供槽位」。
+
+### S1：已核实的创建、绑定与失效路径
+
+| 版本族 | 权威模型与生命周期入口 | 确定的 bind / unbind 点 |
+|---|---|---|
+| 26.1.2 / 26.2 / 26.3 | 各版本 `GeoWorldWorldService` 委托 `GeoWorldV26WorldService`；生成器持有 `GeoWorldV26GeneratorRuntime` | 共享服务 `activateDynamicWorld` 完成存档模型加载/持久化、生成器 `attachModel` 和 `ActiveWorld` 登记后 bind；`deactivate` 首先 unbind |
+| 1.21.1 | `minecraft-v1_21_1-common` 的 `GeoWorldWorldService.CORE` 就是同一个共享服务类 | 与上一行同一处实现；不在 Fabric / NeoForge 适配器复制绑定逻辑 |
+| 1.20.1 | `minecraft-v1_20_1-common` 的 `GeoWorldWorldService.CORE` 仍复用同一个共享服务类 | 与上一行同一处实现；不新增另一套模型持有者 |
+
+新世界的生成器可能在服务器就绪前通过 `ensureModel(seed)` 生成并附加模型；已有世界在服务激活时从本存档 binding 加载，再附加给生成器。门面必须等共享世界服务完成激活才发布事实，不能在创建界面的异步预览或引擎返回处 bind。
+
+Fabric 的就绪回调对应 `SERVER_STARTED`；NeoForge 对应 `ServerStartingEvent`（此时主世界已可访问），另有 `ServerStartedEvent` 的原有出生点处理。两者都在服务端生命周期中调用同一个共享服务，并在停止回调中 `deactivate`；集成服务器和专用服务器共用这条路径。返回标题后旧服务器停止，门面解除旧绑定；进入另一个世界后用新服务器对象登记新绑定。旧服务器的迟到 unbind 不得清除新世界。
+
+补充实现边界：
+
+1. 只把**动态 GeoWorld 主世界**登记为可查询世界；普通世界与有限静态 QA Preview 返回 empty。后者范围外沿用 vanilla 生成，不能把完整 GeoWorld 预测冒充其实际主世界地基。
+2. 每次 `activate(server)` 开始先移除该服务器的旧绑定；错误与关闭时同样移除，避免重试/加载失败残留。
+3. 内部绑定用弱服务器标识；`currentWorld()` 只读原子快照，不采样、不加锁、不写盘、不等待世界线程。
+4. `supports` 在 bind 时缓存。只有气候 5 项及水文 `FLOW_ACCUMULATION / RIVER_ORDER` 需要中心点探测；其余字段总是可用，或属于位置条件可用字段。一次只探测这 7 项，等价于全字段探测的可用性判定，并避免在服务器线程触发区域聚合。
+5. 现有 86 个字段及请求/结果值类型不迁移、不复制。稳定包承诺以门面/视图为入口，并明确涵盖方法签名引用的上述四个既有值类型；原文“只能 import api.*”在 Java 中无法表达这些既有类型，现纠正这一措辞。
 
 ### 与既有决定的关系
 
@@ -1389,3 +1411,4 @@ GeoWorld 的 API 稳定性承诺：
 - 补充 D-002（不绑定单一 Loader）：通过「适配器自注册 + 门面」实现，而非 classpath 约定。
 - 遵守 `ARCHITECTURE.md`「版本/Loader 层只提供薄桥接」：`bind/unbind` 就是那个薄桥接。
 - 不为 D-046/D-047 增加任何工作量：门面不参与世界创建、预览、出生点选择。
+
