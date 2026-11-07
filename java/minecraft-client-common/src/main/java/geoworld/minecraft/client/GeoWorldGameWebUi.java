@@ -340,11 +340,13 @@ public final class GeoWorldGameWebUi {
         Exception lastError = null;
         for (int attempt = 1; attempt <= 3; attempt++) {
             int port;
-            if (
-                attempt == 1 &&
-                preferredRecoveryPort > 0 &&
-                canBind(preferredRecoveryPort)
-            ) {
+            if (attempt == 1 && preferredRecoveryPort > 0) {
+                // Recovery must try the actual previous listener port first.
+                // A probe socket with SO_REUSEADDR disabled can reject a port
+                // that is only in transient TCP cleanup even though the real
+                // WebUI listener can bind it immediately. Let the native
+                // process be authoritative; a genuine bind failure falls
+                // through to the normal retry on a fresh dynamic port.
                 port = preferredRecoveryPort;
             } else if (attempt == 1) {
                 port = selectAvailablePort();

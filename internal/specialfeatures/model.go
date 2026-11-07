@@ -653,7 +653,7 @@ func Apply(
 				depth := math.Max(base.World.WaterDepth, 0.002)
 				surface := target + depth
 				ground := target
-				if rulesVersion == "geoworld-rules-v1.1.16" {
+				if rulesVersion == "geoworld-rules-v1.1.16" || rulesVersion == "geoworld-rules-v1.1.17" {
 					// Deform the shared water datum, then translate the bed by
 					// the same amount. Mapping each bed onto the dry floor and
 					// adding depth creates a raised, crowned river instead.
@@ -722,20 +722,20 @@ func usesV112DepressionGeometry(version string) bool {
 	return version == "geoworld-rules-v1.1.12" ||
 		version == "geoworld-rules-v1.1.13" ||
 		version == "geoworld-rules-v1.1.14" ||
-		(version == "geoworld-rules-v1.1.15" || version == "geoworld-rules-v1.1.16")
+		(version == "geoworld-rules-v1.1.15" || version == "geoworld-rules-v1.1.16" || version == "geoworld-rules-v1.1.17")
 }
 
 func usesCarvedDepressionGeometry(version string) bool {
 	return version == "geoworld-rules-v1.1.14" ||
-		(version == "geoworld-rules-v1.1.15" || version == "geoworld-rules-v1.1.16")
+		(version == "geoworld-rules-v1.1.15" || version == "geoworld-rules-v1.1.16" || version == "geoworld-rules-v1.1.17")
 }
 
 func usesHydrologyConformingDepressions(version string) bool {
-	return (version == "geoworld-rules-v1.1.15" || version == "geoworld-rules-v1.1.16")
+	return (version == "geoworld-rules-v1.1.15" || version == "geoworld-rules-v1.1.16" || version == "geoworld-rules-v1.1.17")
 }
 
 func usesLakeIslandClearance(version string) bool {
-	return (version == "geoworld-rules-v1.1.15" || version == "geoworld-rules-v1.1.16")
+	return (version == "geoworld-rules-v1.1.15" || version == "geoworld-rules-v1.1.16" || version == "geoworld-rules-v1.1.17")
 }
 
 func hasDepressionHeights(f Feature) bool {

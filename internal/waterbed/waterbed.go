@@ -891,10 +891,15 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		naturalSurface := bed + centerDepth
 		surface := riverConnectionSurface(seg, t, naturalSurface)
 		if m.Config.RiverGeometryVersion >= 4 {
-			surface = math.Max(
-				naturalSurface,
-				math.Min(surface, bankCeiling),
-			)
+			receiverTransition :=
+				m.Config.RiverGeometryVersion >= 6 &&
+					(seg.ReceiverSurfaceDefined || seg.LakeOutlet)
+			if !receiverTransition {
+				surface = math.Max(
+					naturalSurface,
+					math.Min(surface, bankCeiling),
+				)
+			}
 		}
 
 		if deltaInBank && !deltaInWater {

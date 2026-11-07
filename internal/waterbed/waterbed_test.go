@@ -1814,3 +1814,174 @@ func TestDiagonalLakeFootprintBackwatersCrossingRiver(t *testing.T) {
 		)
 	}
 }
+func TestV6ReceiverMouthKeepsHydrologicDatumAcrossLowBank(t *testing.T) {
+	g := testGeometry()
+	n := g.Width * g.Height
+	zeros := make([]float64, n)
+	baseElevation := []float64{
+		0.20, 0.20, 0.20,
+		0.54, 0.54, 0.54,
+		0.20, 0.20, 0.20,
+	}
+	base, err := terrain.Generate(terrain.Input{
+		Width: g.Width, Height: g.Height, Geometry: g,
+		BaseElevation:       baseElevation,
+		RollingPlainWeight:  zeros,
+		HillWeight:          zeros,
+		FoothillWeight:      zeros,
+		MountainWeight:      zeros,
+		PlateauWeight:       zeros,
+		ValleyWeight:        zeros,
+		FloodplainWeight:    zeros,
+		AlluvialPlainWeight: zeros,
+		AlluvialFanWeight:   zeros,
+		CanyonWeight:        zeros,
+		ValleyFloorWidth:    zeros,
+		DepositionPotential: zeros,
+	}, terrain.Config{Seed: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	from, ocean := 3, 4
+	rec := &reconcile.Model{
+		Geometry:              g,
+		Config:                reconcile.Config{RiverStrengthThreshold: 0.30},
+		RiverBaseElevation:    append([]float64(nil), baseElevation...),
+		RiverBedTarget:        append([]float64(nil), baseElevation...),
+		LakeBedCeilingDefined: make([]bool, n),
+		LakeBedCeiling:        make([]float64, n),
+		WaterKind:             make([]reconcile.WaterKind, n),
+		WaterSurfaceDefined:   make([]bool, n),
+		WaterSurfaceElevation: make([]float64, n),
+		RiverEdges: []reconcile.RiverEdgeConstraint{{
+			From: from, To: ocean, RiverStrength: 1,
+		}},
+	}
+	rec.RiverBedTarget[from] = 0.47
+	rec.RiverBedTarget[ocean] = 0.45
+	rec.WaterKind[ocean] = reconcile.WaterOcean
+	rec.WaterSurfaceDefined[ocean] = true
+	rec.WaterSurfaceElevation[ocean] = 0.50
+
+	h := emptyHydrology(g)
+	h.LandMask[from] = true
+	h.FlowTo[from] = ocean
+
+	build := func(version uint8) *Model {
+		t.Helper()
+		m, err := Build(base, rec, h, Config{
+			MinRiverHalfWidthBlocks:     6,
+			MaxRiverHalfWidthBlocks:     18,
+			RiverProfileStepBlocks:      1,
+			RiverGeometryVersion:        version,
+			MinRiverBedDepthNormalized:  0.006,
+			RiverCenterDepthNormalized:  0.004,
+			MinLakeWaterDepthNormalized: 0.002,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m
+	}
+
+	legacy := build(5)
+	current := build(6)
+	x0, z := g.NodePosition(0, 1)
+	x1, _ := g.NodePosition(1, 1)
+	x := x0 + 0.55*(x1-x0)
+
+	oldSample := legacy.Sample(x, z)
+	newSample := current.Sample(x, z)
+	if !newSample.RiverBedDefined || !newSample.RiverReceiverSurfaceDefined {
+		t.Fatalf("v6 receiver mouth lost river/backwater ownership: %+v", newSample)
+	}
+	if math.Abs(newSample.RiverReceiverSurface-0.50) > 1e-12 {
+		t.Fatalf("v6 receiver surface=%.12f want ocean datum 0.50", newSample.RiverReceiverSurface)
+	}
+	if oldSample.RiverReceiverSurfaceDefined &&
+		oldSample.RiverReceiverSurface >= newSample.RiverReceiverSurface-1e-12 {
+		t.Fatalf("fixture did not exercise legacy low-bank cap: old=%+v new=%+v", oldSample, newSample)
+	}
+}
+func TestV6PropagatedBackwaterKeepsHydrologicDatumAcrossLowBank(t *testing.T) {
+	g := testGeometry()
+	n := g.Width * g.Height
+	zeros := make([]float64, n)
+	baseElevation := []float64{
+		0.20, 0.20, 0.20,
+		0.54, 0.54, 0.54,
+		0.20, 0.20, 0.20,
+	}
+	base, err := terrain.Generate(terrain.Input{
+		Width: g.Width, Height: g.Height, Geometry: g,
+		BaseElevation:       baseElevation,
+		RollingPlainWeight:  zeros,
+		HillWeight:          zeros,
+		FoothillWeight:      zeros,
+		MountainWeight:      zeros,
+		PlateauWeight:       zeros,
+		ValleyWeight:        zeros,
+		FloodplainWeight:    zeros,
+		AlluvialPlainWeight: zeros,
+		AlluvialFanWeight:   zeros,
+		CanyonWeight:        zeros,
+		ValleyFloorWidth:    zeros,
+		DepositionPotential: zeros,
+	}, terrain.Config{Seed: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	makeModel := func(version uint8) *Model {
+		t.Helper()
+		cfg, err := normalizeConfig(Config{
+			MinRiverHalfWidthBlocks:     6,
+			MaxRiverHalfWidthBlocks:     18,
+			RiverProfileStepBlocks:      1,
+			RiverGeometryVersion:        version,
+			MinRiverBedDepthNormalized:  0.006,
+			RiverCenterDepthNormalized:  0.004,
+			MinLakeWaterDepthNormalized: 0.002,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		seg := RiverSegment{
+			From: 3, To: 4,
+			X0: 0, Z0: 128,
+			X1: 128, Z1: 128,
+			Bed0: 0.47, Bed1: 0.47,
+			HalfWidth:              12,
+			Profile:                []float64{0.47, 0.47},
+			ReceiverSurfaceDefined: true,
+			ReceiverSurface:        0.50,
+			MouthExpansionVersion:  4,
+		}
+		m := &Model{
+			Config:       cfg,
+			Geometry:     g,
+			Base:         base,
+			Rivers:       []RiverSegment{seg},
+			riverBuckets: make([][]int, n),
+			lakeBuckets:  make([][]int, n),
+		}
+		m.indexRiver(0, seg)
+		return m
+	}
+
+	legacy := makeModel(5)
+	current := makeModel(6)
+	oldSample := legacy.Sample(64, 128)
+	newSample := current.Sample(64, 128)
+	if !newSample.RiverReceiverSurfaceDefined {
+		t.Fatalf("v6 propagated backwater lost receiver ownership: %+v", newSample)
+	}
+	if math.Abs(newSample.RiverReceiverSurface-0.50) > 1e-12 {
+		t.Fatalf("v6 propagated receiver surface=%.12f want 0.50", newSample.RiverReceiverSurface)
+	}
+	if oldSample.RiverReceiverSurfaceDefined &&
+		oldSample.RiverReceiverSurface >= newSample.RiverReceiverSurface-1e-12 {
+		t.Fatalf("fixture did not exercise legacy propagated backwater cap: old=%+v new=%+v", oldSample, newSample)
+	}
+}
