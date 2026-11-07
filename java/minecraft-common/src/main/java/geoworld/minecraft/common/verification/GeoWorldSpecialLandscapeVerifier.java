@@ -99,6 +99,7 @@ public final class GeoWorldSpecialLandscapeVerifier {
                         landscape + ", height=" + sample.groundHeight()
                     );
                 }
+                verifyIslandMoat(model, landscape);
             }
 
             if (
@@ -143,6 +144,62 @@ public final class GeoWorldSpecialLandscapeVerifier {
             counts,
             generated.cacheKey()
         );
+    }
+
+    private static void verifyIslandMoat(
+        GeoWorldV1 model,
+        GeoWorldV1.SpecialLandscape landscape
+    ) {
+        String expectedWater = switch (landscape.waterContext()) {
+            case "ocean" -> "Ocean";
+            case "lake" -> "Lake";
+            default -> throw new AssertionError(
+                "special island has no water context: " + landscape
+            );
+        };
+        double searchLimit =
+            Math.max(landscape.radiusX(), landscape.radiusZ()) * 3.0 + 256.0;
+        for (int i = 0; i < 48; i++) {
+            double angle = 2.0 * Math.PI * i / 48.0;
+            double dx = Math.cos(angle);
+            double dz = Math.sin(angle);
+            double lastFeatureRadius = -1.0;
+            for (double radius = 0.0; radius <= searchLimit; radius += 4.0) {
+                GeoWorldV1.RuntimeSample sample = model.sample(
+                    landscape.centerX() + dx * radius,
+                    landscape.centerZ() + dz * radius
+                );
+                if (landscape.kind().equals(sample.specialFeature())) {
+                    lastFeatureRadius = radius;
+                }
+            }
+            if (lastFeatureRadius < 0.0) {
+                throw new AssertionError(
+                    "special island vanished along radial sample: kind=" +
+                    landscape.kind() + " angle=" + angle
+                );
+            }
+            for (double moat : new double[] {16.0, 32.0}) {
+                double radius = lastFeatureRadius + moat;
+                GeoWorldV1.RuntimeSample sample = model.sample(
+                    landscape.centerX() + dx * radius,
+                    landscape.centerZ() + dz * radius
+                );
+                if (
+                    !expectedWater.equals(sample.waterKind()) ||
+                    landscape.kind().equals(sample.specialFeature())
+                ) {
+                    throw new AssertionError(
+                        "special island lost water moat: kind=" +
+                        landscape.kind() + " context=" +
+                        landscape.waterContext() + " angle=" + angle +
+                        " edge=" + lastFeatureRadius + " moat=" + moat +
+                        " water=" + sample.waterKind() + " feature=" +
+                        sample.specialFeature()
+                    );
+                }
+            }
+        }
     }
 
     private static void verifyDepressionSemantics(

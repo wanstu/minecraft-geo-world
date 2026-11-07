@@ -35,3 +35,15 @@ bash scripts/check-dev-prereqs.sh
 实施次序：读取当前算法与对应审计器 → 定位一条可复现失败样例 → 新增定向自动回归 → 最小范围修复 → Go/Java golden/Loader 验证。**现阶段没有证据表明这些问题在 v0.1.4 仍可复现，不能预先宣称存在缺陷。**
 
 任何会改变生成结果的修改必须单独评估 rules version、旧存档与 golden 基线；不得直接更改历史 golden 来让测试通过。验收后再考虑下一次发布，不移动 `v0.1.4` 标签。
+
+## dadm 本机验证进展（2026-11-07）
+
+- dadm 已完成 Go 1.26.5、JDK 21 / JDK 25 工具链配置；scripts/check-dev-prereqs.sh 通过。
+- 跨 Chunk 标量采样回归已补齐正/负坐标与 16-block 边界，提交 e213d69；不改变世界生成语义。
+- 特殊岛屿联通规则已补齐当前基线验收：
+  - geoworld-rules-v1.1.16 海洋蘑菇岛 / 苍白之园岛 / 樱花岛按实际影响边界逐 48 个方向检查，边界外 16 / 32 blocks 保持 Ocean。
+  - 湖中蘑菇岛 / 樱花岛同时锁定 v1.1.15 与当前 v1.1.16 水环语义。
+  - Java Runtime GeoWorldSpecialLandscapeVerifier 同步检查岛屿外水环；26.3 Fabric 专项验证通过。
+  - GOMAXPROCS=2 go test -p 2 ./... 全仓通过。
+- 上述验收未发现当前基线的岛屿粘大陆/湖岸问题，因此**没有修改生成算法，也没有提升 rules version**。
+- geoworld-river-navigation-audit 的额外严格统计不能单独作为当前 Minecraft 缺陷证据；正式 WaterOwnership / Shoreline 等验收已覆盖既有河道修复，不得据此重复开启历史问题。
