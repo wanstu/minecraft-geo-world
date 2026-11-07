@@ -1,0 +1,213 @@
+{
+  "format": "geoworld-native-mining-material-acceptance",
+  "version": 1,
+  "date": "2026-11-07",
+  "timezone": "Asia/Shanghai",
+  "source_base_commit": "2a2dfddc894c97def468c24469f3d48d1c07fea5",
+  "scope": "Native block-placement verification; production generation and Query contracts unchanged",
+  "fixture": {
+    "extra_family": "catalog_fixture",
+    "stone_block": "minecraft:nether_quartz_ore",
+    "deep_block": "minecraft:nether_gold_ore",
+    "note": "Controlled common/forge ore-tag fixture in isolated JVMs, not a live Create test"
+  },
+  "targets": [
+    {
+      "minecraft": "1.21.1",
+      "loader": "neoforge",
+      "jdk": 21,
+      "command": "gradlew.bat -p java/adapters/1.21.1-neoforge check jar --no-daemon",
+      "exit_code": 0,
+      "started": "2026-11-07T03:24:58.894Z",
+      "ended": "2026-11-07T03:29:48.415Z",
+      "native_result": {
+        "seed": 123456,
+        "families": 9,
+        "districts": 35,
+        "mappings": 140,
+        "extraPrimary": 2,
+        "extraCompanion": 1,
+        "nativeOre": 86762,
+        "nativeExtra": 44420,
+        "pileBlocks": 815,
+        "waterFloorPileBlocks": 147,
+        "protected": 12,
+        "peaks": 3,
+        "removed": 3,
+        "disabled": "PASS",
+        "frozen": "PASS"
+      },
+      "log_sha256": "4c793fa68ba4d934532f0aef1150fb14e1a463e93e3b04e364f278dc892a42f4"
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "fabric",
+      "jdk": 21,
+      "command": "gradlew.bat -p java/adapters/1.21.1-fabric check jar --no-daemon",
+      "exit_code": 0,
+      "started": "2026-11-07T03:24:58.946Z",
+      "ended": "2026-11-07T03:27:55.067Z",
+      "native_result": {
+        "seed": 123456,
+        "families": 9,
+        "districts": 35,
+        "mappings": 140,
+        "extraPrimary": 2,
+        "extraCompanion": 1,
+        "nativeOre": 86762,
+        "nativeExtra": 44420,
+        "pileBlocks": 815,
+        "waterFloorPileBlocks": 147,
+        "protected": 12,
+        "peaks": 3,
+        "removed": 3,
+        "disabled": "PASS",
+        "frozen": "PASS"
+      },
+      "log_sha256": "a8a58f8b56c293d19839f37bc7970aea5937e8001af8511e636b1f7b5cb38223"
+    }
+  ],
+  "existing_save_inspections": [
+    {
+      "save": "987654321",
+      "sha256": "6b5d43bd9443e69eb8e7382796d05b47ae7e2292db0ce9d11cd6904d9c5ad3e3",
+      "inspection": {
+        "seed": "987654321",
+        "rules": "geoworld-rules-v1.1.16",
+        "surfaceOrePile": false,
+        "districts": 26,
+        "targets": [
+          {
+            "case": "mod-primary",
+            "districtId": "-7916614114754009038",
+            "primary": "zinc",
+            "companion": "diamond",
+            "x": 13719,
+            "floorY": 121,
+            "z": -3040,
+            "water": "None",
+            "waterY": 121,
+            "tp": "/tp @s 13719 134 -3040"
+          },
+          {
+            "case": "mod-companion",
+            "districtId": "-2923721981758769121",
+            "primary": "lapis",
+            "companion": "zinc",
+            "x": -2019,
+            "floorY": 233,
+            "z": 4922,
+            "water": "None",
+            "waterY": 233,
+            "tp": "/tp @s -2019 246 4922"
+          },
+          {
+            "case": "water-floor",
+            "districtId": "-2201124251796474133",
+            "primary": "zinc",
+            "companion": "lapis",
+            "x": -1940,
+            "floorY": 50,
+            "z": 1839,
+            "water": "Ocean",
+            "waterY": 62,
+            "tp": "/tp @s -1940 63 1839"
+          }
+        ]
+      },
+      "original_bytes_unchanged": true
+    },
+    {
+      "save": "live-world",
+      "sha256": "29279b0461dc5f2e187e7559c95c0e1d54b0cd806501acfe546687d8b5873297",
+      "inspection": {
+        "seed": "-4250254937638407070",
+        "rules": "geoworld-rules-v1.1.16",
+        "surfaceOrePile": false,
+        "districts": 38,
+        "targets": [
+          {
+            "case": "mod-companion",
+            "districtId": "9127274620472784405",
+            "primary": "iron",
+            "companion": "zinc",
+            "x": -10284,
+            "floorY": 118,
+            "z": 7400,
+            "water": "None",
+            "waterY": 118,
+            "tp": "/tp @s -10284 131 7400"
+          },
+          {
+            "case": "water-floor",
+            "districtId": "8431879602984701007",
+            "primary": "coal",
+            "companion": "iron",
+            "x": 855,
+            "floorY": 12,
+            "z": -1992,
+            "water": "Ocean",
+            "waterY": 62,
+            "tp": "/tp @s 855 25 -1992"
+          }
+        ]
+      },
+      "original_bytes_unchanged": true
+    }
+  ],
+  "candidate_package": {
+    "package": "D:\\projects\\minecraft-geo-world\\output\\mining-material-acceptance\\GeoWorld-0.1.3-dev-mining-acceptance-mc1.21.1-neoforge.jar",
+    "sha256": "70d850ee89f9f03af580c05bd7af2fc8599f97fdd05305cb72bee10e4d154d7b",
+    "installed_package": "D:\\games\\hmcl\\.minecraft\\versions\\1.21.1-NeoForge\\mods\\GeoWorld-0.1.1-dev-query-api-mc1.21.1-neoforge.jar",
+    "classes": [
+      {
+        "class": "geoworld/minecraft/v26common/worldgen/GeoWorldOreCatalog.class",
+        "installed_sha256": "1f974edcaf48b25a0c2ec325b924be35fb2d0520a49f505e1ae989d122471e58",
+        "candidate_sha256": "1f974edcaf48b25a0c2ec325b924be35fb2d0520a49f505e1ae989d122471e58",
+        "identical": true
+      },
+      {
+        "class": "geoworld/minecraft/v26common/worldgen/GeoWorldV26MineralVeins.class",
+        "installed_sha256": "84fd16a98b7afb821639f12bb76c74dba8372302fd426cca61f4cb9c6b940d69",
+        "candidate_sha256": "84fd16a98b7afb821639f12bb76c74dba8372302fd426cca61f4cb9c6b940d69",
+        "identical": true
+      },
+      {
+        "class": "geoworld/minecraft/v26common/worldgen/GeoWorldV26TerrainPopulator.class",
+        "installed_sha256": "6c5cc54d7c8b5ef6240212dbf40a4a2c683d787e651b280b5be5b17f30d01470",
+        "candidate_sha256": "6c5cc54d7c8b5ef6240212dbf40a4a2c683d787e651b280b5be5b17f30d01470",
+        "identical": true
+      },
+      {
+        "class": "geoworld/minecraft/common/worldgen/GeoWorldMiningDistrictPlanner.class",
+        "installed_sha256": "9871815d1b370c4a63e569378e4e0a95e7cf4d574f8821109a29d26c1f71c3a4",
+        "candidate_sha256": "9871815d1b370c4a63e569378e4e0a95e7cf4d574f8821109a29d26c1f71c3a4",
+        "identical": true
+      },
+      {
+        "class": "geoworld/runtime/GeoWorldV1.class",
+        "installed_sha256": "fc39b6ed9c6b40e20d3693b612846ad0cf850169c576a9517eac75f4a356087e",
+        "candidate_sha256": "fc39b6ed9c6b40e20d3693b612846ad0cf850169c576a9517eac75f4a356087e",
+        "identical": true
+      },
+      {
+        "class": "geoworld/minecraft/v26common/runtime/GeoWorldV26GeneratorRuntime.class",
+        "installed_sha256": "d7e2889ea255087d774e3e0c65c86704bfe156ef67596189b0e6f392a43d1c23",
+        "candidate_sha256": "d7e2889ea255087d774e3e0c65c86704bfe156ef67596189b0e6f392a43d1c23",
+        "identical": true
+      },
+      {
+        "class": "geoworld/minecraft/common/engine/GeoWorldEngineBridge.class",
+        "installed_sha256": "8f02650eee2753098fd5129bbb09d0f04b4cc90efe82a48f4651c49106e53d3f",
+        "candidate_sha256": "8f02650eee2753098fd5129bbb09d0f04b4cc90efe82a48f4651c49106e53d3f",
+        "identical": true
+      }
+    ]
+  },
+  "manual_acceptance": {
+    "status": "pending",
+    "target": "1.21.1 NeoForge with Create",
+    "required": "Create a new GeoWorld world with surface ore piles enabled; inspect actual saved model before choosing coordinates",
+    "reason": "Both inspected existing GeoWorld saves have surface ore piles disabled"
+  }
+}

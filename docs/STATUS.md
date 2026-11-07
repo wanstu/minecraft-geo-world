@@ -4,6 +4,8 @@
 
 ## 2026-11-07 当前进度
 
+- 2026-11-07 矿区材料验收：新增真实 Minecraft ProtoChunk 方块放置检查并纳入 1.21.1 NeoForge / Fabric 的 `check`；两个目标完整 `check jar` 均通过，分别为 4m49s / 2m55s。受控 9 家族注册表覆盖 35 个矿区、140 次材料映射、86,762 个矿石方块、815 个矿堆方块（147 个在水下）、3 个 5～8 格峰，以及关闭开关、保护宿主和移除家族后的冻结分配。它验证原生放置流程，尚不等同于加载 Create 的实机外观验收；本轮没有改变生成实现、Query 字段或各类契约版本。
+- 已只读核对 1.21.1 NeoForge 的 `987654321` 与 `live-world`：两者地表矿堆均关闭，模型文件字节未变。当前安装包与验收包的 7 个生成相关类逐字节一致，可继续使用当前安装包。下一步由用户新建创造模式 GeoWorld 世界、Seed `123456`，开启“矿区地表原矿堆”；进入后从该世界自己的模型给出锌主矿、锌伴生矿与水下矿堆坐标。完整记录与只读坐标工具见 [MINING_ACCEPTANCE.md](MINING_ACCEPTANCE.md)。
 - 下一步建议：优先收尾矿区实机表现，核对模组矿物、主矿/伴生矿与地表矿堆；随后补齐 WebUI 跨维度暂停/恢复及图标筛选性能验收。具体剩余项仍按下方已验证/未验证记录区分。
 - 2026-11-07 **已发布 `v0.1.3 / 4b190f6`**：[GitHub Release](https://github.com/wanstu/minecraft-geo-world/releases/tag/v0.1.3) 于 10:36:03（Asia/Shanghai）生成，9 个 Minecraft / Loader 目标完整检查全部通过；9 个正式 JAR 的 GitHub SHA-256 digest 与下载的 SHA256SUMS 全部一致。Modrinth 的 9 个版本也已上传并逐项通过 SHA-512、Minecraft 版本和 Loader 核验；项目状态为 `processing`、请求状态为 `approved`，正在等待平台审核，公开页面尚未开放。完整证据见 `acceptance/evidence/release-v0.1.3-20261107.json`。`v0.1.2` 是被旧指纹基线拦下的失败标签，未放出 Release；两版本两 Seed 独立复算证据保留，生成算法未改。
 - 2026-11-07 Query API：QUERY-01～10、现有 24 项验收全部通过（34/34），覆盖 6 个模型、每模型 1,042 点、86 字段；字段表已回填。统一入口 `GeoWorldFacade / WorldFacts` 已实现，内部弱绑定与原子快照只提供逻辑服务端动态主世界；三个版本族通过同一个共享世界服务 bind/unbind。生命周期黑盒检查覆盖进入/关闭/切换、迟到关闭、重新绑定、不可变视图和并发读取。9 个发布目标已接入统一 Query 检查，1.21.1 NeoForge（JDK 21）与 26.3 Fabric（JDK 25）完整 `check` 已通过；Go 全仓测试和 108 个 Java/Go golden 样点也通过。字段、生成算法、版本、缓存号与 golden 文件均未改。

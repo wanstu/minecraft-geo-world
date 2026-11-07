@@ -686,3 +686,18 @@ tasks.named('check').configure {
 
 // Shared Query API contract and lifecycle acceptance.
 apply from: '../../query-api-verification.gradle'
+
+tasks.register('verifyGeoWorldMiningMaterials', JavaExec) {
+    group = 'verification'
+    description = 'Checks tagged mineral families and marker piles in native Minecraft chunks.'
+    dependsOn tasks.named('classes')
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.neoforge.verification.GeoWorldMiningVerifierBootstrap'
+    systemProperty 'geoworld.engine.embeddedOnly', 'true'
+    jvmArgs '-Xmx2g', '-XX:ActiveProcessorCount=2'
+    workingDir layout.buildDirectory.dir('mining-material-verifier').get().asFile
+    doFirst { workingDir.mkdirs() }
+}
+tasks.named('check') {
+    dependsOn tasks.named('verifyGeoWorldMiningMaterials')
+}

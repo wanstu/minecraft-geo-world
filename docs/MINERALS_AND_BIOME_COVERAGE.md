@@ -46,3 +46,7 @@ GeoWorld 先 voxel 化地形，再对真实石层填充矿脉。按世界坐标�
 - `./gradlew.bat verifyGeoWorldDecorationPolicy`：确认目标原版矿石被过滤，但原版地质装饰、原版紫水晶及第三方矿物 Feature 仍保留。
 - `./gradlew.bat build`：以上验证纳入主构建，同时运行 Shoreline/WaterOwnership 等完整回归。
 - 引擎缓存前缀：`v14 -> v15`。新世界/未生成过的区块才能看到新矿脉；不要在既有区块验证新版矿物。
+
+## 2026-11-07：矿区材料放置验收补充
+
+上文保留早期矿脉/群系覆盖记录。当前矿区已补充真实 Minecraft 区块放置检查，覆盖标签解析、模型冻结的主矿/伴生矿、普通石与深板岩矿石、陆地和水下矿堆、关闭开关、宿主保护及移除家族后的行为。1.21.1 NeoForge / Fabric 的完整检查均通过，详见 [MINING_ACCEPTANCE.md](MINING_ACCEPTANCE.md) 及 [结构化证据](../acceptance/evidence/mining-materials-20261107.json)。受控标签测试不代替 Create 锌矿与矿堆的实机外观验收；目前读取的两个 NeoForge 存档都未开启地表矿堆。
