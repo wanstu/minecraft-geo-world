@@ -17,9 +17,9 @@
 | `8e74df5` | S3 共享世界服务接入 |
 | `e9098ad7970de132b8c3d4767584ef600b67c36c` | S4：QUERY-10、生命周期、9 个目标共同 Gradle 检查、验证记录及验收器修正 |
 | `3ed888bc` | 安装验收候选包与实机操作交接 |
-| S5 文档提交（见 git log） | 双目标实机证据、README 对外说明、D-048 解封及最终状态同步 |
+| `cba0007` | 双目标实机证据、README 对外说明、D-048 解封及最终状态同步 |
 
-Query 验收阶段未推送或发布；随后用户已授权正式发布。完整矩阵发现的 26.1.2 / 26.2 旧指纹基线已独立复算并修正，发布进度以 STATUS 与 QUERY_API_ACCEPTANCE §8 为准，最终标签使用 v0.1.3。
+Query 验收阶段未推送或发布；随后用户已授权正式发布。完整矩阵发现的 26.1.2 / 26.2 旧指纹基线已独立复算并修正，发布结果以 STATUS 与 QUERY_API_ACCEPTANCE §8～9 为准。最终 v0.1.3 已在 GitHub 发布，9 个 CI 目标和文件哈希全部通过；Modrinth 9 个版本上传并核验成功，项目处于 processing，等待平台审核。
 
 ## 2. 先读什么
 
@@ -48,7 +48,7 @@ Query 验收阶段未推送或发布；随后用户已授权正式发布。完�
 - 生命周期：A→empty→B、迟到 stop A 保留 B、同 owner 重新绑定、旧视图稳定、结果不可变、4 个线程读取与切换，通过。
 - 完整 `check`：1.21.1 NeoForge 使用 JDK 21；26.3 Fabric 使用 JDK 25，均通过。系统默认 JDK 27 不适合 NeoForge 的 Gradle 8.10.2。
 - 双目标实机：用户完成进入 A → 标题 → 进入 B，日志均为 true → false → true，退出 B 后也恢复 false。证据见下一节。
-- 其余 7 个目标只接入了共同检查，未在本轮本地重建；没有另做专用服务器实测。
+- 其余 7 个目标未在验收阶段本地重建；随后 v0.1.3 的 9 目标完整 CI 已全部通过。没有另做专用服务器实测。
 
 验收器曾有两处旧问题，已在原始 `386aace` 快照核对：地表邻点不能沿用中心 Y；26.3 指纹常量需锁定到本轮之前就存在的实际基线。两 Seed 的旧基线/候选指纹一致，详情在验收主文档。没有改世界生成或已提交 golden 文件。
 
@@ -75,3 +75,11 @@ Query 验收阶段未推送或发布；随后用户已授权正式发布。完�
 自动验证日志：`.tmp/query-api-validation-20261107/`，包括双版本完整检查、Go/golden 和改动前后指纹观测；只读核验可直接读取这些文件。
 
 后续继续保持：字段、单位、缺失条件、生成结果、generationRulesVersion、缓存号及 golden 文件不变；不擅自加入区域查询、玩法或 LocalReality Provider。DECISIONS 保持 CRLF；只提交相关文件，不 force push、不 amend。
+
+## 6. 正式发布与下一步
+
+- 正式包与校验文件：[GeoWorld v0.1.3](https://github.com/wanstu/minecraft-geo-world/releases/tag/v0.1.3)，发布实现提交 `4b190f6378be16da438ac6f9167ae9d5f25abbac`。
+- [GitHub 发布 CI](https://github.com/wanstu/minecraft-geo-world/actions/runs/42329281853) 及 [Modrinth 上传核验](https://github.com/wanstu/minecraft-geo-world/actions/runs/42330203318) 全部通过；[最终结构化证据](../acceptance/evidence/release-v0.1.3-20261107.json) 保存 9 个 JAR 的 SHA-256、下载地址和 9 个 Modrinth 版本 ID。
+- Modrinth 已请求 approved，实际为 processing，等待平台审核；当前可从 GitHub 下载。不要把“上传成功”写成“Modrinth 已公开”。
+- 本文第 5 节的 HMCL JAR 是此前实机验收包的历史安装记录；本次发布收尾没有替换用户的游戏安装。
+- 下一步建议先收尾矿区实机验收：模组矿物、主矿/伴生矿、地表矿堆；再补 WebUI 跨维度联动与图标筛选性能。区域查询与玩法实现仍不在本轮范围内。

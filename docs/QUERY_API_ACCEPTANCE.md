@@ -210,3 +210,11 @@ S5 文档验证：发布检查表 9/9、字段表 86/86 V、DECISIONS 的 CRLF�
 | 26.2 | `-563659577384754347` | `df976bd29eaf4429` |
 
 只更新两个版本的指纹测试常量及说明，不跳过检查、不改变生成算法、既有 golden、字段或规则版本。其余 5 个目标的成功也包括 1.20.1 Fabric 的 Java 17 实际构建。
+
+## 9. v0.1.3 最终发布结果（2026-11-07）
+
+- 发布提交：`4b190f6378be16da438ac6f9167ae9d5f25abbac`，标签 `v0.1.3`；[GitHub Release](https://github.com/wanstu/minecraft-geo-world/releases/tag/v0.1.3) 已生成。
+- [标签 CI](https://github.com/wanstu/minecraft-geo-world/actions/runs/42329281853) 的 Go / 全量 Java golden、9 个 Minecraft / Loader 的完整 check/build 和正式包校验全部通过，包含修正后的 26.1.2 / 26.2 指纹检查。
+- 独立读取 GitHub Release 元数据和下载的 SHA256SUMS，9 个 JAR 的文件集合、SHA-256 digest 逐项一致。
+- [Modrinth CI](https://github.com/wanstu/minecraft-geo-world/actions/runs/42330203318) 已上传全部 9 个版本，并验证每个文件的 SHA-512 与 GitHub JAR 一致、Minecraft 版本及 Loader 正确。项目返回 `processing`，请求状态 `approved`，公开访问仍待平台审核。
+- [发布证据](../acceptance/evidence/release-v0.1.3-20261107.json) 保存两个流水线地址、正式包元数据和全部 Modrinth 版本 ID。发布后的诊断与文档另行提交，发布标签不移动。

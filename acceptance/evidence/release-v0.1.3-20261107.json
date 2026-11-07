@@ -1,0 +1,186 @@
+{
+  "format": "geoworld-release-publication-evidence",
+  "version": 1,
+  "date": "2026-11-07",
+  "timezone": "Asia/Shanghai",
+  "github": {
+    "tag": "v0.1.3",
+    "release_url": "https://github.com/wanstu/minecraft-geo-world/releases/tag/v0.1.3",
+    "published_at": "2026-11-07T02:36:03Z",
+    "release_commit": "4b190f6378be16da438ac6f9167ae9d5f25abbac",
+    "ci_run": "https://github.com/wanstu/minecraft-geo-world/actions/runs/42329281853",
+    "verified_jar_count": 9,
+    "checksum_result": "PASS",
+    "assets": [
+      {
+        "name": "GeoWorld-0.1.3-mc1.20.1-fabric.jar",
+        "size": 9038323,
+        "digest": "sha256:142235eac88c0b09db9a5b6831853f98d32b4f7378ff7c68538463161f9ee678",
+        "browser_download_url": "https://github.com/wanstu/minecraft-geo-world/releases/download/v0.1.3/GeoWorld-0.1.3-mc1.20.1-fabric.jar"
+      },
+      {
+        "name": "GeoWorld-0.1.3-mc1.21.1-fabric.jar",
+        "size": 9054050,
+        "digest": "sha256:e1a71634a9ecb65c6792e579525d075cc0f83ac2432e2176b692f4431cb58feb",
+        "browser_download_url": "https://github.com/wanstu/minecraft-geo-world/releases/download/v0.1.3/GeoWorld-0.1.3-mc1.21.1-fabric.jar"
+      },
+      {
+        "name": "GeoWorld-0.1.3-mc1.21.1-neoforge.jar",
+        "size": 28904198,
+        "digest": "sha256:098c53a3398d307773c23b95368648a2117bd4725b22cf1b9160a70b5af9282c",
+        "browser_download_url": "https://github.com/wanstu/minecraft-geo-world/releases/download/v0.1.3/GeoWorld-0.1.3-mc1.21.1-neoforge.jar"
+      },
+      {
+        "name": "GeoWorld-0.1.3-mc26.1.2-fabric.jar",
+        "size": 9025095,
+        "digest": "sha256:c07d23ca7c964700a07120a9828396a2b45c71e638b2db7b800db760503eab2e",
+        "browser_download_url": "https://github.com/wanstu/minecraft-geo-world/releases/download/v0.1.3/GeoWorld-0.1.3-mc26.1.2-fabric.jar"
+      },
+      {
+        "name": "GeoWorld-0.1.3-mc26.1.2-neoforge.jar",
+        "size": 9017646,
+        "digest": "sha256:35aeea3f12356b6a8f3e9d0677e7294e59c40a0528393979e6b889989c26de1d",
+        "browser_download_url": "https://github.com/wanstu/minecraft-geo-world/releases/download/v0.1.3/GeoWorld-0.1.3-mc26.1.2-neoforge.jar"
+      },
+      {
+        "name": "GeoWorld-0.1.3-mc26.2-fabric.jar",
+        "size": 9024960,
+        "digest": "sha256:df458aa6b1b68a2447181ac7543be37e2880c659e19dcb07ae0fab123c430852",
+        "browser_download_url": "https://github.com/wanstu/minecraft-geo-world/releases/download/v0.1.3/GeoWorld-0.1.3-mc26.2-fabric.jar"
+      },
+      {
+        "name": "GeoWorld-0.1.3-mc26.2-neoforge.jar",
+        "size": 9017543,
+        "digest": "sha256:3b3370ff79bd1c4e18d02187e9f75610e4d6ea4f1b3d1340e0a607ea705fdb8d",
+        "browser_download_url": "https://github.com/wanstu/minecraft-geo-world/releases/download/v0.1.3/GeoWorld-0.1.3-mc26.2-neoforge.jar"
+      },
+      {
+        "name": "GeoWorld-0.1.3-mc26.3-fabric.jar",
+        "size": 28917108,
+        "digest": "sha256:3ee48bc3b294cb6181247d1f09d6a519dc341de632e25378c7aeae026e9a3bbc",
+        "browser_download_url": "https://github.com/wanstu/minecraft-geo-world/releases/download/v0.1.3/GeoWorld-0.1.3-mc26.3-fabric.jar"
+      },
+      {
+        "name": "GeoWorld-0.1.3-mc26.3-neoforge.jar",
+        "size": 28909805,
+        "digest": "sha256:b7d8dffa09b56fcdbea3e4af41a21d146cd680b3bd52d5a96201b8640c4593ff",
+        "browser_download_url": "https://github.com/wanstu/minecraft-geo-world/releases/download/v0.1.3/GeoWorld-0.1.3-mc26.3-neoforge.jar"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "size": 918,
+        "digest": "sha256:be811b6735d17b829d0ac1862d0b6ee0712c9f5d6065ffc7c79c6d31217ba760",
+        "browser_download_url": "https://github.com/wanstu/minecraft-geo-world/releases/download/v0.1.3/SHA256SUMS.txt"
+      }
+    ]
+  },
+  "modrinth": {
+    "workflow_run": "https://github.com/wanstu/minecraft-geo-world/actions/runs/42330203318",
+    "result": "PASS",
+    "verified_version_count": 9,
+    "project_status": "processing",
+    "requested_status": "approved",
+    "public_visibility": "awaiting platform review",
+    "versions": [
+      {
+        "job_id": 128274749249,
+        "minecraft": "26.2",
+        "loader": "neoforge",
+        "version_id": "sinT4gZO",
+        "version_number": "0.1.3-mc26.2-neoforge",
+        "project_status": "processing",
+        "requested_status": "approved",
+        "file_identity_check": "SHA512 matches GitHub Release JAR",
+        "result": "success"
+      },
+      {
+        "job_id": 128274749273,
+        "minecraft": "1.21.1",
+        "loader": "fabric",
+        "version_id": "HBy4J642",
+        "version_number": "0.1.3-mc1.21.1-fabric",
+        "project_status": "processing",
+        "requested_status": "approved",
+        "file_identity_check": "SHA512 matches GitHub Release JAR",
+        "result": "success"
+      },
+      {
+        "job_id": 128274749291,
+        "minecraft": "1.20.1",
+        "loader": "fabric",
+        "version_id": "k8MEcEB1",
+        "version_number": "0.1.3-mc1.20.1-fabric",
+        "project_status": "processing",
+        "requested_status": "approved",
+        "file_identity_check": "SHA512 matches GitHub Release JAR",
+        "result": "success"
+      },
+      {
+        "job_id": 128274749338,
+        "minecraft": "26.1.2",
+        "loader": "fabric",
+        "version_id": "zYQakgn3",
+        "version_number": "0.1.3-mc26.1.2-fabric",
+        "project_status": "processing",
+        "requested_status": "approved",
+        "file_identity_check": "SHA512 matches GitHub Release JAR",
+        "result": "success"
+      },
+      {
+        "job_id": 128274749346,
+        "minecraft": "26.3",
+        "loader": "fabric",
+        "version_id": "LJdwdpKf",
+        "version_number": "0.1.3-mc26.3-fabric",
+        "project_status": "processing",
+        "requested_status": "approved",
+        "file_identity_check": "SHA512 matches GitHub Release JAR",
+        "result": "success"
+      },
+      {
+        "job_id": 128274749349,
+        "minecraft": "26.3",
+        "loader": "neoforge",
+        "version_id": "JABdPh8M",
+        "version_number": "0.1.3-mc26.3-neoforge",
+        "project_status": "processing",
+        "requested_status": "approved",
+        "file_identity_check": "SHA512 matches GitHub Release JAR",
+        "result": "success"
+      },
+      {
+        "job_id": 128274749350,
+        "minecraft": "1.21.1",
+        "loader": "neoforge",
+        "version_id": "EUK1U3dK",
+        "version_number": "0.1.3-mc1.21.1-neoforge",
+        "project_status": "processing",
+        "requested_status": "approved",
+        "file_identity_check": "SHA512 matches GitHub Release JAR",
+        "result": "success"
+      },
+      {
+        "job_id": 128274749380,
+        "minecraft": "26.2",
+        "loader": "fabric",
+        "version_id": "Z8uygZAO",
+        "version_number": "0.1.3-mc26.2-fabric",
+        "project_status": "processing",
+        "requested_status": "approved",
+        "file_identity_check": "SHA512 matches GitHub Release JAR",
+        "result": "success"
+      },
+      {
+        "job_id": 128274749540,
+        "minecraft": "26.1.2",
+        "loader": "neoforge",
+        "version_id": "7P0CWOx7",
+        "version_number": "0.1.3-mc26.1.2-neoforge",
+        "project_status": "processing",
+        "requested_status": "approved",
+        "file_identity_check": "SHA512 matches GitHub Release JAR",
+        "result": "success"
+      }
+    ]
+  }
+}

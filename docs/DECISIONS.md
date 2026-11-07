@@ -1215,7 +1215,7 @@ D-001 已确定 GeoWorld 同时是工具与 Runtime。D-005 已承诺「未来�
 
 封控解除：**2026-11-07 / `e9098ad7970de132b8c3d4767584ef600b67c36c`（验收实现提交）**。QUERY-01～10、MODEL-01～04、双目标完整 check 及 1.21.1 NeoForge / 26.3 Fabric 的实机 A→empty→B 全部通过，发布检查表已全部勾选；S1～S5 完成。实机日志与包哈希存于 [验收证据](../acceptance/evidence/query-api-world-switch-20261107.json)，时间、Seed 和旧模型版本保留情况见 `QUERY_API_ACCEPTANCE.md` §7。
 
-本条、README 对外说明及同步文档随独立 S5 文档提交保存。稳定入口为 `GeoWorldFacade / WorldFacts`，请求/结果沿用四个既有 v1 值类型，受 D-049 约束。本轮字段、查询行为、生成结果、API/生成/模型/缓存版本均未变；没有推送、tag 或模组发布。
+本条、README 对外说明及同步文档随独立 S5 文档提交保存。稳定入口为 `GeoWorldFacade / WorldFacts`，请求/结果沿用四个既有 v1 值类型，受 D-049 约束。验收阶段字段、查询行为、生成结果、API/生成/模型/缓存版本均未变；随后用户授权正式发布，v0.1.3 的 CI、GitHub 与 Modrinth 结果见 STATUS 和 QUERY_API_ACCEPTANCE §9。
 
 ## D-049：Query API 版本升级以「行为契约」为准，不以类结构为准
 
