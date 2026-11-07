@@ -1,7 +1,7 @@
 # GeoWorld Query API 验收与门面落地指导
 
 更新时间：2026-11-07
-状态：**自动验收与 S1～S4 实现已落地；S3 实机记录和 S5 解封尚待完成**。本文件同时保存执行规则与本轮验证记录。
+状态：**QUERY-01～10 与 S1～S5 全部完成，2026-11-07 已解除 D-048 封控**。本文件同时保存执行规则、自动验证和双目标实机记录。
 上游文档：`DECISIONS.md` 中的 D-048 / D-049 / D-050、`FACT_REGISTRY.md`、`FOUNDATION_API.md`
 
 ---
@@ -148,8 +148,8 @@ QUERY-02 ~ QUERY-04 一旦通过，`FACT_REGISTRY.md` 中被覆盖字段的验�
 
 - [x] 1.21.1 NeoForge 完整 `check`（JDK 21）
 - [x] 26.3 Fabric 完整 `check`（JDK 25）
-- [ ] 1.21.1 NeoForge 实机：进入 A → 返回标题 → 进入 B，记录 `currentWorld` 为 true → false → true 与 A/B Seed
-- [ ] 26.3 Fabric 实机：同上
+- [x] 1.21.1 NeoForge 实机：进入 A → 返回标题 → 进入 B，记录 `currentWorld` 为 true → false → true 与 A/B Seed
+- [x] 26.3 Fabric 实机：同上
 
 ## 6. 2026-11-07 实现与自动验收记录
 
@@ -158,9 +158,9 @@ QUERY-02 ~ QUERY-04 一旦通过，`FACT_REGISTRY.md` 中被覆盖字段的验�
 | QUERY-01～09 | `47f1c03`，6 个模型、每模型 1,042 点；86 字段全部出现 |
 | S1 | `3d9472a`，模型持有者与三个版本族的共同生命周期已核实，详见 D-050 |
 | S2 | `d694678`，`GeoWorldFacade / WorldFacts` 已实现，绑定与模型本体留在内部包 |
-| S3 | `8e74df5`，共享 `GeoWorldV26WorldService` 在动态主世界激活后 bind，关闭/失败/重新激活时 unbind；后续补充日志打印实际 `currentWorld` 状态。实机记录待补 |
-| S4 | QUERY-10、生命周期黑盒检查、所有 9 个发布目标共用的 Gradle 检查已接入 |
-| S5 | **未执行，未解除封控**；不能以自动验收替代两个目标的实机切换 |
+| S3 | `8e74df5`，共享 `GeoWorldV26WorldService` 在动态主世界激活后 bind，关闭/失败/重新激活时 unbind；后续补充日志打印实际 `currentWorld` 状态。两个目标实机均通过，见第 7 节 |
+| S4 | `e9098ad`，QUERY-10、生命周期黑盒检查、所有 9 个发布目标共用的 Gradle 检查已接入并通过双目标完整检查 |
+| S5 | 2026-11-07，双目标实机通过，第 5 节全部完成；D-048 已写入解封记录，README Query API 说明定稿 |
 
 自动结果：QUERY-01～10 与现有 24 项验收合计 34/34，在 6 个模型上通过；生命周期覆盖 A→empty→B、迟到关闭、同 owner 重新绑定、保留旧视图、不可变结果、4 个线程读取与并发切换。Go 全仓测试与 6 个模型共 108 个 Java/Go golden 样点通过。最初 Gradle 运行误用了系统默认 JDK 27；实际验证固定为上表的 JDK 21 / 25。
 
@@ -176,4 +176,22 @@ QUERY-02 ~ QUERY-04 一旦通过，`FACT_REGISTRY.md` 中被覆盖字段的验�
 
 验收证据输出在两个目标各自的 `build/query-api-evidence.json`；原有 177 项 Go 验收表未改，新增 QUERY 项登记在 Java 补充表并写入证据的 `queryPassedIds`。
 
-实机操作只使用验收候选包。两个版本分别进入两个不同 Seed 的动态 GeoWorld 存档：进入时日志应出现 `GeoWorld Query bound Overworld facts: currentWorld=true, seed=...`；返回标题后应出现 `Released GeoWorld model and Query facts ... currentWorld=false`；进入 B 后再次为 true 且 Seed 对应 B。记录日志后再完成 S5；自动检查不能填这两个人工勾选项。
+## 7. 2026-11-07 双目标实机与 S5 解封记录
+
+用户使用已安装的验收候选包完成「进入旧世界 A → 返回标题 → 创建并进入新世界 B」，随后读取两个 HMCL 实例的 `latest.log`。下列时间均为 Asia/Shanghai；两个目标都还记录了退出 B 后恢复 false。
+
+| 目标 | A 绑定 true：时间 / Seed / rules | 退出 A：false | B 绑定 true：时间 / Seed / rules | 退出 B：false |
+|---|---|---|---|---|
+| 1.21.1 NeoForge | 09:31:40.790 / `-4250254937638407070` / `geoworld-rules-v1.1.16` | 09:31:57.704 | 09:32:23.154 / `987654321` / `geoworld-rules-v1.1.16` | 09:33:08.964 |
+| 26.3 Fabric | 09:34:40 / `123456` / `geoworld-rules-v1.1.14` | 09:35:11 | 09:35:32 / `987654321` / `geoworld-rules-v1.1.16` | 09:36:16 |
+
+两个世界的 `profile` 都是 `geoworld-profile-v1.1`，`model` 都是 `geoworld-model-v1`。26.3 的旧世界保留自己的 rules v1.1.14，新世界使用 v1.1.16；没有升级或重生成旧存档。已检查生命周期附近的 GeoWorld 错误，未发现相关失败。
+
+- NeoForge 原始日志：`D:/games/hmcl/.minecraft/versions/1.21.1-NeoForge/logs/latest.log`。
+- Fabric 原始日志：`D:/games/hmcl/.minecraft/versions/26.3-Fabric/logs/latest.log`。
+- [已提交的实机证据](../acceptance/evidence/query-api-world-switch-20261107.json) 保存原始生命周期行、日志路径/编码/SHA-256、A/B Seed 和安装包 SHA-256，避免 latest.log 被下次启动覆盖后丢失本次结论。包名与安装备份见 `HANDOFF_QUERY_API.md`。
+- 实机覆盖集成服务器的两个要求目标；其余 7 个适配器未在本轮重建，未另做专用服务器实测。
+
+第 5 节全部勾选后完成 S5：D-048 记录 2026-11-07 解封及验收实现提交 `e9098ad7970de132b8c3d4767584ef600b67c36c`；[runtime-reader README](../java/runtime-reader/README.md#query-api) 的对外说明定稿，字段表、架构、状态和交接同步。此结论是 Query API v1 的接口验收；本轮没有推送、打 tag 或发布模组。
+
+S5 文档验证：发布检查表 9/9、字段表 86/86 V、DECISIONS 的 CRLF、文档相对链接、两份日志与安装包哈希全部通过；README Java 示例已使用 JDK 21、`--release 21` 和本轮 NeoForge 验收 JAR 实际编译通过。

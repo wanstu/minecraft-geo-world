@@ -198,7 +198,7 @@ TRANSPORT_GEOGRAPHY ← SETTLEMENT + NAVIGATION_SCORE + HYDROLOGY
 
 ---
 
-## 附录 C：自动验收证据与剩余发布条件
+## 附录 C：自动与实机验收证据
 
 2026-11-07 已通过：QUERY-01～10 与现有 24 项 MODEL/RUNTIME/PROFILE/PARAM 验收，合计 34/34 项，覆盖 6 个已提交模型。
 
@@ -212,4 +212,4 @@ TRANSPORT_GEOGRAPHY ← SETTLEMENT + NAVIGATION_SCORE + HYDROLOGY
 
 按代码事实修正的文档偏差：展开合并字段行；补全水域 `none` 与 `open_sea / shallow_sea / lake / shallow_lake` 分类；区分外围海岛和海洋；注明当前 Query 矿业评分仍为 8 类原版矿物。没有改变查询返回值或世界生成。
 
-QUERY-10 已在全部 6 个模型上验证门面与直接查询等价，`supports` 与版本信息也一致；门面生命周期黑盒检查已通过。两个 Loader 的实机切换仍是发布前置条件。D-048 封控保持，不能据本表宣称 Query API 已对外开放。
+QUERY-10 已在全部 6 个模型上验证门面与直接查询等价，`supports` 与版本信息也一致；门面生命周期黑盒检查已通过。1.21.1 NeoForge 与 26.3 Fabric 实机切换已于 2026-11-07 通过，均记录 true → false → true，B Seed 为 `987654321`。完整检查表和 S1～S5 已完成，D-048 封控已解除；详见 `QUERY_API_ACCEPTANCE.md` §7 及[实机证据](../acceptance/evidence/query-api-world-switch-20261107.json)。

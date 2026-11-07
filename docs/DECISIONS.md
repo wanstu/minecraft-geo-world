@@ -1165,9 +1165,9 @@ NeoForge 26.3 已确认 WORLD_PRESET registry 与 RegisterPresetEditorsEvent / P
 
 ## D-048：GeoWorld Query API 未登记，必须先定价再谈稳定
 
-状态：**本决定即为登记；实现状态为「已存在但未验收」**
+状态：**已登记、已验收；2026-11-07 解除封控**
 
-### 事实
+### 登记时的事实（2026-11-06）
 
 `java/runtime-reader/src/main/java/geoworld/runtime/GeoWorldQueryService.java` 已声明
 `API_VERSION = "geoworld-query-v1"`，并暴露 86 个 `NaturalField`。但：
@@ -1201,8 +1201,8 @@ D-001 已确定 GeoWorld 同时是工具与 Runtime。D-005 已承诺「未来�
    **不另建**独立 API 站点或版本目录。
 3. 任何对 `NaturalField` 的增删都必须同步更新 `docs/FACT_REGISTRY.md`，
    否则 CI 阶段的文档检查（见 D-049 第 6 条）必须失败。
-4. `GeoWorldModelVerifier` 当前只覆盖 23 个 `NaturalField`，其余字段处于
-   **未验收**状态；`FOUNDATION_API.md` 的字段表必须逐字段标注「已验收 / 未验收」。
+4. 登记时 `GeoWorldModelVerifier` 只覆盖 23 个 `NaturalField`，其余字段处于
+   **未验收**状态；字段表必须逐字段标注验收状态。现已由 `FACT_REGISTRY.md` 登记 86 个字段并全部回填 V，证据见验收主文档。
 
 ### 与既有决定的关系
 
@@ -1211,9 +1211,15 @@ D-001 已确定 GeoWorld 同时是工具与 Runtime。D-005 已承诺「未来�
 - 强化 D-034：未登记的接口等于不存在于项目记忆中，必须纠正。
 
 
+### 封控解除记录（2026-11-07）
+
+封控解除：**2026-11-07 / `e9098ad7970de132b8c3d4767584ef600b67c36c`（验收实现提交）**。QUERY-01～10、MODEL-01～04、双目标完整 check 及 1.21.1 NeoForge / 26.3 Fabric 的实机 A→empty→B 全部通过，发布检查表已全部勾选；S1～S5 完成。实机日志与包哈希存于 [验收证据](../acceptance/evidence/query-api-world-switch-20261107.json)，时间、Seed 和旧模型版本保留情况见 `QUERY_API_ACCEPTANCE.md` §7。
+
+本条、README 对外说明及同步文档随独立 S5 文档提交保存。稳定入口为 `GeoWorldFacade / WorldFacts`，请求/结果沿用四个既有 v1 值类型，受 D-049 约束。本轮字段、查询行为、生成结果、API/生成/模型/缓存版本均未变；没有推送、tag 或模组发布。
+
 ## D-049：Query API 版本升级以「行为契约」为准，不以类结构为准
 
-状态：**已确定**（本文即策略定义；`FACT_REGISTRY.md` 尚未建立）
+状态：**已确定**（字段契约已在 `FACT_REGISTRY.md` 建立并验收）
 
 ### 背景
 
@@ -1378,7 +1384,7 @@ NaturalField、Resolution、QueryRequest、NaturalResult；它们同样受 D-049
 
 ### 原设计遗留与 S1 调查结论（2026-11-07）
 
-1. S2 已实现 `geoworld.runtime.api.GeoWorldFacade / WorldFacts`（`d694678`）；适配器写入钩子为内部包的 `GeoWorldFactsBinding`，门面本身只有三个读取方法。D-048 对外封控仍保持，存在实现不等于已经完成发布验收；
+1. S2 已实现 `geoworld.runtime.api.GeoWorldFacade / WorldFacts`（`d694678`）；适配器写入钩子为内部包的 `GeoWorldFactsBinding`，门面本身只有三个读取方法。两个要求目标的实机切换已于 2026-11-07 通过，D-048 已记录解除封控；
 2. S1 已确认：`GeoWorldEngineBridge.GeneratedModel` 只是生成/缓存加载的返回值，**不是活动世界的权威持有者**；无需向它增加全局模型 getter。权威实例由 `GeoWorldV26GeneratorRuntime.model` 持有，经 `attachModel` 绑定到生成器；世界服务的 `ActiveWorld.model` 保存同一个实例。
 3. S4 已用 QUERY-10 同时验证门面与直接查询，并新增 `GeoWorldFacadeLifecycleVerifier`；9 个发布目标统一应用 `java/query-api-verification.gradle`，两个检查都进入 `check`；
 4. `queryLocalReality` 的 `LocalRealityProvider` 由谁实现、键名约定——留待玩法模组立项时再定，
@@ -1413,8 +1419,8 @@ Fabric 的就绪回调对应 `SERVER_STARTED`；NeoForge 对应 `ServerStartingE
 
 
 
-### 2026-11-07 实现记录（封控未解除）
+### 2026-11-07 实现与验收完成记录
 
-S1、S2 已完成；S3 的共享生命周期接入已完成，实机记录待补；S4 的 QUERY-01～10、生命周期、双目标自动检查已通过，详情见 `QUERY_API_ACCEPTANCE.md`。本轮 API_VERSION、generationRulesVersion、worldModelVersion、世界缓存版本和已提交 golden 文件均未改变。v1 的字段、单位、取值域、缺失条件及量化行为保持不变；没有 D-049 breaking 变更。
+S1～S5 已完成；S3 的共享生命周期已通过 1.21.1 NeoForge 与 26.3 Fabric 实机 A→empty→B；S4 的 QUERY-01～10、生命周期、双目标完整自动检查已通过；S5 已定稿对外 README 并在 D-048 记录解封，详情见 `QUERY_API_ACCEPTANCE.md`。本轮 API_VERSION、generationRulesVersion、worldModelVersion、世界缓存版本和已提交 golden 文件均未改变。v1 的字段、单位、取值域、缺失条件及量化行为保持不变；没有 D-049 breaking 变更。
 
-D-048 的封控必须等两个 Loader 的“进入 A → 标题 → 进入 B”实机结果齐全后另行解除。不得把本节当成封控解除记录。
+两个 Loader 的“进入 A → 标题 → 进入 B”实机证据已齐全，正式封控解除记录在 D-048 下；本节记录最终实现状态。

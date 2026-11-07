@@ -1,0 +1,43 @@
+{
+  "date": "2026-11-07",
+  "version": 1,
+  "format": "geoworld-query-world-switch-evidence",
+  "implementation_commit": "e9098ad7970de132b8c3d4767584ef600b67c36c",
+  "targets": [
+    {
+      "seed_a": "-4250254937638407070",
+      "result": "PASS",
+      "installed_jar_sha256": "a7d217ca33fa977e4a2f493758c6f4e0ced86b8ffd941348a4c0f629eedce63c",
+      "profile": "1.21.1-NeoForge",
+      "log_last_write": "2026-11-07 09:33:12",
+      "seed_b": "987654321",
+      "log_sha256": "0eb3e2502343ee8664ad17e4537a121e3de4b2a36ea85a71c3d0f6d24b9d29c9",
+      "log_encoding": "GBK",
+      "log_path": "D:\\games\\hmcl\\.minecraft\\versions\\1.21.1-NeoForge\\logs\\latest.log",
+      "lifecycle_events": [
+        "[0711月2026 09:31:40.790] [Server thread/INFO] [geoworld.minecraft.v26common.runtime.GeoWorldV26WorldService/]: GeoWorld Query bound Overworld facts: currentWorld=true, seed=-4250254937638407070, profile=geoworld-profile-v1.1, rules=geoworld-rules-v1.1.16, model=geoworld-model-v1",
+        "[0711月2026 09:31:57.704] [Server thread/INFO] [geoworld.minecraft.v26common.runtime.GeoWorldV26WorldService/]: Released GeoWorld model and Query facts for D:\\games\\hmcl\\.minecraft\\versions\\1.21.1-NeoForge\\saves\\live-world; currentWorld=false",
+        "[0711月2026 09:32:23.154] [Server thread/INFO] [geoworld.minecraft.v26common.runtime.GeoWorldV26WorldService/]: GeoWorld Query bound Overworld facts: currentWorld=true, seed=987654321, profile=geoworld-profile-v1.1, rules=geoworld-rules-v1.1.16, model=geoworld-model-v1",
+        "[0711月2026 09:33:08.964] [Server thread/INFO] [geoworld.minecraft.v26common.runtime.GeoWorldV26WorldService/]: Released GeoWorld model and Query facts for D:\\games\\hmcl\\.minecraft\\versions\\1.21.1-NeoForge\\saves\\987654321; currentWorld=false"
+      ]
+    },
+    {
+      "seed_a": "123456",
+      "result": "PASS",
+      "installed_jar_sha256": "ce7dcb2576cb99f0bd2cc7944b806075d3926f0dc273ddb45e29c7b6b85dc109",
+      "profile": "26.3-Fabric",
+      "log_last_write": "2026-11-07 09:36:17",
+      "seed_b": "987654321",
+      "log_sha256": "5bee48167c79cdbbe7ecdd69057dc1019b9292400bb05fa2b4295dc08dde5008",
+      "log_encoding": "GBK",
+      "log_path": "D:\\games\\hmcl\\.minecraft\\versions\\26.3-Fabric\\logs\\latest.log",
+      "lifecycle_events": [
+        "[09:34:40] [Server thread/INFO]: GeoWorld Query bound Overworld facts: currentWorld=true, seed=123456, profile=geoworld-profile-v1.1, rules=geoworld-rules-v1.1.14, model=geoworld-model-v1",
+        "[09:35:11] [Server thread/INFO]: Released GeoWorld model and Query facts for D:\\games\\hmcl\\.minecraft\\versions\\26.3-Fabric\\saves\\123456; currentWorld=false",
+        "[09:35:32] [Server thread/INFO]: GeoWorld Query bound Overworld facts: currentWorld=true, seed=987654321, profile=geoworld-profile-v1.1, rules=geoworld-rules-v1.1.16, model=geoworld-model-v1",
+        "[09:36:16] [Server thread/INFO]: Released GeoWorld model and Query facts for D:\\games\\hmcl\\.minecraft\\versions\\26.3-Fabric\\saves\\987654321; currentWorld=false"
+      ]
+    }
+  ],
+  "timezone": "Asia/Shanghai"
+}
