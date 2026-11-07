@@ -90,6 +90,7 @@ jobs:
           curl --fail --silent --show-error --retry 3 "${auth[@]}" \
             "$api/project/$MODRINTH_PROJECT_ID" > project.json
           jq -e '.slug == "geo-world"' project.json > /dev/null
+          jq -r '"Modrinth project status: " + .status + "; requested status: " + (.requested_status // "none")' project.json
           code=$(curl --silent --show-error --retry 3 -o existing.json -w '%{http_code}' \
             "${auth[@]}" "$api/project/$MODRINTH_PROJECT_ID/version/$VERSION_NUMBER")
           case "$code" in
