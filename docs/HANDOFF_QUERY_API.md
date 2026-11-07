@@ -60,12 +60,12 @@ Query API 代码与自动验收已经落地，**仍未对外解封**。接下来
 4. 在验收主文档记录目标、时间、A/B Seed 和对应日志，勾选两项人工检查。
 5. 全部检查齐全后才在 D-048 **另行**写封控解除日期/提交，并将 `FOUNDATION_API.md` §7 的对外说明定稿到 `java/runtime-reader/README.md` 的 Query API 小节；同步 STATUS 后单独提交。
 
-当前 HMCL mods 未自动替换；本轮没有进行这两个实机步骤，不能声称已经验证。只提供逻辑服务端主世界自然事实，不做区域查询、不实现玩法或 LocalReality Provider。保持字段、单位、缺失条件、生成结果、generationRulesVersion、缓存号及 golden 文件不变；DECISIONS 保持 CRLF；只提交相关文件，不 force push、不 amend。
+2026-11-07 09:22 已在确认 Minecraft 未运行后，为 1.21.1-NeoForge 与 26.3-Fabric 安装本轮验收包；SHA-256 与下表一致。两个实机步骤仍待人工进行，不能声称已经验证。只提供逻辑服务端主世界自然事实，不做区域查询、不实现玩法或 LocalReality Provider。保持字段、单位、缺失条件、生成结果、generationRulesVersion、缓存号及 golden 文件不变；DECISIONS 保持 CRLF；只提交相关文件，不 force push、不 amend。
 
 
-### 验收候选包（2026-11-07，未自动安装）
+### 验收候选包（2026-11-07 09:22 已安装）
 
-目录：`D:\projects\minecraft-geo-world\output\query-api-acceptance`。JAR 已检查包含门面、视图、内部绑定和当前生命周期诊断；旧 HMCL mods 未替换。
+目录：`D:\projects\minecraft-geo-world\output\query-api-acceptance`。JAR 已检查包含门面、视图、内部绑定和当前生命周期诊断；旧包已备份到 `D:/games/hmcl/geoworld-backups/query-api-20261107-092237/`，每个目标 mods 目录只有一个启用的 GeoWorld JAR。
 
 | 文件 | SHA-256 |
 |---|---|
