@@ -33,21 +33,27 @@ type RiverReport struct {
 	Segments int `json:"segments"`
 	Routes   int `json:"routes"`
 
-	RouteDrySamples               int               `json:"routeDrySamples"`
-	TraversedSurfaceRiseSteps     int               `json:"traversedSurfaceRiseSteps"`
-	TraversedInternalRiseSteps    int               `json:"traversedInternalRiseSteps"`
-	TraversedReceiverRiseSteps    int               `json:"traversedReceiverRiseSteps"`
-	UniqueSurfaceRiseSteps        int               `json:"uniqueSurfaceRiseSteps"`
-	UniqueInternalRiseSteps       int               `json:"uniqueInternalRiseSteps"`
-	UniqueReceiverRiseSteps       int               `json:"uniqueReceiverRiseSteps"`
-	InternalRiseAboveQuarterBlock int               `json:"internalRiseAboveQuarterBlock"`
-	InternalRiseAboveOneBlock     int               `json:"internalRiseAboveOneBlock"`
-	MaxInternalRiseBlocks         float64           `json:"maxInternalRiseBlocks"`
-	MaxReceiverRiseBlocks         float64           `json:"maxReceiverRiseBlocks"`
-	DownstreamSteeperRoutes       int               `json:"downstreamSteeperRoutes"`
-	RouteProfiles                 []RouteProfile    `json:"routeProfiles,omitempty"`
-	InternalRiseSignals           []RiverRiseSignal `json:"internalRiseSignals,omitempty"`
-	ReceiverRiseSignals           []RiverRiseSignal `json:"receiverRiseSignals,omitempty"`
+	RouteDrySamples                    int               `json:"routeDrySamples"`
+	TraversedSurfaceRiseSteps          int               `json:"traversedSurfaceRiseSteps"`
+	TraversedInternalRiseSteps         int               `json:"traversedInternalRiseSteps"`
+	TraversedReceiverRiseSteps         int               `json:"traversedReceiverRiseSteps"`
+	UniqueSurfaceRiseSteps             int               `json:"uniqueSurfaceRiseSteps"`
+	UniqueInternalRiseSteps            int               `json:"uniqueInternalRiseSteps"`
+	UniqueReceiverRiseSteps            int               `json:"uniqueReceiverRiseSteps"`
+	InternalRiseAboveQuarterBlock      int               `json:"internalRiseAboveQuarterBlock"`
+	InternalRiseAboveOneBlock          int               `json:"internalRiseAboveOneBlock"`
+	MaxInternalRiseBlocks              float64           `json:"maxInternalRiseBlocks"`
+	MaxReceiverRiseBlocks              float64           `json:"maxReceiverRiseBlocks"`
+	DownstreamSteeperRoutes            int               `json:"downstreamSteeperRoutes"`
+	LongFreeFlowRoutes                 int               `json:"longFreeFlowRoutes"`
+	BroadDownstreamSteepeningSignals   int               `json:"broadDownstreamSteepeningSignals"`
+	DrainageOutlets                    int               `json:"drainageOutlets"`
+	LongRepresentativeDrainages        int               `json:"longRepresentativeDrainages"`
+	BroadDownstreamSteepeningDrainages int               `json:"broadDownstreamSteepeningDrainages"`
+	RouteProfiles                      []RouteProfile    `json:"routeProfiles,omitempty"`
+	RepresentativeDrainageProfiles     []RouteProfile    `json:"representativeDrainageProfiles,omitempty"`
+	InternalRiseSignals                []RiverRiseSignal `json:"internalRiseSignals,omitempty"`
+	ReceiverRiseSignals                []RiverRiseSignal `json:"receiverRiseSignals,omitempty"`
 
 	Confluences                int                `json:"confluences"`
 	ConfluenceSurfaceRises     int                `json:"confluenceSurfaceRises"`
@@ -64,19 +70,50 @@ type RiverReport struct {
 }
 
 type RouteProfile struct {
-	SourceNode        int     `json:"sourceNode"`
-	EndNode           int     `json:"endNode"`
-	Segments          int     `json:"segments"`
-	LengthBlocks      float64 `json:"lengthBlocks"`
-	TotalDropBlocks   float64 `json:"totalDropBlocks"`
-	UpperDropPerKm    float64 `json:"upperDropPerKm"`
-	MiddleDropPerKm   float64 `json:"middleDropPerKm"`
-	LowerDropPerKm    float64 `json:"lowerDropPerKm"`
-	DrySamples        int     `json:"drySamples"`
-	SurfaceRiseSteps  int     `json:"surfaceRiseSteps"`
-	InternalRiseSteps int     `json:"internalRiseSteps"`
-	ReceiverRiseSteps int     `json:"receiverRiseSteps"`
-	DownstreamSteeper bool    `json:"downstreamSteeper"`
+	SourceNode                   int     `json:"sourceNode"`
+	EndNode                      int     `json:"endNode"`
+	Segments                     int     `json:"segments"`
+	LengthBlocks                 float64 `json:"lengthBlocks"`
+	TotalDropBlocks              float64 `json:"totalDropBlocks"`
+	UpperDropPerKm               float64 `json:"upperDropPerKm"`
+	MiddleDropPerKm              float64 `json:"middleDropPerKm"`
+	LowerDropPerKm               float64 `json:"lowerDropPerKm"`
+	DrySamples                   int     `json:"drySamples"`
+	SurfaceRiseSteps             int     `json:"surfaceRiseSteps"`
+	InternalRiseSteps            int     `json:"internalRiseSteps"`
+	ReceiverRiseSteps            int     `json:"receiverRiseSteps"`
+	DownstreamSteeper            bool    `json:"downstreamSteeper"`
+	FreeFlowLengthBlocks         float64 `json:"freeFlowLengthBlocks"`
+	FreeFlowDropBlocks           float64 `json:"freeFlowDropBlocks"`
+	FreeUpperDropPerKm           float64 `json:"freeUpperDropPerKm"`
+	FreeMiddleDropPerKm          float64 `json:"freeMiddleDropPerKm"`
+	FreeLowerDropPerKm           float64 `json:"freeLowerDropPerKm"`
+	LongFreeFlow                 bool    `json:"longFreeFlow"`
+	BroadDownstreamSteepening    bool    `json:"broadDownstreamSteepening"`
+	EndWaterKind                 string  `json:"endWaterKind"`
+	EndOceanMouth                bool    `json:"endOceanMouth"`
+	EndLakeMouth                 bool    `json:"endLakeMouth"`
+	EndLakeOutlet                bool    `json:"endLakeOutlet"`
+	FreeUpperMountainWeight      float64 `json:"freeUpperMountainWeight"`
+	FreeLowerMountainWeight      float64 `json:"freeLowerMountainWeight"`
+	FreeUpperCanyonWeight        float64 `json:"freeUpperCanyonWeight"`
+	FreeLowerCanyonWeight        float64 `json:"freeLowerCanyonWeight"`
+	FreeUpperValleyWeight        float64 `json:"freeUpperValleyWeight"`
+	FreeLowerValleyWeight        float64 `json:"freeLowerValleyWeight"`
+	FreeUpperPlainWeight         float64 `json:"freeUpperPlainWeight"`
+	FreeLowerPlainWeight         float64 `json:"freeLowerPlainWeight"`
+	FreeUpperTerrainDropPerKm    float64 `json:"freeUpperTerrainDropPerKm"`
+	FreeLowerTerrainDropPerKm    float64 `json:"freeLowerTerrainDropPerKm"`
+	FreeUpperCoastDropPerKm      float64 `json:"freeUpperCoastDropPerKm"`
+	FreeLowerCoastDropPerKm      float64 `json:"freeLowerCoastDropPerKm"`
+	FreeUpperBaseDropPerKm       float64 `json:"freeUpperBaseDropPerKm"`
+	FreeLowerBaseDropPerKm       float64 `json:"freeLowerBaseDropPerKm"`
+	FreeUpperFloodplainWeight    float64 `json:"freeUpperFloodplainWeight"`
+	FreeLowerFloodplainWeight    float64 `json:"freeLowerFloodplainWeight"`
+	FreeUpperAlluvialPlainWeight float64 `json:"freeUpperAlluvialPlainWeight"`
+	FreeLowerAlluvialPlainWeight float64 `json:"freeLowerAlluvialPlainWeight"`
+	FreeUpperDepositionPotential float64 `json:"freeUpperDepositionPotential"`
+	FreeLowerDepositionPotential float64 `json:"freeLowerDepositionPotential"`
 }
 
 type RiverRiseSignal struct {
@@ -129,16 +166,27 @@ type TransitionClassStats struct {
 }
 
 type routePoint struct {
-	distance        float64
-	surfaceY        float64
-	wet             bool
-	receiverRelated bool
-	segment         int
-	t               float64
-	x               float64
-	z               float64
-	waterKind       reconcile.WaterKind
-	specialFeature  string
+	distance            float64
+	surfaceY            float64
+	wet                 bool
+	receiverRelated     bool
+	segment             int
+	t                   float64
+	x                   float64
+	z                   float64
+	waterKind           reconcile.WaterKind
+	specialFeature      string
+	connectionSegment   bool
+	mountainWeight      float64
+	canyonWeight        float64
+	valleyWeight        float64
+	plainWeight         float64
+	terrainY            float64
+	coastTerrainY       float64
+	baseElevationY      float64
+	floodplainWeight    float64
+	alluvialPlainWeight float64
+	depositionPotential float64
 }
 
 type transitionAccumulator struct {
@@ -241,9 +289,13 @@ func auditRivers(model *generator.WorldModel, cfg Config, report *RiverReport) {
 		if profile.DownstreamSteeper {
 			report.DownstreamSteeperRoutes++
 		}
-		if len(report.RouteProfiles) < cfg.MaxDetailRecords {
-			report.RouteProfiles = append(report.RouteProfiles, profile)
+		if profile.LongFreeFlow {
+			report.LongFreeFlowRoutes++
 		}
+		if profile.BroadDownstreamSteepening {
+			report.BroadDownstreamSteepeningSignals++
+		}
+		report.RouteProfiles = append(report.RouteProfiles, profile)
 	}
 
 	for _, rise := range uniqueRises {
@@ -269,12 +321,53 @@ func auditRivers(model *generator.WorldModel, cfg Config, report *RiverReport) {
 		}
 	}
 
+	bestByOutlet := make(map[int]RouteProfile)
+	for _, profile := range report.RouteProfiles {
+		best, exists := bestByOutlet[profile.EndNode]
+		if !exists ||
+			profile.FreeFlowLengthBlocks > best.FreeFlowLengthBlocks ||
+			(profile.FreeFlowLengthBlocks == best.FreeFlowLengthBlocks &&
+				profile.LengthBlocks > best.LengthBlocks) {
+			bestByOutlet[profile.EndNode] = profile
+		}
+	}
+	report.DrainageOutlets = len(bestByOutlet)
+	for _, profile := range bestByOutlet {
+		if profile.LongFreeFlow {
+			report.LongRepresentativeDrainages++
+		}
+		if profile.BroadDownstreamSteepening {
+			report.BroadDownstreamSteepeningDrainages++
+		}
+		report.RepresentativeDrainageProfiles = append(
+			report.RepresentativeDrainageProfiles,
+			profile,
+		)
+	}
+
 	sort.Slice(report.InternalRiseSignals, func(i, j int) bool {
 		return report.InternalRiseSignals[i].RiseBlocks > report.InternalRiseSignals[j].RiseBlocks
 	})
 	sort.Slice(report.ReceiverRiseSignals, func(i, j int) bool {
 		return report.ReceiverRiseSignals[i].RiseBlocks > report.ReceiverRiseSignals[j].RiseBlocks
 	})
+	sort.Slice(report.RepresentativeDrainageProfiles, func(i, j int) bool {
+		return report.RepresentativeDrainageProfiles[i].FreeFlowLengthBlocks >
+			report.RepresentativeDrainageProfiles[j].FreeFlowLengthBlocks
+	})
+	if len(report.RepresentativeDrainageProfiles) > cfg.MaxDetailRecords {
+		report.RepresentativeDrainageProfiles =
+			report.RepresentativeDrainageProfiles[:cfg.MaxDetailRecords]
+	}
+	sort.Slice(report.RouteProfiles, func(i, j int) bool {
+		if report.RouteProfiles[i].FreeFlowLengthBlocks != report.RouteProfiles[j].FreeFlowLengthBlocks {
+			return report.RouteProfiles[i].FreeFlowLengthBlocks > report.RouteProfiles[j].FreeFlowLengthBlocks
+		}
+		return report.RouteProfiles[i].LengthBlocks > report.RouteProfiles[j].LengthBlocks
+	})
+	if len(report.RouteProfiles) > cfg.MaxDetailRecords {
+		report.RouteProfiles = report.RouteProfiles[:cfg.MaxDetailRecords]
+	}
 
 	auditConfluences(model, cfg, incoming, outgoing, report)
 	auditMouths(model, cfg, report)
@@ -325,6 +418,7 @@ func profileRoute(model *generator.WorldModel, cfg Config, route []int) (RoutePr
 			havePrevious = true
 			sample := finalRuntimeSample(model, x, z)
 			ground := model.Waterbed.Sample(x, z)
+			terrainSample := model.Terrain.Sample(x, z)
 			wet := sample.World.WaterSurfaceDefined &&
 				sample.World.WaterKind != reconcile.WaterNone
 			surfaceY := 0.0
@@ -338,21 +432,38 @@ func profileRoute(model *generator.WorldModel, cfg Config, route []int) (RoutePr
 				receiverRelated: ground.RiverReceiverSurfaceDefined ||
 					sample.World.WaterKind == reconcile.WaterLake ||
 					sample.World.WaterKind == reconcile.WaterOcean,
-				segment:        id,
-				t:              t,
-				x:              x,
-				z:              z,
-				waterKind:      sample.World.WaterKind,
-				specialFeature: sample.SpecialFeature,
+				segment:             id,
+				t:                   t,
+				x:                   x,
+				z:                   z,
+				waterKind:           sample.World.WaterKind,
+				specialFeature:      sample.SpecialFeature,
+				connectionSegment:   seg.OceanMouth || seg.LakeMouth || seg.LakeOutlet,
+				mountainWeight:      terrainSample.MountainWeight,
+				canyonWeight:        terrainSample.CanyonWeight,
+				valleyWeight:        terrainSample.ValleyWeight,
+				plainWeight:         terrainSample.RollingPlainWeight,
+				terrainY:            minecraftY(terrainSample.FinalHeight),
+				coastTerrainY:       minecraftY(model.CoastTerrain.SampleNormalized(x, z)),
+				baseElevationY:      minecraftY(terrainSample.BaseElevation),
+				floodplainWeight:    terrainSample.FloodplainWeight,
+				alluvialPlainWeight: terrainSample.AlluvialPlainWeight,
+				depositionPotential: terrainSample.DepositionPotential,
 			})
 		}
 	}
 
 	out := RouteProfile{
-		SourceNode:   first.From,
-		EndNode:      last.To,
-		Segments:     len(route),
-		LengthBlocks: totalDistance,
+		SourceNode:    first.From,
+		EndNode:       last.To,
+		Segments:      len(route),
+		LengthBlocks:  totalDistance,
+		EndOceanMouth: last.OceanMouth,
+		EndLakeMouth:  last.LakeMouth,
+		EndLakeOutlet: last.LakeOutlet,
+	}
+	if len(points) > 0 {
+		out.EndWaterKind = waterKindName(points[len(points)-1].waterKind)
 	}
 	if len(points) == 0 || totalDistance <= 1e-9 {
 		return out, nil
@@ -418,7 +529,216 @@ func profileRoute(model *generator.WorldModel, cfg Config, route []int) (RoutePr
 	out.DownstreamSteeper =
 		out.LowerDropPerKm > out.UpperDropPerKm*1.75 &&
 			out.LowerDropPerKm-out.UpperDropPerKm > 0.5
+
+	free := longestFreeFlowRun(points)
+	if len(free) >= 2 {
+		freeStart := free[0].distance
+		freeEnd := free[len(free)-1].distance
+		freeLength := freeEnd - freeStart
+		out.FreeFlowLengthBlocks = freeLength
+		summarizeFreeFlowTerrain(&out, free)
+		if freeLength > 1e-9 {
+			start, okStart := surfaceAt(free, freeStart)
+			q1, okQ1 := surfaceAt(free, freeStart+freeLength/3)
+			q2, okQ2 := surfaceAt(free, freeStart+2*freeLength/3)
+			end, okEnd := surfaceAt(free, freeEnd)
+			thirdKm := freeLength / 3 / 1000
+			if okStart && okEnd {
+				out.FreeFlowDropBlocks = start - end
+			}
+			if thirdKm > 1e-9 {
+				if okStart && okQ1 {
+					out.FreeUpperDropPerKm = (start - q1) / thirdKm
+				}
+				if okQ1 && okQ2 {
+					out.FreeMiddleDropPerKm = (q1 - q2) / thirdKm
+				}
+				if okQ2 && okEnd {
+					out.FreeLowerDropPerKm = (q2 - end) / thirdKm
+				}
+
+				terrainStart, terrainStartOK := routeScalarAt(
+					free, freeStart, func(p routePoint) float64 { return p.terrainY },
+				)
+				terrainQ1, terrainQ1OK := routeScalarAt(
+					free, freeStart+freeLength/3, func(p routePoint) float64 { return p.terrainY },
+				)
+				terrainQ2, terrainQ2OK := routeScalarAt(
+					free, freeStart+2*freeLength/3, func(p routePoint) float64 { return p.terrainY },
+				)
+				terrainEnd, terrainEndOK := routeScalarAt(
+					free, freeEnd, func(p routePoint) float64 { return p.terrainY },
+				)
+				if terrainStartOK && terrainQ1OK {
+					out.FreeUpperTerrainDropPerKm = (terrainStart - terrainQ1) / thirdKm
+				}
+				if terrainQ2OK && terrainEndOK {
+					out.FreeLowerTerrainDropPerKm = (terrainQ2 - terrainEnd) / thirdKm
+				}
+
+				coastStart, coastStartOK := routeScalarAt(
+					free, freeStart, func(p routePoint) float64 { return p.coastTerrainY },
+				)
+				coastQ1, coastQ1OK := routeScalarAt(
+					free, freeStart+freeLength/3, func(p routePoint) float64 { return p.coastTerrainY },
+				)
+				coastQ2, coastQ2OK := routeScalarAt(
+					free, freeStart+2*freeLength/3, func(p routePoint) float64 { return p.coastTerrainY },
+				)
+				coastEnd, coastEndOK := routeScalarAt(
+					free, freeEnd, func(p routePoint) float64 { return p.coastTerrainY },
+				)
+				if coastStartOK && coastQ1OK {
+					out.FreeUpperCoastDropPerKm = (coastStart - coastQ1) / thirdKm
+				}
+				if coastQ2OK && coastEndOK {
+					out.FreeLowerCoastDropPerKm = (coastQ2 - coastEnd) / thirdKm
+				}
+
+				baseStart, baseStartOK := routeScalarAt(
+					free, freeStart, func(p routePoint) float64 { return p.baseElevationY },
+				)
+				baseQ1, baseQ1OK := routeScalarAt(
+					free, freeStart+freeLength/3, func(p routePoint) float64 { return p.baseElevationY },
+				)
+				baseQ2, baseQ2OK := routeScalarAt(
+					free, freeStart+2*freeLength/3, func(p routePoint) float64 { return p.baseElevationY },
+				)
+				baseEnd, baseEndOK := routeScalarAt(
+					free, freeEnd, func(p routePoint) float64 { return p.baseElevationY },
+				)
+				if baseStartOK && baseQ1OK {
+					out.FreeUpperBaseDropPerKm = (baseStart - baseQ1) / thirdKm
+				}
+				if baseQ2OK && baseEndOK {
+					out.FreeLowerBaseDropPerKm = (baseQ2 - baseEnd) / thirdKm
+				}
+			}
+		}
+	}
+	out.LongFreeFlow = out.FreeFlowLengthBlocks >= 1500
+	out.BroadDownstreamSteepening =
+		out.LongFreeFlow &&
+			out.FreeLowerDropPerKm > out.FreeUpperDropPerKm*1.5 &&
+			out.FreeLowerDropPerKm-out.FreeUpperDropPerKm >= 5
+
 	return out, rises
+}
+
+func longestFreeFlowRun(points []routePoint) []routePoint {
+	bestStart, bestEnd := -1, -1
+	start := -1
+	for i, point := range points {
+		free := point.wet &&
+			point.waterKind == reconcile.WaterRiver &&
+			!point.receiverRelated &&
+			!point.connectionSegment
+		if free {
+			if start < 0 {
+				start = i
+			}
+			continue
+		}
+		if start >= 0 {
+			if bestStart < 0 ||
+				points[i-1].distance-points[start].distance >
+					points[bestEnd].distance-points[bestStart].distance {
+				bestStart, bestEnd = start, i-1
+			}
+			start = -1
+		}
+	}
+	if start >= 0 {
+		end := len(points) - 1
+		if bestStart < 0 ||
+			points[end].distance-points[start].distance >
+				points[bestEnd].distance-points[bestStart].distance {
+			bestStart, bestEnd = start, end
+		}
+	}
+	if bestStart < 0 || bestEnd <= bestStart {
+		return nil
+	}
+	return points[bestStart : bestEnd+1]
+}
+
+func summarizeFreeFlowTerrain(out *RouteProfile, points []routePoint) {
+	if out == nil || len(points) == 0 {
+		return
+	}
+	start := points[0].distance
+	length := points[len(points)-1].distance - start
+	if length <= 1e-9 {
+		return
+	}
+	upperCount, lowerCount := 0.0, 0.0
+	for _, point := range points {
+		q := (point.distance - start) / length
+		switch {
+		case q <= 1.0/3.0:
+			upperCount++
+			out.FreeUpperMountainWeight += point.mountainWeight
+			out.FreeUpperCanyonWeight += point.canyonWeight
+			out.FreeUpperValleyWeight += point.valleyWeight
+			out.FreeUpperPlainWeight += point.plainWeight
+			out.FreeUpperFloodplainWeight += point.floodplainWeight
+			out.FreeUpperAlluvialPlainWeight += point.alluvialPlainWeight
+			out.FreeUpperDepositionPotential += point.depositionPotential
+		case q >= 2.0/3.0:
+			lowerCount++
+			out.FreeLowerMountainWeight += point.mountainWeight
+			out.FreeLowerCanyonWeight += point.canyonWeight
+			out.FreeLowerValleyWeight += point.valleyWeight
+			out.FreeLowerPlainWeight += point.plainWeight
+			out.FreeLowerFloodplainWeight += point.floodplainWeight
+			out.FreeLowerAlluvialPlainWeight += point.alluvialPlainWeight
+			out.FreeLowerDepositionPotential += point.depositionPotential
+		}
+	}
+	if upperCount > 0 {
+		out.FreeUpperMountainWeight /= upperCount
+		out.FreeUpperCanyonWeight /= upperCount
+		out.FreeUpperValleyWeight /= upperCount
+		out.FreeUpperPlainWeight /= upperCount
+		out.FreeUpperFloodplainWeight /= upperCount
+		out.FreeUpperAlluvialPlainWeight /= upperCount
+		out.FreeUpperDepositionPotential /= upperCount
+	}
+	if lowerCount > 0 {
+		out.FreeLowerMountainWeight /= lowerCount
+		out.FreeLowerCanyonWeight /= lowerCount
+		out.FreeLowerValleyWeight /= lowerCount
+		out.FreeLowerPlainWeight /= lowerCount
+		out.FreeLowerFloodplainWeight /= lowerCount
+		out.FreeLowerAlluvialPlainWeight /= lowerCount
+		out.FreeLowerDepositionPotential /= lowerCount
+	}
+}
+
+func routeScalarAt(
+	points []routePoint,
+	distance float64,
+	value func(routePoint) float64,
+) (float64, bool) {
+	if len(points) == 0 || value == nil {
+		return 0, false
+	}
+	if distance <= points[0].distance {
+		return value(points[0]), true
+	}
+	for i := 1; i < len(points); i++ {
+		if points[i].distance < distance {
+			continue
+		}
+		a, b := points[i-1], points[i]
+		span := b.distance - a.distance
+		if span <= 1e-9 {
+			return value(b), true
+		}
+		t := (distance - a.distance) / span
+		return value(a) + (value(b)-value(a))*t, true
+	}
+	return value(points[len(points)-1]), true
 }
 
 func surfaceAt(points []routePoint, distance float64) (float64, bool) {

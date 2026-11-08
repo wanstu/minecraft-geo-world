@@ -276,3 +276,76 @@ R2 约束：
   - 河流通过盆地时表现为合理的出口谷/河流走廊，而不是狭窄高架水槽。
 
 河谷宽度、山口冲积扇和更多真实 DEM 对照继续作为 R1/R4/R6 后续指标。
+
+
+## 10. R2 整河纵剖面责任层定位
+
+盆地河流修复后，继续对标准 `320 × 200 / Seed 123456 / v1.1.18` 做整河纵剖面审计。
+
+为避免旧统计误导，本轮新增：
+
+- 排除 receiver/backwater 点。
+- 排除整条 OceanMouth / LakeMouth / LakeOutlet 正式接收段。
+- 只统计连续自由流水段。
+- 长河阈值：`>= 1500 blocks`。
+- 按最终 outlet 去重，每个流域只保留最长代表路径。
+- 同时记录 WaterSurface、Terrain、CoastTerrain、BaseElevation 的上/下游坡降。
+- 同时记录 mountain/canyon/valley/plain、floodplain、alluvial plain、deposition 权重。
+
+标准 Seed 结果：
+
+```text
+long free-flow source routes           = 58
+drainage outlets                       = 68
+long representative drainages          = 27
+broad downstream-steepening drainages  = 22
+```
+
+这里的 `22` 仍然只作为 investigation signal，但已经排除了：
+
+- 多源头共享下游主干造成的重复计数。
+- receiver/backwater 尾段。
+- 正式河口 / 湖口连接段。
+
+### 责任层对照
+
+典型异常流域：
+
+```text
+source 29701 → outlet 29415
+river:   upper 10.55 block/km → lower 25.00
+terrain: upper  9.86 block/km → lower 20.81
+coast:   upper  9.86 block/km → lower 20.81
+base:    upper  7.04 block/km → lower 20.68
+```
+
+```text
+source 20366 → outlet 13661
+river:   upper  4.71 block/km → lower 38.27
+terrain: upper  4.70 block/km → lower 34.85
+coast:   upper  4.70 block/km → lower 34.85
+base:    upper  4.53 block/km → lower 29.95
+```
+
+```text
+source 17401 → outlet 21861
+river lower ≈ 34.57 block/km
+terrain lower ≈ 36.93 block/km
+base lower ≈ 41.08 block/km
+```
+
+结论：
+
+1. **Waterbed 不是广义下游变陡的来源。** 它主要沿已有 broad terrain 下切，并保证河床单调。
+2. **CoastCorrection 不是来源。** 典型异常的 Terrain 与 CoastTerrain 坡降相同。
+3. **异常在 ErodedElevation / BaseElevation 已经存在。**
+4. 当前 Terrain 的沉积只是：
+   `DepositionPotential * DepositionLift + AlluvialFan * AlluvialFanLift`，
+   属于局部垂直抬高，没有建立沿 FlowTo 的纵向冲积基准面。
+5. 下游 floodplain / alluvial / deposition 权重经常已经变高，但仍不能抵消 BaseElevation 的急降；部分最陡流域的下游沉积权重甚至偏低。
+
+因此 R2 下一项不修改 Waterbed，而是进入：
+
+> **Erosion / Geomorph 的河流纵向基准面与冲积平衡。**
+
+目标不是把所有河强制拉平，而是让强河流在低地、冲积平原环境中形成可解释的长期 graded profile；山地溪流、峡谷和真实急流仍保留陡坡。

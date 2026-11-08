@@ -51,7 +51,7 @@ func TestAnalyzeGeneratedWorldIsReadOnlyAndJSONSafe(t *testing.T) {
 	}
 
 	t.Logf(
-		"signals: routes=%d traversed=%d unique=%d internal=%d receiver=%d internal>=0.25=%d internal>=1=%d maxInternal=%.4f downstreamSteeper=%d confluences=%d confluenceRises=%d widthRegressions=%d mouths=%d mouthRises=%d mouthNarrow=%d transitions=%d",
+		"signals: routes=%d traversed=%d unique=%d internal=%d receiver=%d internal>=0.25=%d internal>=1=%d maxInternal=%.4f legacyDownstreamSteeper=%d longFree=%d broadSteepening=%d outlets=%d longDrainages=%d broadDrainages=%d confluences=%d confluenceRises=%d widthRegressions=%d mouths=%d mouthRises=%d mouthNarrow=%d transitions=%d",
 		report.River.Routes,
 		report.River.TraversedSurfaceRiseSteps,
 		report.River.UniqueSurfaceRiseSteps,
@@ -61,6 +61,11 @@ func TestAnalyzeGeneratedWorldIsReadOnlyAndJSONSafe(t *testing.T) {
 		report.River.InternalRiseAboveOneBlock,
 		report.River.MaxInternalRiseBlocks,
 		report.River.DownstreamSteeperRoutes,
+		report.River.LongFreeFlowRoutes,
+		report.River.BroadDownstreamSteepeningSignals,
+		report.River.DrainageOutlets,
+		report.River.LongRepresentativeDrainages,
+		report.River.BroadDownstreamSteepeningDrainages,
 		report.River.Confluences,
 		report.River.ConfluenceSurfaceRises,
 		report.River.ConfluenceWidthRegressions,
