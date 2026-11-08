@@ -239,7 +239,7 @@ Biome 表示长期生态，不直接代表瞬时天气。
 
 ## Phase 8 — 真实地貌强化（Realistic Geomorphology）
 
-状态：**R0 已完成；R1 验收框架准备开始。**
+状态：**R0、R1 第一阶段已完成；R2 已定位为特殊盆地穿河纵剖面问题。**
 
 目标：
 
@@ -250,7 +250,7 @@ Biome 表示长期生态，不直接代表瞬时天气。
 
 DADM 规则：audit 默认只产生调查信号；没有最终 Runtime / Minecraft voxel 可复现证据，不修改生成算法。历史 receiver v1.1.17 方案已回退，不得因 strict 统计单独恢复。
 
-详细方案见 [REALISTIC_GEOMORPHOLOGY.md](REALISTIC_GEOMORPHOLOGY.md)，R0 见 [REALISTIC_GEOMORPHOLOGY_R0_AUDIT.md](REALISTIC_GEOMORPHOLOGY_R0_AUDIT.md)。
+详细方案见 [REALISTIC_GEOMORPHOLOGY.md](REALISTIC_GEOMORPHOLOGY.md)，R0 见 [REALISTIC_GEOMORPHOLOGY_R0_AUDIT.md](REALISTIC_GEOMORPHOLOGY_R0_AUDIT.md)，R1 见 [REALISTIC_GEOMORPHOLOGY_R1_ACCEPTANCE.md](REALISTIC_GEOMORPHOLOGY_R1_ACCEPTANCE.md)。
 
 ## 最终地形连续性原则
 
