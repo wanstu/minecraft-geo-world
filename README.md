@@ -145,6 +145,7 @@ Useful project documents include:
 - `docs/ROADMAP.md` — longer-term roadmap.
 - `docs/CHUNK_PERFORMANCE.md` — chunk-generation performance work.
 - `docs/MINERALS_AND_BIOME_COVERAGE.md` — mineral and biome coverage notes.
+- `docs/REALISTIC_GEOMORPHOLOGY.md` — realistic erosion, sedimentation, hydrology, terrain-transition and real-world morphology acceptance plan.
 
 GeoWorld is under active development. World-model formats and generation behavior may still change between development versions.
 
@@ -301,6 +302,7 @@ gradlew.bat build
 - `docs/ROADMAP.md`：后续路线。
 - `docs/CHUNK_PERFORMANCE.md`：区块生成性能优化记录。
 - `docs/MINERALS_AND_BIOME_COVERAGE.md`：矿物和群系覆盖说明。
+- `docs/REALISTIC_GEOMORPHOLOGY.md`：真实侵蚀、沉积、水文一致性、地貌过渡与真实地貌对照验收计划。
 
 GeoWorld 仍在持续开发中，开发版本之间的世界模型格式和生成结果仍可能发生变化。
 

@@ -237,6 +237,21 @@ Biome 表示长期生态，不直接代表瞬时天气。
 - GeoWorld API 与性能/缓存。
 - 首个 Loader 稳定后再扩展其它 Loader。
 
+## Phase 8 — 真实地貌强化（Realistic Geomorphology）
+
+状态：**R0 已完成；R1 验收框架准备开始。**
+
+目标：
+
+- 完善侵蚀与沉积的成因关系。
+- 加强河流纵剖面、汇流、湖泊出口和河口与最终地形的一致性。
+- 优化山地、平原、盆地、海岸等地貌过渡。
+- 建立真实 DEM / 河网 / 典型地貌对照验收。
+
+DADM 规则：audit 默认只产生调查信号；没有最终 Runtime / Minecraft voxel 可复现证据，不修改生成算法。历史 receiver v1.1.17 方案已回退，不得因 strict 统计单独恢复。
+
+详细方案见 [REALISTIC_GEOMORPHOLOGY.md](REALISTIC_GEOMORPHOLOGY.md)，R0 见 [REALISTIC_GEOMORPHOLOGY_R0_AUDIT.md](REALISTIC_GEOMORPHOLOGY_R0_AUDIT.md)。
+
 ## 最终地形连续性原则
 
 最终 Minecraft 地形不以 Chunk 为生成数学边界。
