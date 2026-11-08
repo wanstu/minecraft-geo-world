@@ -99,13 +99,15 @@ public final class GeoWorldV26MineralVeins {
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || "geoworld-rules-v1.1.18".equals(rules));
     }
 
     private static boolean usesV115MiningDistricts(GeoWorldV1 model) {
         return ("geoworld-rules-v1.1.15".equals(
             model.manifest().generationRulesVersion()
         ) || "geoworld-rules-v1.1.16".equals(
+            model.manifest().generationRulesVersion()
+        ) || "geoworld-rules-v1.1.18".equals(
             model.manifest().generationRulesVersion()
         ));
     }

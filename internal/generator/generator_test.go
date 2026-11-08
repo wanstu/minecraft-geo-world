@@ -235,6 +235,17 @@ func TestRiverDepthDefaultsAreGenerationRuleLocked(t *testing.T) {
 		t.Fatalf("current river geometry version=%d want=5", got)
 	}
 
+	lockedV1116Cfg := testConfig(2026)
+	lockedV1116Cfg.WorldProfile = StandardWorldProfile()
+	lockedV1116Cfg.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.16"
+	lockedV1116, err := resolveTopLevelConfig(lockedV1116Cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := lockedV1116.Waterbed.RiverGeometryVersion; got != 5 {
+		t.Fatalf("locked v1.1.16 river geometry version=%d want=5", got)
+	}
+
 	lockedV1112Cfg := testConfig(2026)
 	lockedV1112Cfg.WorldProfile = StandardWorldProfile()
 	lockedV1112Cfg.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.12"

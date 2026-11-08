@@ -9,6 +9,7 @@ import (
 	"geoworld/internal/mcprofile"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
+	"geoworld/internal/waterbed"
 	"geoworld/internal/world"
 	"geoworld/internal/worldsample"
 )
@@ -33,18 +34,29 @@ type Lobe struct {
 	RadiusZ float64 `json:"radiusZ"`
 }
 
+type BasinDrainageReach struct {
+	X0        float64 `json:"x0"`
+	Z0        float64 `json:"z0"`
+	X1        float64 `json:"x1"`
+	Z1        float64 `json:"z1"`
+	Surface0  float64 `json:"surface0"`
+	Surface1  float64 `json:"surface1"`
+	HalfWidth float64 `json:"halfWidth"`
+}
+
 type Feature struct {
-	ID           int     `json:"id"`
-	Kind         Kind    `json:"kind"`
-	CenterX      float64 `json:"centerX"`
-	CenterZ      float64 `json:"centerZ"`
-	RadiusX      float64 `json:"radiusX"`
-	RadiusZ      float64 `json:"radiusZ"`
-	BaseHeight   float64 `json:"baseHeight,omitempty"`
-	FloorHeight  float64 `json:"floorHeight,omitempty"`
-	RimHeight    float64 `json:"rimHeight,omitempty"`
-	WaterContext string  `json:"waterContext,omitempty"`
-	Lobes        []Lobe  `json:"lobes,omitempty"`
+	ID           int                  `json:"id"`
+	Kind         Kind                 `json:"kind"`
+	CenterX      float64              `json:"centerX"`
+	CenterZ      float64              `json:"centerZ"`
+	RadiusX      float64              `json:"radiusX"`
+	RadiusZ      float64              `json:"radiusZ"`
+	BaseHeight   float64              `json:"baseHeight,omitempty"`
+	FloorHeight  float64              `json:"floorHeight,omitempty"`
+	RimHeight    float64              `json:"rimHeight,omitempty"`
+	WaterContext string               `json:"waterContext,omitempty"`
+	Lobes        []Lobe               `json:"lobes,omitempty"`
+	Drainage     []BasinDrainageReach `json:"drainage,omitempty"`
 }
 
 type candidate struct {
@@ -219,8 +231,146 @@ func Plan(
 		}
 	}
 
+	if usesBasinDrainageCorridors(rulesVersion) {
+		for i := range features {
+			if features[i].Kind != BasinCherry && features[i].Kind != BasinSnow {
+				continue
+			}
+			features[i].Drainage = planBasinDrainage(features[i], runtime)
+		}
+	}
+
 	sort.Slice(features, func(i, j int) bool { return features[i].ID < features[j].ID })
 	return features
+}
+
+func planBasinDrainage(
+	feature Feature,
+	runtime *worldsample.Model,
+) []BasinDrainageReach {
+	if runtime == nil || runtime.Ground == nil {
+		return nil
+	}
+	const stepBlocks = 24.0
+	out := make([]BasinDrainageReach, 0, 64)
+	for _, seg := range runtime.Ground.Rivers {
+		lengthUpperBound := math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0) +
+			math.Pi*math.Abs(seg.MeanderOffset)
+		steps := int(math.Ceil(lengthUpperBound / stepBlocks))
+		if steps < 2 {
+			steps = 2
+		}
+		for j := 0; j < steps; j++ {
+			t0 := float64(j) / float64(steps)
+			t1 := float64(j+1) / float64(steps)
+			x0, z0 := waterbed.RiverCenterPoint(seg, t0)
+			x1, z1 := waterbed.RiverCenterPoint(seg, t1)
+			mx := (x0 + x1) * 0.5
+			mz := (z0 + z1) * 0.5
+			radial, _ := depressionGeometry(feature, mx, mz)
+			if radial > 1.12 {
+				continue
+			}
+			s0 := runtime.Sample(x0, z0)
+			s1 := runtime.Sample(x1, z1)
+			if s0.WaterKind != reconcile.WaterRiver ||
+				s1.WaterKind != reconcile.WaterRiver ||
+				!s0.WaterSurfaceDefined ||
+				!s1.WaterSurfaceDefined {
+				continue
+			}
+			surface0 := s0.WaterSurfaceElevation
+			surface1 := math.Min(s0.WaterSurfaceElevation, s1.WaterSurfaceElevation)
+			out = append(out, BasinDrainageReach{
+				X0:        x0,
+				Z0:        z0,
+				X1:        x1,
+				Z1:        z1,
+				Surface0:  surface0,
+				Surface1:  surface1,
+				HalfWidth: seg.HalfWidth,
+			})
+		}
+	}
+	return out
+}
+
+type basinDrainageSample struct {
+	Distance  float64
+	Surface   float64
+	HalfWidth float64
+}
+
+func sampleBasinDrainage(
+	feature Feature,
+	x, z float64,
+) (basinDrainageSample, bool) {
+	best := basinDrainageSample{Distance: math.Inf(1)}
+	for _, reach := range feature.Drainage {
+		dx := reach.X1 - reach.X0
+		dz := reach.Z1 - reach.Z0
+		length2 := dx*dx + dz*dz
+		t := 0.0
+		if length2 > 1e-12 {
+			t = clamp(
+				((x-reach.X0)*dx+(z-reach.Z0)*dz)/length2,
+				0,
+				1,
+			)
+		}
+		px := reach.X0 + dx*t
+		pz := reach.Z0 + dz*t
+		distance := math.Hypot(x-px, z-pz)
+		if distance >= best.Distance {
+			continue
+		}
+		best = basinDrainageSample{
+			Distance:  distance,
+			Surface:   lerp(reach.Surface0, reach.Surface1, t),
+			HalfWidth: math.Max(1, reach.HalfWidth),
+		}
+	}
+	return best, !math.IsNaN(best.Distance) && !math.IsInf(best.Distance, 0)
+}
+
+func applyBasinDrainageCorridor(
+	feature Feature,
+	baseHeight,
+	basinTarget,
+	x, z float64,
+) float64 {
+	drainage, ok := sampleBasinDrainage(feature, x, z)
+	if !ok {
+		return basinTarget
+	}
+	corridorRadius := clamp(
+		math.Max(112, drainage.HalfWidth*7),
+		112,
+		240,
+	)
+	if drainage.Distance >= corridorRadius {
+		return basinTarget
+	}
+
+	blockStep := 1.0 / 514.0
+	if drainage.Surface < 0.5 {
+		blockStep = 1.0 / 254.0
+	}
+	bankDistance := math.Max(0, drainage.Distance-drainage.HalfWidth)
+	// Keep the active river as the local low point. The corridor rises roughly
+	// one vertical block per 24 horizontal blocks, then fades back into the
+	// ordinary basin floor. This produces an outlet valley/floodplain rather
+	// than a narrow preserved ridge through a radially carved basin.
+	requiredGround := drainage.Surface +
+		blockStep*(1.15+bankDistance/24.0)
+	requiredGround = math.Min(baseHeight, requiredGround)
+	protected := math.Max(basinTarget, requiredGround)
+	blendStart := drainage.HalfWidth + 12
+	weight := 1 - smoothstepRange(blendStart, corridorRadius, drainage.Distance)
+	return math.Min(
+		baseHeight,
+		lerp(basinTarget, protected, weight),
+	)
 }
 
 func collectOceanCandidates(seed int64, g world.GridGeometry, surface *world.Surface) []candidate {
@@ -649,34 +799,57 @@ func Apply(
 			outer := 0.88 + 0.08*wallVariation
 			wall := smoothstepRange(inner, outer, radial)
 			target := math.Min(base.World.GroundHeight, lerp(floor, base.World.GroundHeight, wall))
+			drainageCorridor :=
+				usesBasinDrainageCorridors(rulesVersion) &&
+					len(selected.Drainage) > 0
 			if riverConforming {
-				depth := math.Max(base.World.WaterDepth, 0.002)
-				surface := target + depth
-				ground := target
-				if rulesVersion == "geoworld-rules-v1.1.16" {
-					// Deform the shared water datum, then translate the bed by
-					// the same amount. Mapping each bed onto the dry floor and
-					// adding depth creates a raised, crowned river instead.
-					datum := base.World.GroundHeight + depth
-					if base.World.WaterSurfaceDefined {
-						datum = base.World.WaterSurfaceElevation
-					}
-					riverFloor := depressionFloorHeight(selected, datum, seaLevel)
-					surface = math.Min(datum, lerp(riverFloor-0.002, datum, wall))
-					ground = base.World.GroundHeight - math.Max(0, datum-surface)
+				if drainageCorridor {
+					// The Waterbed river is already hydrologically monotonic.
+					// Keep its datum and incision intact; the surrounding basin
+					// floor is shaped around the persisted drainage corridor so
+					// the river remains a local low point and exits through a
+					// real valley rather than climbing the radial basin wall.
+					out.World = base.World
 				} else {
-					// v1.1.15 locked interpretation.
-					drop := math.Max(0, base.World.GroundHeight-target)
-					if base.World.WaterSurfaceDefined {
-						surface = math.Max(surface, base.World.WaterSurfaceElevation-drop)
+					depth := math.Max(base.World.WaterDepth, 0.002)
+					surface := target + depth
+					ground := target
+					if rulesVersion == "geoworld-rules-v1.1.16" ||
+						rulesVersion == "geoworld-rules-v1.1.18" {
+						// v1.1.16 locked interpretation.
+						// Deform the shared water datum, then translate the bed by
+						// the same amount. This fixed crowned rivers but can bend
+						// a through-flowing river back upward toward a basin rim.
+						datum := base.World.GroundHeight + depth
+						if base.World.WaterSurfaceDefined {
+							datum = base.World.WaterSurfaceElevation
+						}
+						riverFloor := depressionFloorHeight(selected, datum, seaLevel)
+						surface = math.Min(datum, lerp(riverFloor-0.002, datum, wall))
+						ground = base.World.GroundHeight - math.Max(0, datum-surface)
+					} else {
+						// v1.1.15 locked interpretation.
+						drop := math.Max(0, base.World.GroundHeight-target)
+						if base.World.WaterSurfaceDefined {
+							surface = math.Max(surface, base.World.WaterSurfaceElevation-drop)
+						}
 					}
+					out.World.GroundHeight = clamp(ground, 0.001, 0.999)
+					out.World.WaterKind = reconcile.WaterRiver
+					out.World.WaterSurfaceDefined = true
+					out.World.WaterSurfaceElevation = surface
+					out.World.WaterDepth = math.Max(0.002, surface-out.World.GroundHeight)
 				}
-				out.World.GroundHeight = clamp(ground, 0.001, 0.999)
-				out.World.WaterKind = reconcile.WaterRiver
-				out.World.WaterSurfaceDefined = true
-				out.World.WaterSurfaceElevation = surface
-				out.World.WaterDepth = math.Max(0.002, surface-out.World.GroundHeight)
 			} else {
+				if drainageCorridor {
+					target = applyBasinDrainageCorridor(
+						selected,
+						base.World.GroundHeight,
+						target,
+						x,
+						z,
+					)
+				}
 				setLand(target)
 			}
 			theme := clamp(1-math.Abs(radial-(inner+outer)*0.5)/math.Max(0.12, (outer-inner)*0.80), 0, 1)
@@ -722,20 +895,32 @@ func usesV112DepressionGeometry(version string) bool {
 	return version == "geoworld-rules-v1.1.12" ||
 		version == "geoworld-rules-v1.1.13" ||
 		version == "geoworld-rules-v1.1.14" ||
-		(version == "geoworld-rules-v1.1.15" || version == "geoworld-rules-v1.1.16")
+		version == "geoworld-rules-v1.1.15" ||
+		version == "geoworld-rules-v1.1.16" ||
+		version == "geoworld-rules-v1.1.18"
 }
 
 func usesCarvedDepressionGeometry(version string) bool {
 	return version == "geoworld-rules-v1.1.14" ||
-		(version == "geoworld-rules-v1.1.15" || version == "geoworld-rules-v1.1.16")
+		version == "geoworld-rules-v1.1.15" ||
+		version == "geoworld-rules-v1.1.16" ||
+		version == "geoworld-rules-v1.1.18"
 }
 
 func usesHydrologyConformingDepressions(version string) bool {
-	return (version == "geoworld-rules-v1.1.15" || version == "geoworld-rules-v1.1.16")
+	return version == "geoworld-rules-v1.1.15" ||
+		version == "geoworld-rules-v1.1.16" ||
+		version == "geoworld-rules-v1.1.18"
 }
 
 func usesLakeIslandClearance(version string) bool {
-	return (version == "geoworld-rules-v1.1.15" || version == "geoworld-rules-v1.1.16")
+	return version == "geoworld-rules-v1.1.15" ||
+		version == "geoworld-rules-v1.1.16" ||
+		version == "geoworld-rules-v1.1.18"
+}
+
+func usesBasinDrainageCorridors(version string) bool {
+	return version == "geoworld-rules-v1.1.18"
 }
 
 func hasDepressionHeights(f Feature) bool {

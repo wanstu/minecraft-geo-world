@@ -22,7 +22,7 @@
 - 开发机：dadm。
 - 基线提交：`788dc3f`。
 - 工作分支：`adm/realistic-geomorphology`。
-- 当前正式规则：`geoworld-rules-v1.1.16`。
+- 当前正式规则：`geoworld-rules-v1.1.18`；`v1.1.16` 保持锁定，历史 receiver `v1.1.17` 已回退且不复活。
 
 必须遵守现有 DADM 交接原则：
 

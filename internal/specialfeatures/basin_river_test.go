@@ -45,3 +45,110 @@ func TestBasinRiverWaterStaysBelowDryFloor(t *testing.T) {
 		}
 	}
 }
+
+func TestV1118BasinDrainageKeepsRiverDatumAndShapesOutletValley(t *testing.T) {
+	feature := Feature{
+		ID:          1,
+		Kind:        BasinCherry,
+		CenterX:     0,
+		CenterZ:     0,
+		RadiusX:     1000,
+		RadiusZ:     1000,
+		BaseHeight:  0.68,
+		FloorHeight: 0.54,
+		RimHeight:   0.68,
+		Drainage: []BasinDrainageReach{{
+			X0: -1000, Z0: 0,
+			X1: 1000, Z1: 0,
+			Surface0:  0.67,
+			Surface1:  0.65,
+			HalfWidth: 12,
+		}},
+	}
+	baseLand := testHabitableDepressionBase()
+	baseLand.World.GroundHeight = 0.68
+
+	x := 600.0
+	expectedSurface := 0.654
+	river := baseLand
+	river.World.WaterKind = reconcile.WaterRiver
+	river.World.WaterSurfaceDefined = true
+	river.World.WaterSurfaceElevation = expectedSurface
+	river.World.WaterDepth = 0.008
+	river.World.GroundHeight = expectedSurface - river.World.WaterDepth
+	river.World.RiverWeight = 1
+
+	gotRiver := Apply(
+		[]Feature{feature},
+		river,
+		0.5,
+		x,
+		0,
+		"geoworld-rules-v1.1.18",
+	)
+	if math.Abs(gotRiver.World.WaterSurfaceElevation-expectedSurface) > 1e-12 {
+		t.Fatalf(
+			"v1.1.18 basin changed authoritative river datum: got=%.9f want=%.9f",
+			gotRiver.World.WaterSurfaceElevation,
+			expectedSurface,
+		)
+	}
+	if math.Abs(gotRiver.World.GroundHeight-river.World.GroundHeight) > 1e-12 {
+		t.Fatalf(
+			"v1.1.18 basin changed authoritative river bed: got=%.9f want=%.9f",
+			gotRiver.World.GroundHeight,
+			river.World.GroundHeight,
+		)
+	}
+
+	nearBank := Apply(
+		[]Feature{feature},
+		baseLand,
+		0.5,
+		x,
+		32,
+		"geoworld-rules-v1.1.18",
+	)
+	if nearBank.World.GroundHeight <= expectedSurface {
+		t.Fatalf(
+			"v1.1.18 outlet valley bank below river datum: ground=%.9f water=%.9f",
+			nearBank.World.GroundHeight,
+			expectedSurface,
+		)
+	}
+	if nearBank.World.GroundHeight >= baseLand.World.GroundHeight-1e-9 {
+		t.Fatalf(
+			"v1.1.18 outlet valley did not participate in basin carving: ground=%.9f base=%.9f",
+			nearBank.World.GroundHeight,
+			baseLand.World.GroundHeight,
+		)
+	}
+
+	outsideCorridor := Apply(
+		[]Feature{feature},
+		baseLand,
+		0.5,
+		x,
+		260,
+		"geoworld-rules-v1.1.18",
+	)
+	if outsideCorridor.World.GroundHeight >= nearBank.World.GroundHeight {
+		t.Fatalf(
+			"v1.1.18 drainage corridor did not form a river-centered valley: near=%.9f outside=%.9f",
+			nearBank.World.GroundHeight,
+			outsideCorridor.World.GroundHeight,
+		)
+	}
+
+	legacy := Apply(
+		[]Feature{feature},
+		river,
+		0.5,
+		x,
+		0,
+		"geoworld-rules-v1.1.16",
+	)
+	if math.Abs(legacy.World.WaterSurfaceElevation-expectedSurface) <= 1e-9 {
+		t.Fatal("v1.1.16 lock unexpectedly adopted v1.1.18 drainage semantics")
+	}
+}

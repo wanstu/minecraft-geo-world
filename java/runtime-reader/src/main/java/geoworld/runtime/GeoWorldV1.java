@@ -201,6 +201,22 @@ public final class GeoWorldV1 {
         double radiusZ
     ) {}
 
+    private record BasinDrainageReach(
+        double x0,
+        double z0,
+        double x1,
+        double z1,
+        double surface0,
+        double surface1,
+        double halfWidth
+    ) {}
+
+    private record BasinDrainageSample(
+        double distance,
+        double surface,
+        double halfWidth
+    ) {}
+
     private record SpecialFeature(
         int id,
         String kind,
@@ -212,7 +228,8 @@ public final class GeoWorldV1 {
         double floorHeight,
         double rimHeight,
         String waterContext,
-        List<SpecialLobe> lobes
+        List<SpecialLobe> lobes,
+        List<BasinDrainageReach> drainage
     ) {}
 
     public record ClimateSample(
@@ -1623,6 +1640,8 @@ public final class GeoWorldV1 {
                     this.worldProfile.generationRulesVersion()
                 ) && !"geoworld-rules-v1.1.16".equals(
                     this.worldProfile.generationRulesVersion()
+                ) && !"geoworld-rules-v1.1.18".equals(
+                    this.worldProfile.generationRulesVersion()
                 ))
             ) ||
             this.specialFeatures.isEmpty()
@@ -1669,9 +1688,13 @@ public final class GeoWorldV1 {
         String specialRulesVersion = this.worldProfile.generationRulesVersion();
         boolean carvedDepression =
             "geoworld-rules-v1.1.14".equals(specialRulesVersion) ||
-            ("geoworld-rules-v1.1.15".equals(specialRulesVersion) || "geoworld-rules-v1.1.16".equals(specialRulesVersion));
+            "geoworld-rules-v1.1.15".equals(specialRulesVersion) ||
+            "geoworld-rules-v1.1.16".equals(specialRulesVersion) ||
+            "geoworld-rules-v1.1.18".equals(specialRulesVersion);
         boolean hydrologyConformingDepression =
-            ("geoworld-rules-v1.1.15".equals(specialRulesVersion) || "geoworld-rules-v1.1.16".equals(specialRulesVersion));
+            "geoworld-rules-v1.1.15".equals(specialRulesVersion) ||
+            "geoworld-rules-v1.1.16".equals(specialRulesVersion) ||
+            "geoworld-rules-v1.1.18".equals(specialRulesVersion);
         if (carvedDepression && isCarvedDepression(kind)) {
             double dx = (x - selected.centerX()) /
                 Math.max(1.0, selected.radiusX());
@@ -1787,6 +1810,8 @@ public final class GeoWorldV1 {
                         this.worldProfile.generationRulesVersion()
                     ) || "geoworld-rules-v1.1.16".equals(
                         this.worldProfile.generationRulesVersion()
+                    ) || "geoworld-rules-v1.1.18".equals(
+                        this.worldProfile.generationRulesVersion()
                     ))
                 ) &&
                 selected.baseHeight() > 0.0 &&
@@ -1889,6 +1914,8 @@ public final class GeoWorldV1 {
                     ("geoworld-rules-v1.1.15".equals(
                         this.worldProfile.generationRulesVersion()
                     ) || "geoworld-rules-v1.1.16".equals(
+                        this.worldProfile.generationRulesVersion()
+                    ) || "geoworld-rules-v1.1.18".equals(
                         this.worldProfile.generationRulesVersion()
                     ))
                 ) &&
@@ -2062,6 +2089,8 @@ public final class GeoWorldV1 {
                         this.worldProfile.generationRulesVersion()
                     ) || "geoworld-rules-v1.1.16".equals(
                         this.worldProfile.generationRulesVersion()
+                    ) || "geoworld-rules-v1.1.18".equals(
+                        this.worldProfile.generationRulesVersion()
                     ))
                 ) &&
                 selected.baseHeight() > 0.0 &&
@@ -2084,40 +2113,71 @@ public final class GeoWorldV1 {
                     base.groundHeight(),
                     lerp(floor, base.groundHeight(), wall)
                 );
+                boolean drainageCorridor =
+                    "geoworld-rules-v1.1.18".equals(specialRulesVersion) &&
+                    !selected.drainage().isEmpty();
+                if (!riverConforming && drainageCorridor) {
+                    ground = applyBasinDrainageCorridor(
+                        selected,
+                        base.groundHeight(),
+                        ground,
+                        x,
+                        z
+                    );
+                }
                 if (riverConforming) {
-                    double depth = Math.max(base.waterDepth(), 0.002);
-                    double surface = ground + depth;
-                    if ("geoworld-rules-v1.1.16".equals(specialRulesVersion)) {
-                        // Translate the shared water datum and preserve the
-                        // bed's incision beneath it, just as in the Go sampler.
-                        double datum = base.waterSurfaceDefined() &&
-                            base.waterSurfaceElevation() != null
-                            ? base.waterSurfaceElevation()
-                            : base.groundHeight() + depth;
-                        double riverFloor = Math.max(
-                            this.manifest.seaLevelNormalized() + 0.014,
-                            selected.floorHeight() + clamp(
-                                datum - selected.baseHeight(), -0.050, 0.050
-                            ) * 0.08
-                        );
-                        surface = Math.min(
-                            datum, lerp(riverFloor - 0.002, datum, wall)
-                        );
-                        ground = base.groundHeight() -
-                            Math.max(0.0, datum - surface);
+                    if (drainageCorridor) {
+                        // Keep the authoritative Waterbed datum and incision.
+                        // The dry basin floor is shaped around the persisted
+                        // drainage reaches, so the river stays a local low point
+                        // and exits through a real valley rather than climbing
+                        // the radial basin wall.
+                        ground = base.groundHeight();
                     } else {
-                        // v1.1.15 locked interpretation.
-                        double drop = Math.max(0.0, base.groundHeight() - ground);
-                        if (base.waterSurfaceDefined() && base.waterSurfaceElevation() != null) {
-                            surface = Math.max(
-                                surface, base.waterSurfaceElevation() - drop
+                        double depth = Math.max(base.waterDepth(), 0.002);
+                        double surface = ground + depth;
+                        if (
+                            "geoworld-rules-v1.1.16".equals(specialRulesVersion) ||
+                            "geoworld-rules-v1.1.18".equals(specialRulesVersion)
+                        ) {
+                            // v1.1.16 locked interpretation and v1.1.18
+                            // fallback for persisted features without drainage.
+                            double datum = base.waterSurfaceDefined() &&
+                                base.waterSurfaceElevation() != null
+                                ? base.waterSurfaceElevation()
+                                : base.groundHeight() + depth;
+                            double riverFloor = Math.max(
+                                this.manifest.seaLevelNormalized() + 0.014,
+                                selected.floorHeight() + clamp(
+                                    datum - selected.baseHeight(), -0.050, 0.050
+                                ) * 0.08
                             );
+                            surface = Math.min(
+                                datum, lerp(riverFloor - 0.002, datum, wall)
+                            );
+                            ground = base.groundHeight() -
+                                Math.max(0.0, datum - surface);
+                        } else {
+                            // v1.1.15 locked interpretation.
+                            double drop = Math.max(
+                                0.0,
+                                base.groundHeight() - ground
+                            );
+                            if (
+                                base.waterSurfaceDefined() &&
+                                base.waterSurfaceElevation() != null
+                            ) {
+                                surface = Math.max(
+                                    surface,
+                                    base.waterSurfaceElevation() - drop
+                                );
+                            }
                         }
+                        waterKind = "River";
+                        waterSurfaceDefined = true;
+                        waterSurface = surface;
+                        waterDepth = Math.max(0.002, surface - ground);
                     }
-                    waterKind = "River";
-                    waterSurfaceDefined = true;
-                    waterSurface = surface;
-                    waterDepth = Math.max(0.002, surface - ground);
                 }
                 double theme = clamp(
                     1.0 - Math.abs(radial - (inner + outer) * 0.5) /
@@ -2320,6 +2380,83 @@ public final class GeoWorldV1 {
             );
         }
         return best;
+    }
+
+    private static BasinDrainageSample sampleBasinDrainage(
+        SpecialFeature feature,
+        double x,
+        double z
+    ) {
+        BasinDrainageSample best = null;
+        for (BasinDrainageReach reach : feature.drainage()) {
+            double dx = reach.x1() - reach.x0();
+            double dz = reach.z1() - reach.z0();
+            double length2 = dx * dx + dz * dz;
+            double t = 0.0;
+            if (length2 > 1.0e-12) {
+                t = clamp(
+                    ((x - reach.x0()) * dx + (z - reach.z0()) * dz) /
+                        length2,
+                    0.0,
+                    1.0
+                );
+            }
+            double px = reach.x0() + dx * t;
+            double pz = reach.z0() + dz * t;
+            double distance = Math.hypot(x - px, z - pz);
+            if (best != null && distance >= best.distance()) {
+                continue;
+            }
+            best = new BasinDrainageSample(
+                distance,
+                lerp(reach.surface0(), reach.surface1(), t),
+                Math.max(1.0, reach.halfWidth())
+            );
+        }
+        return best;
+    }
+
+    private static double applyBasinDrainageCorridor(
+        SpecialFeature feature,
+        double baseHeight,
+        double basinTarget,
+        double x,
+        double z
+    ) {
+        BasinDrainageSample drainage = sampleBasinDrainage(feature, x, z);
+        if (drainage == null) {
+            return basinTarget;
+        }
+        double corridorRadius = clamp(
+            Math.max(112.0, drainage.halfWidth() * 7.0),
+            112.0,
+            240.0
+        );
+        if (drainage.distance() >= corridorRadius) {
+            return basinTarget;
+        }
+
+        double blockStep = drainage.surface() < 0.5
+            ? 1.0 / 254.0
+            : 1.0 / 514.0;
+        double bankDistance = Math.max(
+            0.0,
+            drainage.distance() - drainage.halfWidth()
+        );
+        double requiredGround = drainage.surface() +
+            blockStep * (1.15 + bankDistance / 24.0);
+        requiredGround = Math.min(baseHeight, requiredGround);
+        double protectedGround = Math.max(basinTarget, requiredGround);
+        double blendStart = drainage.halfWidth() + 12.0;
+        double weight = 1.0 - smoothstep(
+            blendStart,
+            corridorRadius,
+            drainage.distance()
+        );
+        return Math.min(
+            baseHeight,
+            lerp(basinTarget, protectedGround, weight)
+        );
     }
 
     private static boolean isCarvedDepression(String kind) {
@@ -2676,7 +2813,7 @@ public final class GeoWorldV1 {
             !"geoworld-rules-v1.1.12".equals(generationRulesVersion) &&
             !"geoworld-rules-v1.1.13".equals(generationRulesVersion) &&
             !"geoworld-rules-v1.1.14".equals(generationRulesVersion) &&
-            (!"geoworld-rules-v1.1.15".equals(generationRulesVersion) && !"geoworld-rules-v1.1.16".equals(generationRulesVersion))
+            (!"geoworld-rules-v1.1.15".equals(generationRulesVersion) && !"geoworld-rules-v1.1.16".equals(generationRulesVersion) && !"geoworld-rules-v1.1.18".equals(generationRulesVersion))
         ) {
             return legacy;
         }
@@ -3637,7 +3774,7 @@ public final class GeoWorldV1 {
             "geoworld-rules-v1.1.12".equals(rulesVersion) ||
             "geoworld-rules-v1.1.13".equals(rulesVersion) ||
             "geoworld-rules-v1.1.14".equals(rulesVersion) ||
-            ("geoworld-rules-v1.1.15".equals(rulesVersion) || "geoworld-rules-v1.1.16".equals(rulesVersion));
+            ("geoworld-rules-v1.1.15".equals(rulesVersion) || "geoworld-rules-v1.1.16".equals(rulesVersion) || "geoworld-rules-v1.1.18".equals(rulesVersion));
         double activeRiverBankSurface = Double.NEGATIVE_INFINITY;
         boolean activeRiverBankProtected;
         if (boundedRiverBanks) {
@@ -6033,6 +6170,43 @@ public final class GeoWorldV1 {
                 lobes.add(lobe);
             }
 
+            List<Object> rawDrainage = Json.arrayOrEmpty(
+                f.get("drainage"),
+                "specialFeature[" + i + "].drainage"
+            );
+            List<BasinDrainageReach> drainage =
+                new ArrayList<>(rawDrainage.size());
+            for (int j = 0; j < rawDrainage.size(); j++) {
+                Map<String, Object> d = Json.object(
+                    rawDrainage.get(j),
+                    "specialFeature[" + i + "].drainage[" + j + "]"
+                );
+                BasinDrainageReach reach = new BasinDrainageReach(
+                    Json.doubleValue(d, "x0"),
+                    Json.doubleValue(d, "z0"),
+                    Json.doubleValue(d, "x1"),
+                    Json.doubleValue(d, "z1"),
+                    Json.doubleValue(d, "surface0"),
+                    Json.doubleValue(d, "surface1"),
+                    Json.doubleValue(d, "halfWidth")
+                );
+                if (
+                    !finite(reach.x0()) ||
+                    !finite(reach.z0()) ||
+                    !finite(reach.x1()) ||
+                    !finite(reach.z1()) ||
+                    !finite(reach.surface0()) ||
+                    !finite(reach.surface1()) ||
+                    !finite(reach.halfWidth()) ||
+                    reach.halfWidth() <= 0.0
+                ) {
+                    throw new IllegalArgumentException(
+                        "invalid persisted basin drainage reach: " + i + "/" + j
+                    );
+                }
+                drainage.add(reach);
+            }
+
             SpecialFeature feature = new SpecialFeature(
                 Json.intValue(f, "id"),
                 Json.string(f, "kind"),
@@ -6052,7 +6226,8 @@ public final class GeoWorldV1 {
                 f.containsKey("waterContext")
                     ? Json.string(f, "waterContext")
                     : "",
-                List.copyOf(lobes)
+                List.copyOf(lobes),
+                List.copyOf(drainage)
             );
             if (
                 feature.id() <= 0 ||

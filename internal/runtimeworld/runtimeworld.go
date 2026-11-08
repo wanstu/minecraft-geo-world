@@ -212,7 +212,9 @@ func (m *Model) Sample(worldX, worldZ float64) runtimeprofile.Sample {
 		m.GenerationRulesVersion == "geoworld-rules-v1.1.12" ||
 		m.GenerationRulesVersion == "geoworld-rules-v1.1.13" ||
 		m.GenerationRulesVersion == "geoworld-rules-v1.1.14" ||
-		(m.GenerationRulesVersion == "geoworld-rules-v1.1.15" || m.GenerationRulesVersion == "geoworld-rules-v1.1.16")) && len(m.SpecialFeatures) > 0 {
+		(m.GenerationRulesVersion == "geoworld-rules-v1.1.15" ||
+			m.GenerationRulesVersion == "geoworld-rules-v1.1.16" ||
+			m.GenerationRulesVersion == "geoworld-rules-v1.1.18")) && len(m.SpecialFeatures) > 0 {
 		out = m.applySpecialFeatures(out, worldX, worldZ)
 	}
 	return out
@@ -516,7 +518,9 @@ func (m *Model) outerOceanSeafloor(x, z, sea, deep float64) float64 {
 		m.GenerationRulesVersion != "geoworld-rules-v1.1.12" &&
 		m.GenerationRulesVersion != "geoworld-rules-v1.1.13" &&
 		m.GenerationRulesVersion != "geoworld-rules-v1.1.14" &&
-		(m.GenerationRulesVersion != "geoworld-rules-v1.1.15" && m.GenerationRulesVersion != "geoworld-rules-v1.1.16") {
+		m.GenerationRulesVersion != "geoworld-rules-v1.1.15" &&
+		m.GenerationRulesVersion != "geoworld-rules-v1.1.16" &&
+		m.GenerationRulesVersion != "geoworld-rules-v1.1.18" {
 		return legacy
 	}
 
