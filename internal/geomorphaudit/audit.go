@@ -275,6 +275,13 @@ type MouthSignal struct {
 type TransitionReport struct {
 	Samples int                    `json:"samples"`
 	Classes []TransitionClassStats `json:"classes,omitempty"`
+
+	DirectMountainPlainEdges           int     `json:"directMountainPlainEdges"`
+	MountainPlainLowBufferEdges        int     `json:"mountainPlainLowBufferEdges"`
+	MountainPlainBufferStrengthP10     float64 `json:"mountainPlainBufferStrengthP10"`
+	MountainPlainBufferStrengthP50     float64 `json:"mountainPlainBufferStrengthP50"`
+	MountainPlainBufferStrengthP90     float64 `json:"mountainPlainBufferStrengthP90"`
+	MountainPlainLowBufferEdgeFraction float64 `json:"mountainPlainLowBufferEdgeFraction"`
 }
 
 type TransitionClassStats struct {
@@ -1564,6 +1571,7 @@ func auditMouths(model *generator.WorldModel, cfg Config, report *RiverReport) {
 func auditTransitions(model *generator.WorldModel, cfg Config, report *TransitionReport) {
 	g := model.Geometry
 	acc := make(map[string]*transitionAccumulator)
+	mountainPlainBufferStrength := make([]float64, 0, 64)
 	add := func(aClass, bClass string, x0, z0, x1, z1 float64) {
 		if aClass == bClass {
 			return
@@ -1588,6 +1596,22 @@ func auditTransitions(model *generator.WorldModel, cfg Config, report *Transitio
 		left := finalRuntimeSample(model, mx-ux*probe, mz-uz*probe)
 		middle := finalRuntimeSample(model, mx, mz)
 		right := finalRuntimeSample(model, mx+ux*probe, mz+uz*probe)
+		if (from == "mountain" && to == "plain") ||
+			(from == "plain" && to == "mountain") {
+			report.DirectMountainPlainEdges++
+			terrainMid := model.CoastTerrain.Sample(mx, mz)
+			bufferStrength := math.Max(
+				terrainMid.FoothillWeight,
+				terrainMid.HillWeight,
+			)
+			mountainPlainBufferStrength = append(
+				mountainPlainBufferStrength,
+				bufferStrength,
+			)
+			if bufferStrength < 0.10 {
+				report.MountainPlainLowBufferEdges++
+			}
+		}
 		y0 := minecraftY(left.World.GroundHeight)
 		ym := minecraftY(middle.World.GroundHeight)
 		y1 := minecraftY(right.World.GroundHeight)
@@ -1643,6 +1667,18 @@ func auditTransitions(model *generator.WorldModel, cfg Config, report *Transitio
 			CurvatureP90Blocks: percentile(a.curvatures, 0.90),
 			MaxCurvatureBlocks: a.maxCurvature,
 		})
+	}
+
+	report.MountainPlainBufferStrengthP10 =
+		percentile(mountainPlainBufferStrength, 0.10)
+	report.MountainPlainBufferStrengthP50 =
+		percentile(mountainPlainBufferStrength, 0.50)
+	report.MountainPlainBufferStrengthP90 =
+		percentile(mountainPlainBufferStrength, 0.90)
+	if report.DirectMountainPlainEdges > 0 {
+		report.MountainPlainLowBufferEdgeFraction =
+			float64(report.MountainPlainLowBufferEdges) /
+				float64(report.DirectMountainPlainEdges)
 	}
 }
 

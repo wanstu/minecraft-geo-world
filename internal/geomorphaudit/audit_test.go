@@ -46,6 +46,21 @@ func TestAnalyzeGeneratedWorldIsReadOnlyAndJSONSafe(t *testing.T) {
 	if report.Transition.Samples == 0 || len(report.Transition.Classes) == 0 {
 		t.Fatal("expected terrain transition samples")
 	}
+	if report.Transition.MountainPlainLowBufferEdges >
+		report.Transition.DirectMountainPlainEdges {
+		t.Fatalf(
+			"low-buffer mountain/plain edges exceed direct edges: low=%d direct=%d",
+			report.Transition.MountainPlainLowBufferEdges,
+			report.Transition.DirectMountainPlainEdges,
+		)
+	}
+	if report.Transition.MountainPlainLowBufferEdgeFraction < 0 ||
+		report.Transition.MountainPlainLowBufferEdgeFraction > 1 {
+		t.Fatalf(
+			"mountain/plain low-buffer fraction out of range: %g",
+			report.Transition.MountainPlainLowBufferEdgeFraction,
+		)
+	}
 	if report.Sediment.Production <= 0 {
 		t.Fatal("expected actual erosion to produce sediment proxy mass")
 	}

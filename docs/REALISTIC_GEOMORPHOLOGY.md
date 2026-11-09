@@ -297,7 +297,18 @@ v1.1.20 的 routed lift 上限为 `0.001 normalized`，只作为宏观长期沉�
 
 ### R5 — 地貌语义过渡
 
-逐类优化山地、平原、盆地、海岸过渡。
+状态：**R5.1 山地→平原过渡审计完成；没有发现需要修改生成算法的最终几何断层。**
+
+R5 按独立切片推进：
+
+1. R5.1 山地 → 山麓 / 丘陵 → 平原：**PASS**
+2. R5.2 盆地边缘 → 盆底
+3. R5.3 河谷 → 河漫滩
+4. R5.4 陆地 → 海岸 → 海底
+
+R5.1 证明 dominant landform label 的直接 `mountain ↔ plain` 相邻不能单独作为缺陷；4 个固定 Seed 中最终坡度/曲率仍连续，因此没有为了补齐标签顺序而强插山麓层。
+
+详细见 [REALISTIC_GEOMORPHOLOGY_R5_TRANSITIONS.md](REALISTIC_GEOMORPHOLOGY_R5_TRANSITIONS.md)。
 
 ### R6 — 真实地貌统计对照
 
