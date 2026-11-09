@@ -661,3 +661,216 @@ mountain sediment source
 ```
 
 在 fan deposition 有真实 upstream load 与质量守恒证据前，不用新 sediment budget 直接抬升 Terrain。
+
+
+## 15. 第五切片：山前冲积扇 competence loss
+
+位置分类后，Seed `123456` 的 network fan deposition 只占约 `0.25%`。
+
+第一反应不能是“把 fan 权重乘大”，所以先审计 fan core 自身。
+
+### 15.1 根因证据
+
+标准世界原始 fan-core 统计：
+
+```text
+fan core cells                 = 12
+network fan core cells         = 12
+fan-core available load        = 11.7351
+fan-core deposition            = 0.0623
+fan-core deposition fraction   = 0.53%
+
+mean scalar capacity drop      = 0.0097
+load-weighted capacity drop    = 0.0073
+```
+
+结论：
+
+- fan core 并不缺；
+- 12 个 fan core 全部落在 drainage network；
+- routed sediment load 也非常充足；
+- 真正缺的是 transport model 对山前坡折的 **competence loss** 响应。
+
+原因是当前 scalar `TransportCapacity` 同时包含：
+
+- FlowAccumulation；
+- RiverStrength；
+- FluvialPower；
+- slope。
+
+河流从陡峭山地进入山前时，slope 会骤降，但 discharge / accumulation 同时增大，最终 scalar capacity 可能几乎不降。
+
+因此真实的山前坡折被数学上“抵消”了。
+
+### 15.2 定向失败回归
+
+新增：
+
+```text
+TestAlluvialFanCoreDepositsRoutedLoadAcrossMountainFrontSlopeBreak
+```
+
+合成场景：
+
+- 上游为山地河；
+- 真实 TotalErosion 产生 sediment；
+- routed load 到达山前；
+- target 有强 slope break；
+- target 被 Geomorph 明确认定为 AlluvialFanCore；
+- 但增长的 FlowAccumulation 让 scalar capacity 没有下降。
+
+修复前：
+
+```text
+fanCore     = 0.690
+incoming    = 0.09486
+deposition  = 0
+fraction    = 0%
+```
+
+即：
+
+> 模型已经知道“这里是冲积扇核心”，也有真实来沙，却完全没有 routed deposition。
+
+### 15.3 SedimentCompetenceLoss
+
+新增只读事实：
+
+```text
+SedimentCompetenceLoss
+```
+
+普通河段：
+
+```text
+competence loss
+=
+max(upstream transport capacity - current capacity, 0)
+```
+
+山前 fan core 额外提供：
+
+```text
+fan competence loss
+=
+0.28 × AlluvialFanCore
+```
+
+最终：
+
+```text
+SedimentCompetenceLoss
+=
+max(capacity drop, fan competence loss)
+```
+
+然后仍然由：
+
+```text
+incoming carried load
+× competence loss
+× accommodation
+```
+
+决定 routed deposition。
+
+因此：
+
+- 不凭空增加 sediment；
+- 没有 upstream load 时不会制造 fan deposition；
+- 没有 accommodation 时不会大量沉积；
+- 只是在已被独立 Geomorph 证据确认的山前坡折补上 bed-load competence loss。
+
+### 15.4 Seed 123456
+
+修复前 → 修复后：
+
+```text
+fan-core deposition fraction:
+  0.53% → 1.42%
+
+network fan deposition share:
+  0.25% → 0.61%
+
+network floodplain share:
+  11.79% → 16.12%
+
+network lake share:
+  72.63% → 66.66%
+
+network export:
+  79.86% → 79.30%
+```
+
+修复后：
+
+```text
+fan-core available load              = 11.4893
+fan-core deposition                  = 0.1626
+mean scalar capacity drop            = 0.0097
+mean competence loss                 = 0.0251
+load-weighted scalar capacity drop   = 0.0074
+load-weighted competence loss        = 0.0231
+```
+
+仍然保持：
+
+```text
+internal rise >= 0.25 block = 0
+internal rise >= 1 block    = 0
+internal confluence rise    = 0
+mouth rise                  = 0
+mouth narrowing             = 0
+```
+
+### 15.5 额外固定 Seed
+
+```text
+Seed -4852173505788415804
+
+fan cores                    = 21
+fan-core deposition fraction = 1.90%
+network fan share            = 1.51%
+network export               = 86.20%
+guards                       = clean
+
+
+Seed -563659577384754347
+
+fan cores                    = 18
+fan-core deposition fraction = 1.83%
+network fan share            = 0.77%
+network export               = 89.25%
+
+原有一个 <1 block 内部局部 rise；
+没有新增 >=1 block / 汇流 / 河口问题。
+
+
+Seed 4034658472718554561
+
+fan cores                    = 92
+fan-core deposition fraction = 2.57%
+network fan share            = 4.68%
+network export               = 71.82%
+guards                       = clean
+```
+
+fan 最多的 Seed 也仍有超过 70% 的 network load 继续向下游，因此 `0.28` 没有把山前变成 sediment black hole。
+
+### 15.6 当前结论
+
+这一切片解决的是**因果缺口**，不是追求某个固定 fan 百分比。
+
+现在已经形成：
+
+```text
+mountain erosion
+→ routed sediment
+→ mountain-front slope-break semantics
+→ competence loss
+→ accommodation-controlled fan deposition
+```
+
+同时 stable-channel continuity、普通 capacity-drop、Lake trap 与质量守恒回归均保持通过。
+
+这些 routed sediment facts 仍未接入 Terrain / Waterbed，因此仍不改变最终世界几何，也不提升 generation rules version。

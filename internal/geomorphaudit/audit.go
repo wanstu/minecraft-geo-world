@@ -93,6 +93,18 @@ type SedimentReport struct {
 	NetworkDepositionWeightedAccommodation float64 `json:"networkDepositionWeightedAccommodation"`
 	NetworkLowAccommodationDeposition      float64 `json:"networkLowAccommodationDeposition"`
 	NetworkLowAccommodationDepositFraction float64 `json:"networkLowAccommodationDepositFraction"`
+
+	FanCoreCells                      int     `json:"fanCoreCells"`
+	NetworkFanCoreCells               int     `json:"networkFanCoreCells"`
+	FanCoreAvailableLoad              float64 `json:"fanCoreAvailableLoad"`
+	FanCoreDeposition                 float64 `json:"fanCoreDeposition"`
+	FanCoreDepositionFraction         float64 `json:"fanCoreDepositionFraction"`
+	FanCoreMeanTransportCapacity      float64 `json:"fanCoreMeanTransportCapacity"`
+	FanCoreMeanAccommodation          float64 `json:"fanCoreMeanAccommodation"`
+	FanCoreMeanCapacityDrop           float64 `json:"fanCoreMeanCapacityDrop"`
+	FanCoreLoadWeightedCapacityDrop   float64 `json:"fanCoreLoadWeightedCapacityDrop"`
+	FanCoreMeanCompetenceLoss         float64 `json:"fanCoreMeanCompetenceLoss"`
+	FanCoreLoadWeightedCompetenceLoss float64 `json:"fanCoreLoadWeightedCompetenceLoss"`
 }
 
 type RiverReport struct {
@@ -311,6 +323,34 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 	hillslopeAccommodationSum := 0.0
 	networkAccommodationSum := 0.0
 	networkDepositionAccommodation := 0.0
+	fanCoreCapacitySum := 0.0
+	fanCoreAccommodationSum := 0.0
+	fanCoreCapacityDropSum := 0.0
+	fanCoreLoadWeightedCapacityDropSum := 0.0
+	fanCoreCompetenceLossSum := 0.0
+	fanCoreLoadWeightedCompetenceLossSum := 0.0
+
+	incomingMass := make([]float64, len(g.LandMask))
+	incomingCapacityMoment := make([]float64, len(g.LandMask))
+	if model.Hydrology != nil {
+		for i, to := range model.Hydrology.FlowTo {
+			if i < 0 || i >= len(g.LandMask) ||
+				to < 0 || to >= len(g.LandMask) ||
+				!g.LandMask[to] {
+				continue
+			}
+			flux := 0.0
+			capacity := 0.0
+			if i < len(g.SedimentFlux) {
+				flux = g.SedimentFlux[i]
+			}
+			if i < len(g.TransportCapacity) {
+				capacity = g.TransportCapacity[i]
+			}
+			incomingMass[to] += flux
+			incomingCapacityMoment[to] += flux * capacity
+		}
+	}
 
 	isNetworkCell := func(i int) bool {
 		if model.Hydrology == nil || i < 0 {
@@ -357,6 +397,43 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 		report.MaxFlux = math.Max(report.MaxFlux, flux)
 
 		network := isNetworkCell(i)
+		fanCore := 0.0
+		if i < len(g.AlluvialFanCore) {
+			fanCore = math.Max(0, math.Min(1, g.AlluvialFanCore[i]))
+		}
+		if fanCore > 0.05 {
+			report.FanCoreCells++
+			if network {
+				report.NetworkFanCoreCells++
+			}
+			available := production + incomingMass[i]
+			report.FanCoreAvailableLoad += available
+			report.FanCoreDeposition += deposition
+			fanCoreCapacitySum += capacity
+			fanCoreAccommodationSum += accommodation
+			capacityDrop := 0.0
+			if incomingMass[i] > 1e-12 {
+				upstreamCapacity :=
+					incomingCapacityMoment[i] / incomingMass[i]
+				capacityDrop = math.Max(
+					0,
+					math.Min(1, upstreamCapacity-capacity),
+				)
+			}
+			fanCoreCapacityDropSum += capacityDrop
+			fanCoreLoadWeightedCapacityDropSum +=
+				available * capacityDrop
+			competenceLoss := 0.0
+			if i < len(g.SedimentCompetenceLoss) {
+				competenceLoss = math.Max(
+					0,
+					math.Min(1, g.SedimentCompetenceLoss[i]),
+				)
+			}
+			fanCoreCompetenceLossSum += competenceLoss
+			fanCoreLoadWeightedCompetenceLossSum +=
+				available * competenceLoss
+		}
 		if network {
 			report.NetworkProduction += production
 			report.NetworkDeposition += deposition
@@ -565,6 +642,24 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 		report.NetworkLowAccommodationDepositFraction =
 			report.NetworkLowAccommodationDeposition /
 				report.NetworkDeposition
+	}
+	if report.FanCoreCells > 0 {
+		report.FanCoreMeanTransportCapacity =
+			fanCoreCapacitySum / float64(report.FanCoreCells)
+		report.FanCoreMeanAccommodation =
+			fanCoreAccommodationSum / float64(report.FanCoreCells)
+		report.FanCoreMeanCapacityDrop =
+			fanCoreCapacityDropSum / float64(report.FanCoreCells)
+		report.FanCoreMeanCompetenceLoss =
+			fanCoreCompetenceLossSum / float64(report.FanCoreCells)
+	}
+	if report.FanCoreAvailableLoad > 1e-12 {
+		report.FanCoreDepositionFraction =
+			report.FanCoreDeposition / report.FanCoreAvailableLoad
+		report.FanCoreLoadWeightedCapacityDrop =
+			fanCoreLoadWeightedCapacityDropSum / report.FanCoreAvailableLoad
+		report.FanCoreLoadWeightedCompetenceLoss =
+			fanCoreLoadWeightedCompetenceLossSum / report.FanCoreAvailableLoad
 	}
 }
 

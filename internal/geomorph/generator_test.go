@@ -267,6 +267,7 @@ func TestDeterministicAndBounded(t *testing.T) {
 		a.DepositionPotential,
 		a.TransportCapacity,
 		a.SedimentAccommodation,
+		a.SedimentCompetenceLoss,
 	}
 	fieldsB := [][]float64{
 		b.FloodplainWeight,
@@ -277,6 +278,7 @@ func TestDeterministicAndBounded(t *testing.T) {
 		b.DepositionPotential,
 		b.TransportCapacity,
 		b.SedimentAccommodation,
+		b.SedimentCompetenceLoss,
 	}
 
 	for f := range fieldsA {
@@ -402,6 +404,71 @@ func TestSedimentBudgetRoutesAndConservesProxyMass(t *testing.T) {
 			"downstream cell did not receive upstream sediment: flux=%g local=%g",
 			m.SedimentFlux[last],
 			m.SedimentProduction[last],
+		)
+	}
+}
+
+func TestAlluvialFanCoreDepositsRoutedLoadAcrossMountainFrontSlopeBreak(t *testing.T) {
+	in := baseInput(7, 3)
+	row := 1
+	upstream := row*in.Width + 2
+	target := row*in.Width + 3
+	outlet := row*in.Width + 4
+
+	in.FlowTo[upstream] = target
+	in.FlowTo[target] = outlet
+
+	in.RollingPlainWeight[upstream] = 0
+	in.MountainWeight[upstream] = 0.85
+	in.FoothillWeight[upstream] = 0.15
+	in.ReliefIndex[upstream] = 0.82
+	in.Slope[upstream] = 0.055
+	in.FluvialPower[upstream] = 0.20
+	in.TectonicSupport[upstream] = 0.55
+	in.RiverStrength[upstream] = 0.90
+	in.FlowAccumulation[upstream] = 6000
+	in.ValleyWeight[upstream] = 0.70
+	in.TotalErosion[upstream] = 0.10
+
+	in.FoothillWeight[target] = 0.75
+	in.RollingPlainWeight[target] = 0.25
+	in.ReliefIndex[target] = 0.16
+	in.Slope[target] = 0.008
+	in.FluvialPower[target] = 0.60
+	in.RiverStrength[target] = 0.95
+	in.FlowAccumulation[target] = 20000
+	in.ValleyWeight[target] = 0.75
+	in.PerennialRiverPotential[target] = 0.80
+
+	in.RollingPlainWeight[outlet] = 0.80
+	in.ReliefIndex[outlet] = 0.12
+	in.Slope[outlet] = 0.006
+	in.RiverStrength[outlet] = 0.95
+	in.FlowAccumulation[outlet] = 24000
+	in.ValleyWeight[outlet] = 0.80
+
+	m, err := Generate(in, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.AlluvialFanCore[target] < 0.10 {
+		t.Fatalf(
+			"expected a real mountain-front fan core, got %.3f",
+			m.AlluvialFanCore[target],
+		)
+	}
+
+	incoming := m.SedimentFlux[upstream]
+	if incoming <= 0 {
+		t.Fatal("expected routed sediment to reach fan core")
+	}
+	if m.SedimentDeposition[target] < incoming*0.04 {
+		t.Fatalf(
+			"fan-forming slope break failed to deposit routed load: fanCore=%.3f incoming=%g deposition=%g fraction=%.3f",
+			m.AlluvialFanCore[target],
+			incoming,
+			m.SedimentDeposition[target],
+			m.SedimentDeposition[target]/incoming,
 		)
 	}
 }

@@ -66,6 +66,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		SedimentFlux:                make([]float64, n),
 		TransportCapacity:           make([]float64, n),
 		SedimentAccommodation:       make([]float64, n),
+		SedimentCompetenceLoss:      make([]float64, n),
 		SedimentDeposition:          make([]float64, n),
 		SedimentExport:              make([]float64, n),
 		FloodplainWeight:            make([]float64, n),
@@ -456,17 +457,30 @@ func (m *Model) computeSedimentBudget(input Input) {
 		)
 		localDeposition := production * localDepositionFraction
 
-		incomingDeposition := 0.0
+		capacityDrop := 0.0
 		if incoming > 1e-12 {
 			upstreamCapacity :=
 				pendingCapacityMoment[i] / incoming
-			capacityDrop := clamp(
+			capacityDrop = clamp(
 				upstreamCapacity-capacity,
 				0,
 				1,
 			)
+		}
+
+		// A mountain-front slope break can lose bed-load competence even when
+		// growing discharge keeps this scalar transport-capacity proxy flat.
+		// AlluvialFanCore already requires a river, a strong slope break,
+		// upstream mountain memory and a low-gradient receiving surface. It is
+		// therefore a geomorphic competence-loss signal, not extra sediment.
+		fanCompetenceLoss := 0.28 * clamp(m.AlluvialFanCore[i], 0, 1)
+		competenceLoss := math.Max(capacityDrop, fanCompetenceLoss)
+		m.SedimentCompetenceLoss[i] = competenceLoss
+
+		incomingDeposition := 0.0
+		if incoming > 1e-12 {
 			incomingDepositionFraction := clamp(
-				capacityDrop*(0.20+0.80*accommodation),
+				competenceLoss*(0.20+0.80*accommodation),
 				0,
 				0.80,
 			)
