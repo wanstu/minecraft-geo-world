@@ -427,6 +427,7 @@ func (m *Model) computeSedimentBudget(input Input) {
 	}
 
 	pending := make([]float64, n)
+	pendingCapacityMoment := make([]float64, n)
 	processed := make([]bool, n)
 	head := 0
 	for head < len(queue) {
@@ -437,24 +438,54 @@ func (m *Model) computeSedimentBudget(input Input) {
 		}
 		processed[i] = true
 
-		available := pending[i] + m.SedimentProduction[i]
+		incoming := pending[i]
+		production := m.SedimentProduction[i]
+		available := incoming + production
 		capacity := m.sedimentTransportCapacity(input, i)
 		accommodation := m.sedimentAccommodation(input, i)
 		m.SedimentAccommodation[i] = accommodation
 
-		// Capacity is a through-flow fraction, not a second sediment source.
-		// Low energy alone does not force full deposition unless the local
-		// landform also provides accommodation space.
-		depositionFraction :=
-			(1 - capacity) * (0.18 + 0.82*accommodation)
-		if input.LakeID[i] > 0 {
-			// Lakes are strong sediment traps. Keep some through-flow so this
-			// remains a routing proxy rather than an absolute reservoir model.
-			depositionFraction = math.Max(depositionFraction, 0.68)
-		}
-		depositionFraction = clamp(depositionFraction, 0, 0.95)
+		// Freshly eroded material may be stored close to its source. Carried
+		// sediment is different: it should not pay the same deposition tax at
+		// every downstream cell. It deposits when the route loses transport
+		// capacity and the receiving landform has accommodation space.
+		localDepositionFraction := clamp(
+			(1-capacity)*(0.18+0.82*accommodation),
+			0,
+			0.80,
+		)
+		localDeposition := production * localDepositionFraction
 
-		deposition := available * depositionFraction
+		incomingDeposition := 0.0
+		if incoming > 1e-12 {
+			upstreamCapacity :=
+				pendingCapacityMoment[i] / incoming
+			capacityDrop := clamp(
+				upstreamCapacity-capacity,
+				0,
+				1,
+			)
+			incomingDepositionFraction := clamp(
+				capacityDrop*(0.20+0.80*accommodation),
+				0,
+				0.80,
+			)
+			incomingDeposition =
+				incoming * incomingDepositionFraction
+		}
+
+		deposition := localDeposition + incomingDeposition
+		if input.LakeID[i] > 0 {
+			// Lakes are strong sediment traps. Apply the trap to the complete
+			// incoming + local load, while retaining some downstream through-flow.
+			lakeFraction := math.Max(
+				0.68,
+				localDepositionFraction,
+			)
+			lakeFraction = clamp(lakeFraction, 0, 0.95)
+			deposition = available * lakeFraction
+		}
+		deposition = clamp(deposition, 0, available)
 		carry := math.Max(0, available-deposition)
 
 		m.TransportCapacity[i] = capacity
@@ -466,6 +497,7 @@ func (m *Model) computeSedimentBudget(input Input) {
 			input.LandMask[to] &&
 			to != i {
 			pending[to] += carry
+			pendingCapacityMoment[to] += carry * capacity
 			indegree[to]--
 			if indegree[to] == 0 {
 				queue = append(queue, to)

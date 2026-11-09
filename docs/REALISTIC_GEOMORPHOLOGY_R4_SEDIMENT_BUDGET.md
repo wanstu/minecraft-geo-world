@@ -325,28 +325,246 @@ network mass-balance error
 
 因此下一步不能直接把 `SedimentDeposition` 接进 Terrain。
 
-## 10. 下一切片：连续 channel load
+## 10. 第三切片：连续 channel load
 
-下一步优先修正**输沙连续性**，目标是：
+第一版 routed budget 的问题是：
 
 ```text
-hillslope production
-→ near-source storage
-→ channel delivery
-→ channel carried load
-→ capacity drop / accommodation-controlled deposition
-→ lake / fan / mouth sink
-→ terminal export
+deposition fraction
+=
+(1 - transport capacity)
+× accommodation
 ```
 
-关键约束：
+它对当前 cell 的**全部 available load**重复执行。
 
-- incoming carried load 不能在每个普通河网 cell 被重复按同一比例“税收式”沉积；
-- 稳定 capacity 的河段应允许 sediment load 连续通过；
-- capacity 明显下降、坡降突变、湖泊入口、冲积空间增加时才应显著沉积；
-- Lake 继续作为强 sediment trap；
-- 全局、hillslope、network 三层都必须质量守恒；
-- 在 routed facts 稳定前，旧 `SedimentSupply / DepositionPotential` 继续保持正式 Terrain 语义。
+所以即使一条河的 capacity 长距离保持稳定，只要每格有少量 deposition fraction，carried load 也会沿程指数衰减。
+
+### 10.1 定向失败样例
+
+新增 40 个 macro cell 的稳定 channel：
+
+- 无 Lake；
+- 无明显冲积空间；
+- RiverStrength / FluvialPower / slope 基本稳定；
+- sediment 只在最上游产生。
+
+旧算法：
+
+```text
+source production = 0.1000
+outlet export     = 0.0437
+retained fraction = 43.7%
+```
+
+即使没有明确 sediment sink，仍有超过一半 carried load 因“经过了很多 cell”而消失在沿途沉积中。
+
+### 10.2 新路由规则
+
+现在区分：
+
+**Local production**
+
+刚刚在当前 cell 侵蚀产生的 sediment 允许发生 near-source storage：
+
+```text
+local deposition
+=
+local production
+× local storage fraction
+```
+
+**Incoming carried load**
+
+已经在 FlowTo 网络中运输的 sediment 不再重复支付同一份本地 storage。
+
+它只有在：
+
+```text
+upstream transport capacity
+>
+current transport capacity
+```
+
+并且当前存在 accommodation 时才发生明显沉积：
+
+```text
+capacity drop
+× accommodation
+→ incoming deposition
+```
+
+为了在多上游汇入时保持确定性，路由同时携带：
+
+```text
+pending sediment mass
+pending mass-weighted upstream capacity
+```
+
+当前 cell 得到的 upstream capacity 是实际 incoming load 的质量加权值。
+
+### 10.3 Lake
+
+Lake 继续对完整：
+
+```text
+incoming load + local production
+```
+
+执行强 sediment trap。
+
+仍保留部分 through-flow，因此它是可解释的 routing proxy，而不是“湖泊永久吞掉 100% sediment”。
+
+### 10.4 定向回归
+
+新增并通过：
+
+**Stable channel continuity**
+
+稳定 capacity、无明显 sink 的长河必须把至少 70% 的 source load 送达 outlet。
+
+旧算法该样例只有 43.7%。
+
+**Capacity-drop deposition**
+
+相同上游 source 下：
+
+- stable channel 的对照 cell 不应凭空沉积 incoming load；
+- 当 slope / fluvial power 明显下降，同时 floodplain / alluvial accommodation 增加时，该位置必须形成 routed deposition；
+- outlet load 相应下降。
+
+**Lake trap**
+
+原有 Lake sediment trap 回归继续通过。
+
+**Mass conservation**
+
+全局、hillslope、network 三层继续守恒。
+
+## 11. 标准 Seed 结果
+
+### Seed 123456
+
+第一版 budget → continuous-load budget：
+
+```text
+total deposited fraction:
+  82.56% → 27.99%
+
+total export fraction:
+  17.44% → 72.01%
+
+hillslope → network delivery:
+  12.90% → 39.11%
+
+network deposited fraction:
+  84.29% → 20.13%
+
+network export fraction:
+  15.70% → 79.86%
+
+lake share of total deposition:
+  0.94% → 23.04%
+
+network deposition-weighted accommodation:
+  0.374 → 0.830
+
+network deposition in accommodation < 0.15:
+  9.61% → 1.36%
+```
+
+同时：
+
+```text
+global mass-balance error    ≈ floating-point zero
+hillslope mass-balance error ≈ floating-point zero
+network mass-balance error   ≈ floating-point zero
+
+internal rise >= 0.25 block = 0
+internal rise >= 1 block    = 0
+internal confluence rise    = 0
+mouth rise                  = 0
+mouth narrowing             = 0
+```
+
+### 额外固定 Seed
+
+```text
+Seed -4852173505788415804
+
+hillslope delivery = 34.61%
+network deposited = 12.70%
+network export    = 87.30%
+low-accommodation network deposition = 5.01%
+guards = clean
+
+
+Seed -563659577384754347
+
+hillslope delivery = 39.35%
+network deposited = 9.97%
+network export    = 89.97%
+low-accommodation network deposition = 6.25%
+
+该 Seed 原本已有一个 <1 block 内部局部 rise；
+本切片没有新增 >=1 block、汇流或河口问题。
+
+
+Seed 4034658472718554561
+
+hillslope delivery = 47.32%
+network deposited = 22.43%
+network export    = 77.57%
+low-accommodation network deposition = 2.74%
+guards = clean
+```
+
+四个标准 Seed 都表现出同一结构：
+
+- carried load 能连续到达下游；
+- network deposition 不再由“经过 cell 数量”主导；
+- 沉积明显向高 accommodation / Lake 集中；
+- 全局与分层质量守恒；
+- 最终河流几何没有被这些只读 sediment facts 改变。
+
+## 12. 当前版本边界
+
+这批新 sediment facts 仍然只在：
+
+- `internal/geomorph`
+- `internal/geomorphaudit`
+
+内部使用。
+
+目前没有被：
+
+- Terrain
+- Reconcile
+- Waterbed
+- Runtime
+
+消费。
+
+因此本切片**仍不改变最终世界几何，也不提升 generation rules version**。
+
+旧的：
+
+- `SedimentSupply`
+- `DepositionPotential`
+
+继续承担 v1.1.19 正式 Terrain 语义。
+
+## 13. 下一步
+
+下一切片开始把 routed sediment 按**真实沉积位置**继续拆分：
+
+1. mountain-front / alluvial-fan deposition；
+2. floodplain deposition；
+3. lake-inlet deposition；
+4. terminal river / mouth delivered load；
+5. 后续再与 Waterbed delta / estuary 条件关联。
+
+在这些位置级事实稳定前，不直接用新 budget 改 Terrain。
 
 目标仍然是：
 

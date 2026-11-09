@@ -406,6 +406,121 @@ func TestSedimentBudgetRoutesAndConservesProxyMass(t *testing.T) {
 	}
 }
 
+func TestStableChannelDoesNotTaxIncomingLoadAtEveryCell(t *testing.T) {
+	in := baseInput(45, 3)
+	row := 1
+	const start = 2
+	const count = 40
+
+	for n := 0; n < count; n++ {
+		i := row*in.Width + start + n
+		in.RollingPlainWeight[i] = 0
+		in.ValleyWeight[i] = 0.10
+		in.Slope[i] = 0.04
+		in.ReliefIndex[i] = 0.40
+		in.FluvialPower[i] = 0.80
+		in.RiverStrength[i] = 0.90
+		in.FlowAccumulation[i] = 6000 + 250*float64(n)
+		if n+1 < count {
+			in.FlowTo[i] = row*in.Width + start + n + 1
+		}
+	}
+	source := row*in.Width + start
+	outlet := row*in.Width + start + count - 1
+	in.TotalErosion[source] = 0.10
+
+	m, err := Generate(in, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	production := m.SedimentProduction[source]
+	exported := m.SedimentExport[outlet]
+	if production <= 0 {
+		t.Fatal("expected source production")
+	}
+	if exported < production*0.70 {
+		t.Fatalf(
+			"stable channel repeatedly removed carried load without a depositional sink: production=%g outletExport=%g retained=%.3f",
+			production,
+			exported,
+			exported/production,
+		)
+	}
+}
+
+func TestCapacityDropWithAccommodationDepositsIncomingLoad(t *testing.T) {
+	build := func(drop bool) Input {
+		in := baseInput(45, 3)
+		row := 1
+		const start = 2
+		const count = 40
+		const breakAt = 20
+		for n := 0; n < count; n++ {
+			i := row*in.Width + start + n
+			in.RollingPlainWeight[i] = 0
+			in.ValleyWeight[i] = 0.10
+			in.Slope[i] = 0.04
+			in.ReliefIndex[i] = 0.40
+			in.FluvialPower[i] = 0.80
+			in.RiverStrength[i] = 0.90
+			in.FlowAccumulation[i] = 6000 + 250*float64(n)
+			if drop && n >= breakAt {
+				in.RollingPlainWeight[i] = 1
+				in.ValleyWeight[i] = 0.90
+				in.WetlandPotential[i] = 0.35
+				in.PerennialRiverPotential[i] = 0.85
+				in.Slope[i] = 0.005
+				in.ReliefIndex[i] = 0.10
+				in.FluvialPower[i] = 0.12
+			}
+			if n+1 < count {
+				in.FlowTo[i] = row*in.Width + start + n + 1
+			}
+		}
+		in.TotalErosion[row*in.Width+start] = 0.10
+		return in
+	}
+
+	stable, err := Generate(build(false), Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	drop, err := Generate(build(true), Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const row = 1
+	const start = 2
+	const breakAt = 20
+	breakCell := row*45 + start + breakAt
+	outlet := row*45 + start + 39
+	source := row*45 + start
+
+	if stable.SedimentDeposition[breakCell] > 1e-9 {
+		t.Fatalf(
+			"stable channel unexpectedly deposited incoming load at comparison cell: %g",
+			stable.SedimentDeposition[breakCell],
+		)
+	}
+	if drop.SedimentDeposition[breakCell] <
+		drop.SedimentProduction[source]*0.10 {
+		t.Fatalf(
+			"capacity drop with accommodation did not deposit routed load: deposition=%g production=%g",
+			drop.SedimentDeposition[breakCell],
+			drop.SedimentProduction[source],
+		)
+	}
+	if drop.SedimentExport[outlet] >= stable.SedimentExport[outlet] {
+		t.Fatalf(
+			"capacity drop did not reduce outlet load: stable=%g drop=%g",
+			stable.SedimentExport[outlet],
+			drop.SedimentExport[outlet],
+		)
+	}
+}
+
 func TestLakeTrapsRoutedSediment(t *testing.T) {
 	build := func(lake bool) Input {
 		in := baseInput(9, 3)
