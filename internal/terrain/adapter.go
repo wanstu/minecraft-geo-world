@@ -7,11 +7,18 @@ import (
 )
 
 func InputFromModels(erosionModel *erosion.Model, landformModel *landform.Model, geomorphModel *geomorph.Model) Input {
+	baseElevation := append([]float64(nil), erosionModel.ErodedElevation...)
+	if len(geomorphModel.LongitudinalGradeCorrection) == len(baseElevation) {
+		for i, correction := range geomorphModel.LongitudinalGradeCorrection {
+			baseElevation[i] += correction
+		}
+	}
+
 	return Input{
 		Width:               erosionModel.Width,
 		Height:              erosionModel.Height,
 		Geometry:            erosionModel.Geometry,
-		BaseElevation:       append([]float64(nil), erosionModel.ErodedElevation...),
+		BaseElevation:       baseElevation,
 		RollingPlainWeight:  append([]float64(nil), landformModel.RollingPlainWeight...),
 		HillWeight:          append([]float64(nil), landformModel.HillWeight...),
 		FoothillWeight:      append([]float64(nil), landformModel.FoothillWeight...),

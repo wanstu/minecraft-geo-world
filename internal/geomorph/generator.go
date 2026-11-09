@@ -51,29 +51,33 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	}
 	cfg = normalizeConfig(cfg)
 	m := &Model{
-		Config:                 cfg,
-		Geometry:               geometry,
-		Width:                  input.Width,
-		Height:                 input.Height,
-		LandMask:               append([]bool(nil), input.LandMask...),
-		UpstreamSlope:          make([]float64, n),
-		UpstreamSteepMemory:    make([]float64, n),
-		UpstreamMountainMemory: make([]float64, n),
-		SlopeDrop:              make([]float64, n),
-		SedimentSupply:         make([]float64, n),
-		FloodplainWeight:       make([]float64, n),
-		AlluvialPlainWeight:    make([]float64, n),
-		AlluvialFanCore:        make([]float64, n),
-		AlluvialFanWeight:      make([]float64, n),
-		CanyonWeight:           make([]float64, n),
-		ValleyFloorWidth:       make([]float64, n),
-		DepositionPotential:    make([]float64, n),
+		Config:                      cfg,
+		Geometry:                    geometry,
+		Width:                       input.Width,
+		Height:                      input.Height,
+		LandMask:                    append([]bool(nil), input.LandMask...),
+		UpstreamSlope:               make([]float64, n),
+		UpstreamSteepMemory:         make([]float64, n),
+		UpstreamMountainMemory:      make([]float64, n),
+		SlopeDrop:                   make([]float64, n),
+		SedimentSupply:              make([]float64, n),
+		FloodplainWeight:            make([]float64, n),
+		AlluvialPlainWeight:         make([]float64, n),
+		AlluvialFanCore:             make([]float64, n),
+		AlluvialFanWeight:           make([]float64, n),
+		CanyonWeight:                make([]float64, n),
+		ValleyFloorWidth:            make([]float64, n),
+		DepositionPotential:         make([]float64, n),
+		LongitudinalGradeCorrection: make([]float64, n),
 	}
 
 	m.computeUpstreamContext(input)
 	m.computeWeights(input)
 	m.spreadAlluvialFans(input)
 	m.computeDeposition()
+	if m.Config.LongitudinalGradeVersion >= 1 {
+		m.computeLongitudinalGrade(input)
+	}
 	return m, nil
 }
 
@@ -382,6 +386,336 @@ func (m *Model) computeDeposition() {
 			(0.42 + 0.58*m.SedimentSupply[i])
 		m.DepositionPotential[i] = clamp(deposition, 0, 1)
 	}
+}
+
+func (m *Model) computeLongitudinalGrade(input Input) {
+	n := len(input.FlowTo)
+	if n == 0 {
+		return
+	}
+
+	// A river's long profile is a network property. Select one main-stem
+	// predecessor per node from accumulated discharge, then grade contiguous
+	// mature lowland reaches as whole reaches. This avoids local relaxation
+	// stopping at one weak alluvial cell and leaving the broad downstream
+	// knickzone untouched.
+	mainUpstream := make([]int, n)
+	for i := range mainUpstream {
+		mainUpstream[i] = -1
+	}
+	for i, to := range input.FlowTo {
+		if to < 0 || to >= n || !input.LandMask[i] || !input.LandMask[to] {
+			continue
+		}
+		current := mainUpstream[to]
+		if current < 0 ||
+			input.FlowAccumulation[i] > input.FlowAccumulation[current] ||
+			(input.FlowAccumulation[i] == input.FlowAccumulation[current] && i < current) {
+			mainUpstream[to] = i
+		}
+	}
+
+	influence := make([]float64, n)
+	for i := 0; i < n; i++ {
+		if !input.LandMask[i] || input.LakeID[i] > 0 {
+			continue
+		}
+		to := input.FlowTo[i]
+		if to < 0 || to >= n || !input.LandMask[to] || input.LakeID[to] > 0 {
+			continue
+		}
+
+		accum := normalizedAccumulation(
+			input.FlowAccumulation[i],
+			input.RiverThreshold,
+			m.Config.AccumulationScale,
+		)
+		riverSignal := smoothstep(
+			0.06,
+			0.48,
+			clamp(input.RiverStrength[i], 0, 1)*(0.30+0.70*accum),
+		)
+
+		alluvial := clamp(
+			0.45*m.AlluvialPlainWeight[i]+
+				0.30*m.FloodplainWeight[i]+
+				0.25*m.DepositionPotential[i],
+			0,
+			1,
+		)
+		lowlandForm := clamp(
+			0.45*input.RollingPlainWeight[i]+
+				0.30*input.ValleyWeight[i]+
+				0.25*alluvial,
+			0,
+			1,
+		)
+		lowlandGate := smoothstep(0.08, 0.45, lowlandForm)
+
+		// Preserve genuine mountain/canyon rivers. Lowland grading is allowed
+		// to pass through rolling plains and broad valleys, but not through a
+		// tectonically supported steep reach.
+		highReliefForm := clamp(
+			0.65*input.MountainWeight[i]+
+				0.35*input.FoothillWeight[i]+
+				0.75*m.CanyonWeight[i],
+			0,
+			1,
+		)
+		reliefGate := 1 - smoothstep(
+			0.48,
+			0.82,
+			clamp(input.ReliefIndex[i], 0, 1),
+		)
+		maturity := 1 - 0.50*clamp(input.TectonicSupport[i], 0, 1)
+
+		influence[i] = clamp(
+			riverSignal*
+				(0.55+0.45*lowlandGate)*
+				(1-highReliefForm)*
+				reliefGate*
+				maturity,
+			0,
+			1,
+		)
+	}
+
+	eligible := make([]bool, n)
+	for i, w := range influence {
+		eligible[i] = w >= 0.08
+	}
+
+	const (
+		minReachNodes        = 5
+		maxCorrection        = 0.024
+		minimumLandFreeboard = 0.001
+	)
+
+	for start := 0; start < n; start++ {
+		if !eligible[start] {
+			continue
+		}
+		up := mainUpstream[start]
+		if up >= 0 && up < n && eligible[up] && input.FlowTo[up] == start {
+			// This node belongs to an upstream continuation of the same main
+			// stem and will be handled by that reach.
+			continue
+		}
+
+		reach := make([]int, 0, 16)
+		current := start
+		for current >= 0 && current < n && eligible[current] {
+			reach = append(reach, current)
+			to := input.FlowTo[current]
+			if to < 0 || to >= n || !eligible[to] || mainUpstream[to] != current {
+				break
+			}
+			current = to
+		}
+		if len(reach) < minReachNodes {
+			continue
+		}
+
+		distances := make([]float64, len(reach))
+		for k := 1; k < len(reach); k++ {
+			distances[k] = distances[k-1] +
+				gridNodeDistanceBlocks(m.Geometry, reach[k-1], reach[k])
+		}
+		length := distances[len(distances)-1]
+		if length < 512 {
+			continue
+		}
+		upperProcess, lowerProcess := m.reachAlluvialProcessEvidence(
+			reach,
+			distances,
+		)
+		if upperProcess < 0.14 ||
+			lowerProcess < 0.22 ||
+			lowerProcess-upperProcess < 0.04 {
+			// Grade only reaches that are actually behaving as a mature
+			// alluvial system. Plain terrain by itself is not sufficient, and
+			// downstream alluvial/depositional evidence must strengthen as river
+			// energy falls; otherwise a plain stream is not a deposition-driven
+			// graded reach.
+			continue
+		}
+
+		startElevation := input.Elevation[reach[0]]
+		endElevation := input.Elevation[reach[len(reach)-1]]
+		if startElevation <= endElevation+1e-9 {
+			continue
+		}
+
+		upperSlope, lowerSlope, ok := reachThirdSlopes(
+			reach,
+			distances,
+			input.Elevation,
+		)
+		if !ok ||
+			lowerSlope <= upperSlope*1.35 ||
+			lowerSlope-upperSlope < 0.008 {
+			// Already-graded or naturally concave lowland reaches are not
+			// touched. The correction is reserved for broad convex profiles
+			// whose lower third is materially steeper than the upper third.
+			continue
+		}
+
+		for k := 1; k+1 < len(reach); k++ {
+			i := reach[k]
+			fraction := distances[k] / length
+			// Mature graded rivers are generally concave-up in long profile:
+			// steeper upstream, progressively gentler downstream. Keep the
+			// reach anchors fixed and use a mild concave equilibrium target.
+			const profileExponent = 1.22
+			target := endElevation +
+				(startElevation-endElevation)*
+					math.Pow(1-fraction, profileExponent)
+			delta := target - input.Elevation[i]
+			if math.Abs(delta) <= 1e-12 {
+				continue
+			}
+
+			var processStrength float64
+			if delta > 0 {
+				// Filling a low spot is deposition-controlled. River-network
+				// eligibility says this is a valid lowland reach, but available
+				// sediment still limits how much accommodation space can fill.
+				depositionSignal := clamp(
+					0.55*m.DepositionPotential[i]+
+						0.30*m.SedimentSupply[i]+
+						0.15*m.AlluvialPlainWeight[i],
+					0,
+					1,
+				)
+				processStrength = 0.45 + 0.55*depositionSignal
+			} else {
+				// Once a mature lowland reach is eligible, fluvial incision
+				// should actually remove a convex longitudinal high point.
+				// Do not multiply by the eligibility weight a second time.
+				processStrength = 0.75 +
+					0.25*clamp(input.FluvialPower[i], 0, 1)
+			}
+
+			// Corrections fade gently toward reach anchors and remain bounded.
+			// Endpoint elevations still come from the existing hydrology /
+			// erosion solution; this only redistributes interior relief.
+			edgeBlend := 0.70 + 0.30*math.Sin(math.Pi*fraction)
+			correction := delta * processStrength * edgeBlend
+			correction = clamp(correction, -maxCorrection, maxCorrection)
+
+			lo := m.Config.SeaLevelNormalized +
+				minimumLandFreeboard - input.Elevation[i]
+			hi := 0.999 - input.Elevation[i]
+			m.LongitudinalGradeCorrection[i] = clamp(correction, lo, hi)
+		}
+	}
+}
+
+func (m *Model) reachAlluvialProcessEvidence(
+	reach []int,
+	distances []float64,
+) (float64, float64) {
+	if len(reach) == 0 || len(distances) != len(reach) {
+		return 0, 0
+	}
+	length := distances[len(distances)-1]
+	if length <= 1e-9 {
+		return 0, 0
+	}
+	upperSum, lowerSum := 0.0, 0.0
+	upperCount, lowerCount := 0.0, 0.0
+	for k, i := range reach {
+		if i < 0 ||
+			i >= len(m.AlluvialPlainWeight) ||
+			i >= len(m.FloodplainWeight) ||
+			i >= len(m.DepositionPotential) {
+			continue
+		}
+		evidence := clamp(
+			0.50*m.AlluvialPlainWeight[i]+
+				0.30*m.FloodplainWeight[i]+
+				0.20*m.DepositionPotential[i],
+			0,
+			1,
+		)
+		q := distances[k] / length
+		if q <= 1.0/3.0 {
+			upperSum += evidence
+			upperCount++
+		}
+		if q >= 2.0/3.0 {
+			lowerSum += evidence
+			lowerCount++
+		}
+	}
+	if upperCount == 0 || lowerCount == 0 {
+		return 0, 0
+	}
+	return upperSum / upperCount, lowerSum / lowerCount
+}
+
+func reachThirdSlopes(
+	reach []int,
+	distances []float64,
+	elevation []float64,
+) (float64, float64, bool) {
+	if len(reach) < 3 || len(distances) != len(reach) {
+		return 0, 0, false
+	}
+	length := distances[len(distances)-1]
+	if length <= 1e-9 {
+		return 0, 0, false
+	}
+	at := func(distance float64) (float64, bool) {
+		if distance <= 0 {
+			i := reach[0]
+			return elevation[i], i >= 0 && i < len(elevation)
+		}
+		for k := 1; k < len(reach); k++ {
+			if distances[k] < distance {
+				continue
+			}
+			a, b := reach[k-1], reach[k]
+			if a < 0 || b < 0 || a >= len(elevation) || b >= len(elevation) {
+				return 0, false
+			}
+			span := distances[k] - distances[k-1]
+			if span <= 1e-9 {
+				return elevation[b], true
+			}
+			t := (distance - distances[k-1]) / span
+			return elevation[a] + (elevation[b]-elevation[a])*t, true
+		}
+		i := reach[len(reach)-1]
+		if i < 0 || i >= len(elevation) {
+			return 0, false
+		}
+		return elevation[i], true
+	}
+
+	start, okStart := at(0)
+	q1, okQ1 := at(length / 3)
+	q2, okQ2 := at(2 * length / 3)
+	end, okEnd := at(length)
+	if !okStart || !okQ1 || !okQ2 || !okEnd {
+		return 0, 0, false
+	}
+	thirdKm := length / 3 / 1000
+	if thirdKm <= 1e-9 {
+		return 0, 0, false
+	}
+	return (start - q1) / thirdKm, (q2 - end) / thirdKm, true
+}
+
+func gridNodeDistanceBlocks(g world.GridGeometry, a, b int) float64 {
+	if a < 0 || b < 0 || a >= g.Width*g.Height || b >= g.Width*g.Height {
+		return 0
+	}
+	ax, az := a%g.Width, a/g.Width
+	bx, bz := b%g.Width, b/g.Width
+	dx := float64(ax-bx) * g.SpacingX()
+	dz := float64(az-bz) * g.SpacingZ()
+	return math.Hypot(dx, dz)
 }
 
 func normalizedAccumulation(accumulation, threshold, scale float64) float64 {

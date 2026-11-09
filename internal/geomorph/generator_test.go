@@ -285,3 +285,106 @@ func TestDeterministicAndBounded(t *testing.T) {
 		}
 	}
 }
+
+func TestLongitudinalGradeSmoothsMatureAlluvialRiver(t *testing.T) {
+	in := baseInput(11, 3)
+	row := 1
+	elevations := []float64{
+		0.640, 0.635, 0.630, 0.625, 0.620,
+		0.610, 0.595, 0.575, 0.550,
+	}
+	for n, elevation := range elevations {
+		x := n + 1
+		i := row*in.Width + x
+		in.Elevation[i] = elevation
+		in.Slope[i] = 0.006
+		in.ReliefIndex[i] = 0.10
+		in.RiverStrength[i] = 0.95
+		in.FlowAccumulation[i] = 2000 + float64(n)*3000
+		in.PerennialRiverPotential[i] = 0.9
+		in.WetlandPotential[i] = 0.25
+		in.ValleyWeight[i] = 0.95
+		in.RollingPlainWeight[i] = 1
+		if n+1 < len(elevations) {
+			in.FlowTo[i] = row*in.Width + x + 1
+		}
+	}
+
+	legacy, err := Generate(in, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, correction := range legacy.LongitudinalGradeCorrection {
+		if correction != 0 {
+			t.Fatalf("legacy correction[%d]=%.12f want 0", i, correction)
+		}
+	}
+
+	graded, err := Generate(in, Config{LongitudinalGradeVersion: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	corrected := make([]float64, len(elevations))
+	for n, elevation := range elevations {
+		i := row*in.Width + n + 1
+		corrected[n] = elevation + graded.LongitudinalGradeCorrection[i]
+	}
+	upperDrop := corrected[1] - corrected[3]
+	lowerDrop := corrected[5] - corrected[7]
+	originalUpperDrop := elevations[1] - elevations[3]
+	originalLowerDrop := elevations[5] - elevations[7]
+
+	if !(originalLowerDrop > originalUpperDrop*3) {
+		t.Fatalf("test fixture is not downstream-steepening: upper=%.6f lower=%.6f",
+			originalUpperDrop, originalLowerDrop)
+	}
+	if !(lowerDrop < originalLowerDrop-0.004) {
+		t.Fatalf("grade correction did not reduce lower-reach steepening: before=%.6f after=%.6f profile=%v",
+			originalLowerDrop, lowerDrop, corrected)
+	}
+	if !(upperDrop > originalUpperDrop) {
+		t.Fatalf("grade correction did not redistribute drop upstream: before=%.6f after=%.6f profile=%v",
+			originalUpperDrop, upperDrop, corrected)
+	}
+	for n := 1; n < len(corrected); n++ {
+		if corrected[n] > corrected[n-1]+1e-9 {
+			t.Fatalf("graded river rose downstream at %d: %.6f -> %.6f",
+				n, corrected[n-1], corrected[n])
+		}
+	}
+}
+
+func TestLongitudinalGradeDoesNotFlattenMountainCanyon(t *testing.T) {
+	in := baseInput(9, 3)
+	row := 1
+	for n := 0; n < 7; n++ {
+		i := row*in.Width + n + 1
+		in.Elevation[i] = 0.72 - float64(n)*0.018
+		in.Slope[i] = 0.055
+		in.ReliefIndex[i] = 0.9
+		in.RiverStrength[i] = 1
+		in.FlowAccumulation[i] = 3000 + float64(n)*4000
+		in.FluvialPower[i] = 0.9
+		in.ValleyIncision[i] = 0.02
+		in.ValleyWeight[i] = 0.9
+		in.RollingPlainWeight[i] = 0
+		in.MountainWeight[i] = 0.85
+		in.FoothillWeight[i] = 0.2
+		if n < 6 {
+			in.FlowTo[i] = row*in.Width + n + 2
+		}
+	}
+
+	m, err := Generate(in, Config{LongitudinalGradeVersion: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for n := 0; n < 7; n++ {
+		i := row*in.Width + n + 1
+		if math.Abs(m.LongitudinalGradeCorrection[i]) > 1e-12 {
+			t.Fatalf("mountain/canyon river received grade correction at %d: %.12f",
+				i, m.LongitudinalGradeCorrection[i])
+		}
+	}
+}

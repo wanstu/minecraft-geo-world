@@ -7,6 +7,11 @@ type Config struct {
 	AccumulationScale  float64
 	SlopeScale         float64
 	ReliefScale        float64
+
+	// LongitudinalGradeVersion enables causal lowland river-profile grading.
+	// Zero preserves all locked worlds exactly. Version 1 smooths only mature,
+	// alluvial river corridors using the already-resolved FlowTo network.
+	LongitudinalGradeVersion uint8 `json:",omitempty"`
 }
 
 type Input struct {
@@ -47,16 +52,17 @@ type Model struct {
 
 	LandMask []bool
 
-	UpstreamSlope          []float64
-	UpstreamSteepMemory    []float64
-	UpstreamMountainMemory []float64
-	SlopeDrop              []float64
-	SedimentSupply         []float64
-	FloodplainWeight       []float64
-	AlluvialPlainWeight    []float64
-	AlluvialFanCore        []float64
-	AlluvialFanWeight      []float64
-	CanyonWeight           []float64
-	ValleyFloorWidth       []float64
-	DepositionPotential    []float64
+	UpstreamSlope               []float64
+	UpstreamSteepMemory         []float64
+	UpstreamMountainMemory      []float64
+	SlopeDrop                   []float64
+	SedimentSupply              []float64
+	FloodplainWeight            []float64
+	AlluvialPlainWeight         []float64
+	AlluvialFanCore             []float64
+	AlluvialFanWeight           []float64
+	CanyonWeight                []float64
+	ValleyFloorWidth            []float64
+	DepositionPotential         []float64
+	LongitudinalGradeCorrection []float64
 }

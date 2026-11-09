@@ -229,19 +229,35 @@ Minecraft voxel
 
 ### R0 — 现状审计
 
-只读，不改算法。
+状态：**完成。**
 
-输出真实调用链、已有功能、重复职责、当前缺口。
+真实调用链、已有功能、重复职责与当前缺口见
+[REALISTIC_GEOMORPHOLOGY_R0_AUDIT.md](REALISTIC_GEOMORPHOLOGY_R0_AUDIT.md)。
 
 ### R1 — 验收框架
 
-增加只读统计和定位工具。
+状态：**第一阶段完成并持续作为 Phase 8 验收基础。**
+
+增加只读统计和定位工具。详细结果见
+[REALISTIC_GEOMORPHOLOGY_R1_ACCEPTANCE.md](REALISTIC_GEOMORPHOLOGY_R1_ACCEPTANCE.md)。
 
 **R1 的结果默认是调查信号，不是自动生成缺陷结论。**
 
 ### R2 — 河流纵剖面与汇流
 
-仅针对 R1 + 正式最终验收共同证明的问题修改算法。
+状态：**完成两项有最终证据的问题修复。**
+
+仅针对 R1 + 正式最终验收共同证明的问题修改算法：
+
+1. v1.1.18：特殊盆地持久化 drainage corridor，解决盆地河流爬坡而不制造悬高河。
+2. v1.1.19：成熟冲积低地河 longitudinal grading，改善 BaseElevation / Terrain broad downstream steepening。
+
+文档：
+
+- [REALISTIC_GEOMORPHOLOGY_R2_BASIN_DRAINAGE.md](REALISTIC_GEOMORPHOLOGY_R2_BASIN_DRAINAGE.md)
+- [REALISTIC_GEOMORPHOLOGY_R2_LONGITUDINAL_GRADE.md](REALISTIC_GEOMORPHOLOGY_R2_LONGITUDINAL_GRADE.md)
+
+没有恢复已回退的 receiver geometry v6；Waterbed receiver low-bank 语义仍保持 v5。
 
 ### R3 — 湖泊、内流盆地与河口
 

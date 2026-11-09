@@ -8,6 +8,7 @@ import (
 	"geoworld/internal/generator"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
+	"geoworld/internal/sampling"
 	"geoworld/internal/specialfeatures"
 	"geoworld/internal/waterbed"
 )
@@ -55,10 +56,12 @@ type RiverReport struct {
 	InternalRiseSignals                []RiverRiseSignal `json:"internalRiseSignals,omitempty"`
 	ReceiverRiseSignals                []RiverRiseSignal `json:"receiverRiseSignals,omitempty"`
 
-	Confluences                int                `json:"confluences"`
-	ConfluenceSurfaceRises     int                `json:"confluenceSurfaceRises"`
-	ConfluenceWidthRegressions int                `json:"confluenceWidthRegressions"`
-	ConfluenceSignals          []ConfluenceSignal `json:"confluenceSignals,omitempty"`
+	Confluences                    int                `json:"confluences"`
+	ConfluenceSurfaceRises         int                `json:"confluenceSurfaceRises"`
+	ConfluenceInternalSurfaceRises int                `json:"confluenceInternalSurfaceRises"`
+	ConfluenceReceiverSurfaceRises int                `json:"confluenceReceiverSurfaceRises"`
+	ConfluenceWidthRegressions     int                `json:"confluenceWidthRegressions"`
+	ConfluenceSignals              []ConfluenceSignal `json:"confluenceSignals,omitempty"`
 
 	OceanMouths           int           `json:"oceanMouths"`
 	MouthApproachRises    int           `json:"mouthApproachRises"`
@@ -70,50 +73,53 @@ type RiverReport struct {
 }
 
 type RouteProfile struct {
-	SourceNode                   int     `json:"sourceNode"`
-	EndNode                      int     `json:"endNode"`
-	Segments                     int     `json:"segments"`
-	LengthBlocks                 float64 `json:"lengthBlocks"`
-	TotalDropBlocks              float64 `json:"totalDropBlocks"`
-	UpperDropPerKm               float64 `json:"upperDropPerKm"`
-	MiddleDropPerKm              float64 `json:"middleDropPerKm"`
-	LowerDropPerKm               float64 `json:"lowerDropPerKm"`
-	DrySamples                   int     `json:"drySamples"`
-	SurfaceRiseSteps             int     `json:"surfaceRiseSteps"`
-	InternalRiseSteps            int     `json:"internalRiseSteps"`
-	ReceiverRiseSteps            int     `json:"receiverRiseSteps"`
-	DownstreamSteeper            bool    `json:"downstreamSteeper"`
-	FreeFlowLengthBlocks         float64 `json:"freeFlowLengthBlocks"`
-	FreeFlowDropBlocks           float64 `json:"freeFlowDropBlocks"`
-	FreeUpperDropPerKm           float64 `json:"freeUpperDropPerKm"`
-	FreeMiddleDropPerKm          float64 `json:"freeMiddleDropPerKm"`
-	FreeLowerDropPerKm           float64 `json:"freeLowerDropPerKm"`
-	LongFreeFlow                 bool    `json:"longFreeFlow"`
-	BroadDownstreamSteepening    bool    `json:"broadDownstreamSteepening"`
-	EndWaterKind                 string  `json:"endWaterKind"`
-	EndOceanMouth                bool    `json:"endOceanMouth"`
-	EndLakeMouth                 bool    `json:"endLakeMouth"`
-	EndLakeOutlet                bool    `json:"endLakeOutlet"`
-	FreeUpperMountainWeight      float64 `json:"freeUpperMountainWeight"`
-	FreeLowerMountainWeight      float64 `json:"freeLowerMountainWeight"`
-	FreeUpperCanyonWeight        float64 `json:"freeUpperCanyonWeight"`
-	FreeLowerCanyonWeight        float64 `json:"freeLowerCanyonWeight"`
-	FreeUpperValleyWeight        float64 `json:"freeUpperValleyWeight"`
-	FreeLowerValleyWeight        float64 `json:"freeLowerValleyWeight"`
-	FreeUpperPlainWeight         float64 `json:"freeUpperPlainWeight"`
-	FreeLowerPlainWeight         float64 `json:"freeLowerPlainWeight"`
-	FreeUpperTerrainDropPerKm    float64 `json:"freeUpperTerrainDropPerKm"`
-	FreeLowerTerrainDropPerKm    float64 `json:"freeLowerTerrainDropPerKm"`
-	FreeUpperCoastDropPerKm      float64 `json:"freeUpperCoastDropPerKm"`
-	FreeLowerCoastDropPerKm      float64 `json:"freeLowerCoastDropPerKm"`
-	FreeUpperBaseDropPerKm       float64 `json:"freeUpperBaseDropPerKm"`
-	FreeLowerBaseDropPerKm       float64 `json:"freeLowerBaseDropPerKm"`
-	FreeUpperFloodplainWeight    float64 `json:"freeUpperFloodplainWeight"`
-	FreeLowerFloodplainWeight    float64 `json:"freeLowerFloodplainWeight"`
-	FreeUpperAlluvialPlainWeight float64 `json:"freeUpperAlluvialPlainWeight"`
-	FreeLowerAlluvialPlainWeight float64 `json:"freeLowerAlluvialPlainWeight"`
-	FreeUpperDepositionPotential float64 `json:"freeUpperDepositionPotential"`
-	FreeLowerDepositionPotential float64 `json:"freeLowerDepositionPotential"`
+	SourceNode                      int     `json:"sourceNode"`
+	EndNode                         int     `json:"endNode"`
+	Segments                        int     `json:"segments"`
+	LengthBlocks                    float64 `json:"lengthBlocks"`
+	TotalDropBlocks                 float64 `json:"totalDropBlocks"`
+	UpperDropPerKm                  float64 `json:"upperDropPerKm"`
+	MiddleDropPerKm                 float64 `json:"middleDropPerKm"`
+	LowerDropPerKm                  float64 `json:"lowerDropPerKm"`
+	DrySamples                      int     `json:"drySamples"`
+	SurfaceRiseSteps                int     `json:"surfaceRiseSteps"`
+	InternalRiseSteps               int     `json:"internalRiseSteps"`
+	ReceiverRiseSteps               int     `json:"receiverRiseSteps"`
+	DownstreamSteeper               bool    `json:"downstreamSteeper"`
+	FreeFlowLengthBlocks            float64 `json:"freeFlowLengthBlocks"`
+	FreeFlowDropBlocks              float64 `json:"freeFlowDropBlocks"`
+	FreeUpperDropPerKm              float64 `json:"freeUpperDropPerKm"`
+	FreeMiddleDropPerKm             float64 `json:"freeMiddleDropPerKm"`
+	FreeLowerDropPerKm              float64 `json:"freeLowerDropPerKm"`
+	LongFreeFlow                    bool    `json:"longFreeFlow"`
+	BroadDownstreamSteepening       bool    `json:"broadDownstreamSteepening"`
+	EndWaterKind                    string  `json:"endWaterKind"`
+	EndOceanMouth                   bool    `json:"endOceanMouth"`
+	EndLakeMouth                    bool    `json:"endLakeMouth"`
+	EndLakeOutlet                   bool    `json:"endLakeOutlet"`
+	FreeUpperMountainWeight         float64 `json:"freeUpperMountainWeight"`
+	FreeLowerMountainWeight         float64 `json:"freeLowerMountainWeight"`
+	FreeUpperCanyonWeight           float64 `json:"freeUpperCanyonWeight"`
+	FreeLowerCanyonWeight           float64 `json:"freeLowerCanyonWeight"`
+	FreeUpperValleyWeight           float64 `json:"freeUpperValleyWeight"`
+	FreeLowerValleyWeight           float64 `json:"freeLowerValleyWeight"`
+	FreeUpperPlainWeight            float64 `json:"freeUpperPlainWeight"`
+	FreeLowerPlainWeight            float64 `json:"freeLowerPlainWeight"`
+	FreeUpperTerrainDropPerKm       float64 `json:"freeUpperTerrainDropPerKm"`
+	FreeLowerTerrainDropPerKm       float64 `json:"freeLowerTerrainDropPerKm"`
+	FreeUpperCoastDropPerKm         float64 `json:"freeUpperCoastDropPerKm"`
+	FreeLowerCoastDropPerKm         float64 `json:"freeLowerCoastDropPerKm"`
+	FreeUpperBaseDropPerKm          float64 `json:"freeUpperBaseDropPerKm"`
+	FreeLowerBaseDropPerKm          float64 `json:"freeLowerBaseDropPerKm"`
+	FreeUpperFloodplainWeight       float64 `json:"freeUpperFloodplainWeight"`
+	FreeLowerFloodplainWeight       float64 `json:"freeLowerFloodplainWeight"`
+	FreeUpperAlluvialPlainWeight    float64 `json:"freeUpperAlluvialPlainWeight"`
+	FreeLowerAlluvialPlainWeight    float64 `json:"freeLowerAlluvialPlainWeight"`
+	FreeUpperDepositionPotential    float64 `json:"freeUpperDepositionPotential"`
+	FreeLowerDepositionPotential    float64 `json:"freeLowerDepositionPotential"`
+	FreeUpperGradeCorrectionBlocks  float64 `json:"freeUpperGradeCorrectionBlocks"`
+	FreeLowerGradeCorrectionBlocks  float64 `json:"freeLowerGradeCorrectionBlocks"`
+	FreeMaxAbsGradeCorrectionBlocks float64 `json:"freeMaxAbsGradeCorrectionBlocks"`
 }
 
 type RiverRiseSignal struct {
@@ -137,6 +143,7 @@ type ConfluenceSignal struct {
 	RequiredHalfWidthBlocks   float64 `json:"requiredHalfWidthBlocks"`
 	DownstreamHalfWidthBlocks float64 `json:"downstreamHalfWidthBlocks"`
 	WidthRatio                float64 `json:"widthRatio"`
+	ReceiverRelated           bool    `json:"receiverRelated"`
 }
 
 type MouthSignal struct {
@@ -166,27 +173,28 @@ type TransitionClassStats struct {
 }
 
 type routePoint struct {
-	distance            float64
-	surfaceY            float64
-	wet                 bool
-	receiverRelated     bool
-	segment             int
-	t                   float64
-	x                   float64
-	z                   float64
-	waterKind           reconcile.WaterKind
-	specialFeature      string
-	connectionSegment   bool
-	mountainWeight      float64
-	canyonWeight        float64
-	valleyWeight        float64
-	plainWeight         float64
-	terrainY            float64
-	coastTerrainY       float64
-	baseElevationY      float64
-	floodplainWeight    float64
-	alluvialPlainWeight float64
-	depositionPotential float64
+	distance              float64
+	surfaceY              float64
+	wet                   bool
+	receiverRelated       bool
+	segment               int
+	t                     float64
+	x                     float64
+	z                     float64
+	waterKind             reconcile.WaterKind
+	specialFeature        string
+	connectionSegment     bool
+	mountainWeight        float64
+	canyonWeight          float64
+	valleyWeight          float64
+	plainWeight           float64
+	terrainY              float64
+	coastTerrainY         float64
+	baseElevationY        float64
+	floodplainWeight      float64
+	alluvialPlainWeight   float64
+	depositionPotential   float64
+	gradeCorrectionBlocks float64
 }
 
 type transitionAccumulator struct {
@@ -243,6 +251,18 @@ func auditRivers(model *generator.WorldModel, cfg Config, report *RiverReport) {
 	report.Segments = len(model.Waterbed.Rivers)
 	incoming := make(map[int][]int)
 	outgoing := make(map[int]int)
+
+	var gradeGrid *sampling.ScalarGrid
+	if model.Geomorph != nil &&
+		len(model.Geomorph.LongitudinalGradeCorrection) ==
+			model.Geomorph.Width*model.Geomorph.Height {
+		if grid, err := sampling.NewScalarGridWithGeometry(
+			model.Geomorph.Geometry,
+			model.Geomorph.LongitudinalGradeCorrection,
+		); err == nil {
+			gradeGrid = &grid
+		}
+	}
 	type riseKey struct {
 		segment int
 		t       int64
@@ -273,7 +293,7 @@ func auditRivers(model *generator.WorldModel, cfg Config, report *RiverReport) {
 		if len(route) == 0 {
 			continue
 		}
-		profile, rises := profileRoute(model, cfg, route)
+		profile, rises := profileRoute(model, cfg, route, gradeGrid)
 		report.Routes++
 		for _, rise := range rises {
 			key := riseKey{segment: rise.Segment, t: int64(math.Round(rise.T * 1e9))}
@@ -389,7 +409,12 @@ func traceRoute(segments []waterbed.RiverSegment, start int, outgoing map[int]in
 	return route
 }
 
-func profileRoute(model *generator.WorldModel, cfg Config, route []int) (RouteProfile, []RiverRiseSignal) {
+func profileRoute(
+	model *generator.WorldModel,
+	cfg Config,
+	route []int,
+	gradeGrid *sampling.ScalarGrid,
+) (RouteProfile, []RiverRiseSignal) {
 	first := model.Waterbed.Rivers[route[0]]
 	last := model.Waterbed.Rivers[route[len(route)-1]]
 	points := make([]routePoint, 0, len(route)*16)
@@ -419,6 +444,13 @@ func profileRoute(model *generator.WorldModel, cfg Config, route []int) (RoutePr
 			sample := finalRuntimeSample(model, x, z)
 			ground := model.Waterbed.Sample(x, z)
 			terrainSample := model.Terrain.Sample(x, z)
+			gradeCorrectionBlocks := 0.0
+			if gradeGrid != nil {
+				correction := gradeGrid.SampleCubicBSpline(x, z)
+				gradeCorrectionBlocks =
+					minecraftY(terrainSample.BaseElevation) -
+						minecraftY(terrainSample.BaseElevation-correction)
+			}
 			wet := sample.World.WaterSurfaceDefined &&
 				sample.World.WaterKind != reconcile.WaterNone
 			surfaceY := 0.0
@@ -432,23 +464,24 @@ func profileRoute(model *generator.WorldModel, cfg Config, route []int) (RoutePr
 				receiverRelated: ground.RiverReceiverSurfaceDefined ||
 					sample.World.WaterKind == reconcile.WaterLake ||
 					sample.World.WaterKind == reconcile.WaterOcean,
-				segment:             id,
-				t:                   t,
-				x:                   x,
-				z:                   z,
-				waterKind:           sample.World.WaterKind,
-				specialFeature:      sample.SpecialFeature,
-				connectionSegment:   seg.OceanMouth || seg.LakeMouth || seg.LakeOutlet,
-				mountainWeight:      terrainSample.MountainWeight,
-				canyonWeight:        terrainSample.CanyonWeight,
-				valleyWeight:        terrainSample.ValleyWeight,
-				plainWeight:         terrainSample.RollingPlainWeight,
-				terrainY:            minecraftY(terrainSample.FinalHeight),
-				coastTerrainY:       minecraftY(model.CoastTerrain.SampleNormalized(x, z)),
-				baseElevationY:      minecraftY(terrainSample.BaseElevation),
-				floodplainWeight:    terrainSample.FloodplainWeight,
-				alluvialPlainWeight: terrainSample.AlluvialPlainWeight,
-				depositionPotential: terrainSample.DepositionPotential,
+				segment:               id,
+				t:                     t,
+				x:                     x,
+				z:                     z,
+				waterKind:             sample.World.WaterKind,
+				specialFeature:        sample.SpecialFeature,
+				connectionSegment:     seg.OceanMouth || seg.LakeMouth || seg.LakeOutlet,
+				mountainWeight:        terrainSample.MountainWeight,
+				canyonWeight:          terrainSample.CanyonWeight,
+				valleyWeight:          terrainSample.ValleyWeight,
+				plainWeight:           terrainSample.RollingPlainWeight,
+				terrainY:              minecraftY(terrainSample.FinalHeight),
+				coastTerrainY:         minecraftY(model.CoastTerrain.SampleNormalized(x, z)),
+				baseElevationY:        minecraftY(terrainSample.BaseElevation),
+				floodplainWeight:      terrainSample.FloodplainWeight,
+				alluvialPlainWeight:   terrainSample.AlluvialPlainWeight,
+				depositionPotential:   terrainSample.DepositionPotential,
+				gradeCorrectionBlocks: gradeCorrectionBlocks,
 			})
 		}
 	}
@@ -673,6 +706,10 @@ func summarizeFreeFlowTerrain(out *RouteProfile, points []routePoint) {
 	}
 	upperCount, lowerCount := 0.0, 0.0
 	for _, point := range points {
+		out.FreeMaxAbsGradeCorrectionBlocks = math.Max(
+			out.FreeMaxAbsGradeCorrectionBlocks,
+			math.Abs(point.gradeCorrectionBlocks),
+		)
 		q := (point.distance - start) / length
 		switch {
 		case q <= 1.0/3.0:
@@ -684,6 +721,7 @@ func summarizeFreeFlowTerrain(out *RouteProfile, points []routePoint) {
 			out.FreeUpperFloodplainWeight += point.floodplainWeight
 			out.FreeUpperAlluvialPlainWeight += point.alluvialPlainWeight
 			out.FreeUpperDepositionPotential += point.depositionPotential
+			out.FreeUpperGradeCorrectionBlocks += point.gradeCorrectionBlocks
 		case q >= 2.0/3.0:
 			lowerCount++
 			out.FreeLowerMountainWeight += point.mountainWeight
@@ -693,6 +731,7 @@ func summarizeFreeFlowTerrain(out *RouteProfile, points []routePoint) {
 			out.FreeLowerFloodplainWeight += point.floodplainWeight
 			out.FreeLowerAlluvialPlainWeight += point.alluvialPlainWeight
 			out.FreeLowerDepositionPotential += point.depositionPotential
+			out.FreeLowerGradeCorrectionBlocks += point.gradeCorrectionBlocks
 		}
 	}
 	if upperCount > 0 {
@@ -703,6 +742,7 @@ func summarizeFreeFlowTerrain(out *RouteProfile, points []routePoint) {
 		out.FreeUpperFloodplainWeight /= upperCount
 		out.FreeUpperAlluvialPlainWeight /= upperCount
 		out.FreeUpperDepositionPotential /= upperCount
+		out.FreeUpperGradeCorrectionBlocks /= upperCount
 	}
 	if lowerCount > 0 {
 		out.FreeLowerMountainWeight /= lowerCount
@@ -712,6 +752,7 @@ func summarizeFreeFlowTerrain(out *RouteProfile, points []routePoint) {
 		out.FreeLowerFloodplainWeight /= lowerCount
 		out.FreeLowerAlluvialPlainWeight /= lowerCount
 		out.FreeLowerDepositionPotential /= lowerCount
+		out.FreeLowerGradeCorrectionBlocks /= lowerCount
 	}
 }
 
@@ -794,7 +835,11 @@ func auditConfluences(
 		report.Confluences++
 		down := model.Waterbed.Rivers[downID]
 		dx, dz := waterbed.RiverCenterPoint(down, 0.04)
+		downGround := model.Waterbed.Sample(dx, dz)
 		downSample := finalRuntimeSample(model, dx, dz)
+		receiverRelated := downGround.RiverReceiverSurfaceDefined ||
+			downSample.World.WaterKind == reconcile.WaterLake ||
+			downSample.World.WaterKind == reconcile.WaterOcean
 		// The confluence contract is persisted on the downstream segment itself.
 		// NavigationSampleAt can select an overlapping incoming segment at the
 		// exact junction because both bank distances are zero, producing a false
@@ -809,7 +854,13 @@ func auditConfluences(
 			sumSquares += inSeg.HalfWidth * inSeg.HalfWidth
 			maxIncoming = math.Max(maxIncoming, inSeg.HalfWidth)
 			x, z := waterbed.RiverCenterPoint(inSeg, 0.96)
+			inGround := model.Waterbed.Sample(x, z)
 			inSample := finalRuntimeSample(model, x, z)
+			if inGround.RiverReceiverSurfaceDefined ||
+				inSample.World.WaterKind == reconcile.WaterLake ||
+				inSample.World.WaterKind == reconcile.WaterOcean {
+				receiverRelated = true
+			}
 			if !wetRuntime(inSample) || !wetRuntime(downSample) {
 				continue
 			}
@@ -826,6 +877,11 @@ func auditConfluences(
 		widthSignal := ratio < 1
 		if surfaceSignal {
 			report.ConfluenceSurfaceRises++
+			if receiverRelated {
+				report.ConfluenceReceiverSurfaceRises++
+			} else {
+				report.ConfluenceInternalSurfaceRises++
+			}
 		}
 		if widthSignal {
 			report.ConfluenceWidthRegressions++
@@ -840,6 +896,7 @@ func auditConfluences(
 				RequiredHalfWidthBlocks:   required,
 				DownstreamHalfWidthBlocks: downWidth,
 				WidthRatio:                ratio,
+				ReceiverRelated:           receiverRelated,
 			})
 		}
 	}
