@@ -15,6 +15,7 @@ func baseInput(width, height int) Input {
 		Slope:                   make([]float64, n),
 		ReliefIndex:             make([]float64, n),
 		ValleyIncision:          make([]float64, n),
+		TotalErosion:            make([]float64, n),
 		FluvialPower:            make([]float64, n),
 		TectonicSupport:         make([]float64, n),
 		FlowTo:                  make([]int, n),
@@ -238,6 +239,7 @@ func TestDeterministicAndBounded(t *testing.T) {
 	for i := range in.LandMask {
 		in.Slope[i] = float64((i*13)%17) / 400
 		in.ReliefIndex[i] = float64((i*7)%19) / 19
+		in.TotalErosion[i] = float64((i*11)%17) / 850
 		in.FlowAccumulation[i] = float64((i * 101) % 20000)
 		in.RiverStrength[i] = float64((i*3)%11) / 10
 		in.ValleyWeight[i] = float64((i*5)%13) / 12
@@ -263,6 +265,7 @@ func TestDeterministicAndBounded(t *testing.T) {
 		a.CanyonWeight,
 		a.ValleyFloorWidth,
 		a.DepositionPotential,
+		a.TransportCapacity,
 	}
 	fieldsB := [][]float64{
 		b.FloodplainWeight,
@@ -271,6 +274,7 @@ func TestDeterministicAndBounded(t *testing.T) {
 		b.CanyonWeight,
 		b.ValleyFloorWidth,
 		b.DepositionPotential,
+		b.TransportCapacity,
 	}
 
 	for f := range fieldsA {
@@ -283,6 +287,178 @@ func TestDeterministicAndBounded(t *testing.T) {
 				t.Fatalf("field %d cell %d out of range: %v", f, i, v)
 			}
 		}
+	}
+
+	rawA := [][]float64{
+		a.SedimentProduction,
+		a.SedimentFlux,
+		a.SedimentDeposition,
+		a.SedimentExport,
+	}
+	rawB := [][]float64{
+		b.SedimentProduction,
+		b.SedimentFlux,
+		b.SedimentDeposition,
+		b.SedimentExport,
+	}
+	for f := range rawA {
+		for i := range rawA[f] {
+			if rawA[f][i] != rawB[f][i] {
+				t.Fatalf("non-deterministic sediment field %d cell %d", f, i)
+			}
+			v := rawA[f][i]
+			if math.IsNaN(v) || math.IsInf(v, 0) || v < 0 {
+				t.Fatalf("sediment field %d cell %d invalid: %v", f, i, v)
+			}
+		}
+	}
+}
+
+func TestSedimentBudgetDoesNotInventProductionWithoutActualErosion(t *testing.T) {
+	in := baseInput(5, 3)
+	i := 1*in.Width + 2
+	in.ReliefIndex[i] = 0.95
+	in.FluvialPower[i] = 1
+	in.TectonicSupport[i] = 0.8
+	in.RiverStrength[i] = 1
+	in.FlowAccumulation[i] = 20000
+	in.Slope[i] = 0.05
+
+	m, err := Generate(in, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range m.LandMask {
+		if m.SedimentProduction[i] != 0 ||
+			m.SedimentFlux[i] != 0 ||
+			m.SedimentDeposition[i] != 0 ||
+			m.SedimentExport[i] != 0 {
+			t.Fatalf(
+				"cell %d invented sediment without actual erosion: production=%g flux=%g deposition=%g export=%g",
+				i,
+				m.SedimentProduction[i],
+				m.SedimentFlux[i],
+				m.SedimentDeposition[i],
+				m.SedimentExport[i],
+			)
+		}
+	}
+}
+
+func TestSedimentBudgetRoutesAndConservesProxyMass(t *testing.T) {
+	in := baseInput(9, 3)
+	row := 1
+	for n := 0; n < 7; n++ {
+		i := row*in.Width + n + 1
+		in.TotalErosion[i] = 0.004 + 0.004*float64(6-n)
+		in.Slope[i] = 0.040 - 0.005*float64(n)
+		in.ReliefIndex[i] = 0.65 - 0.07*float64(n)
+		in.FluvialPower[i] = 0.90 - 0.08*float64(n)
+		in.RiverStrength[i] = 0.90
+		in.FlowAccumulation[i] = 2000 + 2500*float64(n)
+		in.ValleyWeight[i] = 0.80
+		in.RollingPlainWeight[i] = 0.25 + 0.10*float64(n)
+		if n < 6 {
+			in.FlowTo[i] = row*in.Width + n + 2
+		}
+	}
+
+	m, err := Generate(in, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	production := 0.0
+	deposition := 0.0
+	exported := 0.0
+	for i := range m.LandMask {
+		production += m.SedimentProduction[i]
+		deposition += m.SedimentDeposition[i]
+		exported += m.SedimentExport[i]
+	}
+	if production <= 0 || deposition <= 0 || exported <= 0 {
+		t.Fatalf(
+			"expected active routed budget: production=%g deposition=%g export=%g",
+			production,
+			deposition,
+			exported,
+		)
+	}
+	if delta := math.Abs(production - deposition - exported); delta > 1e-10 {
+		t.Fatalf(
+			"sediment proxy mass is not conserved: production=%g deposition=%g export=%g delta=%g",
+			production,
+			deposition,
+			exported,
+			delta,
+		)
+	}
+
+	last := row*in.Width + 7
+	if m.SedimentFlux[last] <= m.SedimentProduction[last] {
+		t.Fatalf(
+			"downstream cell did not receive upstream sediment: flux=%g local=%g",
+			m.SedimentFlux[last],
+			m.SedimentProduction[last],
+		)
+	}
+}
+
+func TestLakeTrapsRoutedSediment(t *testing.T) {
+	build := func(lake bool) Input {
+		in := baseInput(9, 3)
+		row := 1
+		for n := 0; n < 7; n++ {
+			i := row*in.Width + n + 1
+			in.TotalErosion[i] = 0.02
+			in.Slope[i] = 0.025
+			in.ReliefIndex[i] = 0.30
+			in.FluvialPower[i] = 0.70
+			in.RiverStrength[i] = 0.90
+			in.FlowAccumulation[i] = 2500 + 3000*float64(n)
+			in.ValleyWeight[i] = 0.85
+			if n < 6 {
+				in.FlowTo[i] = row*in.Width + n + 2
+			}
+		}
+		if lake {
+			in.LakeID[row*in.Width+6] = 1
+		}
+		return in
+	}
+
+	openModel, err := Generate(build(false), Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lakeModel, err := Generate(build(true), Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	lakeCell := 1*9 + 6
+	if lakeModel.SedimentDeposition[lakeCell] <=
+		openModel.SedimentDeposition[lakeCell] {
+		t.Fatalf(
+			"lake did not increase sediment trapping: open=%g lake=%g",
+			openModel.SedimentDeposition[lakeCell],
+			lakeModel.SedimentDeposition[lakeCell],
+		)
+	}
+
+	sumExport := func(m *Model) float64 {
+		total := 0.0
+		for _, v := range m.SedimentExport {
+			total += v
+		}
+		return total
+	}
+	if sumExport(lakeModel) >= sumExport(openModel) {
+		t.Fatalf(
+			"lake did not reduce downstream sediment export: open=%g lake=%g",
+			sumExport(openModel),
+			sumExport(lakeModel),
+		)
 	}
 }
 

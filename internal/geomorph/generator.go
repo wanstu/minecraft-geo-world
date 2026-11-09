@@ -22,6 +22,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		{"slope", input.Slope},
 		{"relief", input.ReliefIndex},
 		{"valley incision", input.ValleyIncision},
+		{"total erosion", input.TotalErosion},
 		{"fluvial power", input.FluvialPower},
 		{"tectonic support", input.TectonicSupport},
 		{"flow accumulation", input.FlowAccumulation},
@@ -61,6 +62,11 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		UpstreamMountainMemory:      make([]float64, n),
 		SlopeDrop:                   make([]float64, n),
 		SedimentSupply:              make([]float64, n),
+		SedimentProduction:          make([]float64, n),
+		SedimentFlux:                make([]float64, n),
+		TransportCapacity:           make([]float64, n),
+		SedimentDeposition:          make([]float64, n),
+		SedimentExport:              make([]float64, n),
 		FloodplainWeight:            make([]float64, n),
 		AlluvialPlainWeight:         make([]float64, n),
 		AlluvialFanCore:             make([]float64, n),
@@ -74,6 +80,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	m.computeUpstreamContext(input)
 	m.computeWeights(input)
 	m.spreadAlluvialFans(input)
+	m.computeSedimentBudget(input)
 	m.computeDeposition()
 	if m.Config.LongitudinalGradeVersion >= 1 {
 		m.computeLongitudinalGrade(input)
@@ -373,6 +380,175 @@ func (m *Model) spreadAlluvialFans(input Input) {
 			}
 		}
 	}
+}
+
+func (m *Model) computeSedimentBudget(input Input) {
+	n := len(input.FlowTo)
+	if n == 0 {
+		return
+	}
+
+	indegree := make([]int, n)
+	for i, to := range input.FlowTo {
+		if !input.LandMask[i] ||
+			to < 0 || to >= n ||
+			!input.LandMask[to] ||
+			to == i {
+			continue
+		}
+		indegree[to]++
+	}
+
+	queue := make([]int, 0, n)
+	landCount := 0
+	for i, land := range input.LandMask {
+		if !land {
+			continue
+		}
+		landCount++
+		if indegree[i] == 0 {
+			queue = append(queue, i)
+		}
+	}
+
+	cellAreaScale :=
+		(m.Geometry.SpacingX() * m.Geometry.SpacingZ()) /
+			(world.DefaultMacroSpacingBlocks * world.DefaultMacroSpacingBlocks)
+	for i, land := range input.LandMask {
+		if !land {
+			continue
+		}
+		// TotalErosion is the actual normalized height removed by Erosion,
+		// after all sea-level and resistance limits. Multiplying by cell-area
+		// scale turns it into a resolution-independent volume proxy.
+		m.SedimentProduction[i] =
+			math.Max(0, input.TotalErosion[i]) * cellAreaScale
+	}
+
+	pending := make([]float64, n)
+	processed := make([]bool, n)
+	head := 0
+	for head < len(queue) {
+		i := queue[head]
+		head++
+		if processed[i] {
+			continue
+		}
+		processed[i] = true
+
+		available := pending[i] + m.SedimentProduction[i]
+		capacity := m.sedimentTransportCapacity(input, i)
+		accommodation := m.sedimentAccommodation(input, i)
+
+		// Capacity is a through-flow fraction, not a second sediment source.
+		// Low energy alone does not force full deposition unless the local
+		// landform also provides accommodation space.
+		depositionFraction :=
+			(1 - capacity) * (0.18 + 0.82*accommodation)
+		if input.LakeID[i] > 0 {
+			// Lakes are strong sediment traps. Keep some through-flow so this
+			// remains a routing proxy rather than an absolute reservoir model.
+			depositionFraction = math.Max(depositionFraction, 0.68)
+		}
+		depositionFraction = clamp(depositionFraction, 0, 0.95)
+
+		deposition := available * depositionFraction
+		carry := math.Max(0, available-deposition)
+
+		m.TransportCapacity[i] = capacity
+		m.SedimentDeposition[i] = deposition
+		m.SedimentFlux[i] = carry
+
+		to := input.FlowTo[i]
+		if to >= 0 && to < n &&
+			input.LandMask[to] &&
+			to != i {
+			pending[to] += carry
+			indegree[to]--
+			if indegree[to] == 0 {
+				queue = append(queue, to)
+			}
+		} else {
+			m.SedimentExport[i] = carry
+		}
+	}
+
+	if len(queue) == landCount {
+		return
+	}
+
+	// Hydrology normally guarantees an acyclic FlowTo network. If an invalid
+	// caller supplies a cycle, do not silently create or destroy proxy mass:
+	// expose all unprocessed material as terminal export.
+	for i, land := range input.LandMask {
+		if !land || processed[i] {
+			continue
+		}
+		available := pending[i] + m.SedimentProduction[i]
+		m.SedimentFlux[i] = available
+		m.SedimentExport[i] = available
+	}
+}
+
+func (m *Model) sedimentTransportCapacity(input Input, i int) float64 {
+	if i < 0 || i >= len(input.LandMask) || !input.LandMask[i] {
+		return 0
+	}
+
+	accum := normalizedAccumulation(
+		input.FlowAccumulation[i],
+		input.RiverThreshold,
+		m.Config.AccumulationScale,
+	)
+	slopeNorm := clamp(
+		input.Slope[i]/math.Max(m.Config.SlopeScale, 1e-9),
+		0,
+		1,
+	)
+	river := clamp(input.RiverStrength[i], 0, 1)
+	fluvial := clamp(input.FluvialPower[i], 0, 1)
+
+	capacity := 0.08 +
+		0.30*math.Sqrt(accum) +
+		0.32*fluvial +
+		0.18*slopeNorm +
+		0.12*river
+	if input.LakeID[i] > 0 {
+		capacity *= 0.25
+	}
+	return clamp(capacity, 0.02, 0.98)
+}
+
+func (m *Model) sedimentAccommodation(input Input, i int) float64 {
+	if i < 0 || i >= len(input.LandMask) || !input.LandMask[i] {
+		return 0
+	}
+	if input.LakeID[i] > 0 {
+		return 1
+	}
+
+	slopeNorm := clamp(
+		input.Slope[i]/math.Max(m.Config.SlopeScale, 1e-9),
+		0,
+		1,
+	)
+	relief := clamp(input.ReliefIndex[i], 0, 1)
+	lowSlope := 1 - smoothstep(0.16, 0.60, slopeNorm)
+	lowRelief := 1 - smoothstep(0.30, 0.70, relief)
+
+	landformSpace := clamp(
+		0.42*m.FloodplainWeight[i]+
+			0.34*m.AlluvialPlainWeight[i]+
+			0.24*m.AlluvialFanWeight[i],
+		0,
+		1,
+	)
+	backgroundSpace := 0.35 * lowSlope * lowRelief
+	return clamp(
+		math.Max(landformSpace, backgroundSpace),
+		0,
+		1,
+	)
 }
 
 func (m *Model) computeDeposition() {

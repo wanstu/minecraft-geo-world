@@ -16,6 +16,7 @@ func InputFromModels(h *hydrology.Model, e *erosion.Model, l *landform.Model) In
 		Slope:                   append([]float64(nil), e.Slope...),
 		ReliefIndex:             append([]float64(nil), e.ReliefIndex...),
 		ValleyIncision:          append([]float64(nil), e.ValleyIncision...),
+		TotalErosion:            append([]float64(nil), e.TotalErosion...),
 		FluvialPower:            append([]float64(nil), e.FluvialPower...),
 		TectonicSupport:         append([]float64(nil), e.TectonicSupport...),
 		FlowTo:                  append([]int(nil), h.FlowTo...),

@@ -265,7 +265,23 @@ Minecraft voxel
 
 ### R4 — 侵蚀 / 搬运 / 沉积
 
-强化已有 Erosion / Geomorph 因果关系。
+状态：**第一切片已实现，只读 sediment budget，尚未改变 Terrain。**
+
+已建立：
+
+```text
+Erosion.TotalErosion
+→ SedimentProduction
+→ FlowTo routed flux
+→ TransportCapacity
+→ SedimentDeposition / Export
+```
+
+并增加全世界质量守恒审计。
+
+当前仍保持旧 `SedimentSupply / DepositionPotential` 对 Terrain 的正式语义，不因为第一版 budget 统计直接改地形。
+
+详细见 [REALISTIC_GEOMORPHOLOGY_R4_SEDIMENT_BUDGET.md](REALISTIC_GEOMORPHOLOGY_R4_SEDIMENT_BUDGET.md)。
 
 ### R5 — 地貌语义过渡
 

@@ -24,6 +24,7 @@ type Input struct {
 	Slope           []float64
 	ReliefIndex     []float64
 	ValleyIncision  []float64
+	TotalErosion    []float64
 	FluvialPower    []float64
 	TectonicSupport []float64
 
@@ -57,6 +58,11 @@ type Model struct {
 	UpstreamMountainMemory      []float64
 	SlopeDrop                   []float64
 	SedimentSupply              []float64
+	SedimentProduction          []float64
+	SedimentFlux                []float64
+	TransportCapacity           []float64
+	SedimentDeposition          []float64
+	SedimentExport              []float64
 	FloodplainWeight            []float64
 	AlluvialPlainWeight         []float64
 	AlluvialFanCore             []float64

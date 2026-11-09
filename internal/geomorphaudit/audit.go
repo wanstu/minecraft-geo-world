@@ -27,7 +27,24 @@ type Report struct {
 	RulesVersion  string `json:"rulesVersion"`
 
 	River      RiverReport      `json:"river"`
+	Sediment   SedimentReport   `json:"sediment"`
 	Transition TransitionReport `json:"transition"`
+}
+
+type SedimentReport struct {
+	Production             float64 `json:"production"`
+	Deposition             float64 `json:"deposition"`
+	Export                 float64 `json:"export"`
+	MassBalanceError       float64 `json:"massBalanceError"`
+	DepositedFraction      float64 `json:"depositedFraction"`
+	ExportFraction         float64 `json:"exportFraction"`
+	LakeDeposition         float64 `json:"lakeDeposition"`
+	LakeDepositionFraction float64 `json:"lakeDepositionFraction"`
+	MaxFlux                float64 `json:"maxFlux"`
+	ActiveCells            int     `json:"activeCells"`
+	ProductionCells        int     `json:"productionCells"`
+	DepositionCells        int     `json:"depositionCells"`
+	MeanTransportCapacity  float64 `json:"meanTransportCapacity"`
 }
 
 type RiverReport struct {
@@ -217,6 +234,7 @@ func DefaultConfig() Config {
 func Analyze(model *generator.WorldModel, cfg Config) (Report, error) {
 	if model == nil ||
 		model.Waterbed == nil ||
+		model.Geomorph == nil ||
 		model.RuntimeProfile == nil ||
 		model.Terrain == nil ||
 		model.CoastTerrain == nil {
@@ -229,8 +247,76 @@ func Analyze(model *generator.WorldModel, cfg Config) (Report, error) {
 		RulesVersion:  model.Config.WorldProfile.GenerationRulesVersion,
 	}
 	auditRivers(model, cfg, &report.River)
+	auditSedimentBudget(model, &report.Sediment)
 	auditTransitions(model, cfg, &report.Transition)
 	return report, nil
+}
+
+func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
+	if model == nil || model.Geomorph == nil {
+		return
+	}
+	g := model.Geomorph
+	activeCapacitySum := 0.0
+
+	for i, production := range g.SedimentProduction {
+		deposition := 0.0
+		exported := 0.0
+		flux := 0.0
+		capacity := 0.0
+		if i < len(g.SedimentDeposition) {
+			deposition = g.SedimentDeposition[i]
+		}
+		if i < len(g.SedimentExport) {
+			exported = g.SedimentExport[i]
+		}
+		if i < len(g.SedimentFlux) {
+			flux = g.SedimentFlux[i]
+		}
+		if i < len(g.TransportCapacity) {
+			capacity = g.TransportCapacity[i]
+		}
+
+		report.Production += production
+		report.Deposition += deposition
+		report.Export += exported
+		report.MaxFlux = math.Max(report.MaxFlux, flux)
+
+		if production > 1e-12 {
+			report.ProductionCells++
+		}
+		if deposition > 1e-12 {
+			report.DepositionCells++
+		}
+		if production > 1e-12 ||
+			deposition > 1e-12 ||
+			exported > 1e-12 ||
+			flux > 1e-12 {
+			report.ActiveCells++
+			activeCapacitySum += capacity
+		}
+
+		if model.Hydrology != nil &&
+			i < len(model.Hydrology.LakeID) &&
+			model.Hydrology.LakeID[i] > 0 {
+			report.LakeDeposition += deposition
+		}
+	}
+
+	report.MassBalanceError =
+		math.Abs(report.Production - report.Deposition - report.Export)
+	if report.Production > 1e-12 {
+		report.DepositedFraction = report.Deposition / report.Production
+		report.ExportFraction = report.Export / report.Production
+	}
+	if report.Deposition > 1e-12 {
+		report.LakeDepositionFraction =
+			report.LakeDeposition / report.Deposition
+	}
+	if report.ActiveCells > 0 {
+		report.MeanTransportCapacity =
+			activeCapacitySum / float64(report.ActiveCells)
+	}
 }
 
 func normalizeConfig(cfg Config) Config {

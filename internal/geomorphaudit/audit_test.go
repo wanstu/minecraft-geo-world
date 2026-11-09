@@ -46,10 +46,38 @@ func TestAnalyzeGeneratedWorldIsReadOnlyAndJSONSafe(t *testing.T) {
 	if report.Transition.Samples == 0 || len(report.Transition.Classes) == 0 {
 		t.Fatal("expected terrain transition samples")
 	}
+	if report.Sediment.Production <= 0 {
+		t.Fatal("expected actual erosion to produce sediment proxy mass")
+	}
+	massTolerance := report.Sediment.Production * 1e-10
+	if massTolerance < 1e-12 {
+		massTolerance = 1e-12
+	}
+	if report.Sediment.MassBalanceError > massTolerance {
+		t.Fatalf(
+			"sediment budget is not conserved: production=%g deposition=%g export=%g error=%g",
+			report.Sediment.Production,
+			report.Sediment.Deposition,
+			report.Sediment.Export,
+			report.Sediment.MassBalanceError,
+		)
+	}
 	if _, err := json.Marshal(report); err != nil {
 		t.Fatalf("report must remain JSON-safe: %v", err)
 	}
 
+	t.Logf(
+		"sediment: production=%.6f deposition=%.6f export=%.6f depositedFraction=%.3f exportFraction=%.3f lakeFraction=%.3f maxFlux=%.6f active=%d capacity=%.3f",
+		report.Sediment.Production,
+		report.Sediment.Deposition,
+		report.Sediment.Export,
+		report.Sediment.DepositedFraction,
+		report.Sediment.ExportFraction,
+		report.Sediment.LakeDepositionFraction,
+		report.Sediment.MaxFlux,
+		report.Sediment.ActiveCells,
+		report.Sediment.MeanTransportCapacity,
+	)
 	t.Logf(
 		"signals: routes=%d traversed=%d unique=%d internal=%d receiver=%d internal>=0.25=%d internal>=1=%d maxInternal=%.4f legacyDownstreamSteeper=%d longFree=%d broadSteepening=%d outlets=%d longDrainages=%d broadDrainages=%d confluences=%d confluenceRises=%d widthRegressions=%d mouths=%d mouthRises=%d mouthNarrow=%d transitions=%d",
 		report.River.Routes,
