@@ -253,17 +253,100 @@ mouth narrowing             = 0
 
 因此本阶段**不把这个比例直接接入 Terrain**。
 
-## 9. 下一切片
+## 9. 第二切片：hillslope / network 分层审计
 
-下一步需要把 sediment budget 再分成：
+在不改变 Terrain 的前提下，继续暴露：
 
-1. hillslope / near-source storage；
-2. 真正 delivery 到 channel 的 routed load；
-3. channel transport；
-4. floodplain / fan / lake / mouth deposition；
-5. terminal export。
+- `SedimentAccommodation`
+- hillslope production / deposition / export
+- hillslope → network delivery
+- network production / deposition / export
+- network → hillslope transfer
+- hillslope / network 各自 mass balance
+- hillslope / network mean transport capacity
+- hillslope / network mean accommodation
+- network deposition-weighted accommodation
+- low-accommodation network deposition fraction
 
-等 channel-delivered load 的统计稳定后，才考虑用新的 routed facts 替换或增强旧 `SedimentSupply / DepositionPotential`。
+网络定义暂时使用：
+
+```text
+RiverStrength > 0
+or
+LakeID > 0
+```
+
+这只是 R4 诊断分类，不改变正式 hydrology / terrain 语义。
+
+### Seed 123456 / 320 × 200
+
+```text
+total production = 59.3423
+
+hillslope production = 54.4735
+network production   = 4.8688
+
+hillslope → network delivery = 7.0263
+hillslope delivery fraction  = 0.1290
+
+network input fraction       = 0.2005
+network deposited fraction   = 0.8429
+network export fraction      = 0.1570
+
+hillslope mean capacity      = 0.1852
+network mean capacity        = 0.3612
+
+hillslope mean accommodation = 0.2202
+network mean accommodation   = 0.4148
+
+network deposition-weighted accommodation
+  = 0.3741
+
+network deposition in accommodation < 0.15
+  = 9.61% of network deposition
+
+hillslope mass-balance error
+  ≈ 1.96e-13
+
+network mass-balance error
+  ≈ 4.51e-15
+```
+
+### 结论
+
+这组数据说明第一版 routed budget 的**守恒与分层路由是成立的**，但还不适合直接驱动 Terrain。
+
+当前最明显的结构性风险：
+
+1. hillslope production 只有约 12.9% 真正进入 drainage network；
+2. 进入 network 后约 84.3% 又在网络内部沉积；
+3. 当前 deposition 仍然在每个 cell 反复按 `(1-capacity) × accommodation` 计算；
+4. 对长河而言，这会形成连续乘法衰减，容易让上游 sediment load 在到达湖口、河口前被过早耗尽。
+
+因此下一步不能直接把 `SedimentDeposition` 接进 Terrain。
+
+## 10. 下一切片：连续 channel load
+
+下一步优先修正**输沙连续性**，目标是：
+
+```text
+hillslope production
+→ near-source storage
+→ channel delivery
+→ channel carried load
+→ capacity drop / accommodation-controlled deposition
+→ lake / fan / mouth sink
+→ terminal export
+```
+
+关键约束：
+
+- incoming carried load 不能在每个普通河网 cell 被重复按同一比例“税收式”沉积；
+- 稳定 capacity 的河段应允许 sediment load 连续通过；
+- capacity 明显下降、坡降突变、湖泊入口、冲积空间增加时才应显著沉积；
+- Lake 继续作为强 sediment trap；
+- 全局、hillslope、network 三层都必须质量守恒；
+- 在 routed facts 稳定前，旧 `SedimentSupply / DepositionPotential` 继续保持正式 Terrain 语义。
 
 目标仍然是：
 

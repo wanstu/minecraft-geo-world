@@ -266,6 +266,7 @@ func TestDeterministicAndBounded(t *testing.T) {
 		a.ValleyFloorWidth,
 		a.DepositionPotential,
 		a.TransportCapacity,
+		a.SedimentAccommodation,
 	}
 	fieldsB := [][]float64{
 		b.FloodplainWeight,
@@ -275,6 +276,7 @@ func TestDeterministicAndBounded(t *testing.T) {
 		b.ValleyFloorWidth,
 		b.DepositionPotential,
 		b.TransportCapacity,
+		b.SedimentAccommodation,
 	}
 
 	for f := range fieldsA {

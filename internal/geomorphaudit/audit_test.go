@@ -62,6 +62,28 @@ func TestAnalyzeGeneratedWorldIsReadOnlyAndJSONSafe(t *testing.T) {
 			report.Sediment.MassBalanceError,
 		)
 	}
+	if report.Sediment.HillslopeMassBalanceError > massTolerance {
+		t.Fatalf(
+			"hillslope sediment budget is not conserved: error=%g tolerance=%g",
+			report.Sediment.HillslopeMassBalanceError,
+			massTolerance,
+		)
+	}
+	if report.Sediment.NetworkMassBalanceError > massTolerance {
+		t.Fatalf(
+			"network sediment budget is not conserved: error=%g tolerance=%g",
+			report.Sediment.NetworkMassBalanceError,
+			massTolerance,
+		)
+	}
+	if report.Sediment.HillslopeToNetworkDelivery <= 0 ||
+		report.Sediment.NetworkActiveCells == 0 {
+		t.Fatalf(
+			"expected routed sediment to reach an active drainage network: delivery=%g active=%d",
+			report.Sediment.HillslopeToNetworkDelivery,
+			report.Sediment.NetworkActiveCells,
+		)
+	}
 	if _, err := json.Marshal(report); err != nil {
 		t.Fatalf("report must remain JSON-safe: %v", err)
 	}

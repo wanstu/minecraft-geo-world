@@ -65,6 +65,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		SedimentProduction:          make([]float64, n),
 		SedimentFlux:                make([]float64, n),
 		TransportCapacity:           make([]float64, n),
+		SedimentAccommodation:       make([]float64, n),
 		SedimentDeposition:          make([]float64, n),
 		SedimentExport:              make([]float64, n),
 		FloodplainWeight:            make([]float64, n),
@@ -439,6 +440,7 @@ func (m *Model) computeSedimentBudget(input Input) {
 		available := pending[i] + m.SedimentProduction[i]
 		capacity := m.sedimentTransportCapacity(input, i)
 		accommodation := m.sedimentAccommodation(input, i)
+		m.SedimentAccommodation[i] = accommodation
 
 		// Capacity is a through-flow fraction, not a second sediment source.
 		// Low energy alone does not force full deposition unless the local

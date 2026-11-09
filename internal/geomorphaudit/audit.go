@@ -32,19 +32,47 @@ type Report struct {
 }
 
 type SedimentReport struct {
-	Production             float64 `json:"production"`
-	Deposition             float64 `json:"deposition"`
-	Export                 float64 `json:"export"`
-	MassBalanceError       float64 `json:"massBalanceError"`
-	DepositedFraction      float64 `json:"depositedFraction"`
-	ExportFraction         float64 `json:"exportFraction"`
-	LakeDeposition         float64 `json:"lakeDeposition"`
-	LakeDepositionFraction float64 `json:"lakeDepositionFraction"`
-	MaxFlux                float64 `json:"maxFlux"`
-	ActiveCells            int     `json:"activeCells"`
-	ProductionCells        int     `json:"productionCells"`
-	DepositionCells        int     `json:"depositionCells"`
-	MeanTransportCapacity  float64 `json:"meanTransportCapacity"`
+	Production        float64 `json:"production"`
+	Deposition        float64 `json:"deposition"`
+	Export            float64 `json:"export"`
+	MassBalanceError  float64 `json:"massBalanceError"`
+	DepositedFraction float64 `json:"depositedFraction"`
+	ExportFraction    float64 `json:"exportFraction"`
+
+	HillslopeProduction           float64 `json:"hillslopeProduction"`
+	NetworkProduction             float64 `json:"networkProduction"`
+	HillslopeDeposition           float64 `json:"hillslopeDeposition"`
+	NetworkDeposition             float64 `json:"networkDeposition"`
+	LakeDeposition                float64 `json:"lakeDeposition"`
+	HillslopeExport               float64 `json:"hillslopeExport"`
+	NetworkExport                 float64 `json:"networkExport"`
+	HillslopeToNetworkDelivery    float64 `json:"hillslopeToNetworkDelivery"`
+	HillslopeDirectToLakeDelivery float64 `json:"hillslopeDirectToLakeDelivery"`
+	NetworkToHillslopeTransfer    float64 `json:"networkToHillslopeTransfer"`
+	HillslopeDeliveryFraction     float64 `json:"hillslopeDeliveryFraction"`
+	NetworkInputFraction          float64 `json:"networkInputFraction"`
+	NetworkDepositedFraction      float64 `json:"networkDepositedFraction"`
+	NetworkExportFraction         float64 `json:"networkExportFraction"`
+	LakeDepositionFraction        float64 `json:"lakeDepositionFraction"`
+	HillslopeMassBalanceError     float64 `json:"hillslopeMassBalanceError"`
+	NetworkMassBalanceError       float64 `json:"networkMassBalanceError"`
+	HillslopeToNetworkTransitions int     `json:"hillslopeToNetworkTransitions"`
+	NetworkToHillslopeTransitions int     `json:"networkToHillslopeTransitions"`
+
+	MaxFlux                                float64 `json:"maxFlux"`
+	ActiveCells                            int     `json:"activeCells"`
+	HillslopeActiveCells                   int     `json:"hillslopeActiveCells"`
+	NetworkActiveCells                     int     `json:"networkActiveCells"`
+	ProductionCells                        int     `json:"productionCells"`
+	DepositionCells                        int     `json:"depositionCells"`
+	MeanTransportCapacity                  float64 `json:"meanTransportCapacity"`
+	HillslopeMeanTransportCapacity         float64 `json:"hillslopeMeanTransportCapacity"`
+	NetworkMeanTransportCapacity           float64 `json:"networkMeanTransportCapacity"`
+	HillslopeMeanAccommodation             float64 `json:"hillslopeMeanAccommodation"`
+	NetworkMeanAccommodation               float64 `json:"networkMeanAccommodation"`
+	NetworkDepositionWeightedAccommodation float64 `json:"networkDepositionWeightedAccommodation"`
+	NetworkLowAccommodationDeposition      float64 `json:"networkLowAccommodationDeposition"`
+	NetworkLowAccommodationDepositFraction float64 `json:"networkLowAccommodationDepositFraction"`
 }
 
 type RiverReport struct {
@@ -258,12 +286,35 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 	}
 	g := model.Geomorph
 	activeCapacitySum := 0.0
+	hillslopeCapacitySum := 0.0
+	networkCapacitySum := 0.0
+	hillslopeAccommodationSum := 0.0
+	networkAccommodationSum := 0.0
+	networkDepositionAccommodation := 0.0
+
+	isNetworkCell := func(i int) bool {
+		if model.Hydrology == nil || i < 0 {
+			return false
+		}
+		river := i < len(model.Hydrology.RiverStrength) &&
+			model.Hydrology.RiverStrength[i] > 0
+		lake := i < len(model.Hydrology.LakeID) &&
+			model.Hydrology.LakeID[i] > 0
+		return river || lake
+	}
+	isLakeCell := func(i int) bool {
+		return model.Hydrology != nil &&
+			i >= 0 &&
+			i < len(model.Hydrology.LakeID) &&
+			model.Hydrology.LakeID[i] > 0
+	}
 
 	for i, production := range g.SedimentProduction {
 		deposition := 0.0
 		exported := 0.0
 		flux := 0.0
 		capacity := 0.0
+		accommodation := 0.0
 		if i < len(g.SedimentDeposition) {
 			deposition = g.SedimentDeposition[i]
 		}
@@ -276,11 +327,28 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 		if i < len(g.TransportCapacity) {
 			capacity = g.TransportCapacity[i]
 		}
+		if i < len(g.SedimentAccommodation) {
+			accommodation = g.SedimentAccommodation[i]
+		}
 
 		report.Production += production
 		report.Deposition += deposition
 		report.Export += exported
 		report.MaxFlux = math.Max(report.MaxFlux, flux)
+
+		network := isNetworkCell(i)
+		if network {
+			report.NetworkProduction += production
+			report.NetworkDeposition += deposition
+			report.NetworkExport += exported
+		} else {
+			report.HillslopeProduction += production
+			report.HillslopeDeposition += deposition
+			report.HillslopeExport += exported
+		}
+		if isLakeCell(i) {
+			report.LakeDeposition += deposition
+		}
 
 		if production > 1e-12 {
 			report.ProductionCells++
@@ -294,12 +362,44 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 			flux > 1e-12 {
 			report.ActiveCells++
 			activeCapacitySum += capacity
+			if network {
+				report.NetworkActiveCells++
+				networkCapacitySum += capacity
+				networkAccommodationSum += accommodation
+			} else {
+				report.HillslopeActiveCells++
+				hillslopeCapacitySum += capacity
+				hillslopeAccommodationSum += accommodation
+			}
+		}
+		if network && deposition > 1e-12 {
+			networkDepositionAccommodation +=
+				deposition * accommodation
+			if accommodation < 0.15 {
+				report.NetworkLowAccommodationDeposition += deposition
+			}
 		}
 
 		if model.Hydrology != nil &&
-			i < len(model.Hydrology.LakeID) &&
-			model.Hydrology.LakeID[i] > 0 {
-			report.LakeDeposition += deposition
+			i < len(model.Hydrology.FlowTo) {
+			to := model.Hydrology.FlowTo[i]
+			validLandTarget := to >= 0 &&
+				to < len(g.LandMask) &&
+				g.LandMask[to]
+			if validLandTarget {
+				toNetwork := isNetworkCell(to)
+				switch {
+				case !network && toNetwork:
+					report.HillslopeToNetworkTransitions++
+					report.HillslopeToNetworkDelivery += flux
+					if isLakeCell(to) {
+						report.HillslopeDirectToLakeDelivery += flux
+					}
+				case network && !toNetwork:
+					report.NetworkToHillslopeTransitions++
+					report.NetworkToHillslopeTransfer += flux
+				}
+			}
 		}
 	}
 
@@ -309,6 +409,37 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 		report.DepositedFraction = report.Deposition / report.Production
 		report.ExportFraction = report.Export / report.Production
 	}
+
+	hillslopeInput :=
+		report.HillslopeProduction + report.NetworkToHillslopeTransfer
+	networkInput :=
+		report.NetworkProduction + report.HillslopeToNetworkDelivery
+	if hillslopeInput > 1e-12 {
+		report.HillslopeDeliveryFraction =
+			report.HillslopeToNetworkDelivery / hillslopeInput
+	}
+	if report.Production > 1e-12 {
+		report.NetworkInputFraction = networkInput / report.Production
+	}
+	if networkInput > 1e-12 {
+		report.NetworkDepositedFraction =
+			report.NetworkDeposition / networkInput
+		report.NetworkExportFraction =
+			report.NetworkExport / networkInput
+	}
+	report.HillslopeMassBalanceError = math.Abs(
+		hillslopeInput -
+			report.HillslopeDeposition -
+			report.HillslopeExport -
+			report.HillslopeToNetworkDelivery,
+	)
+	report.NetworkMassBalanceError = math.Abs(
+		networkInput -
+			report.NetworkDeposition -
+			report.NetworkExport -
+			report.NetworkToHillslopeTransfer,
+	)
+
 	if report.Deposition > 1e-12 {
 		report.LakeDepositionFraction =
 			report.LakeDeposition / report.Deposition
@@ -316,6 +447,25 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 	if report.ActiveCells > 0 {
 		report.MeanTransportCapacity =
 			activeCapacitySum / float64(report.ActiveCells)
+	}
+	if report.HillslopeActiveCells > 0 {
+		report.HillslopeMeanTransportCapacity =
+			hillslopeCapacitySum / float64(report.HillslopeActiveCells)
+		report.HillslopeMeanAccommodation =
+			hillslopeAccommodationSum / float64(report.HillslopeActiveCells)
+	}
+	if report.NetworkActiveCells > 0 {
+		report.NetworkMeanTransportCapacity =
+			networkCapacitySum / float64(report.NetworkActiveCells)
+		report.NetworkMeanAccommodation =
+			networkAccommodationSum / float64(report.NetworkActiveCells)
+	}
+	if report.NetworkDeposition > 1e-12 {
+		report.NetworkDepositionWeightedAccommodation =
+			networkDepositionAccommodation / report.NetworkDeposition
+		report.NetworkLowAccommodationDepositFraction =
+			report.NetworkLowAccommodationDeposition /
+				report.NetworkDeposition
 	}
 }
 
