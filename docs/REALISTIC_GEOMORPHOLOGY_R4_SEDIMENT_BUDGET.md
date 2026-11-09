@@ -1181,3 +1181,84 @@ erosion
 原则保持：
 
 > 先保证沉积发生在对的地方，再讨论沉积应该有多厚。
+
+## 17. 第七切片：alluvial-fan lateral footprint 审计
+
+v1.1.20 以后，下一步首先验证一个风险：
+
+> routed deposition 是否仍然只贴着 drainage centerline，而没有形成横向扇面。
+
+现有 `spreadAlluvialFans()` 本来就会：
+
+- 从 `AlluvialFanCore` 沿 FlowTo 下游方向展开；
+- 半宽随 forward distance 增大；
+- 用 distance / lateral decay 形成扇形；
+- 再用 slope、relief、plain / foothill suitability 约束侧翼。
+
+因此不能因为 macro cell 上 `AlluvialFanWeight > 0.05` 很少，就直接宣称“fan 没扩散”。
+
+### Seed 123456 / 320 × 200
+
+以：
+
+```text
+AlluvialFanWeight > AlluvialFanCore
+```
+
+定义实际 spread cell：
+
+```text
+fan core cells           = 12
+fan spread cells         = 399
+
+spread weight > 0.01     = 156
+spread weight > 0.02     = 41
+
+spread weight p50        = 0.00773
+spread weight p90        = 0.02008
+spread weight max        = 0.04672
+```
+
+所以：
+
+- lateral spread 实际存在；
+- 但在 128-block macro grid 上属于低权重连续尾部；
+- 以 `>0.05` 当作“正式扇面”会错误得到 lateral=0。
+
+### Routed Terrain feedback 覆盖
+
+同一批 399 个 spread cell：
+
+```text
+spread cells with routed lift = 224
+coverage                      = 56.14%
+
+spread lift p50               = 0.0000693
+spread lift p90               = 0.0005190
+spread lift max               = 0.0010
+```
+
+fan core：
+
+```text
+lift coverage = 100%
+```
+
+说明 v1.1.20 的 cubic Terrain sampling 已经把 routed deposition 从 network deposition nodes 连续扩展到一部分 fan side lobes。
+
+### 结论
+
+当前证据**不支持立即重写 fan spread**：
+
+- “只在河中心线堆土”不成立；
+- fan core 与 lateral spread 都有 Terrain feedback；
+- lateral 反馈明显弱于 core，方向符合扇体由 apex 向外衰减的基本形态；
+- 当前真正需要的是后续形态统计，而不是简单把 fan 权重整体放大。
+
+因此这一切片只增加 investigation audit，不提升 rules version、不改变生成。
+
+下一步转向：
+
+1. fan 的 forward / lateral 形态比例；
+2. floodplain / natural levee 长期沉积分布；
+3. lake-inlet / mouth delivered load 与 delta 条件连接。

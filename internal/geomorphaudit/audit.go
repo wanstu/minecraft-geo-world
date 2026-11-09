@@ -124,6 +124,27 @@ type SedimentReport struct {
 	FanCoreTerrainLiftP50  float64 `json:"fanCoreTerrainLiftP50"`
 	FanCoreTerrainLiftP90  float64 `json:"fanCoreTerrainLiftP90"`
 	FanCoreTerrainLiftMax  float64 `json:"fanCoreTerrainLiftMax"`
+
+	FanFootprintCells        int     `json:"fanFootprintCells"`
+	FanLateralCells          int     `json:"fanLateralCells"`
+	FanFootprintLiftCells    int     `json:"fanFootprintLiftCells"`
+	FanCoreLiftCells         int     `json:"fanCoreLiftCells"`
+	FanLateralLiftCells      int     `json:"fanLateralLiftCells"`
+	FanFootprintLiftCoverage float64 `json:"fanFootprintLiftCoverage"`
+	FanCoreLiftCoverage      float64 `json:"fanCoreLiftCoverage"`
+	FanLateralLiftCoverage   float64 `json:"fanLateralLiftCoverage"`
+
+	FanSpreadCells        int     `json:"fanSpreadCells"`
+	FanSpreadAbove001     int     `json:"fanSpreadAbove001"`
+	FanSpreadAbove002     int     `json:"fanSpreadAbove002"`
+	FanSpreadWeightP50    float64 `json:"fanSpreadWeightP50"`
+	FanSpreadWeightP90    float64 `json:"fanSpreadWeightP90"`
+	FanSpreadWeightMax    float64 `json:"fanSpreadWeightMax"`
+	FanSpreadLiftCells    int     `json:"fanSpreadLiftCells"`
+	FanSpreadLiftCoverage float64 `json:"fanSpreadLiftCoverage"`
+	FanSpreadLiftP50      float64 `json:"fanSpreadLiftP50"`
+	FanSpreadLiftP90      float64 `json:"fanSpreadLiftP90"`
+	FanSpreadLiftMax      float64 `json:"fanSpreadLiftMax"`
 }
 
 type RiverReport struct {
@@ -352,6 +373,8 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 	fanCoreThickness := make([]float64, 0, 64)
 	routedTerrainLift := make([]float64, 0, 256)
 	fanCoreTerrainLift := make([]float64, 0, 64)
+	fanSpreadWeights := make([]float64, 0, 128)
+	fanSpreadLift := make([]float64, 0, 128)
 	cellAreaScale :=
 		(model.Geometry.SpacingX() * model.Geometry.SpacingZ()) /
 			(world.DefaultMacroSpacingBlocks * world.DefaultMacroSpacingBlocks)
@@ -429,6 +452,52 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 		fanCore := 0.0
 		if i < len(g.AlluvialFanCore) {
 			fanCore = math.Max(0, math.Min(1, g.AlluvialFanCore[i]))
+		}
+		fanWeight := 0.0
+		if i < len(g.AlluvialFanWeight) {
+			fanWeight = math.Max(0, math.Min(1, g.AlluvialFanWeight[i]))
+		}
+		if fanWeight > fanCore+1e-12 {
+			report.FanSpreadCells++
+			fanSpreadWeights = append(fanSpreadWeights, fanWeight)
+			if fanWeight > 0.01 {
+				report.FanSpreadAbove001++
+			}
+			if fanWeight > 0.02 {
+				report.FanSpreadAbove002++
+			}
+			if model.CoastTerrain != nil {
+				x, z := model.Geometry.NodePosition(
+					i%model.Geometry.Width,
+					i/model.Geometry.Width,
+				)
+				lift := model.CoastTerrain.Sample(x, z).RoutedDepositionLift
+				if lift > 1e-12 {
+					report.FanSpreadLiftCells++
+					fanSpreadLift = append(fanSpreadLift, lift)
+				}
+			}
+		}
+		if fanWeight > 0.05 {
+			report.FanFootprintCells++
+			if fanCore <= 0.05 {
+				report.FanLateralCells++
+			}
+			if model.CoastTerrain != nil {
+				x, z := model.Geometry.NodePosition(
+					i%model.Geometry.Width,
+					i/model.Geometry.Width,
+				)
+				lift := model.CoastTerrain.Sample(x, z).RoutedDepositionLift
+				if lift > 1e-12 {
+					report.FanFootprintLiftCells++
+					if fanCore > 0.05 {
+						report.FanCoreLiftCells++
+					} else {
+						report.FanLateralLiftCells++
+					}
+				}
+			}
 		}
 		if fanCore > 0.05 {
 			report.FanCoreCells++
@@ -745,6 +814,30 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 	report.FanCoreTerrainLiftP90 = percentile(fanCoreTerrainLift, 0.90)
 	if len(fanCoreTerrainLift) > 0 {
 		report.FanCoreTerrainLiftMax = percentile(fanCoreTerrainLift, 1)
+	}
+	if report.FanFootprintCells > 0 {
+		report.FanFootprintLiftCoverage =
+			float64(report.FanFootprintLiftCells) / float64(report.FanFootprintCells)
+	}
+	if report.FanCoreCells > 0 {
+		report.FanCoreLiftCoverage =
+			float64(report.FanCoreLiftCells) / float64(report.FanCoreCells)
+	}
+	if report.FanLateralCells > 0 {
+		report.FanLateralLiftCoverage =
+			float64(report.FanLateralLiftCells) / float64(report.FanLateralCells)
+	}
+	report.FanSpreadWeightP50 = percentile(fanSpreadWeights, 0.50)
+	report.FanSpreadWeightP90 = percentile(fanSpreadWeights, 0.90)
+	if len(fanSpreadWeights) > 0 {
+		report.FanSpreadWeightMax = percentile(fanSpreadWeights, 1)
+		report.FanSpreadLiftCoverage =
+			float64(report.FanSpreadLiftCells) / float64(len(fanSpreadWeights))
+	}
+	report.FanSpreadLiftP50 = percentile(fanSpreadLift, 0.50)
+	report.FanSpreadLiftP90 = percentile(fanSpreadLift, 0.90)
+	if len(fanSpreadLift) > 0 {
+		report.FanSpreadLiftMax = percentile(fanSpreadLift, 1)
 	}
 }
 
