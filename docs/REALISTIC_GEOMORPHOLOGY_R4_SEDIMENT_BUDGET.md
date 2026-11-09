@@ -569,3 +569,95 @@ guards = clean
 目标仍然是：
 
 > 先建立可解释、守恒的物质链，再让它影响地貌；不能为了“看起来像沉积”继续堆权重。
+
+
+## 14. 第四切片：沉积位置与 receiver load
+
+连续 channel load 稳定后，R4 继续把**山坡储存**和**河网沉积**严格分开。
+
+沉积分区现在是：
+
+```text
+total deposition
+=
+hillslope near-source storage
++ network fan deposition
++ network floodplain/alluvial-plain deposition
++ network lake deposition
++ other network deposition
+```
+
+其中 fan / floodplain / lake 只对 drainage-network cell 分类。
+
+这避免把山坡近源储存误读成“冲积平原沉积”。
+
+### Seed 123456 / 320 × 200
+
+```text
+total deposition        = 16.6092
+
+hillslope storage       = 11.3410
+network deposition      = 5.2682
+
+network partition:
+
+alluvial-fan deposition = 0.0132   (0.25%)
+floodplain deposition   = 0.6211   (11.79%)
+lake deposition         = 3.8261   (72.63%)
+other network           = 0.8079   (15.33%)
+
+partition error          ≈ 4.8e-14
+```
+
+### Lake inlet
+
+```text
+lake inlet delivered load = 4.3905
+lake inlet transitions     = 32
+```
+
+这是进入 Lake 前的 carried load，不等同于 Lake 内最终 deposition。
+
+### Ocean receiver
+
+所有直接进入 Ocean cell 的 terminal export 继续分成：
+
+- network → ocean；
+- hillslope → ocean。
+
+标准 Seed：
+
+```text
+network → ocean load        = 20.9011
+network → ocean transitions = 64
+
+hillslope → ocean load        = 21.8320
+hillslope → ocean transitions = 1442
+```
+
+只有前者可以作为**河口 delivered sediment load**。
+
+后者是沿海坡面 / 小尺度直接入海的 sediment，不应拿去驱动 Waterbed delta。
+
+64 个 network → ocean transition 与该标准世界的 OceanMouth 量级一致，说明 routed budget 已经能提供稳定的河口来沙事实。
+
+### 当前结论
+
+目前：
+
+- Lake sediment trap 已经形成明确主导沉积；
+- Floodplain / alluvial plain 已经获得一部分 routed deposition；
+- 河口已经有可直接消费的 network-delivered load；
+- **Alluvial fan routed deposition 仅占 network deposition 的约 0.25%，明显偏弱。**
+
+因此下一切片优先审计并修正：
+
+```text
+mountain sediment source
+→ foothill slope break
+→ channel capacity drop
+→ fan-core deposition
+→ lateral fan footprint
+```
+
+在 fan deposition 有真实 upstream load 与质量守恒证据前，不用新 sediment budget 直接抬升 Terrain。

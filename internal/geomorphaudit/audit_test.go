@@ -76,6 +76,20 @@ func TestAnalyzeGeneratedWorldIsReadOnlyAndJSONSafe(t *testing.T) {
 			massTolerance,
 		)
 	}
+	if report.Sediment.DepositionPartitionError > massTolerance {
+		t.Fatalf(
+			"sediment deposition partition is not conserved: error=%g tolerance=%g",
+			report.Sediment.DepositionPartitionError,
+			massTolerance,
+		)
+	}
+	if report.Sediment.OceanReceiverLoad > report.Sediment.Export+massTolerance {
+		t.Fatalf(
+			"ocean receiver load exceeds terminal export: ocean=%g export=%g",
+			report.Sediment.OceanReceiverLoad,
+			report.Sediment.Export,
+		)
+	}
 	if report.Sediment.HillslopeToNetworkDelivery <= 0 ||
 		report.Sediment.NetworkActiveCells == 0 {
 		t.Fatalf(

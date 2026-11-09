@@ -39,25 +39,45 @@ type SedimentReport struct {
 	DepositedFraction float64 `json:"depositedFraction"`
 	ExportFraction    float64 `json:"exportFraction"`
 
-	HillslopeProduction           float64 `json:"hillslopeProduction"`
-	NetworkProduction             float64 `json:"networkProduction"`
-	HillslopeDeposition           float64 `json:"hillslopeDeposition"`
-	NetworkDeposition             float64 `json:"networkDeposition"`
-	LakeDeposition                float64 `json:"lakeDeposition"`
-	HillslopeExport               float64 `json:"hillslopeExport"`
-	NetworkExport                 float64 `json:"networkExport"`
-	HillslopeToNetworkDelivery    float64 `json:"hillslopeToNetworkDelivery"`
-	HillslopeDirectToLakeDelivery float64 `json:"hillslopeDirectToLakeDelivery"`
-	NetworkToHillslopeTransfer    float64 `json:"networkToHillslopeTransfer"`
-	HillslopeDeliveryFraction     float64 `json:"hillslopeDeliveryFraction"`
-	NetworkInputFraction          float64 `json:"networkInputFraction"`
-	NetworkDepositedFraction      float64 `json:"networkDepositedFraction"`
-	NetworkExportFraction         float64 `json:"networkExportFraction"`
-	LakeDepositionFraction        float64 `json:"lakeDepositionFraction"`
-	HillslopeMassBalanceError     float64 `json:"hillslopeMassBalanceError"`
-	NetworkMassBalanceError       float64 `json:"networkMassBalanceError"`
-	HillslopeToNetworkTransitions int     `json:"hillslopeToNetworkTransitions"`
-	NetworkToHillslopeTransitions int     `json:"networkToHillslopeTransitions"`
+	HillslopeProduction                 float64 `json:"hillslopeProduction"`
+	NetworkProduction                   float64 `json:"networkProduction"`
+	HillslopeDeposition                 float64 `json:"hillslopeDeposition"`
+	NetworkDeposition                   float64 `json:"networkDeposition"`
+	FanDeposition                       float64 `json:"fanDeposition"`
+	FloodplainDeposition                float64 `json:"floodplainDeposition"`
+	LakeDeposition                      float64 `json:"lakeDeposition"`
+	OtherNetworkDeposition              float64 `json:"otherNetworkDeposition"`
+	DepositionPartitionError            float64 `json:"depositionPartitionError"`
+	HillslopeExport                     float64 `json:"hillslopeExport"`
+	NetworkExport                       float64 `json:"networkExport"`
+	OceanReceiverLoad                   float64 `json:"oceanReceiverLoad"`
+	OceanReceiverNetworkLoad            float64 `json:"oceanReceiverNetworkLoad"`
+	OceanReceiverHillslopeLoad          float64 `json:"oceanReceiverHillslopeLoad"`
+	OtherTerminalExport                 float64 `json:"otherTerminalExport"`
+	HillslopeToNetworkDelivery          float64 `json:"hillslopeToNetworkDelivery"`
+	HillslopeDirectToLakeDelivery       float64 `json:"hillslopeDirectToLakeDelivery"`
+	LakeInletLoad                       float64 `json:"lakeInletLoad"`
+	NetworkToHillslopeTransfer          float64 `json:"networkToHillslopeTransfer"`
+	HillslopeDeliveryFraction           float64 `json:"hillslopeDeliveryFraction"`
+	NetworkInputFraction                float64 `json:"networkInputFraction"`
+	NetworkDepositedFraction            float64 `json:"networkDepositedFraction"`
+	NetworkExportFraction               float64 `json:"networkExportFraction"`
+	LakeDepositionFraction              float64 `json:"lakeDepositionFraction"`
+	NetworkFanDepositionFraction        float64 `json:"networkFanDepositionFraction"`
+	NetworkFloodplainDepositionFraction float64 `json:"networkFloodplainDepositionFraction"`
+	NetworkLakeDepositionFraction       float64 `json:"networkLakeDepositionFraction"`
+	NetworkOtherDepositionFraction      float64 `json:"networkOtherDepositionFraction"`
+	OceanReceiverFraction               float64 `json:"oceanReceiverFraction"`
+	OceanReceiverNetworkFraction        float64 `json:"oceanReceiverNetworkFraction"`
+	LakeInletLoadFraction               float64 `json:"lakeInletLoadFraction"`
+	HillslopeMassBalanceError           float64 `json:"hillslopeMassBalanceError"`
+	NetworkMassBalanceError             float64 `json:"networkMassBalanceError"`
+	HillslopeToNetworkTransitions       int     `json:"hillslopeToNetworkTransitions"`
+	NetworkToHillslopeTransitions       int     `json:"networkToHillslopeTransitions"`
+	LakeInletTransitions                int     `json:"lakeInletTransitions"`
+	OceanReceiverTransitions            int     `json:"oceanReceiverTransitions"`
+	OceanReceiverNetworkTransitions     int     `json:"oceanReceiverNetworkTransitions"`
+	OceanReceiverHillslopeTransitions   int     `json:"oceanReceiverHillslopeTransitions"`
 
 	MaxFlux                                float64 `json:"maxFlux"`
 	ActiveCells                            int     `json:"activeCells"`
@@ -346,8 +366,40 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 			report.HillslopeDeposition += deposition
 			report.HillslopeExport += exported
 		}
-		if isLakeCell(i) {
+		if network && isLakeCell(i) {
 			report.LakeDeposition += deposition
+		} else if network && deposition > 0 {
+			fanWeight := 0.0
+			floodplainWeight := 0.0
+			if i < len(g.AlluvialFanWeight) {
+				fanWeight = math.Max(0, math.Min(1, g.AlluvialFanWeight[i]))
+			}
+			if i < len(g.FloodplainWeight) {
+				floodplainWeight = math.Max(
+					floodplainWeight,
+					math.Max(0, math.Min(1, g.FloodplainWeight[i])),
+				)
+			}
+			if i < len(g.AlluvialPlainWeight) {
+				floodplainWeight = math.Max(
+					floodplainWeight,
+					math.Max(0, math.Min(1, g.AlluvialPlainWeight[i])),
+				)
+			}
+			weightSum := fanWeight + floodplainWeight
+			if weightSum > 1 {
+				fanWeight /= weightSum
+				floodplainWeight /= weightSum
+			}
+			fanDeposition := deposition * fanWeight
+			floodplainDeposition := deposition * floodplainWeight
+			otherNetworkDeposition := math.Max(
+				0,
+				deposition-fanDeposition-floodplainDeposition,
+			)
+			report.FanDeposition += fanDeposition
+			report.FloodplainDeposition += floodplainDeposition
+			report.OtherNetworkDeposition += otherNetworkDeposition
 		}
 
 		if production > 1e-12 {
@@ -388,6 +440,10 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 				g.LandMask[to]
 			if validLandTarget {
 				toNetwork := isNetworkCell(to)
+				if !isLakeCell(i) && isLakeCell(to) && flux > 1e-12 {
+					report.LakeInletTransitions++
+					report.LakeInletLoad += flux
+				}
 				switch {
 				case !network && toNetwork:
 					report.HillslopeToNetworkTransitions++
@@ -399,15 +455,42 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 					report.NetworkToHillslopeTransitions++
 					report.NetworkToHillslopeTransfer += flux
 				}
+			} else if exported > 1e-12 &&
+				to >= 0 &&
+				to < len(g.LandMask) &&
+				!g.LandMask[to] {
+				report.OceanReceiverTransitions++
+				report.OceanReceiverLoad += exported
+				if network {
+					report.OceanReceiverNetworkTransitions++
+					report.OceanReceiverNetworkLoad += exported
+				} else {
+					report.OceanReceiverHillslopeTransitions++
+					report.OceanReceiverHillslopeLoad += exported
+				}
 			}
 		}
 	}
 
 	report.MassBalanceError =
 		math.Abs(report.Production - report.Deposition - report.Export)
+	report.DepositionPartitionError = math.Abs(
+		report.Deposition -
+			report.HillslopeDeposition -
+			report.FanDeposition -
+			report.FloodplainDeposition -
+			report.LakeDeposition -
+			report.OtherNetworkDeposition,
+	)
+	report.OtherTerminalExport = math.Max(
+		0,
+		report.Export-report.OceanReceiverLoad,
+	)
 	if report.Production > 1e-12 {
 		report.DepositedFraction = report.Deposition / report.Production
 		report.ExportFraction = report.Export / report.Production
+		report.OceanReceiverFraction =
+			report.OceanReceiverLoad / report.Production
 	}
 
 	hillslopeInput :=
@@ -426,6 +509,12 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 			report.NetworkDeposition / networkInput
 		report.NetworkExportFraction =
 			report.NetworkExport / networkInput
+		report.OceanReceiverNetworkFraction =
+			report.OceanReceiverNetworkLoad / networkInput
+	}
+	if report.Production > 1e-12 {
+		report.LakeInletLoadFraction =
+			report.LakeInletLoad / report.Production
 	}
 	report.HillslopeMassBalanceError = math.Abs(
 		hillslopeInput -
@@ -443,6 +532,16 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 	if report.Deposition > 1e-12 {
 		report.LakeDepositionFraction =
 			report.LakeDeposition / report.Deposition
+	}
+	if report.NetworkDeposition > 1e-12 {
+		report.NetworkFanDepositionFraction =
+			report.FanDeposition / report.NetworkDeposition
+		report.NetworkFloodplainDepositionFraction =
+			report.FloodplainDeposition / report.NetworkDeposition
+		report.NetworkLakeDepositionFraction =
+			report.LakeDeposition / report.NetworkDeposition
+		report.NetworkOtherDepositionFraction =
+			report.OtherNetworkDeposition / report.NetworkDeposition
 	}
 	if report.ActiveCells > 0 {
 		report.MeanTransportCapacity =
