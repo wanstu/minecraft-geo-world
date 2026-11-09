@@ -412,6 +412,9 @@ public final class GeoWorldV1 {
         double valleyDepth,
         double depositionLift,
         double alluvialFanLift,
+        int routedDepositionVersion,
+        double routedDepositionScale,
+        double routedDepositionMaxLift,
         double canyonExtraDepth,
         double cliffFrequency
     ) {}
@@ -1644,6 +1647,8 @@ public final class GeoWorldV1 {
                     this.worldProfile.generationRulesVersion()
                 ) && !"geoworld-rules-v1.1.19".equals(
                     this.worldProfile.generationRulesVersion()
+                ) && !"geoworld-rules-v1.1.20".equals(
+                    this.worldProfile.generationRulesVersion()
                 ))
             ) ||
             this.specialFeatures.isEmpty()
@@ -1693,12 +1698,14 @@ public final class GeoWorldV1 {
             "geoworld-rules-v1.1.15".equals(specialRulesVersion) ||
             "geoworld-rules-v1.1.16".equals(specialRulesVersion) ||
             "geoworld-rules-v1.1.18".equals(specialRulesVersion) ||
-            "geoworld-rules-v1.1.19".equals(specialRulesVersion);
+            "geoworld-rules-v1.1.19".equals(specialRulesVersion) ||
+            "geoworld-rules-v1.1.20".equals(specialRulesVersion);
         boolean hydrologyConformingDepression =
             "geoworld-rules-v1.1.15".equals(specialRulesVersion) ||
             "geoworld-rules-v1.1.16".equals(specialRulesVersion) ||
             "geoworld-rules-v1.1.18".equals(specialRulesVersion) ||
-            "geoworld-rules-v1.1.19".equals(specialRulesVersion);
+            "geoworld-rules-v1.1.19".equals(specialRulesVersion) ||
+            "geoworld-rules-v1.1.20".equals(specialRulesVersion);
         if (carvedDepression && isCarvedDepression(kind)) {
             double dx = (x - selected.centerX()) /
                 Math.max(1.0, selected.radiusX());
@@ -1818,6 +1825,8 @@ public final class GeoWorldV1 {
                         this.worldProfile.generationRulesVersion()
                     ) || "geoworld-rules-v1.1.19".equals(
                         this.worldProfile.generationRulesVersion()
+                    ) || "geoworld-rules-v1.1.20".equals(
+                        this.worldProfile.generationRulesVersion()
                     ))
                 ) &&
                 selected.baseHeight() > 0.0 &&
@@ -1924,6 +1933,8 @@ public final class GeoWorldV1 {
                     ) || "geoworld-rules-v1.1.18".equals(
                         this.worldProfile.generationRulesVersion()
                     ) || "geoworld-rules-v1.1.19".equals(
+                        this.worldProfile.generationRulesVersion()
+                    ) || "geoworld-rules-v1.1.20".equals(
                         this.worldProfile.generationRulesVersion()
                     ))
                 ) &&
@@ -2101,6 +2112,8 @@ public final class GeoWorldV1 {
                         this.worldProfile.generationRulesVersion()
                     ) || "geoworld-rules-v1.1.19".equals(
                         this.worldProfile.generationRulesVersion()
+                    ) || "geoworld-rules-v1.1.20".equals(
+                        this.worldProfile.generationRulesVersion()
                     ))
                 ) &&
                 selected.baseHeight() > 0.0 &&
@@ -2125,7 +2138,8 @@ public final class GeoWorldV1 {
                 );
                 boolean drainageCorridor =
                     ("geoworld-rules-v1.1.18".equals(specialRulesVersion) ||
-                        "geoworld-rules-v1.1.19".equals(specialRulesVersion)) &&
+                        "geoworld-rules-v1.1.19".equals(specialRulesVersion) ||
+                        "geoworld-rules-v1.1.20".equals(specialRulesVersion)) &&
                     !selected.drainage().isEmpty();
                 if (!riverConforming && drainageCorridor) {
                     ground = applyBasinDrainageCorridor(
@@ -2150,7 +2164,8 @@ public final class GeoWorldV1 {
                         if (
                             "geoworld-rules-v1.1.16".equals(specialRulesVersion) ||
                             "geoworld-rules-v1.1.18".equals(specialRulesVersion) ||
-                            "geoworld-rules-v1.1.19".equals(specialRulesVersion)
+                            "geoworld-rules-v1.1.19".equals(specialRulesVersion) ||
+                            "geoworld-rules-v1.1.20".equals(specialRulesVersion)
                         ) {
                             // v1.1.16 locked interpretation and v1.1.18
                             // fallback for persisted features without drainage.
@@ -2825,7 +2840,7 @@ public final class GeoWorldV1 {
             !"geoworld-rules-v1.1.12".equals(generationRulesVersion) &&
             !"geoworld-rules-v1.1.13".equals(generationRulesVersion) &&
             !"geoworld-rules-v1.1.14".equals(generationRulesVersion) &&
-            (!"geoworld-rules-v1.1.15".equals(generationRulesVersion) && !"geoworld-rules-v1.1.16".equals(generationRulesVersion) && !"geoworld-rules-v1.1.18".equals(generationRulesVersion) && !"geoworld-rules-v1.1.19".equals(generationRulesVersion))
+            (!"geoworld-rules-v1.1.15".equals(generationRulesVersion) && !"geoworld-rules-v1.1.16".equals(generationRulesVersion) && !"geoworld-rules-v1.1.18".equals(generationRulesVersion) && !"geoworld-rules-v1.1.19".equals(generationRulesVersion) && !"geoworld-rules-v1.1.20".equals(generationRulesVersion))
         ) {
             return legacy;
         }
@@ -3786,7 +3801,7 @@ public final class GeoWorldV1 {
             "geoworld-rules-v1.1.12".equals(rulesVersion) ||
             "geoworld-rules-v1.1.13".equals(rulesVersion) ||
             "geoworld-rules-v1.1.14".equals(rulesVersion) ||
-            ("geoworld-rules-v1.1.15".equals(rulesVersion) || "geoworld-rules-v1.1.16".equals(rulesVersion) || "geoworld-rules-v1.1.18".equals(rulesVersion) || "geoworld-rules-v1.1.19".equals(rulesVersion));
+            ("geoworld-rules-v1.1.15".equals(rulesVersion) || "geoworld-rules-v1.1.16".equals(rulesVersion) || "geoworld-rules-v1.1.18".equals(rulesVersion) || "geoworld-rules-v1.1.19".equals(rulesVersion) || "geoworld-rules-v1.1.20".equals(rulesVersion));
         double activeRiverBankSurface = Double.NEGATIVE_INFINITY;
         boolean activeRiverBankProtected;
         if (boundedRiverBanks) {
@@ -5996,11 +6011,29 @@ public final class GeoWorldV1 {
             Json.doubleValue(configObject, "ValleyDepth"),
             Json.doubleValue(configObject, "DepositionLift"),
             Json.doubleValue(configObject, "AlluvialFanLift"),
+            configObject.containsKey("RoutedDepositionVersion")
+                ? Json.intValue(configObject, "RoutedDepositionVersion")
+                : 0,
+            configObject.containsKey("RoutedDepositionScale")
+                ? Json.doubleValue(configObject, "RoutedDepositionScale")
+                : 0.0,
+            configObject.containsKey("RoutedDepositionMaxLift")
+                ? Json.doubleValue(configObject, "RoutedDepositionMaxLift")
+                : 0.0,
             Json.doubleValue(configObject, "CanyonExtraDepth"),
             configObject.containsKey("CliffFrequency")
                 ? Json.doubleValue(configObject, "CliffFrequency")
                 : 1.0
         );
+
+        double[] routedDepositionThickness = new double[geometry.nodeCount()];
+        Object rawRoutedDeposition = object.get("routedDepositionThickness");
+        if (rawRoutedDeposition != null) {
+            routedDepositionThickness = doubleArray(
+                rawRoutedDeposition,
+                "terrain.routedDepositionThickness"
+            );
+        }
 
         double[] correction = null;
         Object rawCorrection = object.get("heightCorrection");
@@ -6042,6 +6075,7 @@ public final class GeoWorldV1 {
                 Json.required(object, "depositionPotential"),
                 "terrain.depositionPotential"
             ),
+            routedDepositionThickness,
             correction
         );
     }
@@ -6331,6 +6365,7 @@ public final class GeoWorldV1 {
             ThreadLocal.withInitial(CubicFrame::new);
 
         private final ScalarGrid depositionPotential;
+        private final ScalarGrid routedDepositionThickness;
         private final ScalarGrid heightCorrection;
 
         Terrain(
@@ -6349,6 +6384,7 @@ public final class GeoWorldV1 {
             double[] canyonWeight,
             double[] valleyFloorWidth,
             double[] depositionPotential,
+            double[] routedDepositionThickness,
             double[] heightCorrection
         ) {
             this.config = config;
@@ -6365,6 +6401,8 @@ public final class GeoWorldV1 {
             this.canyonWeight = new ScalarGrid(geometry, canyonWeight, true);
             this.valleyFloorWidth = new ScalarGrid(geometry, valleyFloorWidth, true);
             this.depositionPotential = new ScalarGrid(geometry, depositionPotential, true);
+            this.routedDepositionThickness =
+                new ScalarGrid(geometry, routedDepositionThickness);
             this.heightCorrection =
                 heightCorrection == null ? null : new ScalarGrid(geometry, heightCorrection);
         }
@@ -6385,6 +6423,13 @@ public final class GeoWorldV1 {
             double canyon = clamp01(canyonWeight.sampleCubicBSpline(frame));
             double valleyFloor = clamp01(valleyFloorWidth.sampleCubicBSpline(frame));
             double deposition = clamp01(depositionPotential.sampleCubicBSpline(frame));
+            double routedDepositionThicknessValue = 0.0;
+            if (config.routedDepositionVersion() >= 1) {
+                routedDepositionThicknessValue = Math.max(
+                    0.0,
+                    routedDepositionThickness.sampleCubicBSpline(frame)
+                );
+            }
 
             double plainDetail = plain == 0.0
                 ? 0.0
@@ -6645,9 +6690,18 @@ public final class GeoWorldV1 {
                 0.090 * mountain * mountainLiftScale +
                 0.020 * plateau;
 
+            double routedDepositionLift = 0.0;
+            if (config.routedDepositionVersion() >= 1) {
+                routedDepositionLift = Math.min(
+                    config.routedDepositionMaxLift(),
+                    routedDepositionThicknessValue *
+                    config.routedDepositionScale()
+                );
+            }
             double depositionLift =
                 deposition * config.depositionLift() +
-                alluvialFan * config.alluvialFanLift();
+                alluvialFan * config.alluvialFanLift() +
+                routedDepositionLift;
 
             double workingBase = base;
             if (base > 0.82 && mountain > 0) {

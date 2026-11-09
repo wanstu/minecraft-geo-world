@@ -67,7 +67,10 @@ func TestGenerateWorldMatchesManualPipeline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	g, err := geomorph.Generate(geomorph.InputFromModels(h, e, l), geomorph.Config{SeaLevelNormalized: world.DefaultSeaLevelNormalized})
+	g, err := geomorph.Generate(
+		geomorph.InputFromModels(h, e, l),
+		got.Config.Geomorph,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,10 +84,7 @@ func TestGenerateWorldMatchesManualPipeline(t *testing.T) {
 	}
 	tr, err := terrain.Generate(
 		terrain.InputFromModels(e, l, g),
-		terrain.Config{
-			Seed:              cfg.Seed,
-			RareMacroStrength: 1,
-		},
+		got.Config.Terrain,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -218,6 +218,98 @@ func TestGenerateWorldStoresResolvedConfig(t *testing.T) {
 	}
 }
 
+func TestV120RoutedDepositionFeedbackIsVersionedSmallAndNonNegative(t *testing.T) {
+	geometry := world.GridGeometry{
+		Width:       96,
+		Height:      60,
+		OriginX:     -95 * 64,
+		OriginZ:     -59 * 64,
+		SpanXBlocks: 95 * world.DefaultMacroSpacingBlocks,
+		SpanZBlocks: 59 * world.DefaultMacroSpacingBlocks,
+	}
+	baseConfig := Config{
+		Seed:                   123456,
+		Geometry:               geometry,
+		PlateCount:             18,
+		OceanFraction:          0.68,
+		ContinentFragmentation: 0.35,
+		ContinentSeparation:    0.65,
+		WorldProfile:           StandardWorldProfile(),
+	}
+	baseConfig.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.19"
+	base, err := GenerateWorld(context.Background(), baseConfig, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	currentConfig := baseConfig
+	currentConfig.WorldProfile = StandardWorldProfile()
+	current, err := GenerateWorld(context.Background(), currentConfig, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if base.Config.Terrain.RoutedDepositionVersion != 0 {
+		t.Fatalf(
+			"locked v1.1.19 routed deposition version=%d want=0",
+			base.Config.Terrain.RoutedDepositionVersion,
+		)
+	}
+	if current.Config.Terrain.RoutedDepositionVersion != 1 {
+		t.Fatalf(
+			"current routed deposition version=%d want=1",
+			current.Config.Terrain.RoutedDepositionVersion,
+		)
+	}
+	if !reflect.DeepEqual(
+		base.Geomorph.RoutedDepositionThickness,
+		current.Geomorph.RoutedDepositionThickness,
+	) {
+		t.Fatal("v1.1.20 changed routed sediment facts instead of only consuming them in Terrain")
+	}
+
+	raised := 0
+	maxLift := 0.0
+	for z := 0; z < geometry.Height; z++ {
+		for x := 0; x < geometry.Width; x++ {
+			wx, wz := geometry.NodePosition(x, z)
+			before := base.Terrain.SampleNormalized(wx, wz)
+			after := current.Terrain.SampleNormalized(wx, wz)
+			delta := after - before
+			if delta < -1e-12 {
+				t.Fatalf(
+					"routed deposition lowered Terrain at node %d,%d: before=%g after=%g delta=%g",
+					x,
+					z,
+					before,
+					after,
+					delta,
+				)
+			}
+			if delta > 1e-12 {
+				raised++
+				maxLift = math.Max(maxLift, delta)
+			}
+		}
+	}
+	if raised == 0 {
+		t.Fatal("v1.1.20 routed deposition did not affect any Terrain node")
+	}
+	if maxLift > current.Config.Terrain.RoutedDepositionMaxLift+1e-9 {
+		t.Fatalf(
+			"routed deposition lift exceeded configured bound: max=%g bound=%g",
+			maxLift,
+			current.Config.Terrain.RoutedDepositionMaxLift,
+		)
+	}
+	t.Logf(
+		"routed deposition terrain feedback: raisedNodes=%d/%d maxNormalizedLift=%.6f",
+		raised,
+		geometry.Width*geometry.Height,
+		maxLift,
+	)
+}
+
 func TestRiverDepthDefaultsAreGenerationRuleLocked(t *testing.T) {
 	currentCfg := testConfig(2026)
 	currentCfg.WorldProfile = StandardWorldProfile()
@@ -236,6 +328,26 @@ func TestRiverDepthDefaultsAreGenerationRuleLocked(t *testing.T) {
 	}
 	if got := current.Geomorph.LongitudinalGradeVersion; got != 1 {
 		t.Fatalf("current longitudinal grade version=%d want=1", got)
+	}
+	if got := current.Terrain.RoutedDepositionVersion; got != 1 {
+		t.Fatalf("current routed deposition version=%d want=1", got)
+	}
+
+	lockedV1119RulesCfg := testConfig(2026)
+	lockedV1119RulesCfg.WorldProfile = StandardWorldProfile()
+	lockedV1119RulesCfg.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.19"
+	lockedV1119Rules, err := resolveTopLevelConfig(lockedV1119RulesCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := lockedV1119Rules.Geomorph.LongitudinalGradeVersion; got != 1 {
+		t.Fatalf("locked v1.1.19 longitudinal grade version=%d want=1", got)
+	}
+	if got := lockedV1119Rules.Terrain.RoutedDepositionVersion; got != 0 {
+		t.Fatalf("locked v1.1.19 routed deposition version=%d want=0", got)
+	}
+	if got := lockedV1119Rules.Waterbed.RiverGeometryVersion; got != 5 {
+		t.Fatalf("locked v1.1.19 river geometry version=%d want=5", got)
 	}
 
 	lockedV1118RulesCfg := testConfig(2026)

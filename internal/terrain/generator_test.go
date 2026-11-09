@@ -798,6 +798,56 @@ func TestDepositionalLowlandDampsRegionalDetail(t *testing.T) {
 	}
 }
 
+func TestRoutedDepositionLiftIsVersionedAndBounded(t *testing.T) {
+	in := uniformInput(7, 7, 0.63)
+	in.RoutedDepositionThickness = make([]float64, len(in.BaseElevation))
+	for i := range in.RoutedDepositionThickness {
+		in.RoutedDepositionThickness[i] = 0.10
+	}
+
+	legacy, err := Generate(in, Config{
+		Seed:                    2719,
+		CellSizeBlocks:          128,
+		RoutedDepositionVersion: 0,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	modern, err := Generate(in, Config{
+		Seed:                    2719,
+		CellSizeBlocks:          128,
+		RoutedDepositionVersion: 1,
+		RoutedDepositionScale:   0.12,
+		RoutedDepositionMaxLift: 0.0025,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	x, z := 333.0, 281.0
+	oldSample := legacy.Sample(x, z)
+	newSample := modern.Sample(x, z)
+	if oldSample.RoutedDepositionLift != 0 {
+		t.Fatalf(
+			"legacy routed deposition lift=%g want=0",
+			oldSample.RoutedDepositionLift,
+		)
+	}
+	if math.Abs(newSample.RoutedDepositionLift-0.0025) > 1e-12 {
+		t.Fatalf(
+			"modern routed deposition lift=%g want capped 0.0025",
+			newSample.RoutedDepositionLift,
+		)
+	}
+	if !(newSample.FinalHeight > oldSample.FinalHeight) {
+		t.Fatalf(
+			"routed deposition did not raise terrain: legacy=%g modern=%g",
+			oldSample.FinalHeight,
+			newSample.FinalHeight,
+		)
+	}
+}
+
 func TestAlluvialFanAddsSmallDepositionLift(t *testing.T) {
 	base := uniformInput(7, 7, 0.63)
 	fan := uniformInput(7, 7, 0.63)

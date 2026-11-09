@@ -11,6 +11,7 @@ import (
 	"geoworld/internal/sampling"
 	"geoworld/internal/specialfeatures"
 	"geoworld/internal/waterbed"
+	"geoworld/internal/world"
 )
 
 const EvidenceClassInvestigation = "investigation_signal"
@@ -105,6 +106,24 @@ type SedimentReport struct {
 	FanCoreLoadWeightedCapacityDrop   float64 `json:"fanCoreLoadWeightedCapacityDrop"`
 	FanCoreMeanCompetenceLoss         float64 `json:"fanCoreMeanCompetenceLoss"`
 	FanCoreLoadWeightedCompetenceLoss float64 `json:"fanCoreLoadWeightedCompetenceLoss"`
+
+	RoutedNonLakeDepositionCells int     `json:"routedNonLakeDepositionCells"`
+	RoutedNonLakeThicknessP50    float64 `json:"routedNonLakeThicknessP50"`
+	RoutedNonLakeThicknessP90    float64 `json:"routedNonLakeThicknessP90"`
+	RoutedNonLakeThicknessP99    float64 `json:"routedNonLakeThicknessP99"`
+	RoutedNonLakeThicknessMax    float64 `json:"routedNonLakeThicknessMax"`
+	FanCoreThicknessP50          float64 `json:"fanCoreThicknessP50"`
+	FanCoreThicknessP90          float64 `json:"fanCoreThicknessP90"`
+	FanCoreThicknessMax          float64 `json:"fanCoreThicknessMax"`
+
+	RoutedTerrainLiftCells int     `json:"routedTerrainLiftCells"`
+	RoutedTerrainLiftP50   float64 `json:"routedTerrainLiftP50"`
+	RoutedTerrainLiftP90   float64 `json:"routedTerrainLiftP90"`
+	RoutedTerrainLiftP99   float64 `json:"routedTerrainLiftP99"`
+	RoutedTerrainLiftMax   float64 `json:"routedTerrainLiftMax"`
+	FanCoreTerrainLiftP50  float64 `json:"fanCoreTerrainLiftP50"`
+	FanCoreTerrainLiftP90  float64 `json:"fanCoreTerrainLiftP90"`
+	FanCoreTerrainLiftMax  float64 `json:"fanCoreTerrainLiftMax"`
 }
 
 type RiverReport struct {
@@ -329,6 +348,16 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 	fanCoreLoadWeightedCapacityDropSum := 0.0
 	fanCoreCompetenceLossSum := 0.0
 	fanCoreLoadWeightedCompetenceLossSum := 0.0
+	routedNonLakeThickness := make([]float64, 0, 256)
+	fanCoreThickness := make([]float64, 0, 64)
+	routedTerrainLift := make([]float64, 0, 256)
+	fanCoreTerrainLift := make([]float64, 0, 64)
+	cellAreaScale :=
+		(model.Geometry.SpacingX() * model.Geometry.SpacingZ()) /
+			(world.DefaultMacroSpacingBlocks * world.DefaultMacroSpacingBlocks)
+	if cellAreaScale <= 0 {
+		cellAreaScale = 1
+	}
 
 	incomingMass := make([]float64, len(g.LandMask))
 	incomingCapacityMoment := make([]float64, len(g.LandMask))
@@ -433,6 +462,35 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 			fanCoreCompetenceLossSum += competenceLoss
 			fanCoreLoadWeightedCompetenceLossSum +=
 				available * competenceLoss
+		}
+		if network && !isLakeCell(i) && deposition > 1e-12 {
+			thickness := deposition / cellAreaScale
+			routedNonLakeThickness = append(
+				routedNonLakeThickness,
+				thickness,
+			)
+			if fanCore > 0.05 {
+				fanCoreThickness = append(
+					fanCoreThickness,
+					thickness,
+				)
+			}
+			if model.CoastTerrain != nil {
+				x, z := model.Geometry.NodePosition(
+					i%model.Geometry.Width,
+					i/model.Geometry.Width,
+				)
+				lift := model.CoastTerrain.Sample(x, z).RoutedDepositionLift
+				if lift > 1e-12 {
+					routedTerrainLift = append(routedTerrainLift, lift)
+					if fanCore > 0.05 {
+						fanCoreTerrainLift = append(
+							fanCoreTerrainLift,
+							lift,
+						)
+					}
+				}
+			}
 		}
 		if network {
 			report.NetworkProduction += production
@@ -660,6 +718,33 @@ func auditSedimentBudget(model *generator.WorldModel, report *SedimentReport) {
 			fanCoreLoadWeightedCapacityDropSum / report.FanCoreAvailableLoad
 		report.FanCoreLoadWeightedCompetenceLoss =
 			fanCoreLoadWeightedCompetenceLossSum / report.FanCoreAvailableLoad
+	}
+
+	report.RoutedNonLakeDepositionCells = len(routedNonLakeThickness)
+	report.RoutedNonLakeThicknessP50 = percentile(routedNonLakeThickness, 0.50)
+	report.RoutedNonLakeThicknessP90 = percentile(routedNonLakeThickness, 0.90)
+	report.RoutedNonLakeThicknessP99 = percentile(routedNonLakeThickness, 0.99)
+	if len(routedNonLakeThickness) > 0 {
+		report.RoutedNonLakeThicknessMax =
+			percentile(routedNonLakeThickness, 1)
+	}
+	report.FanCoreThicknessP50 = percentile(fanCoreThickness, 0.50)
+	report.FanCoreThicknessP90 = percentile(fanCoreThickness, 0.90)
+	if len(fanCoreThickness) > 0 {
+		report.FanCoreThicknessMax = percentile(fanCoreThickness, 1)
+	}
+
+	report.RoutedTerrainLiftCells = len(routedTerrainLift)
+	report.RoutedTerrainLiftP50 = percentile(routedTerrainLift, 0.50)
+	report.RoutedTerrainLiftP90 = percentile(routedTerrainLift, 0.90)
+	report.RoutedTerrainLiftP99 = percentile(routedTerrainLift, 0.99)
+	if len(routedTerrainLift) > 0 {
+		report.RoutedTerrainLiftMax = percentile(routedTerrainLift, 1)
+	}
+	report.FanCoreTerrainLiftP50 = percentile(fanCoreTerrainLift, 0.50)
+	report.FanCoreTerrainLiftP90 = percentile(fanCoreTerrainLift, 0.90)
+	if len(fanCoreTerrainLift) > 0 {
+		report.FanCoreTerrainLiftMax = percentile(fanCoreTerrainLift, 1)
 	}
 }
 

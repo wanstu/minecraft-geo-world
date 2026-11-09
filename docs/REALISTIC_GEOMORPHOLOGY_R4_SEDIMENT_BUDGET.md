@@ -874,3 +874,310 @@ mountain erosion
 同时 stable-channel continuity、普通 capacity-drop、Lake trap 与质量守恒回归均保持通过。
 
 这些 routed sediment facts 仍未接入 Terrain / Waterbed，因此仍不改变最终世界几何，也不提升 generation rules version。
+
+undefined
+
+## 16. 第六切片：v1.1.20 routed deposition Terrain feedback
+
+前五个切片已经把：
+
+```text
+erosion production
+→ continuous carried load
+→ competence loss
+→ accommodation-controlled deposition
+→ fan / floodplain / lake / mouth sink
+```
+
+做成可解释且质量守恒的 routed facts。
+
+v1.1.20 第一次允许这些新 facts **实际反馈到 Terrain**。
+
+### 16.1 版本边界
+
+当前规则：
+
+```text
+geoworld-rules-v1.1.20
+```
+
+新增：
+
+```text
+Terrain.RoutedDepositionVersion = 1
+Terrain.RoutedDepositionScale = 0.12
+Terrain.RoutedDepositionMaxLift = 0.0010
+```
+
+锁定的 v1.1.19：
+
+```text
+RoutedDepositionVersion = 0
+```
+
+因此旧世界不会因为 Runtime 更新而偷偷获得新沉积地形。
+
+Waterbed：
+
+```text
+RiverGeometryVersion = 5
+```
+
+没有重新引入已回退的 receiver geometry v6。
+
+### 16.2 从 sediment mass 到 terrain thickness
+
+只对：
+
+- drainage-network cell；
+- 非 Lake；
+- 实际存在 routed deposition；
+
+计算：
+
+```text
+RoutedDepositionThickness
+=
+routed deposited mass
+/
+macro-cell area scale
+```
+
+Lake deposition 不直接把湖面整体抬高。
+
+Terrain 再消费：
+
+```text
+routed lift
+=
+min(
+  RoutedDepositionMaxLift,
+  RoutedDepositionThickness × RoutedDepositionScale
+)
+```
+
+并与历史：
+
+- DepositionPotential；
+- AlluvialFanLift；
+
+保持独立相加。
+
+该 lift 是**宏观连续地形反馈**，不是逐方块填土。
+
+### 16.3 为什么 cap 收紧到 0.001
+
+最初候选上限更大，但 Terrain feedback 不应该轻易覆盖一格级水体 / 湿地语义。
+
+因此最终 cap：
+
+```text
+0.001 normalized
+```
+
+在海平面附近约等于半个 Minecraft block 的量级。
+
+目的：
+
+- 允许长期沉积在宏观表面留下可见趋势；
+- 不把一格浅水池、湿地边缘、河岸量化结构直接填掉；
+- 后续若要形成更厚冲积地貌，应由长期 morphology / fan footprint 语义扩展，而不是单点无限堆高。
+
+### 16.4 Seed 123456 / 320 × 200
+
+v1.1.19：
+
+```text
+routed terrain lift cells = 0
+max lift                  = 0
+```
+
+v1.1.20：
+
+```text
+routed terrain lift cells = 948
+p50                        = 0.0001088
+p90                        = 0.0002205
+p99                        = 0.0010
+max                        = 0.0010
+
+fan-core p50               = 0.0002832
+fan-core p90               = 0.0010
+fan-core max               = 0.0010
+```
+
+正式河流 guard：
+
+```text
+internal rise >= 0.25 block = 0
+internal rise >= 1 block    = 0
+internal confluence rise    = 0
+confluence width regression = 0
+mouth rise                  = 0
+mouth narrowing             = 0
+```
+
+### 16.5 额外固定 Seed A/B
+
+```text
+Seed -4852173505788415804
+
+v1.1.19 lift cells = 0
+v1.1.20 lift cells = 939
+v1.1.20 p90        = 0.000201
+v1.1.20 max        = 0.001
+
+所有 river / confluence / mouth guard 与 v1.1.19 完全一致。
+
+
+Seed -563659577384754347
+
+v1.1.19 lift cells = 0
+v1.1.20 lift cells = 938
+v1.1.20 p90        = 0.0002044
+v1.1.20 max        = 0.001
+
+原有一个 <1 block 内部局部 rise 在两版计数一致；
+没有新增 >=1 block / 汇流 / 河口问题。
+
+
+Seed 4034658472718554561
+
+v1.1.19 lift cells = 0
+v1.1.20 lift cells = 947
+v1.1.20 p90        = 0.0003992
+v1.1.20 max        = 0.001
+
+原有内部微小 rise 与 confluence-width investigation signals
+在两版完全一致；没有由 routed deposition 新增。
+```
+
+### 16.6 持久化缺口与修复
+
+第一版 v1.1.20 候选暴露了一个阻断级问题：
+
+```text
+in-memory Terrain
+  有 RoutedDepositionThickness
+
+worldmodelio terrainSnapshot
+  没有该字段
+
+Java Runtime Reader
+  也不知道该字段
+```
+
+如果直接提交会导致：
+
+> 新建世界和保存后重开世界地形不一致。
+
+因此正式补齐：
+
+1. `terrainSnapshot.routedDepositionThickness`；
+2. Go Save / Load grid restore；
+3. Java TerrainConfig 的 RoutedDepositionVersion / Scale / MaxLift；
+4. Java Terrain 的 routedDepositionThickness grid；
+5. Go / Java 完全一致的 routed lift 公式；
+6. 旧模型字段缺失时默认 version=0、thickness=0。
+
+新增 Save→Load 回归会主动寻找最大 deposition-thickness 节点，确保该字段漏持久化时测试必定失败。
+
+### 16.7 Golden 处理
+
+不能修改历史 golden 让测试通过。
+
+原 `runtime-v1` 实际锁定：
+
+```text
+geoworld-rules-v1.1.7
+```
+
+所以先将它**逐字节原样保存**为：
+
+- `runtime-rules-v1.1.7.geoworld`
+- `runtime-rules-v1.1.7.json`
+
+原文件与历史副本 SHA256 完全一致。
+
+然后才按正式有意版本变更流程重新生成 current：
+
+```text
+runtime-v1
+→ geoworld-rules-v1.1.20
+```
+
+Go golden：
+
+```text
+PASS
+```
+
+Java Runtime Reader 全量跨语言 golden：
+
+```text
+7 / 7 models
+18 / 18 cases each
+PASS
+```
+
+覆盖历史 v1.1～v1.1.7 与 current v1.1.20。
+
+### 16.8 Minecraft 门禁
+
+1.21.1 NeoForge / JDK 21：
+
+```text
+compileJava                     PASS
+BasinRiver 573 checks           rawRaised=0
+                               voxelRaised=0
+                               dryChannel=0
+
+WaterOwnership 302848 columns   unownedSurfaceWaterSources=0
+                               unsafeExposedWaterSources=0
+                               freeFallWaterFaces=0
+                               runtimeWaterLost=0
+                               riverWaterBoundaryModelMismatches=0
+                               riverLocalWaterPeaks=0
+                               wetlandPoolLeaks=0
+
+Shoreline                       PASS
+
+BUILD SUCCESSFUL
+```
+
+26.3 Fabric / JDK 25：
+
+```text
+compileJava                     PASS
+BasinRiver 573 checks           rawRaised=0
+                               voxelRaised=0
+                               dryChannel=0
+Shoreline                       PASS
+
+BUILD SUCCESSFUL
+```
+
+### 16.9 当前结论
+
+R4 已经从“只读 sediment facts”进入第一次正式地貌反馈：
+
+```text
+erosion
+→ routed sediment
+→ competence / accommodation
+→ physically located deposition
+→ bounded Terrain accumulation
+```
+
+但反馈仍刻意保持很弱。
+
+下一步不是继续提高 lift，而是先做：
+
+1. fan footprint 的横向扩散；
+2. floodplain / natural levee 的长期沉积形态；
+3. lake-inlet delta / mouth delivered-load 与 Waterbed delta 条件的连接；
+4. 再根据真实地貌统计决定是否需要更厚的长期沉积层。
+
+原则保持：
+
+> 先保证沉积发生在对的地方，再讨论沉积应该有多厚。

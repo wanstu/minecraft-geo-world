@@ -13,6 +13,12 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		return nil, errors.New("terrain: grid must be at least 2x2")
 	}
 	n := input.Width * input.Height
+	routedDepositionThickness := input.RoutedDepositionThickness
+	if len(routedDepositionThickness) == 0 {
+		routedDepositionThickness = make([]float64, n)
+	} else if len(routedDepositionThickness) != n {
+		return nil, errors.New("terrain: routed deposition thickness size does not match dimensions")
+	}
 	for _, field := range []struct {
 		name string
 		data []float64
@@ -94,23 +100,31 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	if err != nil {
 		return nil, err
 	}
+	routedDeposition, err := scalarGrid(
+		geometry,
+		routedDepositionThickness,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Model{
-		Config:              cfg,
-		Geometry:            geometry,
-		BaseElevation:       base,
-		RollingPlainWeight:  plain,
-		HillWeight:          hill,
-		FoothillWeight:      foothill,
-		MountainWeight:      mountain,
-		PlateauWeight:       plateau,
-		ValleyWeight:        valley,
-		FloodplainWeight:    floodplain,
-		AlluvialPlainWeight: alluvialPlain,
-		AlluvialFanWeight:   alluvialFan,
-		CanyonWeight:        canyon,
-		ValleyFloorWidth:    valleyFloor,
-		DepositionPotential: deposition,
+		Config:                    cfg,
+		Geometry:                  geometry,
+		BaseElevation:             base,
+		RollingPlainWeight:        plain,
+		HillWeight:                hill,
+		FoothillWeight:            foothill,
+		MountainWeight:            mountain,
+		PlateauWeight:             plateau,
+		ValleyWeight:              valley,
+		FloodplainWeight:          floodplain,
+		AlluvialPlainWeight:       alluvialPlain,
+		AlluvialFanWeight:         alluvialFan,
+		CanyonWeight:              canyon,
+		ValleyFloorWidth:          valleyFloor,
+		DepositionPotential:       deposition,
+		RoutedDepositionThickness: routedDeposition,
 	}, nil
 }
 
@@ -178,6 +192,14 @@ func normalizeConfig(cfg Config, geometry world.GridGeometry) Config {
 	if cfg.AlluvialFanLift <= 0 {
 		cfg.AlluvialFanLift = 0.0045
 	}
+	if cfg.RoutedDepositionVersion > 0 {
+		if cfg.RoutedDepositionScale <= 0 {
+			cfg.RoutedDepositionScale = 0.12
+		}
+		if cfg.RoutedDepositionMaxLift <= 0 {
+			cfg.RoutedDepositionMaxLift = 0.0025
+		}
+	}
 	if cfg.CanyonExtraDepth <= 0 {
 		cfg.CanyonExtraDepth = 0.006
 	}
@@ -209,6 +231,15 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	canyon := clamp01(m.CanyonWeight.SampleCubicBSpline(worldX, worldZ))
 	valleyFloor := clamp01(m.ValleyFloorWidth.SampleCubicBSpline(worldX, worldZ))
 	deposition := clamp01(m.DepositionPotential.SampleCubicBSpline(worldX, worldZ))
+	routedDepositionThickness := 0.0
+	if m.Config.RoutedDepositionVersion >= 1 &&
+		len(m.RoutedDepositionThickness.Values) ==
+			m.Geometry.Width*m.Geometry.Height {
+		routedDepositionThickness = math.Max(
+			0,
+			m.RoutedDepositionThickness.SampleCubicBSpline(worldX, worldZ),
+		)
+	}
 
 	// These noises are global world-coordinate functions. Chunk coordinates do
 	// not enter the calculation, so neighbouring chunks cannot get different
@@ -439,10 +470,20 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			0.090*mountain*mountainLiftScale +
 			0.020*plateau
 
-	// Deposition fills a small amount of accommodation space. Alluvial fans add
-	// a slightly stronger convex accumulation at mountain exits.
+	// Historical deposition semantics remain intact. Newer rules may add a
+	// separate, strongly bounded accumulation term derived from routed sediment
+	// mass. This keeps the first causal sediment feedback additive and easy to
+	// version without rewriting the established floodplain/fan language.
+	routedDepositionLift := 0.0
+	if m.Config.RoutedDepositionVersion >= 1 {
+		routedDepositionLift = math.Min(
+			m.Config.RoutedDepositionMaxLift,
+			routedDepositionThickness*m.Config.RoutedDepositionScale,
+		)
+	}
 	depositionLift := deposition*m.Config.DepositionLift +
-		alluvialFan*m.Config.AlluvialFanLift
+		alluvialFan*m.Config.AlluvialFanLift +
+		routedDepositionLift
 
 	// Phase 1 can legitimately deliver very high tectonic elevations. If a
 	// whole mountain belt arrives already near normalized height 1, adding any
@@ -474,28 +515,30 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	}
 
 	return Sample{
-		BaseElevation:       base,
-		RollingPlainWeight:  plain,
-		HillWeight:          hill,
-		FoothillWeight:      foothill,
-		MountainWeight:      mountain,
-		PlateauWeight:       plateau,
-		ValleyWeight:        valley,
-		FloodplainWeight:    floodplain,
-		AlluvialPlainWeight: alluvialPlain,
-		AlluvialFanWeight:   alluvialFan,
-		CanyonWeight:        canyon,
-		ValleyFloorWidth:    valleyFloor,
-		DepositionPotential: deposition,
-		RegionalDetail:      regionalDetail,
-		DepositionLift:      depositionLift,
-		ValleyCarve:         valleyCarve,
-		CanyonCarve:         canyonCarve,
-		RareMacroLift:       rarePeakLift,
-		RareMacroCarve:      rareValleyCarve,
-		RareEscarpment:      rareEscarpment,
-		HeightCorrection:    heightCorrection,
-		FinalHeight:         final,
+		BaseElevation:             base,
+		RollingPlainWeight:        plain,
+		HillWeight:                hill,
+		FoothillWeight:            foothill,
+		MountainWeight:            mountain,
+		PlateauWeight:             plateau,
+		ValleyWeight:              valley,
+		FloodplainWeight:          floodplain,
+		AlluvialPlainWeight:       alluvialPlain,
+		AlluvialFanWeight:         alluvialFan,
+		CanyonWeight:              canyon,
+		ValleyFloorWidth:          valleyFloor,
+		DepositionPotential:       deposition,
+		RoutedDepositionThickness: routedDepositionThickness,
+		RegionalDetail:            regionalDetail,
+		RoutedDepositionLift:      routedDepositionLift,
+		DepositionLift:            depositionLift,
+		ValleyCarve:               valleyCarve,
+		CanyonCarve:               canyonCarve,
+		RareMacroLift:             rarePeakLift,
+		RareMacroCarve:            rareValleyCarve,
+		RareEscarpment:            rareEscarpment,
+		HeightCorrection:          heightCorrection,
+		FinalHeight:               final,
 	}
 }
 

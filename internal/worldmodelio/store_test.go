@@ -59,6 +59,12 @@ func TestSaveLoadRoundTripPreservesRuntimeSamplesExactly(t *testing.T) {
 	if !reflect.DeepEqual(reopened.SpecialFeatures, original.SpecialFeatures) {
 		t.Fatalf("special landscape plan changed after reopen\nbefore=%+v\nafter=%+v", original.SpecialFeatures, reopened.SpecialFeatures)
 	}
+	if !reflect.DeepEqual(
+		reopened.CoastTerrain.RoutedDepositionThickness.Values,
+		original.CoastTerrain.RoutedDepositionThickness.Values,
+	) {
+		t.Fatal("routed deposition thickness changed after reopen")
+	}
 
 	points := [][2]float64{
 		{original.Geometry.OriginX, original.Geometry.OriginZ},
@@ -68,6 +74,25 @@ func TestSaveLoadRoundTripPreservesRuntimeSamplesExactly(t *testing.T) {
 	x, z := original.Geometry.NodePosition(17, 11)
 	points = append(points, [2]float64{x, z})
 	points = append(points, [2]float64{x + 37.25, z + 79.5})
+
+	maxRoutedDeposition := 0.0
+	maxRoutedDepositionIndex := -1
+	for i, v := range original.CoastTerrain.RoutedDepositionThickness.Values {
+		if v > maxRoutedDeposition {
+			maxRoutedDeposition = v
+			maxRoutedDepositionIndex = i
+		}
+	}
+	if original.Config.Terrain.RoutedDepositionVersion >= 1 {
+		if maxRoutedDepositionIndex < 0 || maxRoutedDeposition <= 0 {
+			t.Fatal("current routed-deposition rules produced no persisted deposition thickness")
+		}
+		x, z := original.Geometry.NodePosition(
+			maxRoutedDepositionIndex%original.Geometry.Width,
+			maxRoutedDepositionIndex/original.Geometry.Width,
+		)
+		points = append(points, [2]float64{x, z})
+	}
 
 	if len(original.Waterbed.Rivers) > 0 {
 		seg := original.Waterbed.Rivers[0]

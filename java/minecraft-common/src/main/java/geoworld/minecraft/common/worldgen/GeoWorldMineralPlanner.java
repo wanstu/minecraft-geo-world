@@ -72,7 +72,7 @@ public final class GeoWorldMineralPlanner {
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules)));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || "geoworld-rules-v1.1.20".equals(rules)));
     }
 
     private static boolean usesV115MiningDistricts(GeoWorldV1 model) {
@@ -83,6 +83,8 @@ public final class GeoWorldMineralPlanner {
         ) || ("geoworld-rules-v1.1.18".equals(
             model.manifest().generationRulesVersion()
         ) || "geoworld-rules-v1.1.19".equals(
+            model.manifest().generationRulesVersion()
+        ) || "geoworld-rules-v1.1.20".equals(
             model.manifest().generationRulesVersion()
         )));
     }

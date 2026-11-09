@@ -26,8 +26,16 @@ type Config struct {
 	PlateauAmplitude      float64
 	ValleyDepth           float64
 
-	DepositionLift   float64
-	AlluvialFanLift  float64
+	DepositionLift  float64
+	AlluvialFanLift float64
+
+	// RoutedDepositionVersion is zero for locked worlds that use only the
+	// historical heuristic deposition fields. Version 1 adds a strongly
+	// bounded lift from volume-derived routed sediment thickness.
+	RoutedDepositionVersion int     `json:",omitempty"`
+	RoutedDepositionScale   float64 `json:",omitempty"`
+	RoutedDepositionMaxLift float64 `json:",omitempty"`
+
 	CanyonExtraDepth float64
 	CliffFrequency   float64
 	// RareMacroStrength is zero for locked pre-v1.1.7 worlds. Current
@@ -50,12 +58,13 @@ type Input struct {
 	PlateauWeight      []float64
 	ValleyWeight       []float64
 
-	FloodplainWeight    []float64
-	AlluvialPlainWeight []float64
-	AlluvialFanWeight   []float64
-	CanyonWeight        []float64
-	ValleyFloorWidth    []float64
-	DepositionPotential []float64
+	FloodplainWeight          []float64
+	AlluvialPlainWeight       []float64
+	AlluvialFanWeight         []float64
+	CanyonWeight              []float64
+	ValleyFloorWidth          []float64
+	DepositionPotential       []float64
+	RoutedDepositionThickness []float64
 }
 
 type Model struct {
@@ -71,12 +80,13 @@ type Model struct {
 	PlateauWeight      sampling.ScalarGrid
 	ValleyWeight       sampling.ScalarGrid
 
-	FloodplainWeight    sampling.ScalarGrid
-	AlluvialPlainWeight sampling.ScalarGrid
-	AlluvialFanWeight   sampling.ScalarGrid
-	CanyonWeight        sampling.ScalarGrid
-	ValleyFloorWidth    sampling.ScalarGrid
-	DepositionPotential sampling.ScalarGrid
+	FloodplainWeight          sampling.ScalarGrid
+	AlluvialPlainWeight       sampling.ScalarGrid
+	AlluvialFanWeight         sampling.ScalarGrid
+	CanyonWeight              sampling.ScalarGrid
+	ValleyFloorWidth          sampling.ScalarGrid
+	DepositionPotential       sampling.ScalarGrid
+	RoutedDepositionThickness sampling.ScalarGrid
 
 	// HeightCorrection is an optional continuous broad-surface overlay. It is
 	// intentionally separate from river/lake bed geometry.
@@ -93,20 +103,22 @@ type Sample struct {
 	PlateauWeight      float64
 	ValleyWeight       float64
 
-	FloodplainWeight    float64
-	AlluvialPlainWeight float64
-	AlluvialFanWeight   float64
-	CanyonWeight        float64
-	ValleyFloorWidth    float64
-	DepositionPotential float64
+	FloodplainWeight          float64
+	AlluvialPlainWeight       float64
+	AlluvialFanWeight         float64
+	CanyonWeight              float64
+	ValleyFloorWidth          float64
+	DepositionPotential       float64
+	RoutedDepositionThickness float64
 
-	RegionalDetail   float64
-	DepositionLift   float64
-	ValleyCarve      float64
-	CanyonCarve      float64
-	RareMacroLift    float64
-	RareMacroCarve   float64
-	RareEscarpment   float64
-	HeightCorrection float64
-	FinalHeight      float64
+	RegionalDetail       float64
+	RoutedDepositionLift float64
+	DepositionLift       float64
+	ValleyCarve          float64
+	CanyonCarve          float64
+	RareMacroLift        float64
+	RareMacroCarve       float64
+	RareEscarpment       float64
+	HeightCorrection     float64
+	FinalHeight          float64
 }

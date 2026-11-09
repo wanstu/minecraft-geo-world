@@ -67,6 +67,7 @@ func Generate(input Input, cfg Config) (*Model, error) {
 		TransportCapacity:           make([]float64, n),
 		SedimentAccommodation:       make([]float64, n),
 		SedimentCompetenceLoss:      make([]float64, n),
+		RoutedDepositionThickness:   make([]float64, n),
 		SedimentDeposition:          make([]float64, n),
 		SedimentExport:              make([]float64, n),
 		FloodplainWeight:            make([]float64, n),
@@ -501,6 +502,18 @@ func (m *Model) computeSedimentBudget(input Input) {
 		}
 		deposition = clamp(deposition, 0, available)
 		carry := math.Max(0, available-deposition)
+
+		if input.RiverStrength[i] > 0 &&
+			input.LakeID[i] <= 0 &&
+			cellAreaScale > 1e-12 {
+			// Sediment mass is a normalized-height × macro-cell-area proxy.
+			// Dividing routed non-lake deposition by the cell-area scale recovers
+			// the normalized thickness that the mass would represent if spread
+			// across one macro cell. Terrain may consume this only in a versioned,
+			// strongly bounded form.
+			m.RoutedDepositionThickness[i] =
+				deposition / cellAreaScale
+		}
 
 		m.TransportCapacity[i] = capacity
 		m.SedimentDeposition[i] = deposition

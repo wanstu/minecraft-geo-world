@@ -516,20 +516,21 @@ func snapshotFromWorldModel(m *generator.WorldModel) (payload, error) {
 
 func snapshotTerrain(m *terrain.Model) terrainSnapshot {
 	out := terrainSnapshot{
-		Config:              m.Config,
-		BaseElevation:       cloneFloat64(m.BaseElevation.Values),
-		RollingPlainWeight:  cloneFloat64(m.RollingPlainWeight.Values),
-		HillWeight:          cloneFloat64(m.HillWeight.Values),
-		FoothillWeight:      cloneFloat64(m.FoothillWeight.Values),
-		MountainWeight:      cloneFloat64(m.MountainWeight.Values),
-		PlateauWeight:       cloneFloat64(m.PlateauWeight.Values),
-		ValleyWeight:        cloneFloat64(m.ValleyWeight.Values),
-		FloodplainWeight:    cloneFloat64(m.FloodplainWeight.Values),
-		AlluvialPlainWeight: cloneFloat64(m.AlluvialPlainWeight.Values),
-		AlluvialFanWeight:   cloneFloat64(m.AlluvialFanWeight.Values),
-		CanyonWeight:        cloneFloat64(m.CanyonWeight.Values),
-		ValleyFloorWidth:    cloneFloat64(m.ValleyFloorWidth.Values),
-		DepositionPotential: cloneFloat64(m.DepositionPotential.Values),
+		Config:                    m.Config,
+		BaseElevation:             cloneFloat64(m.BaseElevation.Values),
+		RollingPlainWeight:        cloneFloat64(m.RollingPlainWeight.Values),
+		HillWeight:                cloneFloat64(m.HillWeight.Values),
+		FoothillWeight:            cloneFloat64(m.FoothillWeight.Values),
+		MountainWeight:            cloneFloat64(m.MountainWeight.Values),
+		PlateauWeight:             cloneFloat64(m.PlateauWeight.Values),
+		ValleyWeight:              cloneFloat64(m.ValleyWeight.Values),
+		FloodplainWeight:          cloneFloat64(m.FloodplainWeight.Values),
+		AlluvialPlainWeight:       cloneFloat64(m.AlluvialPlainWeight.Values),
+		AlluvialFanWeight:         cloneFloat64(m.AlluvialFanWeight.Values),
+		CanyonWeight:              cloneFloat64(m.CanyonWeight.Values),
+		ValleyFloorWidth:          cloneFloat64(m.ValleyFloorWidth.Values),
+		DepositionPotential:       cloneFloat64(m.DepositionPotential.Values),
+		RoutedDepositionThickness: cloneFloat64(m.RoutedDepositionThickness.Values),
 	}
 	if m.HeightCorrection != nil {
 		out.HeightCorrection = cloneFloat64(m.HeightCorrection.Values)
@@ -602,23 +603,35 @@ func restoreTerrain(g world.GridGeometry, s terrainSnapshot) (*terrain.Model, er
 	if err != nil {
 		return nil, err
 	}
+	routedDepositionValues := s.RoutedDepositionThickness
+	if len(routedDepositionValues) == 0 {
+		routedDepositionValues = make([]float64, g.Width*g.Height)
+	}
+	routedDeposition, err := makeGrid(
+		"routed deposition thickness",
+		routedDepositionValues,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	m := &terrain.Model{
-		Config:              s.Config,
-		Geometry:            g,
-		BaseElevation:       base,
-		RollingPlainWeight:  plain,
-		HillWeight:          hill,
-		FoothillWeight:      foothill,
-		MountainWeight:      mountain,
-		PlateauWeight:       plateau,
-		ValleyWeight:        valley,
-		FloodplainWeight:    floodplain,
-		AlluvialPlainWeight: alluvialPlain,
-		AlluvialFanWeight:   alluvialFan,
-		CanyonWeight:        canyon,
-		ValleyFloorWidth:    valleyFloor,
-		DepositionPotential: deposition,
+		Config:                    s.Config,
+		Geometry:                  g,
+		BaseElevation:             base,
+		RollingPlainWeight:        plain,
+		HillWeight:                hill,
+		FoothillWeight:            foothill,
+		MountainWeight:            mountain,
+		PlateauWeight:             plateau,
+		ValleyWeight:              valley,
+		FloodplainWeight:          floodplain,
+		AlluvialPlainWeight:       alluvialPlain,
+		AlluvialFanWeight:         alluvialFan,
+		CanyonWeight:              canyon,
+		ValleyFloorWidth:          valleyFloor,
+		DepositionPotential:       deposition,
+		RoutedDepositionThickness: routedDeposition,
 	}
 	if len(s.HeightCorrection) > 0 {
 		correction, err := makeGrid("height correction", s.HeightCorrection)

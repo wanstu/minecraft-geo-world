@@ -243,7 +243,7 @@ public class GeoWorldShorelinePlanner {
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules)));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || "geoworld-rules-v1.1.20".equals(rules)));
     }
 
     private static boolean sealHighRiverBanks(GeoWorldV1 runtime) {
@@ -257,7 +257,7 @@ public class GeoWorldShorelinePlanner {
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules)));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || "geoworld-rules-v1.1.20".equals(rules)));
     }
 
     private static boolean adaptiveGentleBanks(GeoWorldV1 runtime) {
@@ -267,7 +267,16 @@ public class GeoWorldShorelinePlanner {
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules)));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || "geoworld-rules-v1.1.20".equals(rules)));
+    }
+
+    private static int wetlandPondInteriorRelief(GeoWorldV1 runtime) {
+        String rules = runtime.manifest().generationRulesVersion();
+        // v1.1.20 adds at most about half a block of broad routed-deposition
+        // feedback. Wetland ponds are a local voxel feature; allow one extra
+        // integer Y of pre-carve relief so that coarse sediment feedback does
+        // not erase otherwise valid one-block shallow pools.
+        return "geoworld-rules-v1.1.20".equals(rules) ? 2 : 1;
     }
 
     private static boolean strictRiverContainment(GeoWorldV1 runtime) {
@@ -275,7 +284,7 @@ public class GeoWorldShorelinePlanner {
         return "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules)));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || "geoworld-rules-v1.1.20".equals(rules)));
     }
 
     private int adaptiveSearchDistanceForChunk(
@@ -375,6 +384,7 @@ public class GeoWorldShorelinePlanner {
         boolean modernRiverBank = smoothRiverBanks(runtime);
         boolean sealedHighRiverBank = sealHighRiverBanks(runtime);
         boolean strictRiverContainment = strictRiverContainment(runtime);
+        int wetlandInteriorRelief = wetlandPondInteriorRelief(runtime);
         for (int localZ = -fringe; localZ < 16 + fringe; localZ++) {
             for (int localX = -fringe; localX < 16 + fringe; localX++) {
                 preliminary[
@@ -392,7 +402,8 @@ public class GeoWorldShorelinePlanner {
                     sealedHighRiverBank,
                     strictRiverContainment,
                     adaptiveBank,
-                    bankSearchDistance
+                    bankSearchDistance,
+                    wetlandInteriorRelief
                 );
             }
         }
@@ -642,6 +653,7 @@ public class GeoWorldShorelinePlanner {
         boolean modernRiverBank = smoothRiverBanks(runtime);
         boolean sealedHighRiverBank = sealHighRiverBanks(runtime);
         boolean strictRiverContainment = strictRiverContainment(runtime);
+        int wetlandInteriorRelief = wetlandPondInteriorRelief(runtime);
         for (int dz = -localRadius; dz <= localRadius; dz++) {
             for (int dx = -localRadius; dx <= localRadius; dx++) {
                 preliminary[
@@ -659,7 +671,8 @@ public class GeoWorldShorelinePlanner {
                     sealedHighRiverBank,
                     strictRiverContainment,
                     false,
-                    MAX_GENTLE_BANK_DISTANCE
+                    MAX_GENTLE_BANK_DISTANCE,
+                    wetlandInteriorRelief
                 );
             }
         }
@@ -762,7 +775,8 @@ public class GeoWorldShorelinePlanner {
         boolean sealedHighRiverBank,
         boolean strictRiverContainment,
         boolean adaptiveBank,
-        int bankSearchDistance
+        int bankSearchDistance,
+        int wetlandInteriorRelief
     ) {
         GeoWorldV1.RuntimeSample center =
             samples.sample(centerX, centerZ);
@@ -781,7 +795,8 @@ public class GeoWorldShorelinePlanner {
             sealedHighRiverBank,
             strictRiverContainment,
             adaptiveBank,
-            bankSearchDistance
+            bankSearchDistance,
+            wetlandInteriorRelief
         );
     }
 
@@ -847,7 +862,8 @@ public class GeoWorldShorelinePlanner {
         boolean sealedHighRiverBank,
         boolean strictRiverContainment,
         boolean adaptiveBank,
-        int bankSearchDistance
+        int bankSearchDistance,
+        int wetlandInteriorRelief
     ) {
         int originalGround = this.heights.boundaryY(center.groundHeight());
         int ownWater = waterBoundaryModel(
@@ -898,7 +914,8 @@ public class GeoWorldShorelinePlanner {
             neighborhood,
             seed,
             worldX,
-            worldZ
+            worldZ,
+            wetlandInteriorRelief
         );
         if (wetlandPond != null && wetlandPond.inside()) {
             // A pond uses one shared water boundary across its 3x3 basin.
@@ -1220,7 +1237,8 @@ public class GeoWorldShorelinePlanner {
         Neighborhood neighborhood,
         long seed,
         int worldX,
-        int worldZ
+        int worldZ,
+        int maxInteriorRelief
     ) {
         final int spacing = 10;
         final int anchorOffset = spacing / 2;
@@ -1246,7 +1264,8 @@ public class GeoWorldShorelinePlanner {
                     worldX,
                     worldZ,
                     anchorX,
-                    anchorZ
+                    anchorZ,
+                    maxInteriorRelief
                 );
                 if (waterBoundary == null) {
                     continue;
@@ -1281,7 +1300,8 @@ public class GeoWorldShorelinePlanner {
         int worldX,
         int worldZ,
         int anchorX,
-        int anchorZ
+        int anchorZ,
+        int maxInteriorRelief
     ) {
         int anchorDX = anchorX - worldX;
         int anchorDZ = anchorZ - worldZ;
@@ -1330,7 +1350,10 @@ public class GeoWorldShorelinePlanner {
                 maxGround = Math.max(maxGround, ground);
             }
         }
-        if (wetInterior < 5 || maxGround - minGround > 1) {
+        if (
+            wetInterior < 5 ||
+            maxGround - minGround > maxInteriorRelief
+        ) {
             return null;
         }
 
@@ -1354,7 +1377,7 @@ public class GeoWorldShorelinePlanner {
                 int ground = this.heights.boundaryY(
                     sample.groundHeight()
                 );
-                if (ground < waterBoundary - 1) {
+                if (ground < waterBoundary - maxInteriorRelief) {
                     return null;
                 }
             }

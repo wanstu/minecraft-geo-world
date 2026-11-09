@@ -46,6 +46,8 @@ public final class GeoWorldV26StructureAdaptation {
             ) || ("geoworld-rules-v1.1.18".equals(
                 model.manifest().generationRulesVersion()
             ) || "geoworld-rules-v1.1.19".equals(
+            model.manifest().generationRulesVersion()
+        ) || "geoworld-rules-v1.1.20".equals(
                 model.manifest().generationRulesVersion()
             )));
         AdaptationPolicy policy = policy(

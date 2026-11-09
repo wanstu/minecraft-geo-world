@@ -287,6 +287,35 @@ func TestLegacyV115GoldenModelRemainsLocked(t *testing.T) {
 	}
 }
 
+
+func TestLegacyV117GoldenModelRemainsLocked(t *testing.T) {
+	doc := loadGoldenDocumentFile(t, "runtime-rules-v1.1.7.json")
+	model, err := worldmodelio.Load(filepath.Join("testdata", "runtime-rules-v1.1.7.geoworld"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := model.Manifest.GenerationRulesVersion; got != "geoworld-rules-v1.1.7" {
+		t.Fatalf("legacy v1.1.7 rules=%q want geoworld-rules-v1.1.7", got)
+	}
+	runtimeWorld, err := runtimeworld.NewReopened(model)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, testCase := range doc.Cases {
+		got := FromRuntimeSample(runtimeWorld.Sample(testCase.X, testCase.Z))
+		if err := CompareSample(got, testCase.Expected, doc.FloatTolerance); err != nil {
+			t.Fatalf(
+				"legacy v1.1.7 changed for %s (%s) at %.6f,%.6f: %v",
+				testCase.Name,
+				testCase.Category,
+				testCase.X,
+				testCase.Z,
+				err,
+			)
+		}
+	}
+}
+
 func TestGoldenCoverageIncludesRequiredCrossLanguageCases(t *testing.T) {
 	doc := loadGoldenDocument(t)
 	required := map[string]bool{

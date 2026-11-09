@@ -265,21 +265,33 @@ Minecraft voxel
 
 ### R4 — 侵蚀 / 搬运 / 沉积
 
-状态：**第一切片已实现，只读 sediment budget，尚未改变 Terrain。**
+状态：**已完成 routed sediment 因果链，并在 v1.1.20 首次以强约束方式反馈到 Terrain。**
 
-已建立：
+当前链路：
 
 ```text
 Erosion.TotalErosion
 → SedimentProduction
-→ FlowTo routed flux
-→ TransportCapacity
-→ SedimentDeposition / Export
+→ FlowTo continuous carried load
+→ TransportCapacity / SedimentCompetenceLoss
+→ Accommodation-controlled deposition
+→ fan / floodplain / lake / mouth sinks
+→ bounded RoutedDepositionThickness Terrain feedback
 ```
 
-并增加全世界质量守恒审计。
+已完成：
 
-当前仍保持旧 `SedimentSupply / DepositionPotential` 对 Terrain 的正式语义，不因为第一版 budget 统计直接改地形。
+- 全局 / hillslope / network 质量守恒；
+- stable-channel continuity；
+- capacity-drop deposition；
+- Lake trap；
+- mountain-front alluvial-fan competence loss；
+- receiver load 分类；
+- v1.1.20 bounded Terrain accumulation；
+- Save→Load 持久化与 Go/Java Runtime 对拍；
+- 历史 v1.1.7 golden 原样锁定，current golden 更新到 v1.1.20。
+
+v1.1.20 的 routed lift 上限为 `0.001 normalized`，只作为宏观长期沉积反馈，不执行逐方块填土。
 
 详细见 [REALISTIC_GEOMORPHOLOGY_R4_SEDIMENT_BUDGET.md](REALISTIC_GEOMORPHOLOGY_R4_SEDIMENT_BUDGET.md)。
 

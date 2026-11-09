@@ -135,6 +135,8 @@ public final class GeoWorldV26MineralPreviewCli {
             model.manifest().generationRulesVersion()
         ) || "geoworld-rules-v1.1.19".equals(
             model.manifest().generationRulesVersion()
+        ) || "geoworld-rules-v1.1.20".equals(
+            model.manifest().generationRulesVersion()
         )));
 
         List<PreviewBody> bodies = new ArrayList<>(limit);

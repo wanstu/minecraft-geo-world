@@ -112,7 +112,8 @@ func (m *RuntimeModel) Sample(worldX, worldZ float64) runtimeprofile.Sample {
 		(m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.15" ||
 			m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.16" ||
 			m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.18" ||
-			m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.19")) && len(m.SpecialFeatures) > 0 {
+			m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.19" ||
+			m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.20")) && len(m.SpecialFeatures) > 0 {
 		out = specialfeatures.Apply(
 			m.SpecialFeatures,
 			out,
@@ -152,20 +153,21 @@ type surfaceSnapshot struct {
 type terrainSnapshot struct {
 	Config terrain.Config `json:"config"`
 
-	BaseElevation       []float64 `json:"baseElevation"`
-	RollingPlainWeight  []float64 `json:"rollingPlainWeight"`
-	HillWeight          []float64 `json:"hillWeight"`
-	FoothillWeight      []float64 `json:"foothillWeight"`
-	MountainWeight      []float64 `json:"mountainWeight"`
-	PlateauWeight       []float64 `json:"plateauWeight"`
-	ValleyWeight        []float64 `json:"valleyWeight"`
-	FloodplainWeight    []float64 `json:"floodplainWeight"`
-	AlluvialPlainWeight []float64 `json:"alluvialPlainWeight"`
-	AlluvialFanWeight   []float64 `json:"alluvialFanWeight"`
-	CanyonWeight        []float64 `json:"canyonWeight"`
-	ValleyFloorWidth    []float64 `json:"valleyFloorWidth"`
-	DepositionPotential []float64 `json:"depositionPotential"`
-	HeightCorrection    []float64 `json:"heightCorrection,omitempty"`
+	BaseElevation             []float64 `json:"baseElevation"`
+	RollingPlainWeight        []float64 `json:"rollingPlainWeight"`
+	HillWeight                []float64 `json:"hillWeight"`
+	FoothillWeight            []float64 `json:"foothillWeight"`
+	MountainWeight            []float64 `json:"mountainWeight"`
+	PlateauWeight             []float64 `json:"plateauWeight"`
+	ValleyWeight              []float64 `json:"valleyWeight"`
+	FloodplainWeight          []float64 `json:"floodplainWeight"`
+	AlluvialPlainWeight       []float64 `json:"alluvialPlainWeight"`
+	AlluvialFanWeight         []float64 `json:"alluvialFanWeight"`
+	CanyonWeight              []float64 `json:"canyonWeight"`
+	ValleyFloorWidth          []float64 `json:"valleyFloorWidth"`
+	DepositionPotential       []float64 `json:"depositionPotential"`
+	RoutedDepositionThickness []float64 `json:"routedDepositionThickness,omitempty"`
+	HeightCorrection          []float64 `json:"heightCorrection,omitempty"`
 }
 
 type waterbedSnapshot struct {

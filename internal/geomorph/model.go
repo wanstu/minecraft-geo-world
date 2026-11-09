@@ -63,6 +63,7 @@ type Model struct {
 	TransportCapacity           []float64
 	SedimentAccommodation       []float64
 	SedimentCompetenceLoss      []float64
+	RoutedDepositionThickness   []float64
 	SedimentDeposition          []float64
 	SedimentExport              []float64
 	FloodplainWeight            []float64
