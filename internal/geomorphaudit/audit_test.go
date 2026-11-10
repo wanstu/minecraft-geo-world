@@ -61,6 +61,32 @@ func TestAnalyzeGeneratedWorldIsReadOnlyAndJSONSafe(t *testing.T) {
 			report.Transition.MountainPlainLowBufferEdgeFraction,
 		)
 	}
+	if report.BasinTransition.Basins > 0 &&
+		report.BasinTransition.Profiles != report.BasinTransition.Basins*16 {
+		t.Fatalf(
+			"basin profile count=%d want=%d",
+			report.BasinTransition.Profiles,
+			report.BasinTransition.Basins*16,
+		)
+	}
+	if report.BasinTransition.OrdinaryProfiles+
+		report.BasinTransition.DrainageAffectedProfiles !=
+		report.BasinTransition.Profiles {
+		t.Fatalf(
+			"basin profile classification mismatch: ordinary=%d drainage=%d total=%d",
+			report.BasinTransition.OrdinaryProfiles,
+			report.BasinTransition.DrainageAffectedProfiles,
+			report.BasinTransition.Profiles,
+		)
+	}
+	if report.BasinTransition.InvertedRimProfiles >
+		report.BasinTransition.OrdinaryProfiles {
+		t.Fatalf(
+			"inverted ordinary basin profiles=%d exceed ordinary=%d",
+			report.BasinTransition.InvertedRimProfiles,
+			report.BasinTransition.OrdinaryProfiles,
+		)
+	}
 	if report.Sediment.Production <= 0 {
 		t.Fatal("expected actual erosion to produce sediment proxy mass")
 	}

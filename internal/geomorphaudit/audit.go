@@ -27,9 +27,10 @@ type Report struct {
 	Seed          int64  `json:"seed"`
 	RulesVersion  string `json:"rulesVersion"`
 
-	River      RiverReport      `json:"river"`
-	Sediment   SedimentReport   `json:"sediment"`
-	Transition TransitionReport `json:"transition"`
+	River           RiverReport           `json:"river"`
+	Sediment        SedimentReport        `json:"sediment"`
+	BasinTransition BasinTransitionReport `json:"basinTransition"`
+	Transition      TransitionReport      `json:"transition"`
 }
 
 type SedimentReport struct {
@@ -272,6 +273,30 @@ type MouthSignal struct {
 	KindAt98                  string  `json:"kindAt98"`
 }
 
+type BasinTransitionReport struct {
+	Basins                      int     `json:"basins"`
+	Profiles                    int     `json:"profiles"`
+	DrainageAffectedProfiles    int     `json:"drainageAffectedProfiles"`
+	OrdinaryProfiles            int     `json:"ordinaryProfiles"`
+	DrainageInvertedRimProfiles int     `json:"drainageInvertedRimProfiles"`
+	InvertedRimProfiles         int     `json:"invertedRimProfiles"`
+	FloorSteeperThanWall        int     `json:"floorSteeperThanWall"`
+	FloorSlopeP50Deg            float64 `json:"floorSlopeP50Deg"`
+	FloorSlopeP90Deg            float64 `json:"floorSlopeP90Deg"`
+	FloorSlopeMaxDeg            float64 `json:"floorSlopeMaxDeg"`
+	WallSlopeP50Deg             float64 `json:"wallSlopeP50Deg"`
+	WallSlopeP90Deg             float64 `json:"wallSlopeP90Deg"`
+	WallSlopeMaxDeg             float64 `json:"wallSlopeMaxDeg"`
+	OuterBlendSlopeP50Deg       float64 `json:"outerBlendSlopeP50Deg"`
+	OuterBlendSlopeP90Deg       float64 `json:"outerBlendSlopeP90Deg"`
+	OuterBlendSlopeMaxDeg       float64 `json:"outerBlendSlopeMaxDeg"`
+	RimToFloorReliefP50Blocks   float64 `json:"rimToFloorReliefP50Blocks"`
+	RimToFloorReliefP90Blocks   float64 `json:"rimToFloorReliefP90Blocks"`
+	RimToFloorReliefMaxBlocks   float64 `json:"rimToFloorReliefMaxBlocks"`
+	WallFloorSlopeRatioP50      float64 `json:"wallFloorSlopeRatioP50"`
+	WallFloorSlopeRatioP90      float64 `json:"wallFloorSlopeRatioP90"`
+}
+
 type TransitionReport struct {
 	Samples int                    `json:"samples"`
 	Classes []TransitionClassStats `json:"classes,omitempty"`
@@ -355,6 +380,7 @@ func Analyze(model *generator.WorldModel, cfg Config) (Report, error) {
 	}
 	auditRivers(model, cfg, &report.River)
 	auditSedimentBudget(model, &report.Sediment)
+	auditBasinTransitions(model, &report.BasinTransition)
 	auditTransitions(model, cfg, &report.Transition)
 	return report, nil
 }
@@ -1566,6 +1592,161 @@ func auditMouths(model *generator.WorldModel, cfg Config, report *RiverReport) {
 			})
 		}
 	}
+}
+
+func basinProfileDrainageAffected(
+	feature specialfeatures.Feature,
+	points [3][2]float64,
+) bool {
+	if len(feature.Drainage) == 0 {
+		return false
+	}
+	for _, point := range points {
+		for _, reach := range feature.Drainage {
+			dx := reach.X1 - reach.X0
+			dz := reach.Z1 - reach.Z0
+			length2 := dx*dx + dz*dz
+			t := 0.0
+			if length2 > 1e-12 {
+				t = ((point[0]-reach.X0)*dx +
+					(point[1]-reach.Z0)*dz) / length2
+				if t < 0 {
+					t = 0
+				} else if t > 1 {
+					t = 1
+				}
+			}
+			px := reach.X0 + dx*t
+			pz := reach.Z0 + dz*t
+			distance := math.Hypot(point[0]-px, point[1]-pz)
+			corridorRadius := math.Max(112, reach.HalfWidth*7)
+			if corridorRadius > 240 {
+				corridorRadius = 240
+			}
+			if distance < corridorRadius {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func auditBasinTransitions(
+	model *generator.WorldModel,
+	report *BasinTransitionReport,
+) {
+	if model == nil || model.RuntimeProfile == nil {
+		return
+	}
+
+	floorSlopes := make([]float64, 0, 64)
+	wallSlopes := make([]float64, 0, 64)
+	outerSlopes := make([]float64, 0, 64)
+	reliefs := make([]float64, 0, 64)
+	ratios := make([]float64, 0, 64)
+
+	for _, feature := range model.SpecialFeatures {
+		if feature.Kind != specialfeatures.BasinCherry &&
+			feature.Kind != specialfeatures.BasinSnow {
+			continue
+		}
+		report.Basins++
+		for direction := 0; direction < 16; direction++ {
+			theta := 2 * math.Pi * float64(direction) / 16
+			point := func(radius float64) (float64, float64) {
+				return feature.CenterX +
+						math.Cos(theta)*feature.RadiusX*radius,
+					feature.CenterZ +
+						math.Sin(theta)*feature.RadiusZ*radius
+			}
+			sampleY := func(radius float64) (float64, float64, float64) {
+				x, z := point(radius)
+				s := finalRuntimeSample(model, x, z)
+				return x, z, minecraftY(s.World.GroundHeight)
+			}
+			slopeBetween := func(
+				r0, r1 float64,
+			) (float64, float64, float64, float64) {
+				x0, z0, y0 := sampleY(r0)
+				x1, z1, y1 := sampleY(r1)
+				distance := math.Hypot(x1-x0, z1-z0)
+				if distance <= 1e-9 {
+					return 0, y0, y1, 0
+				}
+				return math.Atan2(
+					math.Abs(y1-y0),
+					distance,
+				) * 180 / math.Pi, y0, y1, distance
+			}
+
+			floorSlope, floorInnerY, floorOuterY, _ :=
+				slopeBetween(0.15, 0.45)
+			wallSlope, _, rimY, _ :=
+				slopeBetween(0.58, 0.88)
+			outerSlope, _, _, _ :=
+				slopeBetween(0.88, 1.04)
+
+			floorY := (floorInnerY + floorOuterY) * 0.5
+			relief := rimY - floorY
+			wallX, wallZ := point(0.58)
+			rimX, rimZ := point(0.88)
+			outerX, outerZ := point(1.04)
+			drainageAffected := basinProfileDrainageAffected(
+				feature,
+				[3][2]float64{
+					{wallX, wallZ},
+					{rimX, rimZ},
+					{outerX, outerZ},
+				},
+			)
+			report.Profiles++
+			if drainageAffected {
+				report.DrainageAffectedProfiles++
+				if relief <= 0 {
+					report.DrainageInvertedRimProfiles++
+				}
+				continue
+			}
+
+			report.OrdinaryProfiles++
+			if relief <= 0 {
+				report.InvertedRimProfiles++
+			}
+			if floorSlope > wallSlope {
+				report.FloorSteeperThanWall++
+			}
+			ratio := wallSlope / math.Max(0.25, floorSlope)
+
+			floorSlopes = append(floorSlopes, floorSlope)
+			wallSlopes = append(wallSlopes, wallSlope)
+			outerSlopes = append(outerSlopes, outerSlope)
+			reliefs = append(reliefs, relief)
+			ratios = append(ratios, ratio)
+		}
+	}
+
+	report.FloorSlopeP50Deg = percentile(floorSlopes, 0.50)
+	report.FloorSlopeP90Deg = percentile(floorSlopes, 0.90)
+	if len(floorSlopes) > 0 {
+		report.FloorSlopeMaxDeg = percentile(floorSlopes, 1)
+	}
+	report.WallSlopeP50Deg = percentile(wallSlopes, 0.50)
+	report.WallSlopeP90Deg = percentile(wallSlopes, 0.90)
+	if len(wallSlopes) > 0 {
+		report.WallSlopeMaxDeg = percentile(wallSlopes, 1)
+	}
+	report.OuterBlendSlopeP50Deg = percentile(outerSlopes, 0.50)
+	report.OuterBlendSlopeP90Deg = percentile(outerSlopes, 0.90)
+	if len(outerSlopes) > 0 {
+		report.OuterBlendSlopeMaxDeg = percentile(outerSlopes, 1)
+	}
+	report.RimToFloorReliefP50Blocks = percentile(reliefs, 0.50)
+	report.RimToFloorReliefP90Blocks = percentile(reliefs, 0.90)
+	if len(reliefs) > 0 {
+		report.RimToFloorReliefMaxBlocks = percentile(reliefs, 1)
+	}
+	report.WallFloorSlopeRatioP50 = percentile(ratios, 0.50)
+	report.WallFloorSlopeRatioP90 = percentile(ratios, 0.90)
 }
 
 func auditTransitions(model *generator.WorldModel, cfg Config, report *TransitionReport) {
