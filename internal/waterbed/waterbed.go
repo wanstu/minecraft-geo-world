@@ -303,6 +303,16 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 				lakeOutletSurfaceDefined = true
 			}
 		}
+		// Only independent, ordinary rivers taper. Lake outlets, inlets and
+		// ocean receivers keep their exact formal water connection geometry.
+		// incomingSegments was populated by the completed upstream DAG pass.
+		headwater := cfg.RiverGeometryVersion >= 7 &&
+			len(incomingSegments[draft.edge.From]) == 0 &&
+			hydro.LakeID[draft.edge.From] == 0 &&
+			rec.WaterKind[draft.edge.From] != reconcile.WaterOcean &&
+			!lakeOutlet && !lakeMouth && !oceanMouth &&
+			draft.halfWidth >= 10 &&
+			math.Hypot(draft.x1-draft.x0, draft.z1-draft.z0) >= 96
 		segment := RiverSegment{
 			From: draft.edge.From, To: draft.edge.To,
 			X0: draft.x0, Z0: draft.z0, X1: draft.x1, Z1: draft.z1,
@@ -310,6 +320,7 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 			Bed1:                     effectiveBed[draft.edge.To],
 			HalfWidth:                draft.halfWidth,
 			MeanderOffset:            draft.meanderOffset,
+			HeadwaterTaper:           headwater,
 			Profile:                  profile,
 			OceanMouth:               oceanMouth,
 			LakeMouth:                lakeMouth,
@@ -879,7 +890,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		seg := m.Rivers[id]
 		t, distance := pointRiverSegment(worldX, worldZ, seg)
 		halfWidth := riverMouthHalfWidth(seg, t)
-		bankRadius := halfWidth + riverBankBlendBlocks(seg.HalfWidth)
+		bankRadius := halfWidth + riverBankBlendForSegment(seg, t)
 		fluvialReach := math.Max(bankRadius, riverFluvialReach(seg))
 		_, deltaDistance, deltaHalfWidth, deltaBankRadius, deltaOK :=
 			riverDeltaPoint(seg, t, worldX, worldZ)
@@ -888,8 +899,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		if distance >= fluvialReach && !deltaInBank {
 			continue
 		}
-		bed := sampleRiverProfile(seg, t)
-		centerDepth := riverCenterDepth(m.Config, seg.HalfWidth)
+		bed, centerDepth := riverBedAndDepthAt(m.Config, seg, t)
 		bankCeiling := math.Inf(1)
 		if m.Config.RiverGeometryVersion >= 4 {
 			bankCeiling = riverBankSurfaceCeiling(m.Base, seg, t)
@@ -1047,6 +1057,9 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			sample.RiverBedElevation = bed
 			// Mouth flare changes the footprint, not the river's depth datum.
 			sample.RiverHalfWidth = seg.HalfWidth
+			if seg.HeadwaterTaper {
+				sample.RiverHalfWidth = halfWidth
+			}
 			sample.RiverReceiverSurfaceDefined = surface > naturalSurface+1e-12
 			sample.RiverReceiverSurface = surface
 			if sample.RiverReceiverSurfaceDefined {
@@ -1081,9 +1094,15 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			// hydraulic width instead of looking like a narrow channel in a
 			// nominally large corridor.
 			widthT := riverWidthFraction(m.Config, seg.HalfWidth)
+			if seg.HeadwaterTaper {
+				widthT = riverWidthFraction(m.Config, halfWidth)
+			}
 			crossT = math.Pow(crossT, 1.65+0.95*widthT)
 		} else if seg.MouthExpansionVersion >= 2 {
 			widthT := riverWidthFraction(m.Config, seg.HalfWidth)
+			if seg.HeadwaterTaper {
+				widthT = riverWidthFraction(m.Config, halfWidth)
+			}
 			crossT = math.Pow(crossT, 1.35+0.65*widthT)
 		}
 		candidate := math.Min(
@@ -1103,8 +1122,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			// threshold against broad-terrain noise. Keep the full ordinary
 			// hydraulic corridor at least half a center-depth below the surface;
 			// the dry transition begins outside halfWidth in bankRadius.
-			minimumWetDepth :=
-				0.5 * riverCenterDepth(m.Config, seg.HalfWidth)
+			minimumWetDepth := 0.5 * centerDepth
 			candidate = math.Min(
 				candidate,
 				math.Max(0, surface-minimumWetDepth),
@@ -3014,7 +3032,7 @@ func applyRiverFluvialDryDetail(
 		return currentHeight
 	}
 	halfWidth := riverMouthHalfWidth(seg, t)
-	bankRadius := halfWidth + riverBankBlendBlocks(seg.HalfWidth)
+	bankRadius := halfWidth + riverBankBlendForSegment(seg, t)
 	reach := riverFluvialReach(seg)
 	if distance < bankRadius || distance >= reach {
 		return currentHeight
@@ -3377,6 +3395,46 @@ func mouthMaxHalfWidth(seg RiverSegment) float64 {
 	}
 }
 
+// riverBedAndDepthAt keeps the existing free-surface datum intact while
+// raising the narrow headwater bed to its actual local hydraulic depth.
+// oldBed + fullDepth == newBed + localDepth. Because taper width grows
+// monotonically downstream, this correction cannot introduce an uphill bed
+// into an otherwise non-increasing source profile.
+func riverBedAndDepthAt(cfg Config, seg RiverSegment, t float64) (bed, depth float64) {
+	bed = sampleRiverProfile(seg, t)
+	depth = riverCenterDepth(cfg, seg.HalfWidth)
+	if !seg.HeadwaterTaper {
+		return bed, depth
+	}
+	localDepth := riverCenterDepth(cfg, headwaterHalfWidth(seg, t))
+	return bed + depth - localDepth, localDepth
+}
+
+// headwaterHalfWidth is the local width shared by water, riverbed and
+// dry bank carving. The v7+ candidate tapers over the first 65% of the
+// initial reach; later reaches and all legacy persisted models are unchanged.
+func headwaterHalfWidth(seg RiverSegment, t float64) float64 {
+	if !seg.HeadwaterTaper {
+		return seg.HalfWidth
+	}
+	t = clamp(t, 0, 1)
+	minWidth := math.Max(3.5, 0.25*seg.HalfWidth)
+	return lerp(minWidth, seg.HalfWidth, smoothstep(0, 0.65, t))
+}
+
+// RiverHalfWidthAt reports the authoritative rendered water/riverbank width
+// for acceptance and tools. Older persisted river segments remain unchanged.
+func RiverHalfWidthAt(seg RiverSegment, t float64) float64 {
+	return riverMouthHalfWidth(seg, t)
+}
+
+func riverBankBlendForSegment(seg RiverSegment, t float64) float64 {
+	if seg.HeadwaterTaper {
+		return riverBankBlendBlocks(headwaterHalfWidth(seg, t))
+	}
+	return riverBankBlendBlocks(seg.HalfWidth)
+}
+
 // Flare formal water connections at their receiving and source ends. A river
 // entering a lake/ocean opens toward the receiver; a formal lake outlet starts
 // broad enough to overlap the rendered lake shore and then narrows naturally.
@@ -3442,6 +3500,9 @@ func riverMouthHalfWidth(seg RiverSegment, t float64) float64 {
 		}
 		fade := 1 - smoothstep(startFade, endFade, along)
 		width = math.Max(width, seg.HalfWidth+extra*fade)
+	}
+	if seg.HeadwaterTaper {
+		return headwaterHalfWidth(seg, t)
 	}
 	return width
 }
@@ -3725,7 +3786,7 @@ func (m *Model) riverBankProtectionSurfaceAt(
 		seg := m.Rivers[id]
 		t, distance := pointRiverSegment(worldX, worldZ, seg)
 		halfWidth := riverMouthHalfWidth(seg, t)
-		bankRadius := halfWidth + riverBankBlendBlocks(seg.HalfWidth)
+		bankRadius := halfWidth + riverBankBlendForSegment(seg, t)
 		_, deltaDistance, _, deltaBankRadius, deltaOK :=
 			riverDeltaPoint(seg, t, worldX, worldZ)
 		if distance >= bankRadius &&
@@ -3733,8 +3794,7 @@ func (m *Model) riverBankProtectionSurfaceAt(
 			continue
 		}
 
-		bed := sampleRiverProfile(seg, t)
-		centerDepth := riverCenterDepth(m.Config, seg.HalfWidth)
+		bed, centerDepth := riverBedAndDepthAt(m.Config, seg, t)
 		bankCeiling := riverBankSurfaceCeiling(m.Base, seg, t)
 		bed = math.Min(
 			bed,
@@ -3767,7 +3827,7 @@ func riverBankProtectedAt(
 		seg := rivers[id]
 		t, distance := pointRiverSegment(worldX, worldZ, seg)
 		bankRadius := riverMouthHalfWidth(seg, t) +
-			riverBankBlendBlocks(seg.HalfWidth)
+			riverBankBlendForSegment(seg, t)
 		if distance < bankRadius {
 			return true
 		}
@@ -3788,8 +3848,8 @@ func (m *Model) riverOverlapCount(worldX, worldZ float64) int {
 	count := 0
 	for _, id := range m.riverBuckets[bucket] {
 		seg := m.Rivers[id]
-		_, distance := pointRiverSegment(worldX, worldZ, seg)
-		if distance < seg.HalfWidth {
+		t, distance := pointRiverSegment(worldX, worldZ, seg)
+		if distance < riverMouthHalfWidth(seg, t) {
 			count++
 		}
 	}

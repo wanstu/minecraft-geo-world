@@ -310,6 +310,54 @@ func TestV120RoutedDepositionFeedbackIsVersionedSmallAndNonNegative(t *testing.T
 	)
 }
 
+func TestV122NaturalHeadwatersPreserveLegacyWorldGraph(t *testing.T) {
+	const seed int64 = 123456
+	cfg := testConfig(seed)
+	cfg.WorldProfile = StandardWorldProfile()
+	cfg.WorldProfile.Parameters.MainRiverScale = 2
+	old := cfg
+	old.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.21"
+	legacy, err := GenerateWorld(context.Background(), old, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	modern, err := GenerateWorld(context.Background(), cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if legacy.Config.Waterbed.RiverGeometryVersion != 6 || modern.Config.Waterbed.RiverGeometryVersion != 7 {
+		t.Fatalf("unexpected locked geometry versions %d and %d", legacy.Config.Waterbed.RiverGeometryVersion, modern.Config.Waterbed.RiverGeometryVersion)
+	}
+	if len(legacy.Waterbed.Rivers) != len(modern.Waterbed.Rivers) {
+		t.Fatalf("river topology changed %d -> %d", len(legacy.Waterbed.Rivers), len(modern.Waterbed.Rivers))
+	}
+	incoming := make(map[int]int)
+	for _, seg := range legacy.Waterbed.Rivers {
+		incoming[seg.To]++
+	}
+	n := 0
+	for i, seg := range modern.Waterbed.Rivers {
+		previous := legacy.Waterbed.Rivers[i]
+		if previous.HeadwaterTaper {
+			t.Fatalf("legacy river %d unexpectedly tapered", i)
+		}
+		if seg.HeadwaterTaper {
+			n++
+			if incoming[seg.From] != 0 || modern.Hydrology.LakeID[seg.From] != 0 || seg.HalfWidth < 10 || seg.OceanMouth || seg.LakeMouth || seg.LakeOutlet || math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0) < 96 {
+				t.Fatalf("river %d incorrectly identified as a source: %+v", i, seg)
+			}
+		}
+		seg.HeadwaterTaper = false
+		if !reflect.DeepEqual(previous, seg) {
+			t.Fatalf("v22 changed legacy river segment %d beyond the source-width flag", i)
+		}
+	}
+	if !reflect.DeepEqual(legacy.Geomorph.RoutedDepositionThickness, modern.Geomorph.RoutedDepositionThickness) {
+		t.Fatal("headwater-only rule unexpectedly changed macro deposition")
+	}
+	t.Logf("R7.2 seed %d: %d eligible tapered headwaters of %d stable graph reaches", seed, n, len(modern.Waterbed.Rivers))
+}
+
 func TestV121MeanderGeometryIsVersionLocked(t *testing.T) {
 	const seed int64 = 123456
 	legacyConfig := testConfig(seed)
@@ -321,6 +369,7 @@ func TestV121MeanderGeometryIsVersionLocked(t *testing.T) {
 	}
 	candidateConfig := legacyConfig
 	candidateConfig.WorldProfile = StandardWorldProfile()
+	candidateConfig.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.21"
 	if candidateConfig.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.21" {
 		t.Fatalf("unexpected default rule %s", candidateConfig.WorldProfile.GenerationRulesVersion)
 	}
@@ -382,8 +431,8 @@ func TestRiverDepthDefaultsAreGenerationRuleLocked(t *testing.T) {
 	if got := current.WorldSample.RiverCenterDepthNormalized; math.Abs(got-0.004) > 1e-12 {
 		t.Fatalf("current river center depth=%v want=0.004", got)
 	}
-	if got := current.Waterbed.RiverGeometryVersion; got != 6 {
-		t.Fatalf("current river geometry version=%d want=6", got)
+	if got := current.Waterbed.RiverGeometryVersion; got != 7 {
+		t.Fatalf("current river geometry version=%d want=7", got)
 	}
 	if got := current.Geomorph.LongitudinalGradeVersion; got != 1 {
 		t.Fatalf("current longitudinal grade version=%d want=1", got)
@@ -609,7 +658,7 @@ func TestV115OrdinaryRiverInnerWetCoreHasNoDryHoles(t *testing.T) {
 			tAlong := float64(step) / 10
 			cx, cz, nx, nz := riverFrameForWetCoreTest(seg, tAlong)
 			for lateral := -8; lateral <= 8; lateral++ {
-				offset := float64(lateral) / 10 * seg.HalfWidth
+				offset := float64(lateral) / 10 * waterbed.RiverHalfWidthAt(seg, tAlong)
 				q := m.Runtime.Sample(cx+nx*offset, cz+nz*offset)
 				samples++
 				if !q.WaterSurfaceDefined ||

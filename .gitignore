@@ -7,3 +7,6 @@ output/
 **/logs/
 .DS_Store
 Thumbs.db
+
+# Local Minecraft development runs and user saves; never commit world data.
+java/adapters/*/run/

@@ -654,6 +654,56 @@ func TestMajorRiverHalfWidthCanExceedOrdinaryMaximum(t *testing.T) {
 
 // TestV121WideCardinalStraightReachCandidate is opt-in geometry v6. It does
 // not alter the default rules or regenerate any world while under evaluation.
+// TestV122HeadwaterTaper tests the exact versioned half-width shared by
+// voxel water ownership, valley carving, dry banks and bank protection.
+func TestV122HeadwaterTaper(t *testing.T) {
+	const width = 16.86
+	legacy := RiverSegment{X0: -3264, Z0: -1856, X1: -3264, Z1: -1728, HalfWidth: width, MouthExpansionVersion: 5}
+	modern := legacy
+	modern.HeadwaterTaper = true
+
+	if got := riverMouthHalfWidth(modern, 0); math.Abs(got-width*.25) > 1e-12 {
+		t.Fatalf("source begins at %.6f, want %.6f", got, width*.25)
+	}
+	prev := 0.0
+	for i := 0; i <= 100; i++ {
+		tValue := float64(i) / 100
+		current := riverMouthHalfWidth(modern, tValue)
+		if current < prev-1e-12 || current < 3.5 || current > width+1e-10 {
+			t.Fatalf("headwater width not smoothly bounded at t=%.2f: %.4f", tValue, current)
+		}
+		prev = current
+		if got := riverMouthHalfWidth(legacy, tValue); math.Abs(got-width) > 1e-12 {
+			t.Fatalf("persisted v6 segment altered at t=%.2f: %.4f", tValue, got)
+		}
+		if tValue >= .65 && math.Abs(current-width) > 1e-10 {
+			t.Fatalf("end of taper did not restore original hydraulic width: %.4f", current)
+		}
+	}
+	if got := riverMouthHalfWidth(modern, .325); got <= width*.25 || got >= width {
+		t.Fatalf("midpoint taper outside source and downstream width bounds: %f", got)
+	}
+	if blend := riverBankBlendForSegment(modern, 0); blend >= riverBankBlendForSegment(legacy, 0) {
+		t.Fatalf("source valley carve remains full river width: taper=%f original=%f", blend, riverBankBlendForSegment(legacy, 0))
+	}
+	if blend := riverBankBlendForSegment(modern, 1); blend != riverBankBlendForSegment(legacy, 1) {
+		t.Fatal("downstream dry-bank corridor changed")
+	}
+	cfg := Config{MinRiverHalfWidthBlocks: 4, MaxRiverHalfWidthBlocks: 18, RiverCenterDepthNormalized: .004}
+	legacy.Profile = []float64{.54, .52}
+	modern.Profile = []float64{.54, .52}
+	for _, tValue := range []float64{0, .1, .2, .4, .65, .85, 1} {
+		oldBed, oldDepth := riverBedAndDepthAt(cfg, legacy, tValue)
+		newBed, newDepth := riverBedAndDepthAt(cfg, modern, tValue)
+		if newBed < oldBed-1e-10 || newDepth > oldDepth+1e-10 {
+			t.Fatalf("narrow headwater got deeper at t=%.2f: oldBed=%f newBed=%f oldDepth=%f newDepth=%f", tValue, oldBed, newBed, oldDepth, newDepth)
+		}
+		if math.Abs((newBed+newDepth)-(oldBed+oldDepth)) > 1e-12 {
+			t.Fatalf("headwater changed surface datum at t=%.2f: %.6f -> %.6f", tValue, oldBed+oldDepth, newBed+newDepth)
+		}
+	}
+}
+
 func TestV121WideCardinalStraightReachCandidate(t *testing.T) {
 	const seed int64 = 123456
 	const length = 128.0

@@ -113,7 +113,7 @@ func (m *RuntimeModel) Sample(worldX, worldZ float64) runtimeprofile.Sample {
 			m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.16" ||
 			m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.18" ||
 			m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.19" ||
-			(m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.20" || m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.21"))) && len(m.SpecialFeatures) > 0 {
+			(m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.20" || (m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.21" || m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.22")))) && len(m.SpecialFeatures) > 0 {
 		out = specialfeatures.Apply(
 			m.SpecialFeatures,
 			out,

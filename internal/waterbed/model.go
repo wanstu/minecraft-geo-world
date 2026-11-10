@@ -26,6 +26,8 @@ type Config struct {
 	// rendered banks so elevated river sheets cannot escape onto lower land.
 	// Version 6 (rules v1.1.21+) adds small, bounded curvature to qualifying
 	// wide and gentle cardinal reaches from the old random-straight subset.
+	// Version 7 (rules v1.1.22+) narrows natural river headwaters while
+	// leaving lake/ocean receivers and older persisted world shapes unchanged.
 	// Omitted/zero preserves all older worlds exactly.
 	RiverGeometryVersion uint8 `json:",omitempty"`
 
@@ -66,6 +68,11 @@ type RiverSegment struct {
 	Bed1          float64
 	HalfWidth     float64
 	MeanderOffset float64
+
+	// HeadwaterTaper is persisted only for v7+ genuine river sources.
+	// The persisted river profile and free-surface datum stay unchanged.
+	// Local hydraulic depth, wetted bed and dry banks taper together.
+	HeadwaterTaper bool `json:",omitempty"`
 
 	// Profile is a carve-only, monotonically non-increasing centerline bed from
 	// From to To. It is sampled from the actual broad terrain, not only endpoints.
