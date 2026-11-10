@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 1,
+  "coordinateOrder": "west,south,east,north",
+  "crs": "EPSG:4326",
+  "note": "Bounding boxes are fixed R6 sampling windows, not administrative or exact geomorphic boundaries.",
+  "datasets": {
+    "nasadem": {
+      "id": "NASADEM_HGT",
+      "version": "001",
+      "resolution": "1 arc-second",
+      "role": "primary_land_dem"
+    },
+    "merit_dem": {
+      "id": "MERIT_DEM",
+      "version": "1.0.3",
+      "resolution": "3 arc-second",
+      "role": "land_dem_crosscheck"
+    },
+    "hydrosheds": {
+      "id": "HydroSHEDS_core",
+      "version": "1.1",
+      "resolution": "3/15 arc-second",
+      "role": "primary_hydrography"
+    },
+    "hydrorivers": {
+      "id": "HydroRIVERS",
+      "version": "1",
+      "role": "river_vector_network"
+    },
+    "merit_hydro": {
+      "id": "MERIT_Hydro",
+      "version": "1.0.1",
+      "resolution": "3 arc-second",
+      "role": "hydrography_crosscheck"
+    },
+    "jrc_gsw": {
+      "id": "JRC_Global_Surface_Water",
+      "version": "1.5",
+      "period": "1984-2024",
+      "role": "surface_water_activity"
+    },
+    "gebco": {
+      "id": "GEBCO_2026",
+      "version": "2026",
+      "resolution": "15 arc-second",
+      "role": "bathymetry"
+    }
+  },
+  "regions": [
+    {
+      "id": "REF-01-yarlung-zangbo-braided-valley",
+      "bbox": [
+        89.5,
+        29,
+        92,
+        30.3
+      ],
+      "archetypes": [
+        "mountain_valley",
+        "braided_river",
+        "high_sediment_river"
+      ],
+      "datasets": [
+        "nasadem",
+        "hydrosheds",
+        "hydrorivers",
+        "jrc_gsw"
+      ],
+      "metrics": [
+        "slope_distribution",
+        "local_relief_ratio",
+        "longitudinal_gradient_ratio",
+        "valley_channel_width_ratio",
+        "active_water_corridor_ratio"
+      ]
+    },
+    {
+      "id": "REF-02-tarim-kunlun-basin-margin",
+      "bbox": [
+        78,
+        36,
+        82.5,
+        39
+      ],
+      "archetypes": [
+        "large_basin",
+        "alluvial_fan",
+        "bajada"
+      ],
+      "datasets": [
+        "nasadem",
+        "merit_dem",
+        "hydrosheds",
+        "jrc_gsw"
+      ],
+      "metrics": [
+        "rim_floor_relief_ratio",
+        "floor_slope",
+        "fan_radial_slope_decay",
+        "fan_width_length_ratio",
+        "fan_overlap_ratio"
+      ]
+    },
+    {
+      "id": "REF-03-southern-mongolia-alluvial-fans",
+      "bbox": [
+        100,
+        42.3,
+        102,
+        43.6
+      ],
+      "archetypes": [
+        "alluvial_fan",
+        "ephemeral_braided_stream"
+      ],
+      "datasets": [
+        "nasadem",
+        "merit_dem",
+        "hydrosheds",
+        "jrc_gsw"
+      ],
+      "metrics": [
+        "fan_apex_toe_slope_ratio",
+        "fan_radial_relief_decay",
+        "fan_spread_angle",
+        "active_fan_footprint_ratio"
+      ]
+    },
+    {
+      "id": "REF-04-zambezi-barotse-floodplain",
+      "bbox": [
+        22,
+        -17.5,
+        24.8,
+        -14
+      ],
+      "archetypes": [
+        "wide_floodplain",
+        "seasonal_water_corridor"
+      ],
+      "datasets": [
+        "nasadem",
+        "merit_dem",
+        "hydrosheds",
+        "hydrorivers",
+        "jrc_gsw"
+      ],
+      "metrics": [
+        "floodplain_channel_width_ratio",
+        "far_relief_corridor_ratio",
+        "seasonal_water_extent_ratio",
+        "cross_section_asymmetry"
+      ]
+    },
+    {
+      "id": "REF-05-mississippi-deltaic-lowland",
+      "bbox": [
+        -91.5,
+        28.5,
+        -88.5,
+        30.8
+      ],
+      "archetypes": [
+        "delta",
+        "low_gradient_alluvial_plain",
+        "wetland_coast"
+      ],
+      "datasets": [
+        "nasadem",
+        "hydrosheds",
+        "hydrorivers",
+        "jrc_gsw",
+        "gebco"
+      ],
+      "metrics": [
+        "lowland_slope_distribution",
+        "distributary_density",
+        "water_land_patch_scale",
+        "shoreline_complexity",
+        "nearshore_depth_gradient"
+      ]
+    },
+    {
+      "id": "REF-06-cape-cod-barrier-coast",
+      "bbox": [
+        -70.8,
+        41.5,
+        -69.8,
+        42.2
+      ],
+      "archetypes": [
+        "barrier_coast",
+        "spit",
+        "gentle_shoreface"
+      ],
+      "datasets": [
+        "nasadem",
+        "jrc_gsw",
+        "gebco"
+      ],
+      "metrics": [
+        "shore_slope",
+        "barrier_width_length_ratio",
+        "back_barrier_water_ratio",
+        "nearshore_shelf_slope_ratio"
+      ]
+    },
+    {
+      "id": "REF-07-banks-peninsula-steep-coast",
+      "bbox": [
+        172.4,
+        -44,
+        173.3,
+        -43.4
+      ],
+      "archetypes": [
+        "steep_coast",
+        "volcanic_coast",
+        "cove_coast"
+      ],
+      "datasets": [
+        "nasadem",
+        "jrc_gsw",
+        "gebco"
+      ],
+      "metrics": [
+        "inland_relief_ratio",
+        "shore_slope_distribution",
+        "coastline_curvature",
+        "nearshore_depth_gradient"
+      ]
+    }
+  ]
+}

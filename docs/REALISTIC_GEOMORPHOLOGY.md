@@ -312,7 +312,22 @@ R5.1 证明 dominant landform label 的直接 `mountain ↔ plain` 相邻不能�
 
 ### R6 — 真实地貌统计对照
 
-建立固定参考区间。
+状态：**R6.1 真实参考体系已建立；尚未修改生成算法。**
+
+R6.1 已锁定：
+
+- NASADEM / MERIT DEM 陆地高程参考；
+- HydroSHEDS / HydroRIVERS / MERIT Hydro 水文参考；
+- JRC Global Surface Water 水体活动参考；
+- GEBCO 2026 海底参考；
+- 7 个固定真实地貌 archetype；
+- 跨尺度可比较的 dimensionless / slope / ratio 指标。
+
+禁止使用全局“1 Minecraft block = N metres”映射，也禁止在提取真实统计前手填目标值。
+
+详细见 [REALISTIC_GEOMORPHOLOGY_R6_REFERENCE.md](REALISTIC_GEOMORPHOLOGY_R6_REFERENCE.md) 和 [realistic_geomorphology_reference_registry.json](realistic_geomorphology_reference_registry.json)。
+
+下一切片：R6.2 real-data extractor。
 
 ### R7 — Minecraft 实机验收
 
