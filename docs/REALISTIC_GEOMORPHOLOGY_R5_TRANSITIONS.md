@@ -428,3 +428,225 @@ Seed 4034658472718554561：
 - 不增加“强制下游扩宽”规则。
 
 下一独立切片：R5.4 Land → coast → seafloor。
+
+
+## 15. R5.4：Land → coast → seafloor
+
+### 15.1 真实地貌参考
+
+本切片继续使用真实卫星 / 遥感资料作为几何验收参考，而不是复制影像纹理。
+
+参考类型包括：
+
+- NASA Earth Observatory 的 Cape Cod / Padre Island 障壁海岸；
+- USGS Coastal Change：沙岸、湿地、障壁岛、风暴缺口和近岸沉积迁移；
+- USGS coastal morphodynamics / shoreline remote sensing；
+- USGS barrier-island cross section：mainland → lagoon/back-barrier → barrier → shoreface → inner continental shelf；
+- Louisiana deltaic coast：高沉积供应下的三角洲、湿地和浅海演化。
+
+从这些参考中只抽取 GeoWorld 当前需要验证的宏观原则：
+
+1. 海岸不能被强制统一成缓坡；
+2. 基岩 / 山地海岸允许很陡；
+3. 普通大陆边缘应表现为：
+   - 近岸浅海；
+   - 宽缓大陆架；
+   - 更陡大陆坡；
+   - 再进入较缓深海盆地；
+4. 岛弧、海脊、海沟和邻近岛屿属于复杂海岸，不能用“必须单调变深”判缺陷；
+5. 海岸最终验收看 Runtime GroundHeight，而不是只看 Phase1 BaseElevation。
+
+### 15.2 现有 GeoWorld 责任层
+
+Phase1 已经定义真实尺度的海底层次：
+
+    continental shelf = 6 × 128 = 768 blocks
+    continental slope = 18 × 128 = 2304 blocks
+    deep-ocean transition continues beyond
+
+基础高程大致是：
+
+    coast / shallow shelf ≈ 0.485
+    shelf edge           ≈ 0.440
+    slope foot           ≈ 0.290
+    deep ocean           < 0.290
+
+因此 R5.4 不重建海底模型，只检查后续 Terrain / Waterbed / Runtime 是否破坏了这条结构。
+
+### 15.3 审计方法
+
+对每条 Phase1 中直接相邻的：
+
+    Continental crust ↔ Oceanic crust
+
+宏观边建立海岸法向剖面。
+
+最终 Runtime 采样位置：
+
+    +256  blocks : inland
+    +32   blocks : land-near-shore
+    -128  blocks : nearshore
+    -768  blocks : continental shelf edge
+    -2304 blocks : continental slope foot
+    -3072 blocks : deep-ocean transition
+
+其中正方向为陆地，负方向为海洋。
+
+记录：
+
+- inland relief；
+- shore slope；
+- nearshore / shelf-edge / slope-foot / deep-ocean depth；
+- shelf / continental-slope / deep-transition slope；
+- land-near below sea / ocean-near above sea 等 investigation signal。
+
+### 15.4 普通大陆边缘与复杂海岸分离
+
+第一轮直接统计所有海岸时，会看到大量 offshore reverse signal。
+
+这不能直接判缺陷，因为一条 3 km 法向线可能：
+
+- 穿过另一座岛；
+- 进入岛弧；
+- 穿过海脊 / 海沟；
+- 因曲折海岸重新靠近陆地。
+
+因此普通大陆边缘只保留同时满足：
+
+    coast distance continuously becomes more negative offshore
+    and
+    |ocean tectonic influence| < 0.02
+    and
+    nearshore ground < sea level
+
+的 profile。
+
+其余归为：
+
+    complexMarine
+
+复杂海岸仍参与岸线坡度多样性统计，但不参与大陆架 / 陆坡单调性 PASS/FAIL。
+
+## 16. R5.4 固定 Seed 结果
+
+统一：
+
+    Grid = 320 × 200
+    Rules = geoworld-rules-v1.1.20
+
+### Seed 123456
+
+    profiles                = 1149
+    ordinary marine        = 341
+    complex marine         = 808
+
+    gentle coast profiles  = 292
+    steep coast profiles   = 287
+
+    ordinary marine reverse:
+      shelf = 0
+      slope = 0
+      deep  = 0
+
+    depth p50:
+      nearshore   = 4.42 blocks
+      shelf edge  = 14.37 blocks
+      slope foot  = 51.79 blocks
+      deep ocean  = 60.89 blocks
+
+    slope p50:
+      shelf             = 0.88°
+      continental slope = 1.40°
+      deep transition   = 0.74°
+
+### Seed -4852173505788415804
+
+    profiles                = 1119
+    ordinary marine        = 402
+    complex marine         = 717
+
+    gentle / steep          = 423 / 93
+
+    ordinary marine reverse:
+      shelf = 0
+      slope = 0
+      deep  = 0
+
+    depth p50:
+      4.45 → 14.64 → 52.03 → 61.11 blocks
+
+### Seed -563659577384754347
+
+    profiles                = 1034
+    ordinary marine        = 361
+    complex marine         = 673
+
+    gentle / steep          = 465 / 224
+
+    ordinary marine reverse:
+      shelf = 0
+      slope = 0
+      deep  = 0
+
+    depth p50:
+      4.91 → 14.73 → 51.86 → 58.86 blocks
+
+### Seed 4034658472718554561
+
+    profiles                = 1093
+    ordinary marine        = 318
+    complex marine         = 775
+
+    gentle / steep          = 267 / 306
+
+    ordinary marine reverse:
+      shelf = 0
+      slope = 0
+      deep  = 0
+
+    depth p50:
+      3.47 → 13.15 → 50.99 → 58.51 blocks
+
+## 17. R5.4 结论
+
+普通大陆边缘在 4 个固定 Seed 中全部保持：
+
+    shallow nearshore
+    → deeper continental shelf
+    → much deeper continental slope
+    → gentler deep-ocean transition
+
+并且：
+
+    shelf reverse = 0
+    slope reverse = 0
+    deep reverse  = 0
+
+与此同时，岸线坡度分布没有被统一化：
+
+- 有大量缓岸；
+- 也有大量陡岸；
+- 最大 shore slope 可超过 40°–50°；
+- 复杂构造海岸被保留而不是为了审计数字强行抹平。
+
+因此当前没有证据支持修改 Phase1 / Terrain / Waterbed / Runtime 的海岸算法。
+
+## 18. R5.4 验收结果
+
+结论：**PASS / 不需要算法修复。**
+
+本切片：
+
+- 只增加只读 geomorph audit；
+- 不修改世界生成；
+- 不提升 generation rules version；
+- 不增加“所有海岸单调变深”规则。
+
+R5 四个切片至此全部完成：
+
+    R5.1 mountain → plain          PASS
+    R5.2 basin rim → basin floor  PASS
+    R5.3 river valley → floodplain PASS
+    R5.4 land → coast → seafloor  PASS
+
+下一阶段进入 R6：真实地貌对照统计与固定参考验收。

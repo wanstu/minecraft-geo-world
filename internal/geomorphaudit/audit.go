@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"geoworld/internal/generator"
+	"geoworld/internal/phase1"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
 	"geoworld/internal/sampling"
@@ -31,6 +32,7 @@ type Report struct {
 	Sediment         SedimentReport         `json:"sediment"`
 	BasinTransition  BasinTransitionReport  `json:"basinTransition"`
 	ValleyFloodplain ValleyFloodplainReport `json:"valleyFloodplain"`
+	CoastTransition  CoastTransitionReport  `json:"coastTransition"`
 	Transition       TransitionReport       `json:"transition"`
 }
 
@@ -343,6 +345,39 @@ type ValleyFloodplainSignal struct {
 	ExpansionRatio           float64 `json:"expansionRatio"`
 }
 
+type CoastTransitionReport struct {
+	Profiles                  int     `json:"profiles"`
+	OrdinaryMarineProfiles    int     `json:"ordinaryMarineProfiles"`
+	ComplexMarineProfiles     int     `json:"complexMarineProfiles"`
+	GentleProfiles            int     `json:"gentleProfiles"`
+	SteepProfiles             int     `json:"steepProfiles"`
+	LandNearBelowSea          int     `json:"landNearBelowSea"`
+	OceanNearAboveSea         int     `json:"oceanNearAboveSea"`
+	NearshoreNotOcean         int     `json:"nearshoreNotOcean"`
+	ShelfReverseProfiles      int     `json:"shelfReverseProfiles"`
+	SlopeReverseProfiles      int     `json:"slopeReverseProfiles"`
+	DeepReverseProfiles       int     `json:"deepReverseProfiles"`
+	InlandReliefP50Blocks     float64 `json:"inlandReliefP50Blocks"`
+	InlandReliefP90Blocks     float64 `json:"inlandReliefP90Blocks"`
+	ShoreSlopeP50Deg          float64 `json:"shoreSlopeP50Deg"`
+	ShoreSlopeP90Deg          float64 `json:"shoreSlopeP90Deg"`
+	ShoreSlopeMaxDeg          float64 `json:"shoreSlopeMaxDeg"`
+	NearshoreDepthP50Blocks   float64 `json:"nearshoreDepthP50Blocks"`
+	NearshoreDepthP90Blocks   float64 `json:"nearshoreDepthP90Blocks"`
+	ShelfEdgeDepthP50Blocks   float64 `json:"shelfEdgeDepthP50Blocks"`
+	ShelfEdgeDepthP90Blocks   float64 `json:"shelfEdgeDepthP90Blocks"`
+	SlopeFootDepthP50Blocks   float64 `json:"slopeFootDepthP50Blocks"`
+	SlopeFootDepthP90Blocks   float64 `json:"slopeFootDepthP90Blocks"`
+	DeepOceanDepthP50Blocks   float64 `json:"deepOceanDepthP50Blocks"`
+	DeepOceanDepthP90Blocks   float64 `json:"deepOceanDepthP90Blocks"`
+	ShelfSlopeP50Deg          float64 `json:"shelfSlopeP50Deg"`
+	ShelfSlopeP90Deg          float64 `json:"shelfSlopeP90Deg"`
+	ContinentalSlopeP50Deg    float64 `json:"continentalSlopeP50Deg"`
+	ContinentalSlopeP90Deg    float64 `json:"continentalSlopeP90Deg"`
+	DeepTransitionSlopeP50Deg float64 `json:"deepTransitionSlopeP50Deg"`
+	DeepTransitionSlopeP90Deg float64 `json:"deepTransitionSlopeP90Deg"`
+}
+
 type TransitionReport struct {
 	Samples int                    `json:"samples"`
 	Classes []TransitionClassStats `json:"classes,omitempty"`
@@ -428,6 +463,7 @@ func Analyze(model *generator.WorldModel, cfg Config) (Report, error) {
 	auditSedimentBudget(model, &report.Sediment)
 	auditBasinTransitions(model, &report.BasinTransition)
 	auditValleyFloodplain(model, &report.ValleyFloodplain)
+	auditCoastTransitions(model, &report.CoastTransition)
 	auditTransitions(model, cfg, &report.Transition)
 	return report, nil
 }
@@ -2110,6 +2146,251 @@ func sampleValleyCrossSection(
 		corridorHalfWidth: nav.HalfWidth + meanExtent,
 		farReliefBlocks:   0.5 * (leftFar + rightFar),
 	}, true
+}
+
+func auditCoastTransitions(
+	model *generator.WorldModel,
+	report *CoastTransitionReport,
+) {
+	if model == nil || model.Phase1 == nil || model.RuntimeProfile == nil {
+		return
+	}
+	g := model.Geometry
+	coastDistanceGrid, coastErr := sampling.NewScalarGridWithGeometry(
+		g,
+		model.Phase1.CoastDistance,
+	)
+	tectonicGrid, tectonicErr := sampling.NewScalarGridWithGeometry(
+		g,
+		model.Phase1.TectonicInfluence,
+	)
+	if coastErr != nil || tectonicErr != nil {
+		return
+	}
+	minX := g.OriginX
+	maxX := g.OriginX + g.SpanXBlocks
+	minZ := g.OriginZ
+	maxZ := g.OriginZ + g.SpanZBlocks
+	inside := func(x, z float64) bool {
+		return x >= minX && x <= maxX && z >= minZ && z <= maxZ
+	}
+
+	const (
+		landInland = 256.0
+		landNear   = 32.0
+		oceanNear  = 128.0
+		shelfEdge  = 6 * world.DefaultMacroSpacingBlocks
+		slopeFoot  = 18 * world.DefaultMacroSpacingBlocks
+		deepOcean  = 24 * world.DefaultMacroSpacingBlocks
+	)
+
+	inlandReliefs := make([]float64, 0, 256)
+	shoreSlopes := make([]float64, 0, 256)
+	nearDepths := make([]float64, 0, 256)
+	shelfDepths := make([]float64, 0, 256)
+	slopeDepths := make([]float64, 0, 256)
+	deepDepths := make([]float64, 0, 256)
+	shelfSlopes := make([]float64, 0, 256)
+	continentalSlopes := make([]float64, 0, 256)
+	deepSlopes := make([]float64, 0, 256)
+
+	type point struct {
+		x float64
+		z float64
+	}
+	sampleProfile := func(land, ocean point) {
+		dx := land.x - ocean.x
+		dz := land.z - ocean.z
+		length := math.Hypot(dx, dz)
+		if length <= 1e-9 {
+			return
+		}
+		ux := dx / length
+		uz := dz / length
+		cx := 0.5 * (land.x + ocean.x)
+		cz := 0.5 * (land.z + ocean.z)
+		at := func(distance float64) (float64, float64) {
+			return cx + ux*distance, cz + uz*distance
+		}
+		seaAt := func(distance float64) (float64, float64) {
+			return cx - ux*distance, cz - uz*distance
+		}
+
+		lix, liz := at(landInland)
+		lnx, lnz := at(landNear)
+		onx, onz := seaAt(oceanNear)
+		sx, sz := seaAt(shelfEdge)
+		fx, fz := seaAt(slopeFoot)
+		dx2, dz2 := seaAt(deepOcean)
+		for _, p := range [][2]float64{
+			{lix, liz}, {lnx, lnz}, {onx, onz},
+			{sx, sz}, {fx, fz}, {dx2, dz2},
+		} {
+			if !inside(p[0], p[1]) {
+				return
+			}
+		}
+
+		li := finalRuntimeSample(model, lix, liz)
+		ln := finalRuntimeSample(model, lnx, lnz)
+		on := finalRuntimeSample(model, onx, onz)
+		ss := finalRuntimeSample(model, sx, sz)
+		sf := finalRuntimeSample(model, fx, fz)
+		dd := finalRuntimeSample(model, dx2, dz2)
+		for _, s := range []runtimeprofile.Sample{li, ln, on, ss, sf, dd} {
+			if s.SpecialFeature != "" {
+				return
+			}
+		}
+		if ln.World.WaterKind == reconcile.WaterRiver ||
+			ln.World.WaterKind == reconcile.WaterLake ||
+			on.World.WaterKind == reconcile.WaterRiver ||
+			on.World.WaterKind == reconcile.WaterLake {
+			return
+		}
+
+		seaY := minecraftY(model.Config.SeaLevelNormalized)
+		liY := minecraftY(li.World.GroundHeight)
+		lnY := minecraftY(ln.World.GroundHeight)
+		onY := minecraftY(on.World.GroundHeight)
+		ssY := minecraftY(ss.World.GroundHeight)
+		sfY := minecraftY(sf.World.GroundHeight)
+		ddY := minecraftY(dd.World.GroundHeight)
+
+		inlandRelief := liY - seaY
+		nearDepth := seaY - onY
+		shelfDepth := seaY - ssY
+		slopeDepth := seaY - sfY
+		deepDepth := seaY - ddY
+		shoreSlope := math.Atan2(math.Abs(lnY-onY), landNear+oceanNear) * 180 / math.Pi
+		shelfSlope := math.Atan2(
+			math.Abs(ssY-onY),
+			shelfEdge-oceanNear,
+		) * 180 / math.Pi
+		continentalSlope := math.Atan2(
+			math.Abs(sfY-ssY),
+			slopeFoot-shelfEdge,
+		) * 180 / math.Pi
+		deepSlope := math.Atan2(
+			math.Abs(ddY-sfY),
+			deepOcean-slopeFoot,
+		) * 180 / math.Pi
+
+		report.Profiles++
+		if shoreSlope <= 5 {
+			report.GentleProfiles++
+		}
+		if shoreSlope >= 15 {
+			report.SteepProfiles++
+		}
+		if lnY < seaY {
+			report.LandNearBelowSea++
+		}
+		if onY > seaY {
+			report.OceanNearAboveSea++
+		}
+		if on.World.WaterKind != reconcile.WaterOcean {
+			report.NearshoreNotOcean++
+		}
+		inlandReliefs = append(inlandReliefs, inlandRelief)
+		shoreSlopes = append(shoreSlopes, shoreSlope)
+
+		nearCoastDistance := coastDistanceGrid.SampleBilinear(onx, onz)
+		shelfCoastDistance := coastDistanceGrid.SampleBilinear(sx, sz)
+		slopeCoastDistance := coastDistanceGrid.SampleBilinear(fx, fz)
+		deepCoastDistance := coastDistanceGrid.SampleBilinear(dx2, dz2)
+		maxOceanTectonic := math.Max(
+			math.Abs(tectonicGrid.SampleBilinear(onx, onz)),
+			math.Max(
+				math.Abs(tectonicGrid.SampleBilinear(sx, sz)),
+				math.Max(
+					math.Abs(tectonicGrid.SampleBilinear(fx, fz)),
+					math.Abs(tectonicGrid.SampleBilinear(dx2, dz2)),
+				),
+			),
+		)
+		ordinaryMarine :=
+			nearCoastDistance < 0 &&
+				shelfCoastDistance < nearCoastDistance &&
+				slopeCoastDistance < shelfCoastDistance &&
+				deepCoastDistance < slopeCoastDistance &&
+				maxOceanTectonic < 0.02 &&
+				onY < seaY
+		if !ordinaryMarine {
+			report.ComplexMarineProfiles++
+			return
+		}
+		report.OrdinaryMarineProfiles++
+		if shelfDepth+2 < nearDepth {
+			report.ShelfReverseProfiles++
+		}
+		if slopeDepth+4 < shelfDepth {
+			report.SlopeReverseProfiles++
+		}
+		if deepDepth+4 < slopeDepth {
+			report.DeepReverseProfiles++
+		}
+
+		nearDepths = append(nearDepths, nearDepth)
+		shelfDepths = append(shelfDepths, shelfDepth)
+		slopeDepths = append(slopeDepths, slopeDepth)
+		deepDepths = append(deepDepths, deepDepth)
+		shelfSlopes = append(shelfSlopes, shelfSlope)
+		continentalSlopes = append(continentalSlopes, continentalSlope)
+		deepSlopes = append(deepSlopes, deepSlope)
+	}
+
+	for y := 0; y < model.Phase1.Config.Height; y++ {
+		for x := 0; x < model.Phase1.Config.Width; x++ {
+			i := y*model.Phase1.Config.Width + x
+			if x+1 < model.Phase1.Config.Width {
+				j := i + 1
+				if model.Phase1.Crust[i] != model.Phase1.Crust[j] {
+					ax, az := g.NodePosition(x, y)
+					bx, bz := g.NodePosition(x+1, y)
+					if model.Phase1.Crust[i] == phase1.Continental {
+						sampleProfile(point{ax, az}, point{bx, bz})
+					} else {
+						sampleProfile(point{bx, bz}, point{ax, az})
+					}
+				}
+			}
+			if y+1 < model.Phase1.Config.Height {
+				j := i + model.Phase1.Config.Width
+				if model.Phase1.Crust[i] != model.Phase1.Crust[j] {
+					ax, az := g.NodePosition(x, y)
+					bx, bz := g.NodePosition(x, y+1)
+					if model.Phase1.Crust[i] == phase1.Continental {
+						sampleProfile(point{ax, az}, point{bx, bz})
+					} else {
+						sampleProfile(point{bx, bz}, point{ax, az})
+					}
+				}
+			}
+		}
+	}
+
+	report.InlandReliefP50Blocks = percentile(inlandReliefs, 0.50)
+	report.InlandReliefP90Blocks = percentile(inlandReliefs, 0.90)
+	report.ShoreSlopeP50Deg = percentile(shoreSlopes, 0.50)
+	report.ShoreSlopeP90Deg = percentile(shoreSlopes, 0.90)
+	if len(shoreSlopes) > 0 {
+		report.ShoreSlopeMaxDeg = percentile(shoreSlopes, 1)
+	}
+	report.NearshoreDepthP50Blocks = percentile(nearDepths, 0.50)
+	report.NearshoreDepthP90Blocks = percentile(nearDepths, 0.90)
+	report.ShelfEdgeDepthP50Blocks = percentile(shelfDepths, 0.50)
+	report.ShelfEdgeDepthP90Blocks = percentile(shelfDepths, 0.90)
+	report.SlopeFootDepthP50Blocks = percentile(slopeDepths, 0.50)
+	report.SlopeFootDepthP90Blocks = percentile(slopeDepths, 0.90)
+	report.DeepOceanDepthP50Blocks = percentile(deepDepths, 0.50)
+	report.DeepOceanDepthP90Blocks = percentile(deepDepths, 0.90)
+	report.ShelfSlopeP50Deg = percentile(shelfSlopes, 0.50)
+	report.ShelfSlopeP90Deg = percentile(shelfSlopes, 0.90)
+	report.ContinentalSlopeP50Deg = percentile(continentalSlopes, 0.50)
+	report.ContinentalSlopeP90Deg = percentile(continentalSlopes, 0.90)
+	report.DeepTransitionSlopeP50Deg = percentile(deepSlopes, 0.50)
+	report.DeepTransitionSlopeP90Deg = percentile(deepSlopes, 0.90)
 }
 
 func auditTransitions(model *generator.WorldModel, cfg Config, report *TransitionReport) {

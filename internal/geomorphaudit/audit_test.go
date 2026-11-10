@@ -103,6 +103,27 @@ func TestAnalyzeGeneratedWorldIsReadOnlyAndJSONSafe(t *testing.T) {
 			report.ValleyFloodplain.MatureFloodplainDrainages,
 		)
 	}
+	if report.CoastTransition.GentleProfiles >
+		report.CoastTransition.Profiles ||
+		report.CoastTransition.SteepProfiles >
+			report.CoastTransition.Profiles {
+		t.Fatalf(
+			"coast profile classification exceeds total: gentle=%d steep=%d total=%d",
+			report.CoastTransition.GentleProfiles,
+			report.CoastTransition.SteepProfiles,
+			report.CoastTransition.Profiles,
+		)
+	}
+	if report.CoastTransition.OrdinaryMarineProfiles+
+		report.CoastTransition.ComplexMarineProfiles !=
+		report.CoastTransition.Profiles {
+		t.Fatalf(
+			"coast marine classification mismatch: ordinary=%d complex=%d total=%d",
+			report.CoastTransition.OrdinaryMarineProfiles,
+			report.CoastTransition.ComplexMarineProfiles,
+			report.CoastTransition.Profiles,
+		)
+	}
 	if report.Sediment.Production <= 0 {
 		t.Fatal("expected actual erosion to produce sediment proxy mass")
 	}
