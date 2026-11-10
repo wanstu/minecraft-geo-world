@@ -145,6 +145,7 @@ public class GeoWorldPresetScreenBase extends Screen {
     private CycleButton<Integer> parameterPageButton;
     private final List<FractionSlider> parameterSliders = new ArrayList<>();
     private StringWidget statusText;
+    private StringWidget footerStatusText;
     private StringWidget spanText;
     private Button previewButton;
     private Button viewMapButton;
@@ -217,6 +218,7 @@ public class GeoWorldPresetScreenBase extends Screen {
         this.seedEdit.setResponder(value -> {
             this.setSharedSeed(value);
             this.generationSerial++;
+            this.resetFooterStatus();
             GeoWorldCreationSession.invalidateGenerated(
                 this.parent.getUiState()
             );
@@ -374,7 +376,11 @@ public class GeoWorldPresetScreenBase extends Screen {
                 button -> this.openPreviewMap()
             ).width(152).build()
         );
-        body.addChild(previewRow);
+        // Older Minecraft adapters have no preview screen. Do not show
+        // a dead-end "Generate preview" / "View map" workflow there.
+        if (this.previewFactory != null) {
+            body.addChild(previewRow);
+        }
         this.statusText = body.addChild(
             new StringWidget(
                 Component.translatable("geoworld.create.preview_pending"),
@@ -383,18 +389,28 @@ public class GeoWorldPresetScreenBase extends Screen {
         );
 
         LinearLayout footer = this.layout.addToFooter(
+            LinearLayout.vertical().spacing(3)
+        );
+        footer.defaultCellSetting().alignHorizontallyCenter();
+        LinearLayout footerActions = footer.addChild(
             LinearLayout.horizontal().spacing(8)
         );
-        this.doneButton = footer.addChild(
+        this.doneButton = footerActions.addChild(
             Button.builder(CommonComponents.GUI_DONE, button -> this.applyAndClose())
                 .width(150)
                 .build()
         );
-        footer.addChild(
+        footerActions.addChild(
             Button.builder(CommonComponents.GUI_CANCEL, button -> this.onClose())
                 .width(150)
                 .build()
-        );        this.layout.addToContents(
+        );
+        // This message must remain visible even when the settings form is
+        // scrolled: on 1.21.1 the preview/status row is far below the fold.
+        this.footerStatusText = footer.addChild(
+            new StringWidget(Component.empty(), this.font)
+        );
+        this.layout.addToContents(
             this.uiAdapter.createContent(
                 this.minecraft,
                 body,
@@ -735,6 +751,7 @@ public class GeoWorldPresetScreenBase extends Screen {
     private void onConfigEdited() {
         this.generationSerial++;
         this.previewGenerating = false;
+        this.resetFooterStatus();
         GeoWorldCreationSession.invalidateGenerated(
             this.parent.getUiState()
         );
@@ -843,6 +860,11 @@ public class GeoWorldPresetScreenBase extends Screen {
     }
 
     private void restoreCachedPreview() {
+        // The 1.21.1 adapters do not provide a preview screen. Checking the
+        // cache on entry would only disable Done while doing hidden work.
+        if (this.previewFactory == null) {
+            return;
+        }
         if (
             GeoWorldCreationSession
                 .generated(this.parent.getUiState())
@@ -1058,6 +1080,15 @@ public class GeoWorldPresetScreenBase extends Screen {
         );
     }
 
+    private void resetFooterStatus() {
+        if (this.doneButton != null) {
+            this.doneButton.setMessage(CommonComponents.GUI_DONE);
+        }
+        if (this.footerStatusText != null) {
+            this.footerStatusText.setMessage(Component.empty());
+        }
+    }
+
     private void applyAndClose() {
         try {
             GeoWorldCreationConfig config = this.readConfig();
@@ -1098,6 +1129,13 @@ public class GeoWorldPresetScreenBase extends Screen {
             Component.translatable("geoworld.create.preview_generating")
         );
 
+        this.doneButton.setMessage(
+            Component.translatable("geoworld.create.generating_model_button")
+        );
+        this.footerStatusText.setMessage(
+            Component.translatable("geoworld.create.generating_model_footer")
+        );
+
         this.prepareGenerationContext(this.parent.getUiState().getSettings());
         GeoWorldEngineBridge
             .generateAsync(seed, config)
@@ -1111,8 +1149,13 @@ public class GeoWorldPresetScreenBase extends Screen {
                     }
                     this.previewGenerating = false;
                     if (error != null) {
+                        LOGGER.error("GeoWorld world model generation failed", error);
                         this.previewButton.active = true;
                         this.doneButton.active = true;
+                        this.doneButton.setMessage(CommonComponents.GUI_DONE);
+                        this.footerStatusText.setMessage(
+                            Component.translatable("geoworld.create.generation_failed_footer")
+                        );
                         this.statusText.setMessage(
                             Component.translatable(
                                 "geoworld.create.preview_failed",
