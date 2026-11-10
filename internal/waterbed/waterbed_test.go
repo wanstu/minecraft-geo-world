@@ -652,6 +652,79 @@ func TestMajorRiverHalfWidthCanExceedOrdinaryMaximum(t *testing.T) {
 	}
 }
 
+// TestV121WideCardinalStraightReachCandidate is opt-in geometry v6. It does
+// not alter the default rules or regenerate any world while under evaluation.
+func TestV121WideCardinalStraightReachCandidate(t *testing.T) {
+	const seed int64 = 123456
+	const length = 128.0
+	found := 0
+	straightKept := 0
+	for i := 0; i < 1200; i++ {
+		u := riverHashUnit(seed, i, i+1)
+		if u >= 0.20 {
+			continue
+		}
+		old := riverMeanderOffset(seed, i, i+1, 0, 0, length, 0, 16, 0.002, 5)
+		got := riverMeanderOffset(seed, i, i+1, 0, 0, length, 0, 16, 0.002, 6)
+		if old != 0 {
+			t.Fatalf("legacy v5 straight branch changed at id %d: %g", i, old)
+		}
+		if u < 0.015 {
+			if got != 0 {
+				t.Fatalf("v6 must retain a small truly straight subset, id %d: %g", i, got)
+			}
+			straightKept++
+			continue
+		}
+		if math.Abs(got) < 3.5 || math.Abs(got) > 12.0000001 {
+			t.Fatalf("v6 candidate %d out of bounded lateral offset: %g", i, got)
+		}
+		if v := riverMeanderOffset(seed, i, i+1, 0, 0, length, 0, 9.9, 0.002, 6); v != 0 {
+			t.Fatalf("narrow river %d unexpectedly bent: %g", i, v)
+		}
+		if v := riverMeanderOffset(seed, i, i+1, 0, 0, length, 0, 16, 0.09, 6); v != 0 {
+			t.Fatalf("steep river %d unexpectedly bent: %g", i, v)
+		}
+		if v := riverMeanderOffset(seed, i, i+1, 0, 0, 90, 0, 16, 0.002, 6); v != 0 {
+			t.Fatalf("short river %d unexpectedly bent: %g", i, v)
+		}
+		if v := riverMeanderOffset(seed, i, i+1, 0, 0, length, 0, 16, 0.002, 4); v != 0 {
+			t.Fatalf("locked v4 unexpectedly bent: %g", v)
+		}
+		seg := RiverSegment{X0: 0, Z0: 0, X1: length, Z1: 0, HalfWidth: 16, MeanderOffset: got, MouthExpansionVersion: 5}
+		x0, z0, _, _ := riverCenterAndNormalForSegment(seg, 0)
+		x1, z1, _, _ := riverCenterAndNormalForSegment(seg, 1)
+		if math.Abs(x0) > 1e-12 || math.Abs(z0) > 1e-12 || math.Abs(x1-length) > 1e-12 || math.Abs(z1) > 1e-12 {
+			t.Fatalf("bent reach did not preserve endpoints at id %d", i)
+		}
+		found++
+	}
+	if found < 80 || straightKept < 8 {
+		t.Fatalf("insufficient deterministic branch samples: bent=%d keptStraight=%d", found, straightKept)
+	}
+}
+
+func TestV121ObservedTTTStraightReachGetsBoundedBend(t *testing.T) {
+	// This real model anchor was found in the read-only ttt acceptance:
+	// segment #48 from (-3264,-1856) to (-3264,-1728),
+	// width 16.86 and old meander offset exactly zero.
+	// The source terrain drop is an observation proxy, not an extra rule input.
+	const seed int64 = -1818694639628404530
+	const from, to = 27334, 27654
+	old := riverMeanderOffset(seed, from, to, -3264, -1856, -3264, -1728, 16.86, 0.01265, 5)
+	proposed := riverMeanderOffset(seed, from, to, -3264, -1856, -3264, -1728, 16.86, 0.01265, 6)
+	if old != 0 {
+		t.Fatalf("locked v5 saved reach no longer straight: %.6f", old)
+	}
+	if math.Abs(proposed) < 3.5 || math.Abs(proposed) > 0.75*16.86 {
+		t.Fatalf("candidate should bend actual ttt straight reach, got %.6f", proposed)
+	}
+	t.Logf("ttt segment 48: v5 offset=%.3f, v6 bounded offset=%.3f blocks", old, proposed)
+	if repeated := riverMeanderOffset(seed, from, to, -3264, -1856, -3264, -1728, 16.86, 0.01265, 6); repeated != proposed {
+		t.Fatalf("river bend must be deterministic, %g vs %g", proposed, repeated)
+	}
+}
+
 func TestV115DiagonalStraightReachGetsAntiGridDeflection(t *testing.T) {
 	const (
 		seed         int64 = 123456

@@ -310,6 +310,65 @@ func TestV120RoutedDepositionFeedbackIsVersionedSmallAndNonNegative(t *testing.T
 	)
 }
 
+func TestV121MeanderGeometryIsVersionLocked(t *testing.T) {
+	const seed int64 = 123456
+	legacyConfig := testConfig(seed)
+	legacyConfig.WorldProfile = StandardWorldProfile()
+	legacyConfig.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.20"
+	legacy, err := GenerateWorld(context.Background(), legacyConfig, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	candidateConfig := legacyConfig
+	candidateConfig.WorldProfile = StandardWorldProfile()
+	if candidateConfig.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.21" {
+		t.Fatalf("unexpected default rule %s", candidateConfig.WorldProfile.GenerationRulesVersion)
+	}
+	candidate, err := GenerateWorld(context.Background(), candidateConfig, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if legacy.Config.Waterbed.RiverGeometryVersion != 5 || candidate.Config.Waterbed.RiverGeometryVersion != 6 {
+		t.Fatalf("geometry version changed unexpectedly: legacy=%d candidate=%d", legacy.Config.Waterbed.RiverGeometryVersion, candidate.Config.Waterbed.RiverGeometryVersion)
+	}
+	if legacy.Config.Terrain.RoutedDepositionVersion != candidate.Config.Terrain.RoutedDepositionVersion ||
+		legacy.Config.Geomorph.LongitudinalGradeVersion != candidate.Config.Geomorph.LongitudinalGradeVersion {
+		t.Fatal("new river version changed sediment or longitudinal-grade defaults")
+	}
+	if !reflect.DeepEqual(legacy.Geomorph.RoutedDepositionThickness, candidate.Geomorph.RoutedDepositionThickness) {
+		t.Fatal("R7 river geometry changed macro routed sediment facts")
+	}
+	if len(legacy.Waterbed.Rivers) != len(candidate.Waterbed.Rivers) {
+		t.Fatalf("river topology changed: %d vs %d", len(legacy.Waterbed.Rivers), len(candidate.Waterbed.Rivers))
+	}
+	changed := 0
+	for i, a := range legacy.Waterbed.Rivers {
+		b := candidate.Waterbed.Rivers[i]
+		if a.From != b.From || a.To != b.To || a.X0 != b.X0 || a.Z0 != b.Z0 || a.X1 != b.X1 || a.Z1 != b.Z1 || a.HalfWidth != b.HalfWidth {
+			t.Fatalf("river reach %d moved endpoint or width instead of centerline", i)
+		}
+		if a.MeanderOffset != b.MeanderOffset {
+			changed++
+			if a.MeanderOffset != 0 || a.HalfWidth < 10 || a.OceanMouth || a.LakeMouth || a.LakeOutlet {
+				t.Fatalf("v21 modified noncandidate/receiver reach %d: old=%f new=%f mouth=%v/%v/%v from=%d to=%d width=%.2f endpoints=(%.0f,%.0f)->(%.0f,%.0f)", i, a.MeanderOffset, b.MeanderOffset, a.OceanMouth, a.LakeMouth, a.LakeOutlet, a.From, a.To, a.HalfWidth, a.X0, a.Z0, a.X1, a.Z1)
+			}
+			length := math.Hypot(a.X1-a.X0, a.Z1-a.Z0)
+			if length < 96 || (a.X1 != a.X0 && a.Z1 != a.Z0) || math.Abs(b.MeanderOffset) > 0.75*a.HalfWidth+1e-9 {
+				t.Fatalf("v21 reach %d has an unbounded or inappropriate bend: %+v", i, b)
+			}
+		}
+		for j := 1; j < len(b.Profile); j++ {
+			if b.Profile[j] > b.Profile[j-1]+1e-10 {
+				t.Fatalf("v21 river %d uphill at profile sample %d", i, j)
+			}
+		}
+	}
+	if changed == 0 {
+		t.Fatal("R7 candidate did not improve any wide straight river")
+	}
+	t.Logf("R7 seed %d: changed %d of %d ordinary reaches, locked v1.1.20 unchanged", seed, changed, len(candidate.Waterbed.Rivers))
+}
+
 func TestRiverDepthDefaultsAreGenerationRuleLocked(t *testing.T) {
 	currentCfg := testConfig(2026)
 	currentCfg.WorldProfile = StandardWorldProfile()
@@ -323,8 +382,8 @@ func TestRiverDepthDefaultsAreGenerationRuleLocked(t *testing.T) {
 	if got := current.WorldSample.RiverCenterDepthNormalized; math.Abs(got-0.004) > 1e-12 {
 		t.Fatalf("current river center depth=%v want=0.004", got)
 	}
-	if got := current.Waterbed.RiverGeometryVersion; got != 5 {
-		t.Fatalf("current river geometry version=%d want=5", got)
+	if got := current.Waterbed.RiverGeometryVersion; got != 6 {
+		t.Fatalf("current river geometry version=%d want=6", got)
 	}
 	if got := current.Geomorph.LongitudinalGradeVersion; got != 1 {
 		t.Fatalf("current longitudinal grade version=%d want=1", got)

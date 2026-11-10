@@ -24,6 +24,8 @@ type Config struct {
 	// with large rivers instead of clipping them at the legacy fixed cap.
 	// Version 4 (v1.1.12+) also constrains the river free surface by the actual
 	// rendered banks so elevated river sheets cannot escape onto lower land.
+	// Version 6 (rules v1.1.21+) adds small, bounded curvature to qualifying
+	// wide and gentle cardinal reaches from the old random-straight subset.
 	// Omitted/zero preserves all older worlds exactly.
 	RiverGeometryVersion uint8 `json:",omitempty"`
 

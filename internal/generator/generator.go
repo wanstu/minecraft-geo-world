@@ -231,7 +231,7 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 			resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.16" ||
 			resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.18" ||
 			resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.19" ||
-			resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.20") {
+			(resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.20" || resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.21")) {
 		special = specialfeatures.Plan(
 			resolved.Seed,
 			w.Geometry,

@@ -105,6 +105,20 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 			hydro.RiverThreshold,
 			edge.RiverOrder,
 		)
+		meanderGeometry := cfg.RiverGeometryVersion
+		// Resolve an unchanged receiver-channel shape before the confluence
+		// damping pass. Restoring an offset *after* damping would enlarge
+		// lake/ocean approach bends and break the locked v5 geometry.
+		if meanderGeometry >= 6 {
+			oceanMouth := rec.WaterKind[edge.To] == reconcile.WaterOcean
+			lakeMouth := hydro.LakeID[edge.To] > 0 &&
+				hydro.LakeID[edge.From] != hydro.LakeID[edge.To]
+			lakeOutlet := hydro.LakeID[edge.From] > 0 &&
+				hydro.LakeID[edge.From] != hydro.LakeID[edge.To]
+			if oceanMouth || lakeMouth || lakeOutlet {
+				meanderGeometry = 5
+			}
+		}
 		drafts[id] = riverDraft{
 			edge: edge,
 			x0:   x0, z0: z0, x1: x1, z1: z1,
@@ -117,7 +131,7 @@ func Build(base *terrain.Model, rec *reconcile.Model, hydro *hydrology.Model, cf
 				x1, z1,
 				halfWidth,
 				edge.OriginalDrop,
-				cfg.RiverGeometryVersion,
+				meanderGeometry,
 			),
 		}
 		outgoing[edge.From] = id
@@ -1684,6 +1698,28 @@ func riverMeanderOffset(
 	}
 	maxOffset := math.Min(length*0.17, 5+1.35*halfWidth)
 
+	// Geometry v6: very wide, gentle, long cardinal reaches in the legacy
+	// 20% straight subset should not form ruler-straight 128-block cuts.
+	// Keep a small subset genuinely straight, leave rapid/narrow reaches
+	// untouched, and cap the lateral deflection to under the channel width.
+	// A sin(pi*t)^2 centerline preserves exact macro-node endpoints and the
+	// existing bank/river profile constraints; no node or river graph moves.
+	if geometryVersion >= 6 &&
+		u >= 0.015 && u < 0.20 &&
+		halfWidth >= 10 && lowSlope >= 0.70 && length >= 96 &&
+		(math.Abs(x1-x0) <= 1e-8 || math.Abs(z1-z0) <= 1e-8) {
+		amplitude := math.Min(
+			math.Min(0.75*halfWidth, 0.085*length),
+			maxOffset*0.66*lowSlope,
+		)
+		if amplitude >= 3.5 {
+			if riverHashUnit(seed^0x5249564552563621, to, from) < 0.5 {
+				amplitude = -amplitude
+			}
+			return amplitude
+		}
+	}
+
 	// Legacy rules intentionally leave 20% of reaches perfectly straight.
 	// That is visually fine for cardinal reaches, but a D8 diagonal is exactly
 	// 45 degrees to Minecraft's block grid: a wide 128-block straight reach
@@ -2193,6 +2229,10 @@ func appendLakeConnectorPath(
 		if cfg.RiverGeometryVersion >= 1 && !lakeMouth {
 			mouthExpansionVersion = 4
 		}
+		meanderGeometry := cfg.RiverGeometryVersion
+		if lakeMouth && meanderGeometry >= 6 {
+			meanderGeometry = 5
+		}
 		meander := riverMeanderOffset(
 			m.Base.Config.Seed,
 			from,
@@ -2201,7 +2241,7 @@ func appendLakeConnectorPath(
 			x1, z1,
 			halfWidth,
 			originalDrop,
-			cfg.RiverGeometryVersion,
+			meanderGeometry,
 		)
 		profile := buildRiverProfile(
 			m.Base,
