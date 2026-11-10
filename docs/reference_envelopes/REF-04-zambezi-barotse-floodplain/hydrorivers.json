@@ -1,0 +1,1258 @@
+{
+  "schemaVersion": 1,
+  "regionId": "REF-04-zambezi-barotse-floodplain",
+  "status": "candidate_spatial_distribution_not_generation_target",
+  "grid": {
+    "columns": 8,
+    "rows": 10,
+    "bounds": {
+      "west": 22,
+      "south": -17.5,
+      "east": 24.8,
+      "north": -14
+    }
+  },
+  "source": {
+    "datasetId": "HydroRIVERS",
+    "datasetVersion": "1",
+    "layer": "hydrorivers",
+    "observationPeriod": "static_v1",
+    "fileName": "HydroRIVERS_v10_af.shp",
+    "sha256": "3d8b8c421243bf6b88852df03cbb033c5ff19abf67bec80043ee5378d3d65dd6",
+    "sidecarSha256": "5a702710e168057cde4580ab83b31afaeadbce630b6bae7a394d8780002aa1bd"
+  },
+  "minValidPerBlock": 0,
+  "validSamples": 5058,
+  "noDataSamples": 0,
+  "qualityFlags": [
+    "geographic_bbox_grid",
+    "not_global_ground_truth",
+    "not_world_generation_target",
+    "vector_clipped_length_conserved_across_grid",
+    "zero_feature_grid_cells_are_valid",
+    "vector_density_not_channel_width_or_floodplain_width",
+    "geodesic_line_length_approximation",
+    "vector_cell_area_is_spherical_approximation",
+    "dataset_stratum_not_worldwide_model_target"
+  ],
+  "metrics": [
+    {
+      "name": "hydrorivers_vector_density_km_per_km2",
+      "unit": "km_per_km2",
+      "status": "diagnostic_only_not_for_geoworld_comparison",
+      "statistic": "p10_p50_p90_across_equal_geographic_bbox_cells",
+      "sampleBlocks": 80,
+      "excludedBlocks": 0,
+      "percentiles": {
+        "p10": 0.19721792115617645,
+        "p50": 0.22843266532012765,
+        "p90": 0.25583456065401206,
+        "p99": 0.2800974238107967,
+        "min": 0.15333870087519072,
+        "max": 0.28668202642709406
+      }
+    }
+  ],
+  "cells": [
+    {
+      "row": 0,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -14.35,
+        "east": 22.35,
+        "north": -14
+      },
+      "validSamples": 62,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.22184127429988224
+      }
+    },
+    {
+      "row": 0,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -14.35,
+        "east": 22.7,
+        "north": -14
+      },
+      "validSamples": 74,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.20934826885340904
+      }
+    },
+    {
+      "row": 0,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -14.35,
+        "east": 23.05,
+        "north": -14
+      },
+      "validSamples": 87,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.21289364886711462
+      }
+    },
+    {
+      "row": 0,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -14.35,
+        "east": 23.4,
+        "north": -14
+      },
+      "validSamples": 66,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.21719016379833941
+      }
+    },
+    {
+      "row": 0,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -14.35,
+        "east": 23.75,
+        "north": -14
+      },
+      "validSamples": 68,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2607374764115923
+      }
+    },
+    {
+      "row": 0,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -14.35,
+        "east": 24.1,
+        "north": -14
+      },
+      "validSamples": 62,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.1912885374813695
+      }
+    },
+    {
+      "row": 0,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -14.35,
+        "east": 24.45,
+        "north": -14
+      },
+      "validSamples": 72,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.18070863318596345
+      }
+    },
+    {
+      "row": 0,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -14.35,
+        "east": 24.8,
+        "north": -14
+      },
+      "validSamples": 56,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.18984497315040916
+      }
+    },
+    {
+      "row": 1,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -14.7,
+        "east": 22.35,
+        "north": -14.35
+      },
+      "validSamples": 63,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2532854181150665
+      }
+    },
+    {
+      "row": 1,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -14.7,
+        "east": 22.7,
+        "north": -14.35
+      },
+      "validSamples": 70,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.22365080327326828
+      }
+    },
+    {
+      "row": 1,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -14.7,
+        "east": 23.05,
+        "north": -14.35
+      },
+      "validSamples": 64,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2236945800258889
+      }
+    },
+    {
+      "row": 1,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -14.7,
+        "east": 23.4,
+        "north": -14.35
+      },
+      "validSamples": 76,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.22522509116650205
+      }
+    },
+    {
+      "row": 1,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -14.7,
+        "east": 23.75,
+        "north": -14.35
+      },
+      "validSamples": 71,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2627121209865808
+      }
+    },
+    {
+      "row": 1,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -14.7,
+        "east": 24.1,
+        "north": -14.35
+      },
+      "validSamples": 86,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.23157134411744212
+      }
+    },
+    {
+      "row": 1,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -14.7,
+        "east": 24.45,
+        "north": -14.35
+      },
+      "validSamples": 63,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.21842730103682956
+      }
+    },
+    {
+      "row": 1,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -14.7,
+        "east": 24.8,
+        "north": -14.35
+      },
+      "validSamples": 63,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.21992464597410155
+      }
+    },
+    {
+      "row": 2,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -15.05,
+        "east": 22.35,
+        "north": -14.7
+      },
+      "validSamples": 89,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.26480702751208185
+      }
+    },
+    {
+      "row": 2,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -15.05,
+        "east": 22.7,
+        "north": -14.7
+      },
+      "validSamples": 66,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.23743577059964535
+      }
+    },
+    {
+      "row": 2,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -15.05,
+        "east": 23.05,
+        "north": -14.7
+      },
+      "validSamples": 77,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.244950422712484
+      }
+    },
+    {
+      "row": 2,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -15.05,
+        "east": 23.4,
+        "north": -14.7
+      },
+      "validSamples": 68,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.212249908977576
+      }
+    },
+    {
+      "row": 2,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -15.05,
+        "east": 23.75,
+        "north": -14.7
+      },
+      "validSamples": 76,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2385938652245912
+      }
+    },
+    {
+      "row": 2,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -15.05,
+        "east": 24.1,
+        "north": -14.7
+      },
+      "validSamples": 57,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.1989227142621364
+      }
+    },
+    {
+      "row": 2,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -15.05,
+        "east": 24.45,
+        "north": -14.7
+      },
+      "validSamples": 69,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.21478918354227824
+      }
+    },
+    {
+      "row": 2,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -15.05,
+        "east": 24.8,
+        "north": -14.7
+      },
+      "validSamples": 66,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.19132134867038128
+      }
+    },
+    {
+      "row": 3,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -15.4,
+        "east": 22.35,
+        "north": -15.05
+      },
+      "validSamples": 69,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.19394403755567183
+      }
+    },
+    {
+      "row": 3,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -15.4,
+        "east": 22.7,
+        "north": -15.05
+      },
+      "validSamples": 68,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.19560848636781192
+      }
+    },
+    {
+      "row": 3,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -15.4,
+        "east": 23.05,
+        "north": -15.05
+      },
+      "validSamples": 82,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.239008602770456
+      }
+    },
+    {
+      "row": 3,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -15.4,
+        "east": 23.4,
+        "north": -15.05
+      },
+      "validSamples": 68,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.1973967472437725
+      }
+    },
+    {
+      "row": 3,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -15.4,
+        "east": 23.75,
+        "north": -15.05
+      },
+      "validSamples": 59,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.15333870087519072
+      }
+    },
+    {
+      "row": 3,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -15.4,
+        "east": 24.1,
+        "north": -15.05
+      },
+      "validSamples": 78,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.21138669269574947
+      }
+    },
+    {
+      "row": 3,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -15.4,
+        "east": 24.45,
+        "north": -15.05
+      },
+      "validSamples": 67,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.22535952744502205
+      }
+    },
+    {
+      "row": 3,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -15.4,
+        "east": 24.8,
+        "north": -15.05
+      },
+      "validSamples": 88,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.24774103577872275
+      }
+    },
+    {
+      "row": 4,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -15.75,
+        "east": 22.35,
+        "north": -15.4
+      },
+      "validSamples": 94,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.24211808939368964
+      }
+    },
+    {
+      "row": 4,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -15.75,
+        "east": 22.7,
+        "north": -15.4
+      },
+      "validSamples": 88,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2783470864064646
+      }
+    },
+    {
+      "row": 4,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -15.75,
+        "east": 23.05,
+        "north": -15.4
+      },
+      "validSamples": 61,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.20861807653925657
+      }
+    },
+    {
+      "row": 4,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -15.75,
+        "east": 23.4,
+        "north": -15.4
+      },
+      "validSamples": 67,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.24513928315865338
+      }
+    },
+    {
+      "row": 4,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -15.75,
+        "east": 23.75,
+        "north": -15.4
+      },
+      "validSamples": 85,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.23792743926304497
+      }
+    },
+    {
+      "row": 4,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -15.75,
+        "east": 24.1,
+        "north": -15.4
+      },
+      "validSamples": 68,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2049708519233489
+      }
+    },
+    {
+      "row": 4,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -15.75,
+        "east": 24.45,
+        "north": -15.4
+      },
+      "validSamples": 57,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2121544837533279
+      }
+    },
+    {
+      "row": 4,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -15.75,
+        "east": 24.8,
+        "north": -15.4
+      },
+      "validSamples": 61,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.20910583744718705
+      }
+    },
+    {
+      "row": 5,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -16.1,
+        "east": 22.35,
+        "north": -15.75
+      },
+      "validSamples": 78,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.214723112556417
+      }
+    },
+    {
+      "row": 5,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -16.1,
+        "east": 22.7,
+        "north": -15.75
+      },
+      "validSamples": 85,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2539492546858196
+      }
+    },
+    {
+      "row": 5,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -16.1,
+        "east": 23.05,
+        "north": -15.75
+      },
+      "validSamples": 77,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.24950138610444647
+      }
+    },
+    {
+      "row": 5,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -16.1,
+        "east": 23.4,
+        "north": -15.75
+      },
+      "validSamples": 71,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.24345265106497213
+      }
+    },
+    {
+      "row": 5,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -16.1,
+        "east": 23.75,
+        "north": -15.75
+      },
+      "validSamples": 58,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.22651481769141013
+      }
+    },
+    {
+      "row": 5,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -16.1,
+        "east": 24.1,
+        "north": -15.75
+      },
+      "validSamples": 69,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.17903816580946744
+      }
+    },
+    {
+      "row": 5,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -16.1,
+        "east": 24.45,
+        "north": -15.75
+      },
+      "validSamples": 73,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.22009253257662745
+      }
+    },
+    {
+      "row": 5,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -16.1,
+        "east": 24.8,
+        "north": -15.75
+      },
+      "validSamples": 61,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.22585058938482638
+      }
+    },
+    {
+      "row": 6,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -16.45,
+        "east": 22.35,
+        "north": -16.1
+      },
+      "validSamples": 71,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2047072740098428
+      }
+    },
+    {
+      "row": 6,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -16.45,
+        "east": 22.7,
+        "north": -16.1
+      },
+      "validSamples": 74,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2160470790950554
+      }
+    },
+    {
+      "row": 6,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -16.45,
+        "east": 23.05,
+        "north": -16.1
+      },
+      "validSamples": 71,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2373106093613777
+      }
+    },
+    {
+      "row": 6,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -16.45,
+        "east": 23.4,
+        "north": -16.1
+      },
+      "validSamples": 76,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.24088533731974887
+      }
+    },
+    {
+      "row": 6,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -16.45,
+        "east": 23.75,
+        "north": -16.1
+      },
+      "validSamples": 71,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.23181096666512144
+      }
+    },
+    {
+      "row": 6,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -16.45,
+        "east": 24.1,
+        "north": -16.1
+      },
+      "validSamples": 68,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2360329014372826
+      }
+    },
+    {
+      "row": 6,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -16.45,
+        "east": 24.45,
+        "north": -16.1
+      },
+      "validSamples": 61,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2091730029124302
+      }
+    },
+    {
+      "row": 6,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -16.45,
+        "east": 24.8,
+        "north": -16.1
+      },
+      "validSamples": 73,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.20311846979483503
+      }
+    },
+    {
+      "row": 7,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -16.8,
+        "east": 22.35,
+        "north": -16.45
+      },
+      "validSamples": 74,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.23587677973515228
+      }
+    },
+    {
+      "row": 7,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -16.8,
+        "east": 22.7,
+        "north": -16.45
+      },
+      "validSamples": 81,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2677842194194691
+      }
+    },
+    {
+      "row": 7,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -16.8,
+        "east": 23.05,
+        "north": -16.45
+      },
+      "validSamples": 61,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2343571968927222
+      }
+    },
+    {
+      "row": 7,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -16.8,
+        "east": 23.4,
+        "north": -16.45
+      },
+      "validSamples": 80,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2364046033356968
+      }
+    },
+    {
+      "row": 7,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -16.8,
+        "east": 23.75,
+        "north": -16.45
+      },
+      "validSamples": 83,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.23613477244049122
+      }
+    },
+    {
+      "row": 7,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -16.8,
+        "east": 24.1,
+        "north": -16.45
+      },
+      "validSamples": 67,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2511132315933422
+      }
+    },
+    {
+      "row": 7,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -16.8,
+        "east": 24.45,
+        "north": -16.45
+      },
+      "validSamples": 68,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.23596351378613553
+      }
+    },
+    {
+      "row": 7,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -16.8,
+        "east": 24.8,
+        "north": -16.45
+      },
+      "validSamples": 69,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2218476747914843
+      }
+    },
+    {
+      "row": 8,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -17.15,
+        "east": 22.35,
+        "north": -16.8
+      },
+      "validSamples": 71,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2518318418428897
+      }
+    },
+    {
+      "row": 8,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -17.15,
+        "east": 22.7,
+        "north": -16.8
+      },
+      "validSamples": 79,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.23035051294884518
+      }
+    },
+    {
+      "row": 8,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -17.15,
+        "east": 23.05,
+        "north": -16.8
+      },
+      "validSamples": 87,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.23569359520401456
+      }
+    },
+    {
+      "row": 8,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -17.15,
+        "east": 23.4,
+        "north": -16.8
+      },
+      "validSamples": 83,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2530958378066053
+      }
+    },
+    {
+      "row": 8,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -17.15,
+        "east": 23.75,
+        "north": -16.8
+      },
+      "validSamples": 76,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.21394899702510747
+      }
+    },
+    {
+      "row": 8,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -17.15,
+        "east": 24.1,
+        "north": -16.8
+      },
+      "validSamples": 80,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.255441828370702
+      }
+    },
+    {
+      "row": 8,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -17.15,
+        "east": 24.45,
+        "north": -16.8
+      },
+      "validSamples": 66,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2365101829493793
+      }
+    },
+    {
+      "row": 8,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -17.15,
+        "east": 24.8,
+        "north": -16.8
+      },
+      "validSamples": 71,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.21963474123117513
+      }
+    },
+    {
+      "row": 9,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -17.5,
+        "east": 22.35,
+        "north": -17.15
+      },
+      "validSamples": 79,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.28668202642709406
+      }
+    },
+    {
+      "row": 9,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -17.5,
+        "east": 22.7,
+        "north": -17.15
+      },
+      "validSamples": 71,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.23290706489084473
+      }
+    },
+    {
+      "row": 9,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -17.5,
+        "east": 23.05,
+        "north": -17.15
+      },
+      "validSamples": 75,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.23238696501270967
+      }
+    },
+    {
+      "row": 9,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -17.5,
+        "east": 23.4,
+        "north": -17.15
+      },
+      "validSamples": 79,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.27005690850978176
+      }
+    },
+    {
+      "row": 9,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -17.5,
+        "east": 23.75,
+        "north": -17.15
+      },
+      "validSamples": 70,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.22102797374352373
+      }
+    },
+    {
+      "row": 9,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -17.5,
+        "east": 24.1,
+        "north": -17.15
+      },
+      "validSamples": 63,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.2151717305243393
+      }
+    },
+    {
+      "row": 9,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -17.5,
+        "east": 24.45,
+        "north": -17.15
+      },
+      "validSamples": 91,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.23183934848736992
+      }
+    },
+    {
+      "row": 9,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -17.5,
+        "east": 24.8,
+        "north": -17.15
+      },
+      "validSamples": 76,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrorivers_vector_density_km_per_km2": 0.25936915120380194
+      }
+    }
+  ]
+}

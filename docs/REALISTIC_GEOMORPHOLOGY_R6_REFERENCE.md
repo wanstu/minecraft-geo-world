@@ -2,7 +2,7 @@
 
 更新时间：2026-11-10
 
-状态：**R6.1 参考体系建立；尚未修改生成算法。**
+状态：**R6.1 和 R6.2 已完成；R6.3a REF-04 水文参考空间区间候选已生成，其他区域及完整地貌指标尚未完成。仍未修改生成算法。**
 
 ## 1. 目标
 
@@ -63,7 +63,8 @@ Cross-check:
 ### 2.3 水体 / 洪泛活动范围
 
 - JRC Global Surface Water v1.5
-- aggregate period: 1984–2024
+- occurrence aggregate period: 1984–2024
+- seasonality (v1.5): 2024 单年度；不得与 occurrence 的多年度统计混为同一时间范围
 
 用途：
 
@@ -321,7 +322,9 @@ R6 不规定：
 
 ### R6.3 Reference envelopes
 
-固定各 archetype 的真实 p10/p50/p90 区间。
+固定各 archetype 的真实 p10/p50/p90 区间。**R6.3a 已完成 REF-04 的水文空间参考候选和质量标记，其他参考区、真实坡度/起伏、实际洪泛区形态仍待补齐。**
+
+详见 [R6.3a REF-04 真实空间参考区间](REALISTIC_GEOMORPHOLOGY_R6_ENVELOPES.md)。
 
 ### R6.4 GeoWorld comparison
 

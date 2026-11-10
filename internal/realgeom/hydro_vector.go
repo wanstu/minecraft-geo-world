@@ -12,22 +12,33 @@ import (
 )
 
 type HydroVectorReport struct {
-	SchemaVersion           int          `json:"schemaVersion"`
-	RegionID                string       `json:"regionId"`
-	DatasetID               string       `json:"datasetId"`
-	DatasetVersion          string       `json:"datasetVersion"`
-	Layer                   string       `json:"layer"`
-	Input                   string       `json:"input"`
-	Crop                    Bounds       `json:"crop"`
-	ReadReaches             int          `json:"readReaches"`
-	IntersectingReaches     int          `json:"intersectingReaches"`
-	ClippedSegments         int          `json:"clippedSegments"`
-	ClippedLengthKM         float64      `json:"clippedLengthKm"`
-	RegionAreaKM2           float64      `json:"regionAreaKm2"`
-	DrainageDensityKMPerKM2 float64      `json:"drainageDensityKmPerKm2"`
-	LocalConfluences        int          `json:"localConfluences"`
-	StrahlerOrder           *Percentiles `json:"strahlerOrder,omitempty"`
-	QualityFlags            []string     `json:"qualityFlags"`
+	SchemaVersion           int                   `json:"schemaVersion"`
+	RegionID                string                `json:"regionId"`
+	DatasetID               string                `json:"datasetId"`
+	DatasetVersion          string                `json:"datasetVersion"`
+	Layer                   string                `json:"layer"`
+	Input                   string                `json:"input"`
+	Crop                    Bounds                `json:"crop"`
+	ReadReaches             int                   `json:"readReaches"`
+	IntersectingReaches     int                   `json:"intersectingReaches"`
+	ClippedSegments         int                   `json:"clippedSegments"`
+	ClippedLengthKM         float64               `json:"clippedLengthKm"`
+	RegionAreaKM2           float64               `json:"regionAreaKm2"`
+	DrainageDensityKMPerKM2 float64               `json:"drainageDensityKmPerKm2"`
+	LocalConfluences        int                   `json:"localConfluences"`
+	StrahlerOrder           *Percentiles          `json:"strahlerOrder,omitempty"`
+	QualityFlags            []string              `json:"qualityFlags"`
+	GridCells               []HydroVectorGridCell `json:"gridCells,omitempty"`
+}
+
+type HydroVectorGridCell struct {
+	Row                     int     `json:"row"`
+	Column                  int     `json:"column"`
+	Bounds                  Bounds  `json:"bounds"`
+	ClippedLengthKM         float64 `json:"clippedLengthKm"`
+	AreaKM2                 float64 `json:"areaKm2"`
+	DrainageDensityKMPerKM2 float64 `json:"drainageDensityKmPerKm2"`
+	IntersectingReaches     int     `json:"intersectingReaches"`
 }
 
 type dbfField struct{ offset, length int }
@@ -110,6 +121,25 @@ func (d *dbfTable) numbers(index int) (int64, int64, int64, error) {
 // polyline segment to the registry bbox, and reports length inside the bbox.
 // It never substitutes a whole-feature length for a clipped length.
 func ExtractHydroRIVERS(path string, regionID, version string, crop Bounds) (HydroVectorReport, error) {
+	return extractHydroRIVERS(path, regionID, version, crop, nil)
+}
+
+func ExtractHydroRIVERSGrid(path string, regionID, version string, crop Bounds, grid ReferenceGrid) (HydroVectorReport, error) {
+	if err := grid.Validate(); err != nil {
+		return HydroVectorReport{}, err
+	}
+	if grid.Bounds != crop {
+		return HydroVectorReport{}, fmt.Errorf("realgeom: vector grid must match crop bounds")
+	}
+	return extractHydroRIVERS(path, regionID, version, crop, &grid)
+}
+
+func geographicAreaKm2(b Bounds) float64 {
+	const radius = 6371.0088
+	return radius * radius * (b.East - b.West) * math.Pi / 180 * (math.Sin(b.North*math.Pi/180) - math.Sin(b.South*math.Pi/180))
+}
+
+func extractHydroRIVERS(path string, regionID, version string, crop Bounds, grid *ReferenceGrid) (HydroVectorReport, error) {
 	r := HydroVectorReport{SchemaVersion: 1, RegionID: regionID, DatasetID: "HydroRIVERS", DatasetVersion: version,
 		Layer: "hydrorivers", Input: path, Crop: crop, QualityFlags: []string{
 			"source_polyline_segments_clipped_to_registry_bbox",
@@ -119,6 +149,16 @@ func ExtractHydroRIVERS(path string, regionID, version string, crop Bounds) (Hyd
 	}
 	if !validBounds(crop) {
 		return r, fmt.Errorf("realgeom: invalid bbox")
+	}
+	if grid != nil {
+		r.GridCells = make([]HydroVectorGridCell, grid.Columns*grid.Rows)
+		for i := range r.GridCells {
+			c := &r.GridCells[i]
+			c.Row = i / grid.Columns
+			c.Column = i % grid.Columns
+			c.Bounds = grid.CellBounds(c.Row, c.Column)
+			c.AreaKM2 = geographicAreaKm2(c.Bounds)
+		}
 	}
 	if strings.ToLower(filepath.Ext(path)) != ".shp" {
 		return r, fmt.Errorf("realgeom: HydroRIVERS expects .shp")
@@ -215,6 +255,10 @@ func ExtractHydroRIVERS(path string, regionID, version string, crop Bounds) (Hyd
 				math.Float64frombits(binary.LittleEndian.Uint64(body[off+8:]))
 		}
 		clippedLength := 0.0
+		var gridTouched map[int]bool
+		if grid != nil {
+			gridTouched = make(map[int]bool)
+		}
 		for p := 0; p < parts; p++ {
 			for i := starts[p] + 1; i < starts[p+1]; i++ {
 				x1, y1 := xypoint(i - 1)
@@ -227,11 +271,43 @@ func ExtractHydroRIVERS(path string, regionID, version string, crop Bounds) (Hyd
 				if length > 0 {
 					clippedLength += length
 					r.ClippedSegments++
+					if grid != nil {
+						type segmentPiece struct {
+							index int
+							km    float64
+						}
+						pieces := []segmentPiece{}
+						total := 0.0
+						for gi := range r.GridCells {
+							gc := &r.GridCells[gi]
+							xa, ya, xb, yb, ok := clipLine(a, b, c, d, gc.Bounds)
+							if !ok {
+								continue
+							}
+							ln := haversineKm(xa, ya, xb, yb)
+							if ln > 0 {
+								pieces = append(pieces, segmentPiece{gi, ln})
+								total += ln
+							}
+						}
+						// Enforce length conservation when a vector sits exactly on a
+						// grid border and would otherwise be counted twice.
+						if total == 0 {
+							return r, fmt.Errorf("realgeom: segment inside bbox missed all grid cells")
+						}
+						for _, piece := range pieces {
+							r.GridCells[piece.index].ClippedLengthKM += piece.km * length / total
+							gridTouched[piece.index] = true
+						}
+					}
 				}
 			}
 		}
 		if clippedLength <= 0 {
 			continue
+		}
+		for gi := range gridTouched {
+			r.GridCells[gi].IntersectingReaches++
 		}
 		id, next, order, err := table.numbers(idx)
 		if err != nil {
@@ -257,13 +333,17 @@ func ExtractHydroRIVERS(path string, regionID, version string, crop Bounds) (Hyd
 		p := summarize(orders)
 		r.StrahlerOrder = &p
 	}
-	const earthRadius = 6371.0088
-	r.RegionAreaKM2 = earthRadius * earthRadius * (crop.East - crop.West) * math.Pi / 180 *
-		(math.Sin(crop.North*math.Pi/180) - math.Sin(crop.South*math.Pi/180))
+	r.RegionAreaKM2 = geographicAreaKm2(crop)
 	if r.RegionAreaKM2 <= 0 {
 		return r, fmt.Errorf("realgeom: invalid crop area")
 	}
 	r.DrainageDensityKMPerKM2 = r.ClippedLengthKM / r.RegionAreaKM2
+	if grid != nil {
+		for i := range r.GridCells {
+			c := &r.GridCells[i]
+			c.DrainageDensityKMPerKM2 = c.ClippedLengthKM / c.AreaKM2
+		}
+	}
 	return r, nil
 }
 

@@ -134,4 +134,19 @@ func TestHydroRIVERSClipsPolylineNotFeatureLength(t *testing.T) {
 	if math.Abs(report.ClippedLengthKM-111.2) > 1 {
 		t.Fatalf("clipped length %g should reflect only bbox width, not 3-degree original", report.ClippedLengthKM)
 	}
+	grid := ReferenceGrid{Columns: 2, Rows: 2, Bounds: Bounds{West: 0, South: 0, East: 1, North: 1}}
+	gridded, err := ExtractHydroRIVERSGrid(path, "ref", "1", grid.Bounds, grid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := 0.0
+	for _, cell := range gridded.GridCells {
+		sum += cell.ClippedLengthKM
+	}
+	if math.Abs(sum-gridded.ClippedLengthKM) > 1e-6 {
+		t.Fatalf("grid length conservation: gridded %f original %f", sum, gridded.ClippedLengthKM)
+	}
+	if len(gridded.GridCells) != 4 {
+		t.Fatalf("wrong grid cell count %d", len(gridded.GridCells))
+	}
 }

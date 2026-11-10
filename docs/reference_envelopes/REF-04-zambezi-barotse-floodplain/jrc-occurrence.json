@@ -1,0 +1,1375 @@
+{
+  "schemaVersion": 1,
+  "regionId": "REF-04-zambezi-barotse-floodplain",
+  "status": "candidate_spatial_distribution_not_generation_target",
+  "grid": {
+    "columns": 8,
+    "rows": 10,
+    "bounds": {
+      "west": 22,
+      "south": -17.5,
+      "east": 24.8,
+      "north": -14
+    }
+  },
+  "source": {
+    "datasetId": "JRC_Global_Surface_Water",
+    "datasetVersion": "1.5",
+    "layer": "jrc-occurrence",
+    "observationPeriod": "1984-2024",
+    "fileName": "occurrence.tif",
+    "sha256": "df716abc4e86d1bcc50533d648a491e86129d7f9b46ad00fb08e6aecd3af40e5",
+    "sampleStride": 32,
+    "raster": {
+      "source": ".tmp/realdata-r62c/occurrence.tif",
+      "sourceWidth": 40000,
+      "sourceHeight": 40000,
+      "sourceBounds": {
+        "west": 20.000000000000142,
+        "south": -20.000000000000057,
+        "east": 30.000000000000142,
+        "north": -10.000000000000057
+      },
+      "pixelWindow": {
+        "X": 8000,
+        "Y": 16000,
+        "Width": 11200,
+        "Height": 14000
+      },
+      "bounds": {
+        "west": 22.000000000000142,
+        "south": -17.500000000000057,
+        "east": 24.800000000000143,
+        "north": -14.000000000000057
+      }
+    }
+  },
+  "minValidPerBlock": 32,
+  "validSamples": 153300,
+  "noDataSamples": 0,
+  "qualityFlags": [
+    "geographic_bbox_grid",
+    "not_global_ground_truth",
+    "not_world_generation_target",
+    "raster_source_pixel_center_sampling",
+    "occurrence_is_multi_year_1984_2024",
+    "ge90_is_proxy_not_permanent_class",
+    "sampled_pixel_fractions_not_geodesic_area"
+  ],
+  "metrics": [
+    {
+      "name": "jrc_occurrence_ge90_fraction",
+      "unit": "fraction",
+      "status": "candidate_not_calibrated",
+      "statistic": "p10_p50_p90_across_equal_geographic_bbox_cells",
+      "sampleBlocks": 80,
+      "excludedBlocks": 0,
+      "percentiles": {
+        "p10": 0,
+        "p50": 0,
+        "p90": 0.003782673457620618,
+        "p99": 0.016013838170286353,
+        "min": 0,
+        "max": 0.01859504132231405
+      }
+    },
+    {
+      "name": "jrc_occurrence_positive_fraction",
+      "unit": "fraction",
+      "status": "candidate_not_calibrated",
+      "statistic": "p10_p50_p90_across_equal_geographic_bbox_cells",
+      "sampleBlocks": 80,
+      "excludedBlocks": 0,
+      "percentiles": {
+        "p10": 0,
+        "p50": 0.0074896694214876035,
+        "p90": 0.11098524889486851,
+        "p99": 0.33671079185085423,
+        "min": 0,
+        "max": 0.4700413223140496
+      }
+    }
+  ],
+  "cells": [
+    {
+      "row": 0,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -14.35,
+        "east": 22.35,
+        "north": -14
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.012396694214876033
+      }
+    },
+    {
+      "row": 0,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -14.35,
+        "east": 22.7,
+        "north": -14
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.02737603305785124
+      }
+    },
+    {
+      "row": 0,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -14.35,
+        "east": 23.05,
+        "north": -14
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.0030991735537190084,
+        "jrc_occurrence_positive_fraction": 0.09297520661157024
+      }
+    },
+    {
+      "row": 0,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -14.35,
+        "east": 23.4,
+        "north": -14
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.008456659619450317,
+        "jrc_occurrence_positive_fraction": 0.08668076109936575
+      }
+    },
+    {
+      "row": 0,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -14.35,
+        "east": 23.75,
+        "north": -14
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.002066115702479339,
+        "jrc_occurrence_positive_fraction": 0.011363636363636364
+      }
+    },
+    {
+      "row": 0,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -14.35,
+        "east": 24.1,
+        "north": -14
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0025826446280991736
+      }
+    },
+    {
+      "row": 0,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -14.35,
+        "east": 24.45,
+        "north": -14
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0
+      }
+    },
+    {
+      "row": 0,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -14.35,
+        "east": 24.8,
+        "north": -14
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0
+      }
+    },
+    {
+      "row": 1,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -14.7,
+        "east": 22.35,
+        "north": -14.35
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0743801652892562
+      }
+    },
+    {
+      "row": 1,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -14.7,
+        "east": 22.7,
+        "north": -14.35
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.10898760330578512
+      }
+    },
+    {
+      "row": 1,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -14.7,
+        "east": 23.05,
+        "north": -14.35
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.1441115702479339
+      }
+    },
+    {
+      "row": 1,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -14.7,
+        "east": 23.4,
+        "north": -14.35
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.007399577167019027,
+        "jrc_occurrence_positive_fraction": 0.12896405919661733
+      }
+    },
+    {
+      "row": 1,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -14.7,
+        "east": 23.75,
+        "north": -14.35
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.007231404958677686
+      }
+    },
+    {
+      "row": 1,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -14.7,
+        "east": 24.1,
+        "north": -14.35
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.005165289256198347
+      }
+    },
+    {
+      "row": 1,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -14.7,
+        "east": 24.45,
+        "north": -14.35
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0015495867768595042
+      }
+    },
+    {
+      "row": 1,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -14.7,
+        "east": 24.8,
+        "north": -14.35
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0
+      }
+    },
+    {
+      "row": 2,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -15.05,
+        "east": 22.35,
+        "north": -14.7
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.04597107438016529
+      }
+    },
+    {
+      "row": 2,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -15.05,
+        "east": 22.7,
+        "north": -14.7
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.05785123966942149
+      }
+    },
+    {
+      "row": 2,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -15.05,
+        "east": 23.05,
+        "north": -14.7
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.003615702479338843,
+        "jrc_occurrence_positive_fraction": 0.4700413223140496
+      }
+    },
+    {
+      "row": 2,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -15.05,
+        "east": 23.4,
+        "north": -14.7
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.0005285412262156448,
+        "jrc_occurrence_positive_fraction": 0.035940803382663845
+      }
+    },
+    {
+      "row": 2,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -15.05,
+        "east": 23.75,
+        "north": -14.7
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.015495867768595042
+      }
+    },
+    {
+      "row": 2,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -15.05,
+        "east": 24.1,
+        "north": -14.7
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.01652892561983471
+      }
+    },
+    {
+      "row": 2,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -15.05,
+        "east": 24.45,
+        "north": -14.7
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.003615702479338843
+      }
+    },
+    {
+      "row": 2,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -15.05,
+        "east": 24.8,
+        "north": -14.7
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0
+      }
+    },
+    {
+      "row": 3,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -15.4,
+        "east": 22.35,
+        "north": -15.05
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.04756871035940803
+      }
+    },
+    {
+      "row": 3,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -15.4,
+        "east": 22.7,
+        "north": -15.05
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.014799154334038054
+      }
+    },
+    {
+      "row": 3,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -15.4,
+        "east": 23.05,
+        "north": -15.05
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.0021141649048625794,
+        "jrc_occurrence_positive_fraction": 0.22304439746300211
+      }
+    },
+    {
+      "row": 3,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -15.4,
+        "east": 23.4,
+        "north": -15.05
+      },
+      "validSamples": 1849,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.0005408328826392645,
+        "jrc_occurrence_positive_fraction": 0.1919956733369389
+      }
+    },
+    {
+      "row": 3,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -15.4,
+        "east": 23.75,
+        "north": -15.05
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.022727272727272728
+      }
+    },
+    {
+      "row": 3,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -15.4,
+        "east": 24.1,
+        "north": -15.05
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0047568710359408035
+      }
+    },
+    {
+      "row": 3,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -15.4,
+        "east": 24.45,
+        "north": -15.05
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0
+      }
+    },
+    {
+      "row": 3,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -15.4,
+        "east": 24.8,
+        "north": -15.05
+      },
+      "validSamples": 1849,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.001081665765278529
+      }
+    },
+    {
+      "row": 4,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -15.75,
+        "east": 22.35,
+        "north": -15.4
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.02737603305785124
+      }
+    },
+    {
+      "row": 4,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -15.75,
+        "east": 22.7,
+        "north": -15.4
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.0010330578512396695,
+        "jrc_occurrence_positive_fraction": 0.007747933884297521
+      }
+    },
+    {
+      "row": 4,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -15.75,
+        "east": 23.05,
+        "north": -15.4
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.0005165289256198347,
+        "jrc_occurrence_positive_fraction": 0.061466942148760334
+      }
+    },
+    {
+      "row": 4,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -15.75,
+        "east": 23.4,
+        "north": -15.4
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.005285412262156448,
+        "jrc_occurrence_positive_fraction": 0.3012684989429176
+      }
+    },
+    {
+      "row": 4,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -15.75,
+        "east": 23.75,
+        "north": -15.4
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.026859504132231406
+      }
+    },
+    {
+      "row": 4,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -15.75,
+        "east": 24.1,
+        "north": -15.4
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0030991735537190084
+      }
+    },
+    {
+      "row": 4,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -15.75,
+        "east": 24.45,
+        "north": -15.4
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0
+      }
+    },
+    {
+      "row": 4,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -15.75,
+        "east": 24.8,
+        "north": -15.4
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0005285412262156448
+      }
+    },
+    {
+      "row": 5,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -16.1,
+        "east": 22.35,
+        "north": -15.75
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.008264462809917356
+      }
+    },
+    {
+      "row": 5,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -16.1,
+        "east": 22.7,
+        "north": -15.75
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.007747933884297521
+      }
+    },
+    {
+      "row": 5,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -16.1,
+        "east": 23.05,
+        "north": -15.75
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.013946280991735538
+      }
+    },
+    {
+      "row": 5,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -16.1,
+        "east": 23.4,
+        "north": -15.75
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.006871035940803382,
+        "jrc_occurrence_positive_fraction": 0.3007399577167019
+      }
+    },
+    {
+      "row": 5,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -16.1,
+        "east": 23.75,
+        "north": -15.75
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.019111570247933883
+      }
+    },
+    {
+      "row": 5,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -16.1,
+        "east": 24.1,
+        "north": -15.75
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.003615702479338843
+      }
+    },
+    {
+      "row": 5,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -16.1,
+        "east": 24.45,
+        "north": -15.75
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0
+      }
+    },
+    {
+      "row": 5,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -16.1,
+        "east": 24.8,
+        "north": -15.75
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0
+      }
+    },
+    {
+      "row": 6,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -16.45,
+        "east": 22.35,
+        "north": -16.1
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.007231404958677686
+      }
+    },
+    {
+      "row": 6,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -16.45,
+        "east": 22.7,
+        "north": -16.1
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.02221074380165289
+      }
+    },
+    {
+      "row": 6,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -16.45,
+        "east": 23.05,
+        "north": -16.1
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0253099173553719
+      }
+    },
+    {
+      "row": 6,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -16.45,
+        "east": 23.4,
+        "north": -16.1
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.006871035940803382,
+        "jrc_occurrence_positive_fraction": 0.20454545454545456
+      }
+    },
+    {
+      "row": 6,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -16.45,
+        "east": 23.75,
+        "north": -16.1
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.003615702479338843
+      }
+    },
+    {
+      "row": 6,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -16.45,
+        "east": 24.1,
+        "north": -16.1
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.004132231404958678
+      }
+    },
+    {
+      "row": 6,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -16.45,
+        "east": 24.45,
+        "north": -16.1
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0010330578512396695
+      }
+    },
+    {
+      "row": 6,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -16.45,
+        "east": 24.8,
+        "north": -16.1
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0
+      }
+    },
+    {
+      "row": 7,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -16.8,
+        "east": 22.35,
+        "north": -16.45
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.004228329809725159
+      }
+    },
+    {
+      "row": 7,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -16.8,
+        "east": 22.7,
+        "north": -16.45
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.011099365750528542
+      }
+    },
+    {
+      "row": 7,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -16.8,
+        "east": 23.05,
+        "north": -16.45
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.012156448202959831
+      }
+    },
+    {
+      "row": 7,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -16.8,
+        "east": 23.4,
+        "north": -16.45
+      },
+      "validSamples": 1849,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.017847485127095726
+      }
+    },
+    {
+      "row": 7,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -16.8,
+        "east": 23.75,
+        "north": -16.45
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.0153276955602537,
+        "jrc_occurrence_positive_fraction": 0.023784355179704016
+      }
+    },
+    {
+      "row": 7,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -16.8,
+        "east": 24.1,
+        "north": -16.45
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0021141649048625794
+      }
+    },
+    {
+      "row": 7,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -16.8,
+        "east": 24.45,
+        "north": -16.45
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0005285412262156448
+      }
+    },
+    {
+      "row": 7,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -16.8,
+        "east": 24.8,
+        "north": -16.45
+      },
+      "validSamples": 1849,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0
+      }
+    },
+    {
+      "row": 8,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -17.15,
+        "east": 22.35,
+        "north": -16.8
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0046487603305785125
+      }
+    },
+    {
+      "row": 8,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -17.15,
+        "east": 22.7,
+        "north": -16.8
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.005165289256198347
+      }
+    },
+    {
+      "row": 8,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -17.15,
+        "east": 23.05,
+        "north": -16.8
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.002066115702479339
+      }
+    },
+    {
+      "row": 8,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -17.15,
+        "east": 23.4,
+        "north": -16.8
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0047568710359408035
+      }
+    },
+    {
+      "row": 8,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -17.15,
+        "east": 23.75,
+        "north": -16.8
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0
+      }
+    },
+    {
+      "row": 8,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -17.15,
+        "east": 24.1,
+        "north": -16.8
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.011880165289256199,
+        "jrc_occurrence_positive_fraction": 0.01962809917355372
+      }
+    },
+    {
+      "row": 8,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -17.15,
+        "east": 24.45,
+        "north": -16.8
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0
+      }
+    },
+    {
+      "row": 8,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -17.15,
+        "east": 24.8,
+        "north": -16.8
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0005285412262156448
+      }
+    },
+    {
+      "row": 9,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -17.5,
+        "east": 22.35,
+        "north": -17.15
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0010330578512396695
+      }
+    },
+    {
+      "row": 9,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -17.5,
+        "east": 22.7,
+        "north": -17.15
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0010330578512396695
+      }
+    },
+    {
+      "row": 9,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -17.5,
+        "east": 23.05,
+        "north": -17.15
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0046487603305785125
+      }
+    },
+    {
+      "row": 9,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -17.5,
+        "east": 23.4,
+        "north": -17.15
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0.0021141649048625794
+      }
+    },
+    {
+      "row": 9,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -17.5,
+        "east": 23.75,
+        "north": -17.15
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0,
+        "jrc_occurrence_positive_fraction": 0
+      }
+    },
+    {
+      "row": 9,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -17.5,
+        "east": 24.1,
+        "north": -17.15
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.003615702479338843,
+        "jrc_occurrence_positive_fraction": 0.004132231404958678
+      }
+    },
+    {
+      "row": 9,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -17.5,
+        "east": 24.45,
+        "north": -17.15
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.01859504132231405,
+        "jrc_occurrence_positive_fraction": 0.028409090909090908
+      }
+    },
+    {
+      "row": 9,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -17.5,
+        "east": 24.8,
+        "north": -17.15
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_occurrence_ge90_fraction": 0.0010570824524312897,
+        "jrc_occurrence_positive_fraction": 0.06553911205073996
+      }
+    }
+  ]
+}

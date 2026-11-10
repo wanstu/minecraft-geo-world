@@ -16,6 +16,7 @@ type GeoTIFFScanOptions struct {
 	NoData       float64
 	HasNoData    bool
 	SampleStride int
+	OnInfo       func(GeoTIFFScanInfo) error // optional metadata callback before reading pixels
 }
 
 type GeoTIFFScanInfo struct {
@@ -86,6 +87,11 @@ func ScanGeoTIFF(path string, opts GeoTIFFScanOptions, visit func(x, y int, v fl
 		South: source.North - float64(window.Y+window.Height)*dy,
 	}
 	info := GeoTIFFScanInfo{Source: path, SourceWidth: w, SourceHeight: h, SourceBounds: source, Window: window, Bounds: actual}
+	if opts.OnInfo != nil {
+		if err := opts.OnInfo(info); err != nil {
+			return info, err
+		}
+	}
 	rows := opts.StripeRows
 	if rows <= 0 {
 		rows = 128

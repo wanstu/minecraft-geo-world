@@ -1,0 +1,1470 @@
+{
+  "schemaVersion": 1,
+  "regionId": "REF-04-zambezi-barotse-floodplain",
+  "status": "candidate_spatial_distribution_not_generation_target",
+  "grid": {
+    "columns": 8,
+    "rows": 10,
+    "bounds": {
+      "west": 22,
+      "south": -17.5,
+      "east": 24.8,
+      "north": -14
+    }
+  },
+  "source": {
+    "datasetId": "JRC_Global_Surface_Water",
+    "datasetVersion": "1.5",
+    "layer": "jrc-seasonality",
+    "observationPeriod": "2024",
+    "fileName": "seasonality.tif",
+    "sha256": "93a9a16ed2733b8c07d4d46694608ad3e363571c0fe3ee82c378334f631567ed",
+    "sampleStride": 32,
+    "raster": {
+      "source": ".tmp/realdata-r62c/seasonality.tif",
+      "sourceWidth": 40000,
+      "sourceHeight": 40000,
+      "sourceBounds": {
+        "west": 20.000000000000142,
+        "south": -20.000000000000057,
+        "east": 30.000000000000142,
+        "north": -10.000000000000057
+      },
+      "pixelWindow": {
+        "X": 8000,
+        "Y": 16000,
+        "Width": 11200,
+        "Height": 14000
+      },
+      "bounds": {
+        "west": 22.000000000000142,
+        "south": -17.500000000000057,
+        "east": 24.800000000000143,
+        "north": -14.000000000000057
+      }
+    }
+  },
+  "minValidPerBlock": 32,
+  "validSamples": 153300,
+  "noDataSamples": 0,
+  "qualityFlags": [
+    "geographic_bbox_grid",
+    "not_global_ground_truth",
+    "not_world_generation_target",
+    "raster_source_pixel_center_sampling",
+    "seasonality_is_single_year_2024_not_1984_2024",
+    "sampled_pixel_fractions_not_geodesic_area"
+  ],
+  "metrics": [
+    {
+      "name": "jrc_2024_water_12_months_fraction",
+      "unit": "fraction",
+      "status": "candidate_not_calibrated",
+      "statistic": "p10_p50_p90_across_equal_geographic_bbox_cells",
+      "sampleBlocks": 80,
+      "excludedBlocks": 0,
+      "percentiles": {
+        "p10": 0,
+        "p50": 0,
+        "p90": 0.010701758600807238,
+        "p99": 0.018627594656928693,
+        "min": 0,
+        "max": 0.019111570247933883
+      }
+    },
+    {
+      "name": "jrc_2024_water_1to11_months_fraction",
+      "unit": "fraction",
+      "status": "candidate_not_calibrated",
+      "statistic": "p10_p50_p90_across_equal_geographic_bbox_cells",
+      "sampleBlocks": 80,
+      "excludedBlocks": 0,
+      "percentiles": {
+        "p10": 0,
+        "p50": 0.00025826446280991736,
+        "p90": 0.005177301556794158,
+        "p99": 0.03312896405919659,
+        "min": 0,
+        "max": 0.03646934460887949
+      }
+    },
+    {
+      "name": "jrc_2024_water_any_month_fraction",
+      "unit": "fraction",
+      "status": "candidate_not_calibrated",
+      "statistic": "p10_p50_p90_across_equal_geographic_bbox_cells",
+      "sampleBlocks": 80,
+      "excludedBlocks": 0,
+      "percentiles": {
+        "p10": 0,
+        "p50": 0.0005165289256198347,
+        "p90": 0.018604651162790708,
+        "p99": 0.0457875264270613,
+        "min": 0,
+        "max": 0.04704016913319239
+      }
+    }
+  ],
+  "cells": [
+    {
+      "row": 0,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -14.35,
+        "east": 22.35,
+        "north": -14
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0005165289256198347,
+        "jrc_2024_water_any_month_fraction": 0.0005165289256198347
+      }
+    },
+    {
+      "row": 0,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -14.35,
+        "east": 22.7,
+        "north": -14
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.0005165289256198347,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0.0005165289256198347
+      }
+    },
+    {
+      "row": 0,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -14.35,
+        "east": 23.05,
+        "north": -14
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.004132231404958678,
+        "jrc_2024_water_1to11_months_fraction": 0.002066115702479339,
+        "jrc_2024_water_any_month_fraction": 0.006198347107438017
+      }
+    },
+    {
+      "row": 0,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -14.35,
+        "east": 23.4,
+        "north": -14
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.013742071881606765,
+        "jrc_2024_water_1to11_months_fraction": 0.0047568710359408035,
+        "jrc_2024_water_any_month_fraction": 0.01849894291754757
+      }
+    },
+    {
+      "row": 0,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -14.35,
+        "east": 23.75,
+        "north": -14
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.003615702479338843,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0.003615702479338843
+      }
+    },
+    {
+      "row": 0,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -14.35,
+        "east": 24.1,
+        "north": -14
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.0005165289256198347,
+        "jrc_2024_water_1to11_months_fraction": 0.0010330578512396695,
+        "jrc_2024_water_any_month_fraction": 0.0015495867768595042
+      }
+    },
+    {
+      "row": 0,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -14.35,
+        "east": 24.45,
+        "north": -14
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 0,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -14.35,
+        "east": 24.8,
+        "north": -14
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 1,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -14.7,
+        "east": 22.35,
+        "north": -14.35
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0025826446280991736,
+        "jrc_2024_water_any_month_fraction": 0.0025826446280991736
+      }
+    },
+    {
+      "row": 1,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -14.7,
+        "east": 22.7,
+        "north": -14.35
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0010330578512396695,
+        "jrc_2024_water_any_month_fraction": 0.0010330578512396695
+      }
+    },
+    {
+      "row": 1,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -14.7,
+        "east": 23.05,
+        "north": -14.35
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.002066115702479339,
+        "jrc_2024_water_1to11_months_fraction": 0.0010330578512396695,
+        "jrc_2024_water_any_month_fraction": 0.0030991735537190084
+      }
+    },
+    {
+      "row": 1,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -14.7,
+        "east": 23.4,
+        "north": -14.35
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.012684989429175475,
+        "jrc_2024_water_1to11_months_fraction": 0.006871035940803382,
+        "jrc_2024_water_any_month_fraction": 0.019556025369978858
+      }
+    },
+    {
+      "row": 1,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -14.7,
+        "east": 23.75,
+        "north": -14.35
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 1,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -14.7,
+        "east": 24.1,
+        "north": -14.35
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0010330578512396695,
+        "jrc_2024_water_any_month_fraction": 0.0010330578512396695
+      }
+    },
+    {
+      "row": 1,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -14.7,
+        "east": 24.45,
+        "north": -14.35
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0005165289256198347,
+        "jrc_2024_water_any_month_fraction": 0.0005165289256198347
+      }
+    },
+    {
+      "row": 1,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -14.7,
+        "east": 24.8,
+        "north": -14.35
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 2,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -15.05,
+        "east": 22.35,
+        "north": -14.7
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 2,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -15.05,
+        "east": 22.7,
+        "north": -14.7
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0010330578512396695,
+        "jrc_2024_water_any_month_fraction": 0.0010330578512396695
+      }
+    },
+    {
+      "row": 2,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -15.05,
+        "east": 23.05,
+        "north": -14.7
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.011880165289256199,
+        "jrc_2024_water_1to11_months_fraction": 0.023760330578512397,
+        "jrc_2024_water_any_month_fraction": 0.035640495867768594
+      }
+    },
+    {
+      "row": 2,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -15.05,
+        "east": 23.4,
+        "north": -14.7
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.0015856236786469344,
+        "jrc_2024_water_1to11_months_fraction": 0.0005285412262156448,
+        "jrc_2024_water_any_month_fraction": 0.0021141649048625794
+      }
+    },
+    {
+      "row": 2,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -15.05,
+        "east": 23.75,
+        "north": -14.7
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0046487603305785125,
+        "jrc_2024_water_any_month_fraction": 0.0046487603305785125
+      }
+    },
+    {
+      "row": 2,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -15.05,
+        "east": 24.1,
+        "north": -14.7
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.002066115702479339,
+        "jrc_2024_water_1to11_months_fraction": 0.0005165289256198347,
+        "jrc_2024_water_any_month_fraction": 0.0025826446280991736
+      }
+    },
+    {
+      "row": 2,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -15.05,
+        "east": 24.45,
+        "north": -14.7
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 2,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -15.05,
+        "east": 24.8,
+        "north": -14.7
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 3,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -15.4,
+        "east": 22.35,
+        "north": -15.05
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 3,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -15.4,
+        "east": 22.7,
+        "north": -15.05
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0010570824524312897,
+        "jrc_2024_water_any_month_fraction": 0.0010570824524312897
+      }
+    },
+    {
+      "row": 3,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -15.4,
+        "east": 23.05,
+        "north": -15.05
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.010570824524312896,
+        "jrc_2024_water_1to11_months_fraction": 0.03646934460887949,
+        "jrc_2024_water_any_month_fraction": 0.04704016913319239
+      }
+    },
+    {
+      "row": 3,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -15.4,
+        "east": 23.4,
+        "north": -15.05
+      },
+      "validSamples": 1849,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.006489994591671174,
+        "jrc_2024_water_1to11_months_fraction": 0.02541914548404543,
+        "jrc_2024_water_any_month_fraction": 0.0319091400757166
+      }
+    },
+    {
+      "row": 3,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -15.4,
+        "east": 23.75,
+        "north": -15.05
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.0005285412262156448,
+        "jrc_2024_water_1to11_months_fraction": 0.0010570824524312897,
+        "jrc_2024_water_any_month_fraction": 0.0015856236786469344
+      }
+    },
+    {
+      "row": 3,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -15.4,
+        "east": 24.1,
+        "north": -15.05
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0021141649048625794,
+        "jrc_2024_water_any_month_fraction": 0.0021141649048625794
+      }
+    },
+    {
+      "row": 3,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -15.4,
+        "east": 24.45,
+        "north": -15.05
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 3,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -15.4,
+        "east": 24.8,
+        "north": -15.05
+      },
+      "validSamples": 1849,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 4,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -15.75,
+        "east": 22.35,
+        "north": -15.4
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 4,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -15.75,
+        "east": 22.7,
+        "north": -15.4
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.0015495867768595042,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0.0015495867768595042
+      }
+    },
+    {
+      "row": 4,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -15.75,
+        "east": 23.05,
+        "north": -15.4
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.0015495867768595042,
+        "jrc_2024_water_1to11_months_fraction": 0.006714876033057851,
+        "jrc_2024_water_any_month_fraction": 0.008264462809917356
+      }
+    },
+    {
+      "row": 4,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -15.75,
+        "east": 23.4,
+        "north": -15.4
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.012684989429175475,
+        "jrc_2024_water_1to11_months_fraction": 0.023255813953488372,
+        "jrc_2024_water_any_month_fraction": 0.035940803382663845
+      }
+    },
+    {
+      "row": 4,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -15.75,
+        "east": 23.75,
+        "north": -15.4
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.0015495867768595042,
+        "jrc_2024_water_1to11_months_fraction": 0.005165289256198347,
+        "jrc_2024_water_any_month_fraction": 0.006714876033057851
+      }
+    },
+    {
+      "row": 4,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -15.75,
+        "east": 24.1,
+        "north": -15.4
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0010330578512396695,
+        "jrc_2024_water_any_month_fraction": 0.0010330578512396695
+      }
+    },
+    {
+      "row": 4,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -15.75,
+        "east": 24.45,
+        "north": -15.4
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 4,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -15.75,
+        "east": 24.8,
+        "north": -15.4
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 5,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -16.1,
+        "east": 22.35,
+        "north": -15.75
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 5,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -16.1,
+        "east": 22.7,
+        "north": -15.75
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.0005165289256198347,
+        "jrc_2024_water_1to11_months_fraction": 0.0005165289256198347,
+        "jrc_2024_water_any_month_fraction": 0.0010330578512396695
+      }
+    },
+    {
+      "row": 5,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -16.1,
+        "east": 23.05,
+        "north": -15.75
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0005165289256198347,
+        "jrc_2024_water_any_month_fraction": 0.0005165289256198347
+      }
+    },
+    {
+      "row": 5,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -16.1,
+        "east": 23.4,
+        "north": -15.75
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.013213530655391121,
+        "jrc_2024_water_1to11_months_fraction": 0.03224101479915433,
+        "jrc_2024_water_any_month_fraction": 0.045454545454545456
+      }
+    },
+    {
+      "row": 5,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -16.1,
+        "east": 23.75,
+        "north": -15.75
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0015495867768595042,
+        "jrc_2024_water_any_month_fraction": 0.0015495867768595042
+      }
+    },
+    {
+      "row": 5,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -16.1,
+        "east": 24.1,
+        "north": -15.75
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0015495867768595042,
+        "jrc_2024_water_any_month_fraction": 0.0015495867768595042
+      }
+    },
+    {
+      "row": 5,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -16.1,
+        "east": 24.45,
+        "north": -15.75
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 5,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -16.1,
+        "east": 24.8,
+        "north": -15.75
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 6,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -16.45,
+        "east": 22.35,
+        "north": -16.1
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0005165289256198347,
+        "jrc_2024_water_any_month_fraction": 0.0005165289256198347
+      }
+    },
+    {
+      "row": 6,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -16.45,
+        "east": 22.7,
+        "north": -16.1
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 6,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -16.45,
+        "east": 23.05,
+        "north": -16.1
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 6,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -16.45,
+        "east": 23.4,
+        "north": -16.1
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.010570824524312896,
+        "jrc_2024_water_1to11_months_fraction": 0.005285412262156448,
+        "jrc_2024_water_any_month_fraction": 0.015856236786469344
+      }
+    },
+    {
+      "row": 6,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -16.45,
+        "east": 23.75,
+        "north": -16.1
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 6,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -16.45,
+        "east": 24.1,
+        "north": -16.1
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 6,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -16.45,
+        "east": 24.45,
+        "north": -16.1
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0005165289256198347,
+        "jrc_2024_water_any_month_fraction": 0.0005165289256198347
+      }
+    },
+    {
+      "row": 6,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -16.45,
+        "east": 24.8,
+        "north": -16.1
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 7,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -16.8,
+        "east": 22.35,
+        "north": -16.45
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0005285412262156448,
+        "jrc_2024_water_any_month_fraction": 0.0005285412262156448
+      }
+    },
+    {
+      "row": 7,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -16.8,
+        "east": 22.7,
+        "north": -16.45
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 7,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -16.8,
+        "east": 23.05,
+        "north": -16.45
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 7,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -16.8,
+        "east": 23.4,
+        "north": -16.45
+      },
+      "validSamples": 1849,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 7,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -16.8,
+        "east": 23.75,
+        "north": -16.45
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.01849894291754757,
+        "jrc_2024_water_1to11_months_fraction": 0.0015856236786469344,
+        "jrc_2024_water_any_month_fraction": 0.0200845665961945
+      }
+    },
+    {
+      "row": 7,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -16.8,
+        "east": 24.1,
+        "north": -16.45
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.0005285412262156448,
+        "jrc_2024_water_1to11_months_fraction": 0.0005285412262156448,
+        "jrc_2024_water_any_month_fraction": 0.0010570824524312897
+      }
+    },
+    {
+      "row": 7,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -16.8,
+        "east": 24.45,
+        "north": -16.45
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 7,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -16.8,
+        "east": 24.8,
+        "north": -16.45
+      },
+      "validSamples": 1849,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 8,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -17.15,
+        "east": 22.35,
+        "north": -16.8
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 8,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -17.15,
+        "east": 22.7,
+        "north": -16.8
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 8,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -17.15,
+        "east": 23.05,
+        "north": -16.8
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 8,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -17.15,
+        "east": 23.4,
+        "north": -16.8
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0005285412262156448,
+        "jrc_2024_water_any_month_fraction": 0.0005285412262156448
+      }
+    },
+    {
+      "row": 8,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -17.15,
+        "east": 23.75,
+        "north": -16.8
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 8,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -17.15,
+        "east": 24.1,
+        "north": -16.8
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.013429752066115703,
+        "jrc_2024_water_1to11_months_fraction": 0.0005165289256198347,
+        "jrc_2024_water_any_month_fraction": 0.013946280991735538
+      }
+    },
+    {
+      "row": 8,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -17.15,
+        "east": 24.45,
+        "north": -16.8
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 8,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -17.15,
+        "east": 24.8,
+        "north": -16.8
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 9,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -17.5,
+        "east": 22.35,
+        "north": -17.15
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 9,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -17.5,
+        "east": 22.7,
+        "north": -17.15
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0.0005165289256198347,
+        "jrc_2024_water_any_month_fraction": 0.0005165289256198347
+      }
+    },
+    {
+      "row": 9,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -17.5,
+        "east": 23.05,
+        "north": -17.15
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 9,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -17.5,
+        "east": 23.4,
+        "north": -17.15
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 9,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -17.5,
+        "east": 23.75,
+        "north": -17.15
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0
+      }
+    },
+    {
+      "row": 9,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -17.5,
+        "east": 24.1,
+        "north": -17.15
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.003615702479338843,
+        "jrc_2024_water_1to11_months_fraction": 0,
+        "jrc_2024_water_any_month_fraction": 0.003615702479338843
+      }
+    },
+    {
+      "row": 9,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -17.5,
+        "east": 24.45,
+        "north": -17.15
+      },
+      "validSamples": 1936,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.019111570247933883,
+        "jrc_2024_water_1to11_months_fraction": 0.0046487603305785125,
+        "jrc_2024_water_any_month_fraction": 0.023760330578512397
+      }
+    },
+    {
+      "row": 9,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -17.5,
+        "east": 24.8,
+        "north": -17.15
+      },
+      "validSamples": 1892,
+      "noDataSamples": 0,
+      "metrics": {
+        "jrc_2024_water_12_months_fraction": 0.0036997885835095136,
+        "jrc_2024_water_1to11_months_fraction": 0.002642706131078224,
+        "jrc_2024_water_any_month_fraction": 0.006342494714587738
+      }
+    }
+  ]
+}

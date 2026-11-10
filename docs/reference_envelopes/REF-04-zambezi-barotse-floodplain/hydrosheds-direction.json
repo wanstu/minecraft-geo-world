@@ -1,0 +1,1277 @@
+{
+  "schemaVersion": 1,
+  "regionId": "REF-04-zambezi-barotse-floodplain",
+  "status": "candidate_spatial_distribution_not_generation_target",
+  "grid": {
+    "columns": 8,
+    "rows": 10,
+    "bounds": {
+      "west": 22,
+      "south": -17.5,
+      "east": 24.8,
+      "north": -14
+    }
+  },
+  "source": {
+    "datasetId": "HydroSHEDS_core",
+    "datasetVersion": "1.1",
+    "layer": "hydrosheds-direction",
+    "observationPeriod": "static_v1.1",
+    "fileName": "hyd_af_dir_15s.tif",
+    "sha256": "38cf5714ddf34f3c9487e57d70ec23d2a77ff3a6e72c9f7fc3a558147e5ad517",
+    "sampleStride": 8,
+    "raster": {
+      "source": ".tmp/realdata-r62c/dir/hyd_af_dir_15s.tif",
+      "sourceWidth": 17760,
+      "sourceHeight": 17520,
+      "sourceBounds": {
+        "west": -19,
+        "south": -35,
+        "east": 55.00000000000006,
+        "north": 38.00000000000006
+      },
+      "pixelWindow": {
+        "X": 9840,
+        "Y": 12480,
+        "Width": 672,
+        "Height": 840
+      },
+      "bounds": {
+        "west": 22.000000000000036,
+        "south": -17.499999999999986,
+        "east": 24.800000000000033,
+        "north": -13.999999999999986
+      }
+    }
+  },
+  "minValidPerBlock": 32,
+  "validSamples": 8820,
+  "noDataSamples": 0,
+  "qualityFlags": [
+    "geographic_bbox_grid",
+    "not_global_ground_truth",
+    "not_world_generation_target",
+    "raster_source_pixel_center_sampling",
+    "direction_entropy_diagnostic_only"
+  ],
+  "metrics": [
+    {
+      "name": "hydrosheds_d8_direction_entropy",
+      "unit": "normalized_entropy",
+      "status": "diagnostic_only_not_for_geoworld_comparison",
+      "statistic": "p10_p50_p90_across_equal_geographic_bbox_cells",
+      "sampleBlocks": 80,
+      "excludedBlocks": 0,
+      "percentiles": {
+        "p10": 0.9051067211398116,
+        "p50": 0.9439774934302778,
+        "p90": 0.972419749770444,
+        "p99": 0.9881923361737671,
+        "min": 0.8791338758733818,
+        "max": 0.9891873488742938
+      }
+    }
+  ],
+  "cells": [
+    {
+      "row": 0,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -14.35,
+        "east": 22.35,
+        "north": -14
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9667307383589339
+      }
+    },
+    {
+      "row": 0,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -14.35,
+        "east": 22.7,
+        "north": -14
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.965898163021551
+      }
+    },
+    {
+      "row": 0,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -14.35,
+        "east": 23.05,
+        "north": -14
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9610041931400205
+      }
+    },
+    {
+      "row": 0,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -14.35,
+        "east": 23.4,
+        "north": -14
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9675088263841132
+      }
+    },
+    {
+      "row": 0,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -14.35,
+        "east": 23.75,
+        "north": -14
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9051673785924834
+      }
+    },
+    {
+      "row": 0,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -14.35,
+        "east": 24.1,
+        "north": -14
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9436896172096352
+      }
+    },
+    {
+      "row": 0,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -14.35,
+        "east": 24.45,
+        "north": -14
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9708412327807651
+      }
+    },
+    {
+      "row": 0,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -14.35,
+        "east": 24.8,
+        "north": -14
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9544700802953765
+      }
+    },
+    {
+      "row": 1,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -14.7,
+        "east": 22.35,
+        "north": -14.35
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.8993919770803583
+      }
+    },
+    {
+      "row": 1,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -14.7,
+        "east": 22.7,
+        "north": -14.35
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9278177203177898
+      }
+    },
+    {
+      "row": 1,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -14.7,
+        "east": 23.05,
+        "north": -14.35
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9554387445513304
+      }
+    },
+    {
+      "row": 1,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -14.7,
+        "east": 23.4,
+        "north": -14.35
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9528506622377615
+      }
+    },
+    {
+      "row": 1,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -14.7,
+        "east": 23.75,
+        "north": -14.35
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.8993818398263959
+      }
+    },
+    {
+      "row": 1,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -14.7,
+        "east": 24.1,
+        "north": -14.35
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9038949472506516
+      }
+    },
+    {
+      "row": 1,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -14.7,
+        "east": 24.45,
+        "north": -14.35
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.983242764201313
+      }
+    },
+    {
+      "row": 1,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -14.7,
+        "east": 24.8,
+        "north": -14.35
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9710599670634297
+      }
+    },
+    {
+      "row": 2,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -15.05,
+        "east": 22.35,
+        "north": -14.7
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9120038253343296
+      }
+    },
+    {
+      "row": 2,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -15.05,
+        "east": 22.7,
+        "north": -14.7
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9655830738202353
+      }
+    },
+    {
+      "row": 2,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -15.05,
+        "east": 23.05,
+        "north": -14.7
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9714874160356498
+      }
+    },
+    {
+      "row": 2,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -15.05,
+        "east": 23.4,
+        "north": -14.7
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9417081478179965
+      }
+    },
+    {
+      "row": 2,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -15.05,
+        "east": 23.75,
+        "north": -14.7
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9118512129775503
+      }
+    },
+    {
+      "row": 2,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -15.05,
+        "east": 24.1,
+        "north": -14.7
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9463568854932604
+      }
+    },
+    {
+      "row": 2,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -15.05,
+        "east": 24.45,
+        "north": -14.7
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.925601899350964
+      }
+    },
+    {
+      "row": 2,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -15.05,
+        "east": 24.8,
+        "north": -14.7
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9891873488742938
+      }
+    },
+    {
+      "row": 3,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -15.4,
+        "east": 22.35,
+        "north": -15.05
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.944981176535558
+      }
+    },
+    {
+      "row": 3,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -15.4,
+        "east": 22.7,
+        "north": -15.05
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9507766165797056
+      }
+    },
+    {
+      "row": 3,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -15.4,
+        "east": 23.05,
+        "north": -15.05
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.967258010769184
+      }
+    },
+    {
+      "row": 3,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -15.4,
+        "east": 23.4,
+        "north": -15.05
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9040778507747429
+      }
+    },
+    {
+      "row": 3,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -15.4,
+        "east": 23.75,
+        "north": -15.05
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9757623940291693
+      }
+    },
+    {
+      "row": 3,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -15.4,
+        "east": 24.1,
+        "north": -15.05
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9567601884073479
+      }
+    },
+    {
+      "row": 3,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -15.4,
+        "east": 24.45,
+        "north": -15.05
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9417717024768593
+      }
+    },
+    {
+      "row": 3,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -15.4,
+        "east": 24.8,
+        "north": -15.05
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9771423671124713
+      }
+    },
+    {
+      "row": 4,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -15.75,
+        "east": 22.35,
+        "north": -15.4
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9538401557358962
+      }
+    },
+    {
+      "row": 4,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -15.75,
+        "east": 22.7,
+        "north": -15.4
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9737439824668417
+      }
+    },
+    {
+      "row": 4,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -15.75,
+        "east": 23.05,
+        "north": -15.4
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9608260243635277
+      }
+    },
+    {
+      "row": 4,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -15.75,
+        "east": 23.4,
+        "north": -15.4
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9500493359090597
+      }
+    },
+    {
+      "row": 4,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -15.75,
+        "east": 23.75,
+        "north": -15.4
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9713658039894528
+      }
+    },
+    {
+      "row": 4,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -15.75,
+        "east": 24.1,
+        "north": -15.4
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.932688022187936
+      }
+    },
+    {
+      "row": 4,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -15.75,
+        "east": 24.45,
+        "north": -15.4
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9325240492269437
+      }
+    },
+    {
+      "row": 4,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -15.75,
+        "east": 24.8,
+        "north": -15.4
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.974808830533448
+      }
+    },
+    {
+      "row": 5,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -16.1,
+        "east": 22.35,
+        "north": -15.75
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9273139495131166
+      }
+    },
+    {
+      "row": 5,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -16.1,
+        "east": 22.7,
+        "north": -15.75
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9449034415293648
+      }
+    },
+    {
+      "row": 5,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -16.1,
+        "east": 23.05,
+        "north": -15.75
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9442653696509204
+      }
+    },
+    {
+      "row": 5,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -16.1,
+        "east": 23.4,
+        "north": -15.75
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9470777017606812
+      }
+    },
+    {
+      "row": 5,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -16.1,
+        "east": 23.75,
+        "north": -15.75
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9155872261269468
+      }
+    },
+    {
+      "row": 5,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -16.1,
+        "east": 24.1,
+        "north": -15.75
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9503637680983605
+      }
+    },
+    {
+      "row": 5,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -16.1,
+        "east": 24.45,
+        "north": -15.75
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.93931975449605
+      }
+    },
+    {
+      "row": 5,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -16.1,
+        "east": 24.8,
+        "north": -15.75
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9267081075911502
+      }
+    },
+    {
+      "row": 6,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -16.45,
+        "east": 22.35,
+        "north": -16.1
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9278890569260662
+      }
+    },
+    {
+      "row": 6,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -16.45,
+        "east": 22.7,
+        "north": -16.1
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9348631636262948
+      }
+    },
+    {
+      "row": 6,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -16.45,
+        "east": 23.05,
+        "north": -16.1
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.980004926630947
+      }
+    },
+    {
+      "row": 6,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -16.45,
+        "east": 23.4,
+        "north": -16.1
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9427126062677612
+      }
+    },
+    {
+      "row": 6,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -16.45,
+        "east": 23.75,
+        "north": -16.1
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.8969657002602834
+      }
+    },
+    {
+      "row": 6,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -16.45,
+        "east": 24.1,
+        "north": -16.1
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.952050254809397
+      }
+    },
+    {
+      "row": 6,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -16.45,
+        "east": 24.45,
+        "north": -16.1
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.8812950327492369
+      }
+    },
+    {
+      "row": 6,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -16.45,
+        "east": 24.8,
+        "north": -16.1
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.930213684016321
+      }
+    },
+    {
+      "row": 7,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -16.8,
+        "east": 22.35,
+        "north": -16.45
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9236629369276176
+      }
+    },
+    {
+      "row": 7,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -16.8,
+        "east": 22.7,
+        "north": -16.45
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9317608250795563
+      }
+    },
+    {
+      "row": 7,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -16.8,
+        "east": 23.05,
+        "north": -16.45
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9428783106839467
+      }
+    },
+    {
+      "row": 7,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -16.8,
+        "east": 23.4,
+        "north": -16.45
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9486387955864045
+      }
+    },
+    {
+      "row": 7,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -16.8,
+        "east": 23.75,
+        "north": -16.45
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9722726128041775
+      }
+    },
+    {
+      "row": 7,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -16.8,
+        "east": 24.1,
+        "north": -16.45
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9494245424346105
+      }
+    },
+    {
+      "row": 7,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -16.8,
+        "east": 24.45,
+        "north": -16.45
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9427286110279017
+      }
+    },
+    {
+      "row": 7,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -16.8,
+        "east": 24.8,
+        "north": -16.45
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9281466476343069
+      }
+    },
+    {
+      "row": 8,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -17.15,
+        "east": 22.35,
+        "north": -16.8
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9365027724640493
+      }
+    },
+    {
+      "row": 8,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -17.15,
+        "east": 22.7,
+        "north": -16.8
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9385596261498802
+      }
+    },
+    {
+      "row": 8,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -17.15,
+        "east": 23.05,
+        "north": -16.8
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9395897609227801
+      }
+    },
+    {
+      "row": 8,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -17.15,
+        "east": 23.4,
+        "north": -16.8
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9476929354603908
+      }
+    },
+    {
+      "row": 8,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -17.15,
+        "east": 23.75,
+        "north": -16.8
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9322938757653103
+      }
+    },
+    {
+      "row": 8,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -17.15,
+        "east": 24.1,
+        "north": -16.8
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9879278391267917
+      }
+    },
+    {
+      "row": 8,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -17.15,
+        "east": 24.45,
+        "north": -16.8
+      },
+      "validSamples": 121,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9308841984963442
+      }
+    },
+    {
+      "row": 8,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -17.15,
+        "east": 24.8,
+        "north": -16.8
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.8791338758733818
+      }
+    },
+    {
+      "row": 9,
+      "column": 0,
+      "bounds": {
+        "west": 22,
+        "south": -17.5,
+        "east": 22.35,
+        "north": -17.15
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9045608040657653
+      }
+    },
+    {
+      "row": 9,
+      "column": 1,
+      "bounds": {
+        "west": 22.35,
+        "south": -17.5,
+        "east": 22.7,
+        "north": -17.15
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9518289622326163
+      }
+    },
+    {
+      "row": 9,
+      "column": 2,
+      "bounds": {
+        "west": 22.7,
+        "south": -17.5,
+        "east": 23.05,
+        "north": -17.15
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9259258968074877
+      }
+    },
+    {
+      "row": 9,
+      "column": 3,
+      "bounds": {
+        "west": 23.05,
+        "south": -17.5,
+        "east": 23.4,
+        "north": -17.15
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9059768952507513
+      }
+    },
+    {
+      "row": 9,
+      "column": 4,
+      "bounds": {
+        "west": 23.4,
+        "south": -17.5,
+        "east": 23.75,
+        "north": -17.15
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9299755406950286
+      }
+    },
+    {
+      "row": 9,
+      "column": 5,
+      "bounds": {
+        "west": 23.75,
+        "south": -17.5,
+        "east": 24.1,
+        "north": -17.15
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9619626494645814
+      }
+    },
+    {
+      "row": 9,
+      "column": 6,
+      "bounds": {
+        "west": 24.1,
+        "south": -17.5,
+        "east": 24.45,
+        "north": -17.15
+      },
+      "validSamples": 110,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.9694497120450756
+      }
+    },
+    {
+      "row": 9,
+      "column": 7,
+      "bounds": {
+        "west": 24.45,
+        "south": -17.5,
+        "east": 24.8,
+        "north": -17.15
+      },
+      "validSamples": 100,
+      "noDataSamples": 0,
+      "metrics": {
+        "hydrosheds_d8_direction_entropy": 0.906992934200114
+      }
+    }
+  ]
+}
