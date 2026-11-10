@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,12 +23,14 @@ func (s *stringList) Set(value string) error {
 func main() {
 	var inputs stringList
 	flag.Var(&inputs, "input", "input raster path; repeat for multiple tiles")
-	format := flag.String("format", "auto", "auto|hgt|hgt-zip|esri-ascii")
+	format := flag.String("format", "auto", "auto|hgt|hgt-zip|esri-ascii|geotiff")
 	dataset := flag.String("dataset", "", "dataset id, e.g. NASADEM_HGT or GEBCO_2026")
 	version := flag.String("version", "", "dataset version")
 	region := flag.String("region", "", "reference region id")
 	reliefWindow := flag.Float64("relief-window-km", 5, "local relief block size in km")
 	stride := flag.Int("sample-stride", 4, "sample every Nth raster cell for elevation/slope statistics")
+	stripeRows := flag.Int("geotiff-stripe-rows", 512, "GeoTIFF rows processed per chunk")
+	noData := flag.Float64("nodata", math.NaN(), "optional explicit NoData value for GeoTIFF")
 	output := flag.String("output", "-", "output JSON path or - for stdout")
 	flag.Parse()
 
@@ -36,51 +39,73 @@ func main() {
 		os.Exit(2)
 	}
 
-	rasters := make([]realgeom.Raster, 0, len(inputs))
 	resolvedFormats := make(map[string]struct{})
-	for _, path := range inputs {
-		f := resolveFormat(*format, path)
-		var (
-			r   realgeom.Raster
-			err error
-		)
-		switch f {
-		case "hgt":
-			r, err = realgeom.ReadHGT(path)
-		case "hgt-zip":
-			r, err = realgeom.ReadHGTZip(path)
-		case "esri-ascii":
-			r, err = realgeom.ReadESRIASCII(path)
-		default:
-			err = fmt.Errorf("unsupported input format %q", f)
-		}
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
-			os.Exit(2)
-		}
-		resolvedFormats[f] = struct{}{}
-		rasters = append(rasters, r)
-	}
-	resolvedFormat := *format
-	if *format == "auto" {
-		if len(resolvedFormats) == 1 {
-			for f := range resolvedFormats {
-				resolvedFormat = f
-			}
-		} else {
-			resolvedFormat = "mixed"
-		}
-	}
-
-	report, err := realgeom.Analyze(rasters, realgeom.AnalyzeConfig{
+	analyzer, err := realgeom.NewAnalyzer(realgeom.AnalyzeConfig{
 		RegionID: *region, DatasetID: *dataset, DatasetVersion: *version,
-		InputFormat: resolvedFormat, ReliefWindowKM: *reliefWindow,
+		InputFormat: *format, ReliefWindowKM: *reliefWindow,
 		SampleStride: *stride,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
 	}
+
+	for _, path := range inputs {
+		f := resolveFormat(*format, path)
+		resolvedFormats[f] = struct{}{}
+		switch f {
+		case "hgt":
+			r, err := realgeom.ReadHGT(path)
+			if err != nil {
+				failInput(path, err)
+			}
+			if err := analyzer.AddRaster(r); err != nil {
+				failInput(path, err)
+			}
+		case "hgt-zip":
+			r, err := realgeom.ReadHGTZip(path)
+			if err != nil {
+				failInput(path, err)
+			}
+			if err := analyzer.AddRaster(r); err != nil {
+				failInput(path, err)
+			}
+		case "esri-ascii":
+			r, err := realgeom.ReadESRIASCII(path)
+			if err != nil {
+				failInput(path, err)
+			}
+			if err := analyzer.AddRaster(r); err != nil {
+				failInput(path, err)
+			}
+		case "geotiff":
+			err := realgeom.AddGeoTIFF(analyzer, path, realgeom.GeoTIFFOptions{
+				NoData: *noData, HasNoData: !math.IsNaN(*noData),
+				StripeRows: *stripeRows,
+			})
+			if err != nil {
+				failInput(path, err)
+			}
+		default:
+			failInput(path, fmt.Errorf("unsupported input format %q", f))
+		}
+	}
+
+	report, err := analyzer.Report()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
+	}
+	if *format == "auto" {
+		if len(resolvedFormats) == 1 {
+			for f := range resolvedFormats {
+				report.InputFormat = f
+			}
+		} else {
+			report.InputFormat = "mixed"
+		}
+	}
+
 	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -91,9 +116,12 @@ func main() {
 		_, _ = os.Stdout.Write(data)
 		return
 	}
-	if err := os.MkdirAll(filepath.Dir(*output), 0o755); err != nil && filepath.Dir(*output) != "." {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+	dir := filepath.Dir(*output)
+	if dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
 	}
 	if err := os.WriteFile(*output, data, 0o644); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -101,17 +129,28 @@ func main() {
 	}
 }
 
+func failInput(path string, err error) {
+	fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
+	os.Exit(2)
+}
+
 func resolveFormat(requested, path string) string {
 	if requested != "auto" {
 		return requested
 	}
-	switch strings.ToLower(filepath.Ext(path)) {
-	case ".hgt":
+	lower := strings.ToLower(path)
+	switch {
+	case strings.HasSuffix(lower, ".hgt"):
 		return "hgt"
-	case ".zip":
+	case strings.HasSuffix(lower, ".zip"):
 		return "hgt-zip"
-	case ".asc", ".ascii", ".txt":
+	case strings.HasSuffix(lower, ".asc"),
+		strings.HasSuffix(lower, ".ascii"),
+		strings.HasSuffix(lower, ".txt"):
 		return "esri-ascii"
+	case strings.HasSuffix(lower, ".tif"),
+		strings.HasSuffix(lower, ".tiff"):
+		return "geotiff"
 	default:
 		return "unknown"
 	}

@@ -55,12 +55,17 @@ type AnalyzeConfig struct {
 	SampleStride   int
 }
 
-func Analyze(rasters []Raster, cfg AnalyzeConfig) (Report, error) {
-	if len(rasters) == 0 {
-		return Report{}, errors.New("realgeom: at least one raster is required")
-	}
+type Analyzer struct {
+	cfg        AnalyzeConfig
+	elevations []float64
+	slopes     []float64
+	reliefs    []float64
+	inputs     []FileSummary
+}
+
+func NewAnalyzer(cfg AnalyzeConfig) (*Analyzer, error) {
 	if cfg.DatasetID == "" {
-		return Report{}, errors.New("realgeom: dataset id is required")
+		return nil, errors.New("realgeom: dataset id is required")
 	}
 	if cfg.ReliefWindowKM <= 0 {
 		cfg.ReliefWindowKM = 5
@@ -68,53 +73,87 @@ func Analyze(rasters []Raster, cfg AnalyzeConfig) (Report, error) {
 	if cfg.SampleStride < 1 {
 		cfg.SampleStride = 1
 	}
+	return &Analyzer{cfg: cfg}, nil
+}
 
-	elevations := make([]float64, 0, 1024)
-	slopes := make([]float64, 0, 1024)
-	reliefs := make([]float64, 0, 256)
-	inputs := make([]FileSummary, 0, len(rasters))
-
+func Analyze(rasters []Raster, cfg AnalyzeConfig) (Report, error) {
+	if len(rasters) == 0 {
+		return Report{}, errors.New("realgeom: at least one raster is required")
+	}
+	a, err := NewAnalyzer(cfg)
+	if err != nil {
+		return Report{}, err
+	}
 	for _, r := range rasters {
-		if err := r.Validate(); err != nil {
+		if err := a.AddRaster(r); err != nil {
 			return Report{}, err
 		}
-		valid := 0
-		for y := 0; y < r.Height; y += cfg.SampleStride {
-			for x := 0; x < r.Width; x += cfg.SampleStride {
-				if v, ok := r.At(x, y); ok {
-					elevations = append(elevations, v)
-					valid++
-				}
+	}
+	return a.Report()
+}
+
+func (a *Analyzer) AddRaster(r Raster) error {
+	if err := r.Validate(); err != nil {
+		return err
+	}
+	valid := a.addRasterSamples(r)
+	a.inputs = append(a.inputs, FileSummary{
+		Path: r.Source, Width: r.Width, Height: r.Height, ValidSamples: valid,
+		Bounds: Bounds{West: r.West, South: r.South, East: r.East, North: r.North},
+	})
+	return nil
+}
+
+// AddRasterChunk accumulates statistics from one window of a larger raster.
+// It intentionally does not add an input summary; callers should add the
+// source file summary once through AddInputSummary.
+func (a *Analyzer) AddRasterChunk(r Raster) (int, error) {
+	if err := r.Validate(); err != nil {
+		return 0, err
+	}
+	return a.addRasterSamples(r), nil
+}
+
+func (a *Analyzer) AddInputSummary(summary FileSummary) {
+	a.inputs = append(a.inputs, summary)
+}
+
+func (a *Analyzer) addRasterSamples(r Raster) int {
+	valid := 0
+	for y := 0; y < r.Height; y += a.cfg.SampleStride {
+		for x := 0; x < r.Width; x += a.cfg.SampleStride {
+			if v, ok := r.At(x, y); ok {
+				a.elevations = append(a.elevations, v)
+				valid++
 			}
 		}
-		slopes = append(slopes, rasterSlopes(r, cfg.SampleStride)...)
-		reliefs = append(reliefs, rasterBlockRelief(r, cfg.ReliefWindowKM)...)
-		inputs = append(inputs, FileSummary{
-			Path: r.Source, Width: r.Width, Height: r.Height, ValidSamples: valid,
-			Bounds: Bounds{West: r.West, South: r.South, East: r.East, North: r.North},
-		})
 	}
-	if len(elevations) == 0 {
+	a.slopes = append(a.slopes, rasterSlopes(r, a.cfg.SampleStride)...)
+	a.reliefs = append(a.reliefs, rasterBlockRelief(r, a.cfg.ReliefWindowKM)...)
+	return valid
+}
+
+func (a *Analyzer) Report() (Report, error) {
+	if len(a.elevations) == 0 {
 		return Report{}, errors.New("realgeom: no valid elevation samples")
 	}
-	elevationStats := summarize(elevations)
+	elevationStats := summarize(a.elevations)
 	hypsometric := 0.0
 	if elevationStats.Max > elevationStats.Min {
 		sum := 0.0
-		for _, v := range elevations {
+		for _, v := range a.elevations {
 			sum += v
 		}
-		mean := sum / float64(len(elevations))
+		mean := sum / float64(len(a.elevations))
 		hypsometric = (mean - elevationStats.Min) / (elevationStats.Max - elevationStats.Min)
 	}
-
 	return Report{
-		SchemaVersion: 1, RegionID: cfg.RegionID, DatasetID: cfg.DatasetID,
-		DatasetVersion: cfg.DatasetVersion, InputFormat: cfg.InputFormat, Inputs: inputs,
-		ValidElevationCells: len(elevations), ValidSlopeCells: len(slopes),
-		ReliefWindowKM:  cfg.ReliefWindowKM,
-		ElevationMeters: elevationStats, SlopeDegrees: summarize(slopes),
-		LocalReliefMeters: summarize(reliefs), HypsometricIntegral: hypsometric,
+		SchemaVersion: 1, RegionID: a.cfg.RegionID, DatasetID: a.cfg.DatasetID,
+		DatasetVersion: a.cfg.DatasetVersion, InputFormat: a.cfg.InputFormat,
+		Inputs: a.inputs, ValidElevationCells: len(a.elevations),
+		ValidSlopeCells: len(a.slopes), ReliefWindowKM: a.cfg.ReliefWindowKM,
+		ElevationMeters: elevationStats, SlopeDegrees: summarize(a.slopes),
+		LocalReliefMeters: summarize(a.reliefs), HypsometricIntegral: hypsometric,
 	}, nil
 }
 

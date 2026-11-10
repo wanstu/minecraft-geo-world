@@ -327,11 +327,13 @@ R6.1 已锁定：
 
 详细见 [REALISTIC_GEOMORPHOLOGY_R6_REFERENCE.md](REALISTIC_GEOMORPHOLOGY_R6_REFERENCE.md) 和 [realistic_geomorphology_reference_registry.json](realistic_geomorphology_reference_registry.json)。
 
-R6.2a 已完成零第三方依赖的通用 real-data extractor：支持 NASADEM HGT/HGT zip 与 Esri ASCII Grid，输出 elevation / slope / local relief / hypsometry 的统一 JSON。
+R6.2a 已完成通用 real-data extractor：支持 NASADEM HGT/HGT zip 与 Esri ASCII Grid，输出 elevation / slope / local relief / hypsometry 的统一 JSON。
+
+R6.2b 已完成纯 Go GeoTIFF elevation / bathymetry 适配：支持分块读取、signed / unsigned integer、Float32 / Float64、explicit NoData，并强制保持主分辨率。
 
 详细见 [REALISTIC_GEOMORPHOLOGY_R6_EXTRACTOR.md](REALISTIC_GEOMORPHOLOGY_R6_EXTRACTOR.md)。
 
-下一切片：R6.2b GeoTIFF / hydro / surface-water adapters。
+下一切片：R6.2c hydro / surface-water / registry-crop adapters。
 
 ### R7 — Minecraft 实机验收
 

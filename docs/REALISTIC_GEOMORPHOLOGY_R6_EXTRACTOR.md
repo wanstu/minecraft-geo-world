@@ -2,7 +2,7 @@
 
 更新时间：2026-11-10
 
-状态：**R6.2a 通用 DEM / bathymetry 提取器完成；R6.2b GeoTIFF / hydro / water 专题适配待做。**
+状态：**R6.2a 通用 DEM / bathymetry 提取器、R6.2b GeoTIFF elevation/bathymetry 适配均完成；R6.2c hydro / surface-water 专题适配待做。**
 
 ## 1. 边界
 
@@ -74,6 +74,28 @@ R6.2 是离线开发工具，不进入世界生成运行时。
       --sample-stride 1 \
       --relief-window-km 2 \
       --output out/ref06_gebco.json
+
+### GeoTIFF elevation / bathymetry
+
+R6.2b 增加纯 Go GeoTIFF 读取：
+
+- 不依赖 GDAL；
+- 不依赖 Python / rasterio；
+- 支持 strip / tile；
+- 支持 None / LZW / Deflate / JPEG；
+- 支持 8/16/32-bit integer 与 Float32/Float64；
+- 当前只接受单波段 EPSG:4326；
+- GeoTIFF NoData 通过 --nodata 显式传入，不猜产品默认值。
+
+大影像不会整张展开到内存。
+
+工具按像素行窗口分块读取；如果源文件带 overview，会把 stripe 高度限制到主影像 1% 以下，并校验返回 width / height，防止读取库偷偷切换 overview。
+
+示例：
+
+    go run ./cmd/geoworld-realdata-extract       --input hydrosheds_dem_tile.tif       --dataset HydroSHEDS_core       --version 1.1       --region REF-04-zambezi-barotse-floodplain       --format geotiff       --nodata <product-specific-value>       --sample-stride 4       --geotiff-stripe-rows 512       --output out/ref04_hydrosheds_dem.json
+
+GEBCO user-defined-area GeoTIFF 也可以直接使用同一路径。
 
 ## 3. 输出 schema
 
@@ -158,24 +180,34 @@ percentile 字段统一：
 
 当前不会自动裁剪到 registry bbox。
 
-因此 R6.2a 建议下载本身已经覆盖参考区的 tile；R6.2b 再加入 registry bbox crop。
+因此当前建议下载本身已经覆盖参考区的 tile，或先使用数据源自己的 area subset 功能。
+
+registry bbox crop 留到 R6.2c，和 HydroSHEDS / JRC 专题适配一起完成。
 
 ## 6. 当前未支持
 
-R6.2a **不宣称完整 R6.2 已完成**。
+R6.2a / R6.2b **不宣称完整 R6.2 已完成**。
+
+已经支持：
+
+- NASADEM HGT / HGT zip；
+- Esri ASCII elevation / bathymetry；
+- 单波段 EPSG:4326 GeoTIFF elevation / bathymetry；
+- HydroSHEDS v1.1 DEM 类 GeoTIFF 的格式读取路径；
+- GEBCO elevation/bathymetry GeoTIFF 的格式读取路径。
 
 尚未支持：
 
-- HydroSHEDS v1.1 GeoTIFF；
-- JRC Global Surface Water GeoTIFF；
+- JRC Global Surface Water occurrence / seasonality 等专题语义；
+- HydroSHEDS flow direction / accumulation 专题语义；
 - HydroRIVERS vector network；
-- GEBCO TID GeoTIFF / NetCDF；
+- GEBCO TID 质量分类；
 - registry bbox 自动裁剪；
 - river longitudinal metrics；
 - active-water corridor metrics；
 - coastline vector metrics。
 
-这些属于 R6.2b。
+这些属于 R6.2c。
 
 ## 7. HydroSHEDS 版本说明
 
@@ -191,7 +223,7 @@ R6.2a **不宣称完整 R6.2 已完成**。
 
 作为全球主口径。
 
-美洲参考区可以在后续 R6.2b 中额外加入 v2 cross-check，但不能把 v2 美洲结果和 v1.1 亚洲/非洲直接混成一个全球 envelope。
+美洲参考区可以在后续 R6.2c 中额外加入 v2 cross-check，但不能把 v2 美洲结果和 v1.1 亚洲/非洲直接混成一个全球 envelope。
 
 ## 8. R6.2a 验收
 
@@ -208,6 +240,40 @@ R6.2a **不宣称完整 R6.2 已完成**。
 
 结论：**R6.2a PASS。**
 
+## 9. R6.2b 验收
+
+GeoTIFF elevation / bathymetry 适配已验证：
+
+- pure-Go reader；
+- EPSG:4326 bounds；
+- signed Int16 / Int32；
+- UInt8 / UInt16 / UInt32；
+- Float32 / Float64；
+- pixel-window chunking；
+- overview 防误切换；
+- explicit NoData；
+- full-resolution sample count 无重叠 / 无遗漏。
+
+真实 GeoTIFF smoke：
+
+    dimensions = 1437 × 1188
+    expected pixels = 1,707,156
+    extracted valid samples = 1,707,156
+
+独立 GeoTIFF 解析器交叉检查：
+
+    min ≈ -67.681
+    max ≈ 2131.559
+
+本工具：
+
+    min = -67.680824
+    max = 2131.558838
+
+一致。
+
+结论：**R6.2b PASS。**
+
 下一步：
 
-    R6.2b GeoTIFF / hydro / surface-water adapters
+    R6.2c hydro / surface-water / registry-crop adapters

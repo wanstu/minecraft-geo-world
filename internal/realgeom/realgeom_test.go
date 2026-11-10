@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/tingold/gocog"
 )
 
 func TestReadHGTAndZip(t *testing.T) {
@@ -90,6 +92,32 @@ func TestReadESRIASCII(t *testing.T) {
 	}
 	if _, ok := r.At(1, 1); ok {
 		t.Fatal("ASCII nodata should be invalid")
+	}
+}
+
+func TestGeoTIFFValueDecoding(t *testing.T) {
+	signed16 := int16(-1234)
+	got, err := geoTIFFValue(gocog.DTSShortS, uint64(signed16))
+	if err != nil || got != -1234 {
+		t.Fatalf("signed16 got=%g err=%v", got, err)
+	}
+
+	signed32 := int32(-1234567)
+	got, err = geoTIFFValue(gocog.DTSLongS, uint64(signed32))
+	if err != nil || got != -1234567 {
+		t.Fatalf("signed32 got=%g err=%v", got, err)
+	}
+
+	f32 := float32(-67.680824)
+	got, err = geoTIFFValue(gocog.DTFloat, uint64(math.Float32bits(f32)))
+	if err != nil || math.Abs(got-float64(f32)) > 1e-6 {
+		t.Fatalf("float32 got=%g want=%g err=%v", got, f32, err)
+	}
+
+	f64 := 2131.558838
+	got, err = geoTIFFValue(gocog.DTDouble, math.Float64bits(f64))
+	if err != nil || math.Abs(got-f64) > 1e-12 {
+		t.Fatalf("float64 got=%g want=%g err=%v", got, f64, err)
 	}
 }
 
