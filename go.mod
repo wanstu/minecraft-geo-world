@@ -13,3 +13,5 @@ require (
 	go.mongodb.org/mongo-driver v1.17.6 // indirect
 	golang.org/x/image v0.33.0 // indirect
 )
+
+replace github.com/tingold/gocog => ./third_party/gocog

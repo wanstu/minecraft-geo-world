@@ -2,7 +2,7 @@
 
 更新时间：2026-11-10
 
-状态：**R6.2a 通用 DEM / bathymetry 提取器、R6.2b GeoTIFF elevation/bathymetry 适配均完成；R6.2c hydro / surface-water 专题适配待做。**
+状态：**R6.2a、R6.2b 与 R6.2c 水文专题适配均完成；尚未开始 R6.3 真实参考区间建模。**
 
 ## 1. 边界
 
@@ -182,7 +182,7 @@ percentile 字段统一：
 
 因此当前建议下载本身已经覆盖参考区的 tile，或先使用数据源自己的 area subset 功能。
 
-registry bbox crop 留到 R6.2c，和 HydroSHEDS / JRC 专题适配一起完成。
+R6.2c 已为 HydroSHEDS / JRC / HydroRIVERS 专题提供 registry bbox 原始像素裁剪。现有 elevation 模式仍需提供方预先裁剪的子集；未改变 R6.2a/b 已验收的 elevation 统计路径。
 
 ## 6. 当前未支持
 
@@ -198,16 +198,17 @@ R6.2a / R6.2b **不宣称完整 R6.2 已完成**。
 
 尚未支持：
 
-- JRC Global Surface Water occurrence / seasonality 等专题语义；
-- HydroSHEDS flow direction / accumulation 专题语义；
-- HydroRIVERS vector network；
+已在 R6.2c 新增 JRC occurrence / seasonality、HydroSHEDS flow direction / accumulation、HydroRIVERS SHP/DBF 的矢量河网统计，以及这些水文专题的 registry bbox 裁剪。详细测试与真实数据输出见 [R6.2c 水文专题验收](REALISTIC_GEOMORPHOLOGY_R6_HYDRO.md)。
+
+仍未支持：
+
 - GEBCO TID 质量分类；
-- registry bbox 自动裁剪；
+- elevation 模式的通用 registry bbox 自动裁剪；
 - river longitudinal metrics；
-- active-water corridor metrics；
+- active-water corridor 宽度与季节变化的联合指标；
 - coastline vector metrics。
 
-这些属于 R6.2c。
+未完成项不得作为真实世界参考区间使用，尤其不得推导生成参数。
 
 ## 7. HydroSHEDS 版本说明
 
@@ -274,6 +275,10 @@ GeoTIFF elevation / bathymetry 适配已验证：
 
 结论：**R6.2b PASS。**
 
-下一步：
+## 10. R6.2c 水文专题验收
 
-    R6.2c hydro / surface-water / registry-crop adapters
+实现：registry bbox、JRC occurrence / seasonality、HydroSHEDS DIR / ACC、HydroRIVERS SHP+DBF。真实 REF-04 数据已成功生成 JSON，见 [验收与数据](REALISTIC_GEOMORPHOLOGY_R6_HYDRO.md)。
+
+结论：**R6.2c 指定的四类水文适配 PASS**；GEBCO TID、河流纵剖面及 GeoWorld 指标对照不属于本次完成范围。
+
+下一步：R6.3 reference envelopes；必须使用真实统计，严禁手填目标值。
