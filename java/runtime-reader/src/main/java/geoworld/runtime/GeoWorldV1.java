@@ -370,6 +370,7 @@ public final class GeoWorldV1 {
         double bed1,
         double halfWidth,
         double meanderOffset,
+        boolean headwaterTaper,
         double[] profile,
         boolean receiverSurfaceDefined,
         double receiverSurface,
@@ -818,7 +819,7 @@ public final class GeoWorldV1 {
             double halfWidth =
                 riverMouthHalfWidth(segment, point.t());
             double bankRadius =
-                halfWidth + riverBankBlendBlocks(segment.halfWidth());
+                halfWidth + riverBankBlendForSegment(segment, point.t());
             DeltaPoint delta = geometry.delta(i);
             boolean inBank = point.distance() < bankRadius;
             boolean inDeltaBank =
@@ -827,22 +828,11 @@ public final class GeoWorldV1 {
                 continue;
             }
 
-            double widthSpan = Math.max(
-                1.0e-9,
-                waterbedConfig.maxRiverHalfWidthBlocks() -
-                    waterbedConfig.minRiverHalfWidthBlocks()
-            );
-            double widthT = clamp(
-                (segment.halfWidth() -
-                    waterbedConfig.minRiverHalfWidthBlocks()) /
-                    widthSpan,
-                0,
-                1
-            );
-            double centerDepth =
-                worldSampleConfig.riverCenterDepthNormalized() *
-                (1 + 2 * Math.pow(widthT, 1.15));
+            double centerDepth = centerDepthForWidth(halfWidth);
             double bed = sampleRiverProfile(segment, point.t());
+            if (segment.headwaterTaper()) {
+                bed += centerDepthForWidth(segment.halfWidth()) - centerDepth;
+            }
             double bankCeiling =
                 riverBankSurfaceCeiling(segment, point.t());
             bed = Math.min(
@@ -874,7 +864,7 @@ public final class GeoWorldV1 {
             PointSegment point = pointRiverSegment(x, z, segment);
             double bankRadius =
                 riverMouthHalfWidth(segment, point.t()) +
-                riverBankBlendBlocks(segment.halfWidth());
+                riverBankBlendForSegment(segment, point.t());
             if (point.distance() < bankRadius) {
                 return true;
             }
@@ -3846,7 +3836,7 @@ public final class GeoWorldV1 {
             double mouthHalfWidth = riverMouthHalfWidth(segment, point.t());
             double bankRadius =
                 mouthHalfWidth +
-                riverBankBlendBlocks(segment.halfWidth());
+                riverBankBlendForSegment(segment, point.t());
             double fluvialReach =
                 Math.max(bankRadius, riverFluvialReach(segment));
             DeltaPoint delta = riverGeometry.delta(i);
@@ -3858,22 +3848,22 @@ public final class GeoWorldV1 {
                 continue;
             }
             double bed = sampleRiverProfile(segment, point.t());
-
+            double actualWidth = segment.headwaterTaper()
+                ? mouthHalfWidth : segment.halfWidth();
             double widthSpan = Math.max(
                 1.0e-9,
                 waterbedConfig.maxRiverHalfWidthBlocks() -
                     waterbedConfig.minRiverHalfWidthBlocks()
             );
             double widthT = clamp(
-                (segment.halfWidth() -
-                    waterbedConfig.minRiverHalfWidthBlocks()) /
-                    widthSpan,
-                0,
-                1
+                (actualWidth - waterbedConfig.minRiverHalfWidthBlocks()) /
+                    widthSpan, 0, 1
             );
-            double centerDepth =
-                worldSampleConfig.riverCenterDepthNormalized() *
-                (1 + 2 * Math.pow(widthT, 1.15));
+            double centerDepth = centerDepthForWidth(actualWidth);
+            if (segment.headwaterTaper()) {
+                // Keep the persisted bed+fullDepth free-surface datum.
+                bed += centerDepthForWidth(segment.halfWidth()) - centerDepth;
+            }
             double bankCeiling = Double.POSITIVE_INFINITY;
             if (boundedRiverBanks) {
                 bankCeiling =
@@ -4035,7 +4025,7 @@ public final class GeoWorldV1 {
                 riverBedDefined = true;
                 riverBedElevation = bed;
                 // Flaring the river footprint must not inflate centerDepth.
-                riverHalfWidth = segment.halfWidth();
+                riverHalfWidth = actualWidth;
                 receiverDefined =
                     surface > naturalSurface + 1.0e-12;
                 receiverSurface = surface;
@@ -4872,7 +4862,7 @@ public final class GeoWorldV1 {
         }
         double halfWidth = riverMouthHalfWidth(segment, t);
         double bankRadius =
-            halfWidth + riverBankBlendBlocks(segment.halfWidth());
+            halfWidth + riverBankBlendForSegment(segment, t);
         double reach = riverFluvialReach(segment);
         if (distance < bankRadius || distance >= reach) {
             return currentHeight;
@@ -5415,7 +5405,30 @@ public final class GeoWorldV1 {
                 segment.halfWidth() + extra * fade
             );
         }
+        if (segment.headwaterTaper()) {
+            return headwaterHalfWidth(segment, t);
+        }
         return width;
+    }
+
+    private static double headwaterHalfWidth(RiverSegment segment, double t) {
+        if (!segment.headwaterTaper()) {
+            return segment.halfWidth();
+        }
+        double minWidth = Math.max(3.5, segment.halfWidth() * 0.25);
+        return lerp(minWidth, segment.halfWidth(), smoothstep(0.0, 0.65, clamp(t, 0.0, 1.0)));
+    }
+
+    private static double riverBankBlendForSegment(RiverSegment segment, double t) {
+        return riverBankBlendBlocks(segment.headwaterTaper()
+            ? headwaterHalfWidth(segment, t) : segment.halfWidth());
+    }
+
+    private double centerDepthForWidth(double width) {
+        double span = Math.max(1.0e-9,
+            waterbedConfig.maxRiverHalfWidthBlocks() - waterbedConfig.minRiverHalfWidthBlocks());
+        double fraction = clamp((width - waterbedConfig.minRiverHalfWidthBlocks()) / span, 0.0, 1.0);
+        return worldSampleConfig.riverCenterDepthNormalized() * (1.0 + 2.0 * Math.pow(fraction, 1.15));
     }
 
     private static double lakeOutletSourceWeight(
@@ -6113,6 +6126,7 @@ public final class GeoWorldV1 {
                 r.get("MeanderOffset") == null
                     ? 0.0
                     : Json.doubleValue(r, "MeanderOffset"),
+                r.containsKey("HeadwaterTaper") && Json.bool(r, "HeadwaterTaper"),
                 doubleArray(Json.required(r, "Profile"), "river.Profile"),
                 Json.bool(r, "ReceiverSurfaceDefined"),
                 Json.doubleValue(r, "ReceiverSurface"),

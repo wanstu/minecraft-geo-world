@@ -42,6 +42,13 @@
 - NeoForge Java 编译、模型查询 34/34 Golden、BasinRivers 573 采样和部分 Shoreline 已通过；dadm 本地**完整** Gradle `check` 在 Shoreline 后续验证阶段因 450 秒时间限制中断，并未宣称整套通过。
 - 实际 **v22 Minecraft 保存区块** 尚未生成并验收，因此不能把前述模型示意当作游戏中的实际水体。
 
+### Java 运行时一致性补丁（2026-11-10）
+
+- 静态检查发现 Java `GeoWorldV1.RiverSegment` 早先没有解析新增的 `HeadwaterTaper` 属性。虽然 Go 模型正确，新版 Minecraft 会错误复用未收窄宽度。现已修复 Java 读取、湿润核心、河床水深、岸坡/岸线保护路径，局部宽度与 Go 原生引擎共用相同数值函数。
+- 使用完整 v1.1.22 已保存世界模型，对河源及下游 **231 个坐标**执行 Go 与 Java 独立运行时采样对照（水体类型、地面高程、水面高程、水深），**全部数值相等**；其中 66 点为河流水体。
+- 使用历史 dadm v1.1.21 世界模型执行相同 231 坐标交叉回归，也 **完全相等**，排除 Java 补丁破坏旧存档的直接证据。
+- 完整跨语言/实际区块正式验收仍以 GitHub CI 与新建 v22 Minecraft 世界为准；命令和本地探针位于被 Git 忽略的 `.tmp/r7-visual/R72JavaParity.java`、`r72_go_parity.go`。
+
 **停止/发布门槛：** Go 全量回归与 GitHub 九版本 CI 必须通过；必须用新建 v22 Minecraft 世界读取 Anvil 方块列并形成真实截面证据后才可发布 rc.4。旧 `ttt` / dadm 历史 `New World` 不能修改。
 
 ## 测试世界与旧世界隔离
