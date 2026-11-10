@@ -27,10 +27,11 @@ type Report struct {
 	Seed          int64  `json:"seed"`
 	RulesVersion  string `json:"rulesVersion"`
 
-	River           RiverReport           `json:"river"`
-	Sediment        SedimentReport        `json:"sediment"`
-	BasinTransition BasinTransitionReport `json:"basinTransition"`
-	Transition      TransitionReport      `json:"transition"`
+	River            RiverReport            `json:"river"`
+	Sediment         SedimentReport         `json:"sediment"`
+	BasinTransition  BasinTransitionReport  `json:"basinTransition"`
+	ValleyFloodplain ValleyFloodplainReport `json:"valleyFloodplain"`
+	Transition       TransitionReport       `json:"transition"`
 }
 
 type SedimentReport struct {
@@ -297,6 +298,51 @@ type BasinTransitionReport struct {
 	WallFloorSlopeRatioP90      float64 `json:"wallFloorSlopeRatioP90"`
 }
 
+type ValleyFloodplainReport struct {
+	RepresentativeDrainages                  int                      `json:"representativeDrainages"`
+	LongDrainages                            int                      `json:"longDrainages"`
+	MatureFloodplainDrainages                int                      `json:"matureFloodplainDrainages"`
+	ChannelWideningDrainages                 int                      `json:"channelWideningDrainages"`
+	FloodplainWeightIncreaseDrainages        int                      `json:"floodplainWeightIncreaseDrainages"`
+	CorridorExpansionDrainages               int                      `json:"corridorExpansionDrainages"`
+	MatureFloodplainCorridorNarrowingSignals int                      `json:"matureFloodplainCorridorNarrowingSignals"`
+	UpperChannelHalfWidthP50                 float64                  `json:"upperChannelHalfWidthP50"`
+	LowerChannelHalfWidthP50                 float64                  `json:"lowerChannelHalfWidthP50"`
+	UpperFloodplainWeightP50                 float64                  `json:"upperFloodplainWeightP50"`
+	LowerFloodplainWeightP50                 float64                  `json:"lowerFloodplainWeightP50"`
+	UpperCorridorHalfWidthP50                float64                  `json:"upperCorridorHalfWidthP50"`
+	LowerCorridorHalfWidthP50                float64                  `json:"lowerCorridorHalfWidthP50"`
+	UpperFarReliefP50Blocks                  float64                  `json:"upperFarReliefP50Blocks"`
+	LowerFarReliefP50Blocks                  float64                  `json:"lowerFarReliefP50Blocks"`
+	CorridorExpansionRatioP50                float64                  `json:"corridorExpansionRatioP50"`
+	MatureFloodplainExpansionRatioP50        float64                  `json:"matureFloodplainExpansionRatioP50"`
+	MatureSignals                            []ValleyFloodplainSignal `json:"matureSignals,omitempty"`
+}
+
+type ValleyFloodplainSignal struct {
+	SourceNode               int     `json:"sourceNode"`
+	EndNode                  int     `json:"endNode"`
+	UpperX                   float64 `json:"upperX"`
+	UpperZ                   float64 `json:"upperZ"`
+	LowerX                   float64 `json:"lowerX"`
+	LowerZ                   float64 `json:"lowerZ"`
+	UpperChannelHalfWidth    float64 `json:"upperChannelHalfWidth"`
+	LowerChannelHalfWidth    float64 `json:"lowerChannelHalfWidth"`
+	UpperFloodplainWeight    float64 `json:"upperFloodplainWeight"`
+	LowerFloodplainWeight    float64 `json:"lowerFloodplainWeight"`
+	UpperCorridorHalfWidth   float64 `json:"upperCorridorHalfWidth"`
+	LowerCorridorHalfWidth   float64 `json:"lowerCorridorHalfWidth"`
+	UpperPlainContext        float64 `json:"upperPlainContext"`
+	LowerPlainContext        float64 `json:"lowerPlainContext"`
+	UpperUplandContext       float64 `json:"upperUplandContext"`
+	LowerUplandContext       float64 `json:"lowerUplandContext"`
+	UpperAlluvialPlainWeight float64 `json:"upperAlluvialPlainWeight"`
+	LowerAlluvialPlainWeight float64 `json:"lowerAlluvialPlainWeight"`
+	UpperValleyFloorWidth    float64 `json:"upperValleyFloorWidth"`
+	LowerValleyFloorWidth    float64 `json:"lowerValleyFloorWidth"`
+	ExpansionRatio           float64 `json:"expansionRatio"`
+}
+
 type TransitionReport struct {
 	Samples int                    `json:"samples"`
 	Classes []TransitionClassStats `json:"classes,omitempty"`
@@ -381,6 +427,7 @@ func Analyze(model *generator.WorldModel, cfg Config) (Report, error) {
 	auditRivers(model, cfg, &report.River)
 	auditSedimentBudget(model, &report.Sediment)
 	auditBasinTransitions(model, &report.BasinTransition)
+	auditValleyFloodplain(model, &report.ValleyFloodplain)
 	auditTransitions(model, cfg, &report.Transition)
 	return report, nil
 }
@@ -1747,6 +1794,322 @@ func auditBasinTransitions(
 	}
 	report.WallFloorSlopeRatioP50 = percentile(ratios, 0.50)
 	report.WallFloorSlopeRatioP90 = percentile(ratios, 0.90)
+}
+
+type valleyCrossSection struct {
+	x                   float64
+	z                   float64
+	channelHalfWidth    float64
+	floodplainWeight    float64
+	alluvialPlainWeight float64
+	valleyFloorWidth    float64
+	plainContext        float64
+	uplandContext       float64
+	corridorHalfWidth   float64
+	farReliefBlocks     float64
+}
+
+func auditValleyFloodplain(
+	model *generator.WorldModel,
+	report *ValleyFloodplainReport,
+) {
+	if model == nil || model.Waterbed == nil || model.CoastTerrain == nil {
+		return
+	}
+
+	incoming := make(map[int][]int)
+	outgoing := make(map[int]int)
+	for id, seg := range model.Waterbed.Rivers {
+		incoming[seg.To] = append(incoming[seg.To], id)
+		if previous, exists := outgoing[seg.From]; !exists ||
+			model.Waterbed.Rivers[previous].HalfWidth < seg.HalfWidth {
+			outgoing[seg.From] = id
+		}
+	}
+
+	type routeCandidate struct {
+		route  []int
+		length float64
+	}
+	bestByOutlet := make(map[int]routeCandidate)
+	for id, first := range model.Waterbed.Rivers {
+		if len(incoming[first.From]) != 0 {
+			continue
+		}
+		route := traceRoute(model.Waterbed.Rivers, id, outgoing)
+		if len(route) == 0 {
+			continue
+		}
+		length := routeLength(model.Waterbed.Rivers, route)
+		endNode := model.Waterbed.Rivers[route[len(route)-1]].To
+		best, exists := bestByOutlet[endNode]
+		if !exists || length > best.length {
+			bestByOutlet[endNode] = routeCandidate{
+				route:  append([]int(nil), route...),
+				length: length,
+			}
+		}
+	}
+	report.RepresentativeDrainages = len(bestByOutlet)
+
+	upperChannel := make([]float64, 0, len(bestByOutlet))
+	lowerChannel := make([]float64, 0, len(bestByOutlet))
+	upperFloodplain := make([]float64, 0, len(bestByOutlet))
+	lowerFloodplain := make([]float64, 0, len(bestByOutlet))
+	upperCorridor := make([]float64, 0, len(bestByOutlet))
+	lowerCorridor := make([]float64, 0, len(bestByOutlet))
+	upperFarRelief := make([]float64, 0, len(bestByOutlet))
+	lowerFarRelief := make([]float64, 0, len(bestByOutlet))
+	expansionRatios := make([]float64, 0, len(bestByOutlet))
+	matureExpansionRatios := make([]float64, 0, len(bestByOutlet))
+
+	for _, candidate := range bestByOutlet {
+		if candidate.length < 1800 || len(candidate.route) < 4 {
+			continue
+		}
+		upper, okUpper := sampleRouteCrossSection(
+			model,
+			candidate.route,
+			0.25,
+		)
+		lower, okLower := sampleRouteCrossSection(
+			model,
+			candidate.route,
+			0.70,
+		)
+		if !okUpper || !okLower {
+			continue
+		}
+		report.LongDrainages++
+
+		upperChannel = append(upperChannel, upper.channelHalfWidth)
+		lowerChannel = append(lowerChannel, lower.channelHalfWidth)
+		upperFloodplain = append(upperFloodplain, upper.floodplainWeight)
+		lowerFloodplain = append(lowerFloodplain, lower.floodplainWeight)
+		upperCorridor = append(upperCorridor, upper.corridorHalfWidth)
+		lowerCorridor = append(lowerCorridor, lower.corridorHalfWidth)
+		upperFarRelief = append(upperFarRelief, upper.farReliefBlocks)
+		lowerFarRelief = append(lowerFarRelief, lower.farReliefBlocks)
+
+		expansionRatio := lower.corridorHalfWidth /
+			math.Max(1, upper.corridorHalfWidth)
+		expansionRatios = append(expansionRatios, expansionRatio)
+
+		if lower.channelHalfWidth > upper.channelHalfWidth*1.05 {
+			report.ChannelWideningDrainages++
+		}
+		if lower.floodplainWeight > upper.floodplainWeight+0.10 {
+			report.FloodplainWeightIncreaseDrainages++
+		}
+		if expansionRatio >= 1.10 {
+			report.CorridorExpansionDrainages++
+		}
+
+		matureFloodplain := lower.floodplainWeight >= 0.35 &&
+			lower.floodplainWeight > upper.floodplainWeight+0.10
+		if matureFloodplain {
+			report.MatureFloodplainDrainages++
+			matureExpansionRatios = append(
+				matureExpansionRatios,
+				expansionRatio,
+			)
+			if len(report.MatureSignals) < 16 {
+				first := model.Waterbed.Rivers[candidate.route[0]]
+				last := model.Waterbed.Rivers[candidate.route[len(candidate.route)-1]]
+				report.MatureSignals = append(
+					report.MatureSignals,
+					ValleyFloodplainSignal{
+						SourceNode:               first.From,
+						EndNode:                  last.To,
+						UpperX:                   upper.x,
+						UpperZ:                   upper.z,
+						LowerX:                   lower.x,
+						LowerZ:                   lower.z,
+						UpperChannelHalfWidth:    upper.channelHalfWidth,
+						LowerChannelHalfWidth:    lower.channelHalfWidth,
+						UpperFloodplainWeight:    upper.floodplainWeight,
+						LowerFloodplainWeight:    lower.floodplainWeight,
+						UpperCorridorHalfWidth:   upper.corridorHalfWidth,
+						LowerCorridorHalfWidth:   lower.corridorHalfWidth,
+						UpperPlainContext:        upper.plainContext,
+						LowerPlainContext:        lower.plainContext,
+						UpperUplandContext:       upper.uplandContext,
+						LowerUplandContext:       lower.uplandContext,
+						UpperAlluvialPlainWeight: upper.alluvialPlainWeight,
+						LowerAlluvialPlainWeight: lower.alluvialPlainWeight,
+						UpperValleyFloorWidth:    upper.valleyFloorWidth,
+						LowerValleyFloorWidth:    lower.valleyFloorWidth,
+						ExpansionRatio:           expansionRatio,
+					},
+				)
+			}
+			if expansionRatio < 0.80 {
+				report.MatureFloodplainCorridorNarrowingSignals++
+			}
+		}
+	}
+
+	report.UpperChannelHalfWidthP50 = percentile(upperChannel, 0.50)
+	report.LowerChannelHalfWidthP50 = percentile(lowerChannel, 0.50)
+	report.UpperFloodplainWeightP50 = percentile(upperFloodplain, 0.50)
+	report.LowerFloodplainWeightP50 = percentile(lowerFloodplain, 0.50)
+	report.UpperCorridorHalfWidthP50 = percentile(upperCorridor, 0.50)
+	report.LowerCorridorHalfWidthP50 = percentile(lowerCorridor, 0.50)
+	report.UpperFarReliefP50Blocks = percentile(upperFarRelief, 0.50)
+	report.LowerFarReliefP50Blocks = percentile(lowerFarRelief, 0.50)
+	report.CorridorExpansionRatioP50 = percentile(expansionRatios, 0.50)
+	report.MatureFloodplainExpansionRatioP50 =
+		percentile(matureExpansionRatios, 0.50)
+}
+
+func routeLength(
+	segments []waterbed.RiverSegment,
+	route []int,
+) float64 {
+	total := 0.0
+	for _, id := range route {
+		if id < 0 || id >= len(segments) {
+			continue
+		}
+		seg := segments[id]
+		total += math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0) +
+			math.Pi*math.Abs(seg.MeanderOffset)
+	}
+	return total
+}
+
+func sampleRouteCrossSection(
+	model *generator.WorldModel,
+	route []int,
+	fraction float64,
+) (valleyCrossSection, bool) {
+	total := routeLength(model.Waterbed.Rivers, route)
+	if total <= 1e-9 {
+		return valleyCrossSection{}, false
+	}
+	target := total * fraction
+	traversed := 0.0
+	for _, id := range route {
+		if id < 0 || id >= len(model.Waterbed.Rivers) {
+			continue
+		}
+		seg := model.Waterbed.Rivers[id]
+		length := math.Hypot(seg.X1-seg.X0, seg.Z1-seg.Z0) +
+			math.Pi*math.Abs(seg.MeanderOffset)
+		if traversed+length < target {
+			traversed += length
+			continue
+		}
+		t := 0.5
+		if length > 1e-9 {
+			t = (target - traversed) / length
+		}
+		if t < 0.08 {
+			t = 0.08
+		} else if t > 0.92 {
+			t = 0.92
+		}
+		return sampleValleyCrossSection(model, seg, t)
+	}
+	return valleyCrossSection{}, false
+}
+
+func sampleValleyCrossSection(
+	model *generator.WorldModel,
+	seg waterbed.RiverSegment,
+	t float64,
+) (valleyCrossSection, bool) {
+	if seg.ReceiverSurfaceDefined ||
+		seg.OceanMouth ||
+		seg.LakeMouth ||
+		seg.LakeOutlet {
+		return valleyCrossSection{}, false
+	}
+
+	t0 := math.Max(0, t-0.05)
+	t1 := math.Min(1, t+0.05)
+	x0, z0 := waterbed.RiverCenterPoint(seg, t0)
+	cx, cz := waterbed.RiverCenterPoint(seg, t)
+	x1, z1 := waterbed.RiverCenterPoint(seg, t1)
+	dx := x1 - x0
+	dz := z1 - z0
+	length := math.Hypot(dx, dz)
+	if length <= 1e-9 {
+		return valleyCrossSection{}, false
+	}
+	nx := -dz / length
+	nz := dx / length
+
+	center := finalRuntimeSample(model, cx, cz)
+	if center.SpecialFeature != "" ||
+		center.World.WaterKind != reconcile.WaterRiver ||
+		!center.World.WaterSurfaceDefined {
+		return valleyCrossSection{}, false
+	}
+	terrainCenter := model.CoastTerrain.Sample(cx, cz)
+	nav, ok := model.Waterbed.NavigationSampleAt(cx, cz)
+	if !ok || nav.HalfWidth <= 0 {
+		return valleyCrossSection{}, false
+	}
+
+	const (
+		nearBankOffset = 8.0
+		farProbe       = 160.0
+		maxExtent      = 256.0
+		step           = 16.0
+	)
+	waterSurfaceY := minecraftY(center.World.WaterSurfaceElevation)
+	floodplainCeiling := waterSurfaceY + 6.0
+
+	sampleGround := func(sign, fromBank float64) float64 {
+		distance := nav.HalfWidth + fromBank
+		s := finalRuntimeSample(
+			model,
+			cx+sign*nx*distance,
+			cz+sign*nz*distance,
+		)
+		return minecraftY(s.World.GroundHeight)
+	}
+	side := func(sign float64) (float64, float64) {
+		extent := 0.0
+		for d := nearBankOffset; d <= maxExtent; d += step {
+			y := sampleGround(sign, d)
+			if y > floodplainCeiling {
+				break
+			}
+			extent = d
+		}
+		farRelief := math.Max(
+			0,
+			sampleGround(sign, farProbe)-waterSurfaceY,
+		)
+		return extent, farRelief
+	}
+	leftExtent, leftFar := side(-1)
+	rightExtent, rightFar := side(1)
+	meanExtent := 0.5 * (leftExtent + rightExtent)
+
+	return valleyCrossSection{
+		x:                   cx,
+		z:                   cz,
+		channelHalfWidth:    nav.HalfWidth,
+		floodplainWeight:    terrainCenter.FloodplainWeight,
+		alluvialPlainWeight: terrainCenter.AlluvialPlainWeight,
+		valleyFloorWidth:    terrainCenter.ValleyFloorWidth,
+		plainContext: math.Max(
+			terrainCenter.RollingPlainWeight,
+			terrainCenter.AlluvialPlainWeight,
+		),
+		uplandContext: math.Max(
+			terrainCenter.MountainWeight,
+			math.Max(
+				terrainCenter.FoothillWeight,
+				terrainCenter.HillWeight,
+			),
+		),
+		corridorHalfWidth: nav.HalfWidth + meanExtent,
+		farReliefBlocks:   0.5 * (leftFar + rightFar),
+	}, true
 }
 
 func auditTransitions(model *generator.WorldModel, cfg Config, report *TransitionReport) {

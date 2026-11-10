@@ -87,6 +87,22 @@ func TestAnalyzeGeneratedWorldIsReadOnlyAndJSONSafe(t *testing.T) {
 			report.BasinTransition.OrdinaryProfiles,
 		)
 	}
+	if report.ValleyFloodplain.LongDrainages >
+		report.ValleyFloodplain.RepresentativeDrainages {
+		t.Fatalf(
+			"long valley/floodplain drainages=%d exceed representative=%d",
+			report.ValleyFloodplain.LongDrainages,
+			report.ValleyFloodplain.RepresentativeDrainages,
+		)
+	}
+	if report.ValleyFloodplain.MatureFloodplainCorridorNarrowingSignals >
+		report.ValleyFloodplain.MatureFloodplainDrainages {
+		t.Fatalf(
+			"mature floodplain corridor narrowing signals=%d exceed mature drainages=%d",
+			report.ValleyFloodplain.MatureFloodplainCorridorNarrowingSignals,
+			report.ValleyFloodplain.MatureFloodplainDrainages,
+		)
+	}
 	if report.Sediment.Production <= 0 {
 		t.Fatal("expected actual erosion to produce sediment proxy mass")
 	}
