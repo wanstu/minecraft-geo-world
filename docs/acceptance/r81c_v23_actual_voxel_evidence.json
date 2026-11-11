@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "status": "R8.1c selected voxel cases pass; overall RC not approved",
+  "seed": -1818694639628404530,
+  "minecraft": "1.21.1",
+  "loader": "NeoForge",
+  "baselineRules": "geoworld-rules-v1.1.22",
+  "candidateRules": "geoworld-rules-v1.1.23",
+  "worlds": {
+    "baseline": {
+      "save": "R81VoxelAudit",
+      "preflight": true,
+      "modelSha256": "eb1ffcbc19ee43e55495f2007716b1ca0a907dcedf7b493303358d689e20512f",
+      "regionMouth509Sha256": "19b902c8b64b915c423cfcf2954d506678b4cb5887e865827841224d91003a63"
+    },
+    "candidate": {
+      "save": "R81cVerifiedGeoWorld",
+      "preflight": true,
+      "modelSha256": "f3b7f470e585aec4950d52f5aec779061d521b1853359e364075c8a88aeeec1a",
+      "regionMouth509Sha256": "83d33948ffa93b13480464143efbfd5f436e4b7ffe6473aba27622c707ed5385",
+      "regionMouth915Sha256": "a8c54986e14e41d6bbf50d71de07c74bd586f557a52c93d2d0c360cba6b9874f"
+    }
+  },
+  "mouth509": {
+    "direction": "decreasing-z",
+    "comparison": "minecraft:full Anvil top water block",
+    "fourPairs": {
+      "-1071": {
+        "old": {
+          "upstreamTop": 61,
+          "downstreamTop": 62,
+          "upstreamStatus": "full",
+          "downstreamStatus": "full"
+        },
+        "new": {
+          "upstreamTop": 62,
+          "downstreamTop": 62,
+          "upstreamStatus": "full",
+          "downstreamStatus": "full"
+        }
+      },
+      "-1070": {
+        "old": {
+          "upstreamTop": 61,
+          "downstreamTop": 62,
+          "upstreamStatus": "full",
+          "downstreamStatus": "full"
+        },
+        "new": {
+          "upstreamTop": 62,
+          "downstreamTop": 62,
+          "upstreamStatus": "full",
+          "downstreamStatus": "full"
+        }
+      },
+      "-1069": {
+        "old": {
+          "upstreamTop": 61,
+          "downstreamTop": 62,
+          "upstreamStatus": "full",
+          "downstreamStatus": "full"
+        },
+        "new": {
+          "upstreamTop": 62,
+          "downstreamTop": 62,
+          "upstreamStatus": "full",
+          "downstreamStatus": "full"
+        }
+      },
+      "-1068": {
+        "old": {
+          "upstreamTop": 61,
+          "downstreamTop": 62,
+          "upstreamStatus": "full",
+          "downstreamStatus": "full"
+        },
+        "new": {
+          "upstreamTop": 62,
+          "downstreamTop": 62,
+          "upstreamStatus": "full",
+          "downstreamStatus": "full"
+        }
+      }
+    },
+    "legacyInverseRiseCount": 4,
+    "candidateInverseRiseCount": 0,
+    "matchedCrossSectionSamples": 110,
+    "changedLiquidSurfaceSamples": 54,
+    "changedFloorSamples": [
+      {
+        "x": -1026,
+        "z": -1016,
+        "oldFloorY": 59,
+        "newFloorY": 60
+      }
+    ],
+    "note": "One sand-bed floor height is +1 at (-1026,-1016); not all terrain geometry is identical"
+  },
+  "mouth915": {
+    "direction": "increasing-x",
+    "testLine": {
+      "z": 10432,
+      "xStart": 1616,
+      "xEndInclusive": 1700,
+      "step": 1
+    },
+    "fullColumns": 85,
+    "seaDatumBlockTopY": 62,
+    "columnsAtSeaDatum": 85,
+    "frozenCapColumns": 76,
+    "icebergColumnsAboveDatum": 1,
+    "unknownSurfaceColumns": [],
+    "positiveLevelRises": [],
+    "crossSectionSampledColumns": 140,
+    "crossSectionFullColumns": 140,
+    "crossSectionSeaDatumColumns": 140,
+    "legacyModelRiseSignalBlocks": 4,
+    "legacyActualMinecraftVoxelNotAvailable": true,
+    "caveat": "Counts both water blocks and a one-block frozen surface; isolated blue-ice outcrop is not a water-level rise"
+  },
+  "modelAudit": {
+    "riverSegments": 953,
+    "terminalSegments": 103,
+    "oceanTerminals": 88,
+    "lakeTerminals": 15,
+    "unclassifiedTerminals": 0,
+    "oceanMouths": 88,
+    "dryApproachSignals": 0,
+    "endpointNotOceanSignals": 0,
+    "seaAboveApproachSignals": 0,
+    "riverOceanBoundaryRiseSignals": 0,
+    "riverOceanBoundaryChecked": 88,
+    "levelJumpSignals": 0,
+    "sinkholes": 4,
+    "sinkholeRiverOverlapSignals": 1,
+    "sinkholeOverlapWithoutDrainage": 1
+  },
+  "scopeLimits": [
+    "Only mouth #509 and #915 are verified with Minecraft actual Anvil blocks",
+    "Mouth #915 historical +4 rise came from the model; old v1.1.22 actual voxels have not been captured there",
+    "No whole-world visual acceptance or other sea-mouth bank transects",
+    "Pre-existing Go/Java dry terrain parity differences not resolved in this stage",
+    "Sinkhole #11 / river #735 drainage conflict remains uncorrected"
+  ],
+  "releaseEligible": false
+}

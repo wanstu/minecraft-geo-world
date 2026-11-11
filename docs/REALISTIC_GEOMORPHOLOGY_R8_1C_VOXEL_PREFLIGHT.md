@@ -53,3 +53,7 @@ python3 scripts/verify_geoworld_voxel_world.py \
 在**真正新建的规则 v1.1.23 GeoWorld 世界**完成模型绑定后，重新生成河段 #509 的 `(-1069,-1026)` 与 `(-1069,-1027)` 及相邻四列真实方块；比较旧版 +1 方块水面逆坡、两侧低岸、海床、海水连通性。接着检查 #915 原先 +4 格的异常河口，同时保留旧 v1.1.22 不迁移。没有实际 Anvil `minecraft:full` 区块与横断面报告时不得发布 RC。
 
 天坑 #11 / 河流 #735 的冲突仍属 R8.1d，雪山盆地与岛屿选址仍属 R8.2，不在本轮顺手修改。
+
+## 后续专项验收（同日补充）
+
+本文件保留预检时点的历史状态，后续已取得有效 v1.1.23 GeoWorld 新世界实际 Anvil 方块证据：#509 四处原一格台阶消失；#915 冰水共同水面 85 列连续。详见 `docs/REALISTIC_GEOMORPHOLOGY_R8_1C_VOXEL_ACCEPTANCE.md` 与 `docs/acceptance/r81c_v23_actual_voxel_evidence.json`。这些不代表整体 RC 发布验收完成。
