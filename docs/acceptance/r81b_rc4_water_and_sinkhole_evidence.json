@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "scope": "R8.1b water receiver transition and sinkhole diagnostic",
+  "evidenceClass": "mixed_model_and_voxel",
+  "sourceVersion": "v0.1.5-rc.4",
+  "rulesVersion": "geoworld-rules-v1.1.22",
+  "seed": -1818694639628404530,
+  "modelSha256": "eb1ffcbc19ee43e55495f2007716b1ca0a907dcedf7b493303358d689e20512f",
+  "counts": {
+    "riverSegments": 953,
+    "terminalSegments": 103,
+    "oceanTerminals": 88,
+    "lakeTerminals": 15,
+    "unclassifiedTerminals": 0,
+    "oceanMouths": 88,
+    "dryApproachSignals": 0,
+    "endpointNotOceanSignals": 0,
+    "seaAboveApproachSignals": 0,
+    "riverOceanBoundaryRiseSignals": 4,
+    "riverOceanBoundaryChecked": 88,
+    "levelJumpSignals": 0,
+    "sinkholes": 4,
+    "sinkholeRiverOverlapSignals": 1,
+    "sinkholeOverlapWithoutDrainage": 1
+  },
+  "riverOceanModelRiseSignals": [
+    {
+      "riverId": 509,
+      "riseBlocks": 1,
+      "riverSurfaceY": 62,
+      "oceanSurfaceY": 63,
+      "t": 0.5234375
+    },
+    {
+      "riverId": 535,
+      "riseBlocks": 1,
+      "riverSurfaceY": 62,
+      "oceanSurfaceY": 63,
+      "t": 0.6484375
+    },
+    {
+      "riverId": 851,
+      "riseBlocks": 1,
+      "riverSurfaceY": 62,
+      "oceanSurfaceY": 63,
+      "t": 0.6484375
+    },
+    {
+      "riverId": 915,
+      "riseBlocks": 4,
+      "riverSurfaceY": 59,
+      "oceanSurfaceY": 63,
+      "t": 0.5
+    }
+  ],
+  "minecraftActualVoxels": {
+    "world": "R81VoxelAudit",
+    "worldIsCopiedTestSave": true,
+    "region": "region/r.-3.-3.mca",
+    "regionSha256": "19b902c8b64b915c423cfcf2954d506678b4cb5887e865827841224d91003a63",
+    "adjacentSameXOneBlockRises": [
+      {
+        "x": -1071,
+        "upstream": {
+          "z": -1026,
+          "waterTopY": 61
+        },
+        "downstream": {
+          "z": -1027,
+          "waterTopY": 62
+        }
+      },
+      {
+        "x": -1070,
+        "upstream": {
+          "z": -1026,
+          "waterTopY": 61
+        },
+        "downstream": {
+          "z": -1027,
+          "waterTopY": 62
+        }
+      },
+      {
+        "x": -1069,
+        "upstream": {
+          "z": -1026,
+          "waterTopY": 61
+        },
+        "downstream": {
+          "z": -1027,
+          "waterTopY": 62
+        }
+      },
+      {
+        "x": -1068,
+        "upstream": {
+          "z": -1026,
+          "waterTopY": 61
+        },
+        "downstream": {
+          "z": -1027,
+          "waterTopY": 62
+        }
+      }
+    ],
+    "sampledColumns": [
+      {
+        "x": -1069,
+        "z": -1026,
+        "topWaterBlockY": 61,
+        "blockAtTop": "minecraft:water",
+        "blockAbove": "minecraft:air",
+        "underwaterFloorY": 57,
+        "fullyGenerated": true
+      },
+      {
+        "x": -1069,
+        "z": -1027,
+        "topWaterBlockY": 62,
+        "blockAtTop": "minecraft:water",
+        "blockAbove": "minecraft:air",
+        "underwaterFloorY": 57,
+        "fullyGenerated": true
+      },
+      {
+        "x": -1070,
+        "z": -1026,
+        "topWaterBlockY": 61,
+        "blockAtTop": "minecraft:water",
+        "blockAbove": "minecraft:air",
+        "underwaterFloorY": 57,
+        "fullyGenerated": true
+      },
+      {
+        "x": -1070,
+        "z": -1027,
+        "topWaterBlockY": 62,
+        "blockAtTop": "minecraft:water",
+        "blockAbove": "minecraft:air",
+        "underwaterFloorY": 57,
+        "fullyGenerated": true
+      },
+      {
+        "x": -1071,
+        "z": -1026,
+        "topWaterBlockY": 61,
+        "blockAtTop": "minecraft:water",
+        "blockAbove": "minecraft:air",
+        "underwaterFloorY": 57,
+        "fullyGenerated": true
+      },
+      {
+        "x": -1071,
+        "z": -1027,
+        "topWaterBlockY": 62,
+        "blockAtTop": "minecraft:water",
+        "blockAbove": "minecraft:air",
+        "underwaterFloorY": 57,
+        "fullyGenerated": true
+      },
+      {
+        "x": -1068,
+        "z": -1026,
+        "topWaterBlockY": 61,
+        "blockAtTop": "minecraft:water",
+        "blockAbove": "minecraft:air",
+        "underwaterFloorY": 57,
+        "fullyGenerated": true
+      },
+      {
+        "x": -1068,
+        "z": -1027,
+        "topWaterBlockY": 62,
+        "blockAtTop": "minecraft:water",
+        "blockAbove": "minecraft:air",
+        "underwaterFloorY": 57,
+        "fullyGenerated": true
+      }
+    ],
+    "interpretation": "Actual minecraft:water columns rise one block at river-ocean contact; all four coordinate pairs are within one Anvil region. Air exists immediately above each top water block."
+  },
+  "sinkholeModelEvidence": {
+    "featureId": 11,
+    "kind": "sinkhole",
+    "riverSegmentId": 735,
+    "centerX": -1600,
+    "centerZ": 5312,
+    "riverAtApproxX": -1699,
+    "riverAtApproxZ": 5347,
+    "riverWaterSurfaceY": 98,
+    "dryBankOffset16BlocksGroundY": 80,
+    "dryBankOffset32BlocksGroundY": 71,
+    "hasPersistedDrainage": false,
+    "requiresVoxelTest": true
+  },
+  "unverifiedCases": [
+    "R81-TERMINAL-01 voxel path",
+    "R81-SINKHOLE-01 voxel banks",
+    "river #915 voxel 4-block rise"
+  ],
+  "generatorModified": false
+}

@@ -123,3 +123,26 @@ func TestR81SinkholeIntersectionSignalIsNotAnOutletProof(t *testing.T) {
 		t.Fatalf("distant sinkhole intersects river %+v", got)
 	}
 }
+
+func TestR81RiverOceanBoundaryOneBlockRiseDetected(t *testing.T) {
+	y62, y63, y59, y64 := 62, 63, 59, 64
+	for _, tc := range []struct {
+		name  string
+		pts   []Point
+		found bool
+		rise  int
+	}{
+		{"one-block-water-wall", []Point{{Kind: "river", WaterY: &y62}, {Kind: "ocean", WaterY: &y63}}, true, 1},
+		{"four-block-water-wall", []Point{{Kind: "river", WaterY: &y59}, {Kind: "ocean", WaterY: &y63}}, true, 4},
+		{"downward-handoff", []Point{{Kind: "river", WaterY: &y64}, {Kind: "ocean", WaterY: &y63}}, true, -1},
+		{"no-transition", []Point{{Kind: "river", WaterY: &y62}, {Kind: "river", WaterY: &y63}}, false, 0},
+		{"dry-gap-not-fabricated", []Point{{Kind: "river", WaterY: &y62}, {Kind: "none"}, {Kind: "ocean", WaterY: &y63}}, false, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, _, rise := detectRiverOceanBoundary(tc.pts)
+			if got != tc.found || rise != tc.rise {
+				t.Fatalf("got found=%v rise=%d want found=%v rise=%d", got, rise, tc.found, tc.rise)
+			}
+		})
+	}
+}

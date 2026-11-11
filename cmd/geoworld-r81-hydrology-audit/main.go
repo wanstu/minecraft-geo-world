@@ -49,14 +49,19 @@ type Site struct {
 	NearestOceanMouth     bool    `json:"nearestOceanMouth"`
 }
 type Mouth struct {
-	RiverID            int     `json:"riverId"`
-	From               int     `json:"from"`
-	To                 int     `json:"to"`
-	HalfWidth          float64 `json:"halfWidth"`
-	Samples            []Point `json:"samples"`
-	DryAt98            bool    `json:"dryAt98"`
-	EndpointNotOcean   bool    `json:"endpointNotOcean"`
-	ReceiverRiseBlocks int     `json:"receiverRiseBlocks"`
+	RiverID                      int     `json:"riverId"`
+	From                         int     `json:"from"`
+	To                           int     `json:"to"`
+	HalfWidth                    float64 `json:"halfWidth"`
+	Samples                      []Point `json:"samples"`
+	DryAt98                      bool    `json:"dryAt98"`
+	EndpointNotOcean             bool    `json:"endpointNotOcean"`
+	ReceiverRiseBlocks           int     `json:"receiverRiseBlocks"`
+	RiverOceanBoundaryFound      bool    `json:"riverOceanBoundaryFound"`
+	RiverOceanBoundaryT          float64 `json:"riverOceanBoundaryT"`
+	RiverOceanBoundaryRiseBlocks int     `json:"riverOceanBoundaryRiseBlocks"`
+	RiverOceanBoundaryRiverY     int     `json:"riverOceanBoundaryRiverY"`
+	RiverOceanBoundaryOceanY     int     `json:"riverOceanBoundaryOceanY"`
 }
 type Sinkhole struct {
 	ID                       int     `json:"id"`
@@ -77,6 +82,8 @@ type Counts struct {
 	DryApproachSignals             int `json:"dryApproachSignals"`
 	EndpointNotOceanSignals        int `json:"endpointNotOceanSignals"`
 	SeaAboveApproachSignals        int `json:"seaAboveApproachSignals"`
+	RiverOceanBoundaryRiseSignals  int `json:"riverOceanBoundaryRiseSignals"`
+	RiverOceanBoundaryChecked      int `json:"riverOceanBoundaryChecked"`
 	LevelJumpSignals               int `json:"levelJumpSignals"`
 	Sinkholes                      int `json:"sinkholes,omitempty"`
 	SinkholeRiverOverlapSignals    int `json:"sinkholeRiverOverlapSignals"`
@@ -202,6 +209,46 @@ func sinkhole(m *worldmodelio.RuntimeModel, sf specialfeatures.Feature) Sinkhole
 	}
 	return f
 }
+
+// detectRiverOceanBoundary finds the maximum water-level step precisely at a
+// river-to-ocean ownership handoff. It also reports 1-block jumps (the old
+// final-2-percent-of-reach inspection missed them entirely).
+func detectRiverOceanBoundary(points []Point) (found bool, index int, rise int) {
+	for i := 1; i < len(points); i++ {
+		prev, cur := points[i-1], points[i]
+		if prev.Kind != "river" || cur.Kind != "ocean" || prev.WaterY == nil || cur.WaterY == nil {
+			continue
+		}
+		delta := *cur.WaterY - *prev.WaterY
+		if !found || delta > rise {
+			found = true
+			index = i
+			rise = delta
+		}
+	}
+	return
+}
+
+// Inspect the entire receiving reach, not merely t=0.98..1.0 (which may
+// already be ocean). Model sampling here is diagnostic, not voxel proof.
+func inspectRiverOceanBoundary(m *worldmodelio.RuntimeModel, s waterbed.RiverSegment, item *Mouth) {
+	const divisions = 128
+	points := make([]Point, 0, divisions+1)
+	for j := 0; j <= divisions; j++ {
+		x, z := waterbed.RiverCenterPoint(s, float64(j)/divisions)
+		points = append(points, sample(m, x, z))
+	}
+	found, index, rise := detectRiverOceanBoundary(points)
+	if !found {
+		return
+	}
+	item.RiverOceanBoundaryFound = true
+	item.RiverOceanBoundaryT = float64(index) / divisions
+	item.RiverOceanBoundaryRiseBlocks = rise
+	item.RiverOceanBoundaryRiverY = *points[index-1].WaterY
+	item.RiverOceanBoundaryOceanY = *points[index].WaterY
+}
+
 func audit(m *worldmodelio.RuntimeModel, f Fixture, maxDetails int) (Report, error) {
 	if m == nil || m.Waterbed == nil {
 		return Report{}, errors.New("missing loaded model or waterbed")
@@ -243,6 +290,13 @@ func audit(m *worldmodelio.RuntimeModel, f Fixture, maxDetails int) (Report, err
 		}
 		near := item.Samples[2]
 		end := item.Samples[3]
+		inspectRiverOceanBoundary(m, s, &item)
+		if item.RiverOceanBoundaryFound {
+			r.Counts.RiverOceanBoundaryChecked++
+			if item.RiverOceanBoundaryRiseBlocks > 0 {
+				r.Counts.RiverOceanBoundaryRiseSignals++
+			}
+		}
 		item.DryAt98 = near.Kind == "none"
 		item.EndpointNotOcean = end.Kind != "ocean"
 		if item.DryAt98 {
@@ -260,7 +314,7 @@ func audit(m *worldmodelio.RuntimeModel, f Fixture, maxDetails int) (Report, err
 				r.Counts.LevelJumpSignals++
 			}
 		}
-		if len(r.MouthExamples) < maxDetails && (item.DryAt98 || item.EndpointNotOcean || math.Abs(float64(item.ReceiverRiseBlocks)) > 1) {
+		if len(r.MouthExamples) < maxDetails && (item.DryAt98 || item.EndpointNotOcean || math.Abs(float64(item.ReceiverRiseBlocks)) > 1 || item.RiverOceanBoundaryRiseBlocks > 0) {
 			r.MouthExamples = append(r.MouthExamples, item)
 		}
 	}
