@@ -11,6 +11,7 @@ import (
 func TestR81dV124KeepsV123MacroAndCoastalSettings(t *testing.T) {
 	current := testConfig(20261111)
 	current.WorldProfile = StandardWorldProfile()
+	current.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.24"
 	legacy := current
 	legacy.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.23"
 

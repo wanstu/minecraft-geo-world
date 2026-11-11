@@ -11,7 +11,7 @@ import (
 
 const (
 	CurrentWorldProfileVersion    = "geoworld-profile-v1.1"
-	CurrentGenerationRulesVersion = "geoworld-rules-v1.1.24"
+	CurrentGenerationRulesVersion = "geoworld-rules-v1.1.25"
 	CurrentWorldModelVersion      = "geoworld-model-v1"
 )
 
@@ -286,7 +286,7 @@ func usesV117Features(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || version == "geoworld-rules-v1.1.24"))))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || version == "geoworld-rules-v1.1.25")))))
 }
 
 func usesV119Features(version string) bool {
@@ -300,7 +300,7 @@ func usesV119Features(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || version == "geoworld-rules-v1.1.24"))))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || version == "geoworld-rules-v1.1.25")))))
 }
 
 func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
@@ -364,11 +364,11 @@ func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
 	}
 	if cfg.Geomorph.LongitudinalGradeVersion == 0 &&
 		(cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.19" ||
-			(cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.20" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.21" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.22" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.23" || cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.24"))))) {
+			(cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.20" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.21" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.22" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.23" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.24" || cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.25")))))) {
 		cfg.Geomorph.LongitudinalGradeVersion = 1
 	}
 	if cfg.Terrain.RoutedDepositionVersion == 0 &&
-		(cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.20" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.21" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.22" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.23" || cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.24")))) {
+		(cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.20" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.21" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.22" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.23" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.24" || cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.25"))))) {
 		cfg.Terrain.RoutedDepositionVersion = 1
 		cfg.Terrain.RoutedDepositionScale = 0.12
 		// Routed macro deposition is a broad surface feedback, not a local
@@ -388,7 +388,7 @@ func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
 	}
 	if cfg.Waterbed.RiverGeometryVersion == 0 {
 		switch cfg.WorldProfile.GenerationRulesVersion {
-		case "geoworld-rules-v1.1.24", "geoworld-rules-v1.1.23", "geoworld-rules-v1.1.22":
+		case "geoworld-rules-v1.1.25", "geoworld-rules-v1.1.24", "geoworld-rules-v1.1.23", "geoworld-rules-v1.1.22":
 			cfg.Waterbed.RiverGeometryVersion = 7
 		case "geoworld-rules-v1.1.21":
 			cfg.Waterbed.RiverGeometryVersion = 6
@@ -423,7 +423,7 @@ func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
 			cfg.Waterbed.MinRiverBedDepthNormalized = 0.004
 		}
 	}
-	if cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.23" || cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.24" {
+	if cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.23" || (cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.24" || cfg.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.25") {
 		cfg.WorldSample.CoastalBackwaterVersion = 1
 	}
 	if cfg.WorldSample.RiverCenterDepthNormalized == 0 {
