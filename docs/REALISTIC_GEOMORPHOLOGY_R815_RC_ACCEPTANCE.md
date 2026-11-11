@@ -32,14 +32,14 @@
 
 | Minecraft / Loader | 本地 JDK | 本轮结果 | 是否 CI 发布验收 |
 |---|---|---|---|
-| 26.3 / NeoForge | 25 | 尚未构建 | 否 |
-| 26.3 / Fabric | 25 | `compileJava` **通过** | 否（未做完整 check/build） |
+| 26.3 / NeoForge | 25 | 离线缺少 ModDevGradle 2.0.147 插件，源码尚未编译 | 否 |
+| 26.3 / Fabric | 25 | **`compileJava` 与 `assemble` 通过；本地 JAR 六平台原生引擎、Loader 元数据检查通过** | 否（未做完整 check/build） |
 | 26.2 / NeoForge | 25 | 尚未构建 | 否 |
 | 26.2 / Fabric | 25 | 尚未构建 | 否 |
 | 26.1.2 / NeoForge | 25 | 尚未构建 | 否 |
 | 26.1.2 / Fabric | 25 | 尚未构建 | 否 |
 | 1.21.1 / NeoForge | 21 | `assemble` 通过；`check build` 在 8 分钟上限超时 | 否 |
-| 1.21.1 / Fabric | 21 | 离线缺失 Fabric Loom 1.7.4；在线重试 6 分钟超时，**未进入成功编译结论** | 否 |
+| 1.21.1 / Fabric | 21 | Loom 1.7.4 已缓存，但离线仍缺 Minecraft 编译类路径 26 个依赖 JAR；未完成编译 | 否 |
 | 1.20.1 / Fabric | 17 | dadm 本地 JDK17 缺失 | 否 |
 
 ### 1.21.1 NeoForge 开发候选产物
@@ -51,6 +51,17 @@
 - 产物验证结果：`docs/acceptance/r815_rc_neoforge_1211_jar_inspection.json`，重复验证工具 `scripts/r815_rc_verify_jar.py`。
 - `check build` 未在本地限定运行时间内结束。**不称此为 check/build PASS**，不上传、不发布此产物。
 
+
+
+### 26.3 Fabric 开发候选 JAR（本轮新增）
+
+- `bash ./gradlew --offline --no-daemon --max-workers=1 ... -Pmod_version=0.1.5-rc.4-dev assemble`：**BUILD SUCCESSFUL**。
+- `java/adapters/26.3-fabric/build/libs/geoworld-0.1.5-rc.4-dev.jar`：29,144,410 字节。
+- Loader 元数据 ID `geoworld` 与版本 `0.1.5-rc.4-dev` 正确，Java Runtime 与 Windows/Linux/macOS x64/ARM64 六套原生引擎均存在。
+- SHA256：`4b9837194eae1fb7396ca5cd78b91079a5f57590800c459ce0c773c65048d3df`。
+- 证据：`docs/acceptance/r815_rc_fabric263_jar_inspection.json`。
+- **没有运行此版本的全部游戏测试和完整 `check build`；不能作为九目标发布验收替代。**
+
 ## RC 仍需的明确验收门槛
 
 1. 9 个正式 CI 目标都需编译、`check build`、元数据及原生引擎验证（推荐在 GitHub Actions Windows Matrix，避免强行在 dadm 同时运行所有 Gradle/JVM）。
@@ -59,3 +70,19 @@
 4. 禁止覆盖旧世界模型和旧版本生成规则；不修改旧存档；新规则只对新世界生效。
 
 此阶段不合并 master、不推送、不打 tag、不发 RC。
+
+
+## 本轮补充：新天坑 #11 新位置真实方块与地貌自然度
+
+详见 `docs/REALISTIC_GEOMORPHOLOGY_R81D_NEW_SINKHOLE_SHAPE_REVIEW.md`。
+在固定种子 v1.1.24 的真实 1.21.1 NeoForge 保存世界中，围绕新址 `(320,6592)` 的
+40/40 横断面方块列全部 `minecraft:full`。坑底自然基底 Y77，四向外缘 Y115～116；
+东西约 160 格和南北约 128 格的抽样范围几乎都完全平坦，
+部分坑壁绝对坡率达 1.875 格高度/水平格。数据与模型、Go/Java 原有
+`Sinkhole` 恒定 floor + 狭窄 smoothstep wall 公式吻合。
+
+**重要：** R8.1d 的河流避让固定问题通过，不意味着改址后大平底/陡壁的自然度已通过。
+当前 `shapeRealism=HOLD_FOR_GAMEPLAY_VISUAL_REVIEW`，不能批准 RC 发布。
+真实方块投影图在 `docs/acceptance/r81d_new_sinkhole_anvil_planview.png`，
+**这不是 Minecraft 游戏相机截图**。是否改变天坑形状应进入下一独立地貌阶段，
+并采用新规则版本、明确多种子/多加载器兼容性和回归验收，不直接改已通过的河口/河道算法。

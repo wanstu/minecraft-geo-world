@@ -23,9 +23,10 @@
       "loader": "neoforge",
       "java": "25",
       "module": "java/neoforge-mod",
-      "compile": "NOT_RUN",
+      "compile": "BLOCKED_MISSING_OFFLINE_MODDEVGRADLE_2.0.147_PLUGIN",
       "assemble": "NOT_RUN",
-      "checkBuild": "NOT_RUN"
+      "checkBuild": "NOT_RUN",
+      "sourceCompileErrorsObserved": false
     },
     {
       "minecraft": "26.3",
@@ -33,8 +34,10 @@
       "java": "25",
       "module": "java/adapters/26.3-fabric",
       "compile": "PASS",
-      "assemble": "NOT_RUN",
-      "checkBuild": "NOT_RUN"
+      "assemble": "PASS",
+      "checkBuild": "NOT_RUN",
+      "jarInspection": "PASS",
+      "jarSHA256": "4b9837194eae1fb7396ca5cd78b91079a5f57590800c459ce0c773c65048d3df"
     },
     {
       "minecraft": "26.2",
@@ -87,11 +90,13 @@
       "loader": "fabric",
       "java": "21",
       "module": "java/adapters/1.21.1-fabric",
-      "compile": "UNVERIFIED",
+      "compile": "BLOCKED_MISSING_OFFLINE_MINECRAFT_JARS",
       "assemble": "NOT_RUN",
       "checkBuild": "NOT_RUN",
-      "offlineDependency": "BLOCKED_FABRIC_LOOM_1.7.4",
-      "onlineAttempt": "TIMEOUT_360_SECONDS"
+      "offlineDependency": "BLOCKED_26_MINECRAFT_COMPILE_CLASSPATH_JARS",
+      "onlineAttempt": "TIMEOUT_360_SECONDS",
+      "offlineRetest": "FABRIC_LOOM_1.7.4_PLUGIN_NOW_CACHED",
+      "sourceCompileErrorsObserved": false
     },
     {
       "minecraft": "1.20.1",
@@ -124,5 +129,29 @@
     "new sinkhole #11 at (320,6592) in-game terrain verification",
     "real-world satellite or DEM visual comparison for release",
     "do not bind historical worlds to new rules"
-  ]
+  ],
+  "sinkhole11_new_site_actual_voxel": {
+    "evidence": "docs/acceptance/r81d_new_sinkhole_actual_voxels.json",
+    "visualization": "docs/acceptance/r81d_new_sinkhole_anvil_planview.png",
+    "profileSamplesFull": 40,
+    "profileSamplesTotal": 40,
+    "pitNaturalFloorY": 77,
+    "outerGroundRangeY": [
+      115,
+      116
+    ],
+    "coreFloorFlatEastWest": true,
+    "coreFloorFlatNorthSouth": true,
+    "measuredMaxRisePerHorizontalBlock": 1.875,
+    "shapeRealism": "HOLD_FOR_GAMEPLAY_VISUAL_REVIEW",
+    "gameplayScreenshot": false
+  },
+  "fabric263Jar": {
+    "inspectionPassed": true,
+    "sha256": "4b9837194eae1fb7396ca5cd78b91079a5f57590800c459ce0c773c65048d3df",
+    "bytes": 29144410,
+    "version": "0.1.5-rc.4-dev",
+    "sixNativeEngines": true,
+    "published": false
+  }
 }
