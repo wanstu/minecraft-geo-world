@@ -1,0 +1,582 @@
+{
+  "seed": -1818694639628404530,
+  "rulesVersion": "geoworld-rules-v1.1.23",
+  "feature": {
+    "id": 11,
+    "centerX": -1600,
+    "centerZ": 5312,
+    "radiusX": 153.61189697561292,
+    "radiusZ": 130.47393614546564
+  },
+  "cases": [
+    {
+      "x": -1704,
+      "z": 5416,
+      "status": "not_generated",
+      "t": 0.5,
+      "offset": -48
+    },
+    {
+      "x": -1693,
+      "z": 5405,
+      "status": "full",
+      "topY": 104,
+      "floorY": 104,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        104,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:stone",
+      "y99": "minecraft:stone",
+      "y70": "minecraft:stone",
+      "t": 0.5,
+      "offset": -32
+    },
+    {
+      "x": -1682,
+      "z": 5394,
+      "status": "full",
+      "topY": 111,
+      "floorY": 111,
+      "topBlock": "minecraft:dark_oak_leaves",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        111,
+        "minecraft:dark_oak_leaves"
+      ],
+      "y98": "minecraft:dirt",
+      "y99": "minecraft:dirt",
+      "y70": "minecraft:stone",
+      "t": 0.5,
+      "offset": -16
+    },
+    {
+      "x": -1670,
+      "z": 5382,
+      "status": "full",
+      "topY": 96,
+      "floorY": 93,
+      "topBlock": "minecraft:water",
+      "waterTopY": 96,
+      "firstNonwaterBlock": [
+        93,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:stone",
+      "t": 0.5,
+      "offset": 0
+    },
+    {
+      "x": -1659,
+      "z": 5371,
+      "status": "full",
+      "topY": 79,
+      "floorY": 79,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        79,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:stone",
+      "t": 0.5,
+      "offset": 16
+    },
+    {
+      "x": -1648,
+      "z": 5360,
+      "status": "full",
+      "topY": 69,
+      "floorY": 69,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        69,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:air",
+      "t": 0.5,
+      "offset": 32
+    },
+    {
+      "x": -1636,
+      "z": 5348,
+      "status": "full",
+      "topY": 69,
+      "floorY": 69,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        69,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:air",
+      "t": 0.5,
+      "offset": 48
+    },
+    {
+      "x": -1723,
+      "z": 5395,
+      "status": "full",
+      "topY": 104,
+      "floorY": 104,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        104,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:andesite",
+      "y99": "minecraft:andesite",
+      "y70": "minecraft:stone",
+      "t": 0.625,
+      "offset": -48
+    },
+    {
+      "x": -1710,
+      "z": 5385,
+      "status": "full",
+      "topY": 112,
+      "floorY": 112,
+      "topBlock": "minecraft:dark_oak_leaves",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        112,
+        "minecraft:dark_oak_leaves"
+      ],
+      "y98": "minecraft:stone",
+      "y99": "minecraft:stone",
+      "y70": "minecraft:stone",
+      "t": 0.625,
+      "offset": -32
+    },
+    {
+      "x": -1698,
+      "z": 5375,
+      "status": "full",
+      "topY": 111,
+      "floorY": 111,
+      "topBlock": "minecraft:dark_oak_leaves",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        111,
+        "minecraft:dark_oak_leaves"
+      ],
+      "y98": "minecraft:dirt",
+      "y99": "minecraft:dirt",
+      "y70": "minecraft:stone",
+      "t": 0.625,
+      "offset": -16
+    },
+    {
+      "x": -1685,
+      "z": 5365,
+      "status": "full",
+      "topY": 96,
+      "floorY": 93,
+      "topBlock": "minecraft:water",
+      "waterTopY": 96,
+      "firstNonwaterBlock": [
+        93,
+        "minecraft:gravel"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:stone",
+      "t": 0.625,
+      "offset": 0
+    },
+    {
+      "x": -1673,
+      "z": 5355,
+      "status": "full",
+      "topY": 82,
+      "floorY": 82,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        82,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:stone",
+      "t": 0.625,
+      "offset": 16
+    },
+    {
+      "x": -1660,
+      "z": 5345,
+      "status": "full",
+      "topY": 69,
+      "floorY": 69,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        69,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:air",
+      "t": 0.625,
+      "offset": 32
+    },
+    {
+      "x": -1648,
+      "z": 5335,
+      "status": "full",
+      "topY": 69,
+      "floorY": 69,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        69,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:air",
+      "t": 0.625,
+      "offset": 48
+    },
+    {
+      "x": -1738,
+      "z": 5375,
+      "status": "full",
+      "topY": 112,
+      "floorY": 112,
+      "topBlock": "minecraft:dark_oak_leaves",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        112,
+        "minecraft:dark_oak_leaves"
+      ],
+      "y98": "minecraft:stone",
+      "y99": "minecraft:stone",
+      "y70": "minecraft:stone",
+      "t": 0.75,
+      "offset": -48
+    },
+    {
+      "x": -1725,
+      "z": 5366,
+      "status": "full",
+      "topY": 112,
+      "floorY": 112,
+      "topBlock": "minecraft:dark_oak_leaves",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        112,
+        "minecraft:dark_oak_leaves"
+      ],
+      "y98": "minecraft:stone",
+      "y99": "minecraft:stone",
+      "y70": "minecraft:stone",
+      "t": 0.75,
+      "offset": -32
+    },
+    {
+      "x": -1712,
+      "z": 5357,
+      "status": "full",
+      "topY": 109,
+      "floorY": 109,
+      "topBlock": "minecraft:dark_oak_leaves",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        109,
+        "minecraft:dark_oak_leaves"
+      ],
+      "y98": "minecraft:dirt",
+      "y99": "minecraft:dirt",
+      "y70": "minecraft:stone",
+      "t": 0.75,
+      "offset": -16
+    },
+    {
+      "x": -1699,
+      "z": 5347,
+      "status": "full",
+      "topY": 96,
+      "floorY": 93,
+      "topBlock": "minecraft:water",
+      "waterTopY": 96,
+      "firstNonwaterBlock": [
+        93,
+        "minecraft:sand"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:stone",
+      "t": 0.75,
+      "offset": 0
+    },
+    {
+      "x": -1686,
+      "z": 5338,
+      "status": "full",
+      "topY": 79,
+      "floorY": 79,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        79,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:stone",
+      "t": 0.75,
+      "offset": 16
+    },
+    {
+      "x": -1673,
+      "z": 5328,
+      "status": "full",
+      "topY": 69,
+      "floorY": 69,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        69,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:air",
+      "t": 0.75,
+      "offset": 32
+    },
+    {
+      "x": -1660,
+      "z": 5319,
+      "status": "full",
+      "topY": 69,
+      "floorY": 69,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        69,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:air",
+      "t": 0.75,
+      "offset": 48
+    },
+    {
+      "x": -1750,
+      "z": 5359,
+      "status": "full",
+      "topY": 102,
+      "floorY": 102,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        102,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:stone",
+      "y99": "minecraft:dirt",
+      "y70": "minecraft:stone",
+      "t": 0.875,
+      "offset": -48
+    },
+    {
+      "x": -1738,
+      "z": 5349,
+      "status": "full",
+      "topY": 102,
+      "floorY": 102,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        102,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:stone",
+      "y99": "minecraft:dirt",
+      "y70": "minecraft:stone",
+      "t": 0.875,
+      "offset": -32
+    },
+    {
+      "x": -1725,
+      "z": 5339,
+      "status": "full",
+      "topY": 103,
+      "floorY": 103,
+      "topBlock": "minecraft:oak_leaves",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        103,
+        "minecraft:oak_leaves"
+      ],
+      "y98": "minecraft:dirt",
+      "y99": "minecraft:dirt",
+      "y70": "minecraft:stone",
+      "t": 0.875,
+      "offset": -16
+    },
+    {
+      "x": -1713,
+      "z": 5329,
+      "status": "full",
+      "topY": 96,
+      "floorY": 93,
+      "topBlock": "minecraft:water",
+      "waterTopY": 96,
+      "firstNonwaterBlock": [
+        93,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:stone",
+      "t": 0.875,
+      "offset": 0
+    },
+    {
+      "x": -1700,
+      "z": 5319,
+      "status": "full",
+      "topY": 94,
+      "floorY": 94,
+      "topBlock": "minecraft:dark_oak_leaves",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        94,
+        "minecraft:dark_oak_leaves"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:stone",
+      "t": 0.875,
+      "offset": 16
+    },
+    {
+      "x": -1688,
+      "z": 5309,
+      "status": "full",
+      "topY": 80,
+      "floorY": 80,
+      "topBlock": "minecraft:dark_oak_leaves",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        80,
+        "minecraft:dark_oak_leaves"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:dirt",
+      "t": 0.875,
+      "offset": 32
+    },
+    {
+      "x": -1675,
+      "z": 5299,
+      "status": "full",
+      "topY": 69,
+      "floorY": 69,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        69,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:air",
+      "t": 0.875,
+      "offset": 48
+    },
+    {
+      "x": -1600,
+      "z": 5312,
+      "status": "full",
+      "topY": 69,
+      "floorY": 69,
+      "topBlock": "minecraft:grass_block",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        69,
+        "minecraft:grass_block"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:air",
+      "control": true
+    },
+    {
+      "x": -1665,
+      "z": 5313,
+      "status": "full",
+      "topY": 70,
+      "floorY": 69,
+      "topBlock": "minecraft:short_grass",
+      "waterTopY": null,
+      "firstNonwaterBlock": [
+        70,
+        "minecraft:short_grass"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:short_grass",
+      "control": true
+    },
+    {
+      "x": -1699,
+      "z": 5347,
+      "status": "full",
+      "topY": 96,
+      "floorY": 93,
+      "topBlock": "minecraft:water",
+      "waterTopY": 96,
+      "firstNonwaterBlock": [
+        93,
+        "minecraft:sand"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:stone",
+      "control": true
+    },
+    {
+      "x": -1728,
+      "z": 5312,
+      "status": "full",
+      "topY": 95,
+      "floorY": 92,
+      "topBlock": "minecraft:water",
+      "waterTopY": 95,
+      "firstNonwaterBlock": [
+        92,
+        "minecraft:sand"
+      ],
+      "y98": "minecraft:air",
+      "y99": "minecraft:air",
+      "y70": "minecraft:stone",
+      "control": true
+    }
+  ],
+  "evidenceClass": "actual_minecraft_anvil_full_blockstates",
+  "minecraft": "1.21.1 NeoForge",
+  "world": "R81cVerifiedGeoWorld",
+  "regionSha256": "184397146745722d0f8eef05fb9903ebd6f6bdc1162d08858b09ecf36fada3c2",
+  "modelSha256": "f3b7f470e585aec4950d52f5aec779061d521b1853359e364075c8a88aeeec1a",
+  "fullSampleCount": 31,
+  "unknownSampleCount": 1,
+  "siteOutcome": "river high above carved sinkhole floor; model-only selection fix not yet verified in new world"
+}

@@ -195,6 +195,58 @@ func Plan(
 
 	take(Sinkhole, sinkCandidates, clampInt(base+1, 2, 6), sinkRadius, "", 0x51)
 
+	// R8.1d: preserve every existing sinkhole ID and all other rare-feature
+	// placements, then move only the sinkholes that conflict with an
+	// authoritative river. Keeping each old site in 'used' preserves the
+	// original spacing choices for downstream crater/basin placement.
+	// If no valid replacement exists, omit the conflicting sinkhole rather
+	// than leave an elevated river crossing a freshly carved pit.
+	if usesRiverSafeSinkholeSites(rulesVersion) && runtime.Ground != nil {
+		kept := make([]Feature, 0, len(features))
+		for _, original := range features {
+			if original.Kind != Sinkhole ||
+				!sinkholeConflictsRiver(original, runtime.Ground.Rivers) {
+				kept = append(kept, original)
+				continue
+			}
+			replaced := false
+			for _, c := range sinkCandidates {
+				radius := sinkRadius * (0.86 + 0.28*hashUnit(c.score^0x51))
+				minGap := math.Max(1800, radius*5)
+				spaced := true
+				for _, previous := range used {
+					if math.Hypot(c.x-previous.x, c.z-previous.z) < minGap {
+						spaced = false
+						break
+					}
+				}
+				if !spaced {
+					continue
+				}
+				replacement := makeFeature(
+					original.ID, Sinkhole, c.x, c.z, radius, seed, 0x51, "",
+				)
+				if sinkholeConflictsRiver(replacement, runtime.Ground.Rivers) {
+					continue
+				}
+				center := runtime.Sample(c.x, c.z).GroundHeight
+				replacement.BaseHeight = center
+				replacement.FloorHeight = math.Max(runtime.SeaLevelNormalized+0.014, center-0.075)
+				replacement.RimHeight = center
+				kept = append(kept, replacement)
+				used = append(used, c)
+				replaced = true
+				break
+			}
+			if !replaced {
+				// The old site stays excluded from all later feature placements.
+				// A missing rare feature is safer than a river without drainage.
+				continue
+			}
+		}
+		features = kept
+	}
+
 	craterAdded := 0
 	for i, c := range craterCandidates {
 		kind := VolcanicCraterCherry
@@ -242,6 +294,47 @@ func Plan(
 
 	sort.Slice(features, func(i, j int) bool { return features[i].ID < features[j].ID })
 	return features
+}
+
+// A new version gate is mandatory: persisted v1.1.23 worlds retain the old
+// placement semantics even if loaded by a newer runtime.
+func usesRiverSafeSinkholeSites(version string) bool {
+	return version == "geoworld-rules-v1.1.24"
+}
+
+// sinkholeConflictsRiver checks the existing persisted river centerline,
+// including its bank/edge clearance, before accepting a new sinkhole site.
+// It is deliberately conservative: an unplanned river should never remain
+// suspended above a newly carved pit. The original river and its datum are
+// not modified.
+func sinkholeConflictsRiver(feature Feature, rivers []waterbed.RiverSegment) bool {
+	if feature.Kind != Sinkhole || feature.RadiusX <= 0 || feature.RadiusZ <= 0 {
+		return false
+	}
+	for _, river := range rivers {
+		margin := math.Max(24, river.HalfWidth+16)
+		rx, rz := feature.RadiusX+margin, feature.RadiusZ+margin
+		bend := math.Abs(river.MeanderOffset)
+		if math.Max(river.X0, river.X1)+bend < feature.CenterX-rx ||
+			math.Min(river.X0, river.X1)-bend > feature.CenterX+rx ||
+			math.Max(river.Z0, river.Z1)+bend < feature.CenterZ-rz ||
+			math.Min(river.Z0, river.Z1)-bend > feature.CenterZ+rz {
+			continue
+		}
+		pathLength := math.Hypot(river.X1-river.X0, river.Z1-river.Z0) + math.Pi*bend
+		steps := int(math.Ceil(pathLength / 12))
+		if steps < 2 {
+			steps = 2
+		}
+		for i := 0; i <= steps; i++ {
+			x, z := waterbed.RiverCenterPoint(river, float64(i)/float64(steps))
+			dx, dz := (x-feature.CenterX)/rx, (z-feature.CenterZ)/rz
+			if dx*dx+dz*dz <= 1 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func planBasinDrainage(
@@ -817,7 +910,7 @@ func Apply(
 					if rulesVersion == "geoworld-rules-v1.1.16" ||
 						rulesVersion == "geoworld-rules-v1.1.18" ||
 						rulesVersion == "geoworld-rules-v1.1.19" ||
-						(rulesVersion == "geoworld-rules-v1.1.20" || (rulesVersion == "geoworld-rules-v1.1.21" || (rulesVersion == "geoworld-rules-v1.1.22" || rulesVersion == "geoworld-rules-v1.1.23"))) {
+						(rulesVersion == "geoworld-rules-v1.1.20" || (rulesVersion == "geoworld-rules-v1.1.21" || (rulesVersion == "geoworld-rules-v1.1.22" || (rulesVersion == "geoworld-rules-v1.1.23" || rulesVersion == "geoworld-rules-v1.1.24")))) {
 						// v1.1.16 locked interpretation.
 						// Deform the shared water datum, then translate the bed by
 						// the same amount. This fixed crowned rivers but can bend
@@ -901,7 +994,7 @@ func usesV112DepressionGeometry(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || version == "geoworld-rules-v1.1.23")))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || version == "geoworld-rules-v1.1.24"))))
 }
 
 func usesCarvedDepressionGeometry(version string) bool {
@@ -910,7 +1003,7 @@ func usesCarvedDepressionGeometry(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || version == "geoworld-rules-v1.1.23")))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || version == "geoworld-rules-v1.1.24"))))
 }
 
 func usesHydrologyConformingDepressions(version string) bool {
@@ -918,7 +1011,7 @@ func usesHydrologyConformingDepressions(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || version == "geoworld-rules-v1.1.23")))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || version == "geoworld-rules-v1.1.24"))))
 }
 
 func usesLakeIslandClearance(version string) bool {
@@ -926,13 +1019,13 @@ func usesLakeIslandClearance(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || version == "geoworld-rules-v1.1.23")))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || version == "geoworld-rules-v1.1.24"))))
 }
 
 func usesBasinDrainageCorridors(version string) bool {
 	return version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || version == "geoworld-rules-v1.1.23")))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || version == "geoworld-rules-v1.1.24"))))
 }
 
 func hasDepressionHeights(f Feature) bool {

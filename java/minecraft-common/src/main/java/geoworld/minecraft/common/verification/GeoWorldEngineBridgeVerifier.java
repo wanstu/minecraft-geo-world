@@ -63,9 +63,11 @@ public final class GeoWorldEngineBridgeVerifier {
         }
         if (!("geoworld-rules-v1.1.22".equals(
             generated.model().manifest().generationRulesVersion()
-        ) || "geoworld-rules-v1.1.23".equals(
+        ) || ("geoworld-rules-v1.1.23".equals(
             generated.model().manifest().generationRulesVersion()
-        ))) {
+        ) || "geoworld-rules-v1.1.24".equals(
+            generated.model().manifest().generationRulesVersion()
+        )))) {
             throw new AssertionError(
                 "generation rules mismatch: " +
                 generated.model().manifest().generationRulesVersion()

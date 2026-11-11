@@ -40,9 +40,11 @@ public final class GeoWorldV26MiningDistrictVerifier {
         }
         if (!("geoworld-rules-v1.1.22".equals(
             model.manifest().generationRulesVersion()
-        ) || "geoworld-rules-v1.1.23".equals(
+        ) || ("geoworld-rules-v1.1.23".equals(
             model.manifest().generationRulesVersion()
-        ))) {
+        ) || "geoworld-rules-v1.1.24".equals(
+            model.manifest().generationRulesVersion()
+        )))) {
             throw new AssertionError(
                 "mining district verifier requires v1.1.16, got " +
                 model.manifest().generationRulesVersion()

@@ -824,7 +824,7 @@ public final class GeoWorldV26BiomeRealizer {
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || "geoworld-rules-v1.1.23".equals(rules))))));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || "geoworld-rules-v1.1.24".equals(rules)))))));
     }
 
     private boolean supportsSulfurCaves() {
