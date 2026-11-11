@@ -899,6 +899,19 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		if distance >= fluvialReach && !deltaInBank {
 			continue
 		}
+		// Preserve a nearby sea receiver separately from the per-bank
+		// ceiling which intentionally limits inland river water planes.
+		// Metadata only; existing rules do not interpret it.
+		if distance < bankRadius && seg.ReceiverSurfaceDefined {
+			if seg.OceanMouth ||
+				!sample.RiverCoastalReceiverDefined ||
+				(!sample.RiverOceanMouthNearby &&
+					seg.ReceiverSurface > sample.RiverCoastalReceiverSurface) {
+				sample.RiverCoastalReceiverDefined = true
+				sample.RiverCoastalReceiverSurface = seg.ReceiverSurface
+				sample.RiverOceanMouthNearby = seg.OceanMouth
+			}
+		}
 		bed, centerDepth := riverBedAndDepthAt(m.Config, seg, t)
 		bankCeiling := math.Inf(1)
 		if m.Config.RiverGeometryVersion >= 4 {

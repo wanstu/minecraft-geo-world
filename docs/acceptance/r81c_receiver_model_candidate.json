@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "status": "model_candidate_not_release",
+  "seed": -1818694639628404530,
+  "legacyRules": "geoworld-rules-v1.1.22",
+  "candidateRules": "geoworld-rules-v1.1.23",
+  "legacyModelSha256": "eb1ffcbc19ee43e55495f2007716b1ca0a907dcedf7b493303358d689e20512f",
+  "candidateModelSha256": "9024476e6ce6f59dea5196e600048575c63b792d7926050e1dfbb1d62b9d89b2",
+  "receiverAudit": {
+    "riverSegments": 953,
+    "terminalSegments": 103,
+    "oceanTerminals": 88,
+    "lakeTerminals": 15,
+    "unclassifiedTerminals": 0,
+    "oceanMouths": 88,
+    "dryApproachSignals": 0,
+    "endpointNotOceanSignals": 0,
+    "seaAboveApproachSignals": 0,
+    "riverOceanBoundaryRiseSignals": 0,
+    "riverOceanBoundaryChecked": 88,
+    "levelJumpSignals": 0,
+    "sinkholes": 4,
+    "sinkholeRiverOverlapSignals": 1,
+    "sinkholeOverlapWithoutDrainage": 1
+  },
+  "coastalReceiverBefore": {
+    "509": 1,
+    "535": 1,
+    "851": 1,
+    "915": 4
+  },
+  "coastalReceiverAfterPositiveRiseCount": 0,
+  "riverbedGeometryVersion": 7,
+  "modelGroundChangesAt11352MouthCenterlineSamples": 0,
+  "modelRiverCenterlineWaterChanges": 293,
+  "parity": {
+    "sampleCount": 1014,
+    "goJavaIdenticalWaterDeltaPositions": 108,
+    "existingGoJavaDryTerrainMismatches": 16,
+    "newlyIntroducedGoJavaMismatches": 0,
+    "knownPreexistingMaxGroundHeightMismatchNormalized": 0.002784283
+  },
+  "minecraftVoxelAcceptance": "pending_verified_new_world_only",
+  "legacyBindingRejectedSwappedModel": "confirmed_correctly_prevented",
+  "generatorModified": true,
+  "published": false
+}

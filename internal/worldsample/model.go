@@ -14,6 +14,8 @@ type Config struct {
 	RiverCenterDepthNormalized   float64
 	MinRiverWaterDepthNormalized float64 `json:",omitempty"`
 	OceanEligibilityThreshold    float64
+	// R8.1c: opt-in sea-connected river and low-bank backwater; zero is legacy.
+	CoastalBackwaterVersion uint8 `json:",omitempty"`
 }
 
 type Model struct {

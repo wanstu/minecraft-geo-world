@@ -152,6 +152,10 @@ type Sample struct {
 	RiverReceiverSurfaceDefined bool
 	RiverReceiverSurface        float64
 	RiverReceiverWeight         float64
+	// Raw receiver data from a river corridor; old models do not consume this.
+	RiverCoastalReceiverDefined bool
+	RiverCoastalReceiverSurface float64
+	RiverOceanMouthNearby       bool
 	LakeCarve                   float64
 
 	WaterKind             reconcile.WaterKind
