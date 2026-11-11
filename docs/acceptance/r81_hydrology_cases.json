@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "seed": -1818694639628404530,
+  "rulesVersion": "geoworld-rules-v1.1.22",
+  "cases": [
+    {"id":"R81-OCEAN-01","category":"coastal-river-wall","x":-1018,"z":-982,"question":"河口与海面、海岸衔接异常；检查相邻河段509及实际方块水面","requiresVoxelTest":true},
+    {"id":"R81-TERMINAL-01","category":"river-outlet-visibility","x":-345,"z":-1113,"question":"预览中的大河没有明显出海口；区分宏观终端、预览及最终水体连接","requiresVoxelTest":true},
+    {"id":"R81-SINKHOLE-01","category":"sinkhole-river-interaction","x":-1665,"z":5313,"question":"天坑切开原有地形但没有形成可见支流；检查坑壁、河道、水文关系","requiresVoxelTest":true},
+    {"id":"R81-SINKHOLE-CENTER","category":"sinkhole-center","x":-1600,"z":5312,"question":"天坑中心基准，检查地形径向下切与水域保护","requiresVoxelTest":true},
+    {"id":"R81-CONTROL-HEADWATER","category":"control-previously-verified","x":-3264,"z":-1792,"question":"先前 R7.2 通过真实方块验收的河源控制点","requiresVoxelTest":false}
+  ]
+}

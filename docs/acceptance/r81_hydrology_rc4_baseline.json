@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "investigation_signal",
+  "baselineTag": "v0.1.5-rc.4",
+  "modelSeed": -1818694639628404530,
+  "rulesVersion": "geoworld-rules-v1.1.22",
+  "modelSha256": "eb1ffcbc19ee43e55495f2007716b1ca0a907dcedf7b493303358d689e20512f",
+  "purpose": "Frozen R8.1a read-only model baseline. It does not certify Minecraft voxel water or the shoreline.",
+  "counts": {
+    "riverSegments": 953,
+    "terminalSegments": 103,
+    "oceanTerminals": 88,
+    "lakeTerminals": 15,
+    "unclassifiedTerminals": 0,
+    "oceanMouths": 88,
+    "dryApproachSignals": 0,
+    "endpointNotOceanSignals": 0,
+    "seaAboveApproachSignals": 0,
+    "levelJumpSignals": 0,
+    "sinkholes": 4,
+    "sinkholeRiverOverlapSignals": 1,
+    "sinkholeOverlapWithoutDrainage": 1
+  },
+  "sites": [
+    {
+      "id": "R81-OCEAN-01",
+      "category": "coastal-river-wall",
+      "x": -1018,
+      "z": -982,
+      "modelWaterKind": "none",
+      "modelGroundY": 65,
+      "nearestRiverId": 509,
+      "distanceToCenterlineBlocks": 59.383,
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81-TERMINAL-01",
+      "category": "river-outlet-visibility",
+      "x": -345,
+      "z": -1113,
+      "modelWaterKind": "none",
+      "modelGroundY": 72,
+      "nearestRiverId": 58,
+      "distanceToCenterlineBlocks": 145.664,
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81-SINKHOLE-01",
+      "category": "sinkhole-river-interaction",
+      "x": -1665,
+      "z": 5313,
+      "modelWaterKind": "none",
+      "modelGroundY": 70,
+      "nearestRiverId": 735,
+      "distanceToCenterlineBlocks": 47.769,
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81-SINKHOLE-CENTER",
+      "category": "sinkhole-center",
+      "x": -1600,
+      "z": 5312,
+      "modelWaterKind": "none",
+      "modelGroundY": 70,
+      "nearestRiverId": 735,
+      "distanceToCenterlineBlocks": 99.492,
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81-CONTROL-HEADWATER",
+      "category": "control-previously-verified",
+      "x": -3264,
+      "z": -1792,
+      "modelWaterKind": "river",
+      "modelGroundY": 84,
+      "nearestRiverId": 48,
+      "distanceToCenterlineBlocks": 10.88,
+      "requiresVoxelTest": false
+    }
+  ],
+  "sinkholeRiverOverlapEvidence": [
+    {
+      "id": 11,
+      "x": -1600,
+      "z": 5312,
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 99.49191204922029,
+      "riverIntersectsFootprint": true,
+      "hasPersistedDrainage": false
+    }
+  ],
+  "requiresActualVoxelAcceptance": true
+}
