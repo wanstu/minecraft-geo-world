@@ -79,3 +79,7 @@ python3 scripts/r81c_voxel_audit.py \
 ```
 
 两套模型与 Anvil 报告的 SHA256 和固定统计都保存在证据 JSON 中。当前仍不合并主干、不推送、不发布 JAR。
+
+## 2026-11-11 后续补充：正式 #535/#851、河床差异复核
+
+已使用真实 v1.1.23 GeoWorld 存档的精确河道中心线完成 #535、#851 的河海接缝实际方块复验，两个接缝各 9/9 列 Y62 连续，没有旧版模型报告的一格逆升；外围未生成区块不计通过。另将 #509 的 6,105 列比较从 `OCEAN_FLOOR` 高度图细化到自然基底，明确 576 列确有 +2/-1 格范围内的真实表层整形变化，宏观模型采样的 22/22 个地面高度不变。详情参见 `docs/REALISTIC_GEOMORPHOLOGY_R8_1C_COASTAL_FOLLOWUP.md` 和 `docs/acceptance/r81c_coastal_followup_evidence.json`。这一专项收敛不代表所有 88 条河口的 Minecraft 视觉验收已通过，也不授权发布 RC。
