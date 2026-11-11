@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "real_minecraft_full_anvil_world_surface_projection",
+  "worlds": [
+    "v1.1.23",
+    "v1.1.24"
+  ],
+  "xRange": [
+    -1760,
+    -1544
+  ],
+  "zRange": [
+    5250,
+    5466
+  ],
+  "measurement": "WORLD_SURFACE top Y and top block; can include vegetation, not natural substrate",
+  "renderedScreenshot": false,
+  "fullOld": 29312,
+  "fullNew": 24560,
+  "fullPaired": 24560,
+  "unknownPaired": 22529,
+  "changedTopHeight": 18664,
+  "unchangedTopHeight": 5896,
+  "oldLowLand": 14976,
+  "newLowLand": 0
+}

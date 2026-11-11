@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "milestone": "GeoWorld v0.1.5-rc.4-dev pre-release acceptance",
+  "branch": "adm/geoworld-r81d-sinkhole-20261111",
+  "baseCommit": "2982977",
+  "date": "2026-11-11",
+  "releaseEligible": false,
+  "published": false,
+  "merged": false,
+  "go": {
+    "corePackageFullTests": "PASS",
+    "allPackageCompileOnly": "PASS",
+    "allPackageTests": "NOT_RUN"
+  },
+  "python": {
+    "r81dEvidenceTests": "7 PASS",
+    "r81cPlusR81dEvidenceTests": "17 PASS"
+  },
+  "ciMatrixStaticPreflight": "9/9 PASS",
+  "targets": [
+    {
+      "minecraft": "26.3",
+      "loader": "neoforge",
+      "java": "25",
+      "module": "java/neoforge-mod",
+      "compile": "NOT_RUN",
+      "assemble": "NOT_RUN",
+      "checkBuild": "NOT_RUN"
+    },
+    {
+      "minecraft": "26.3",
+      "loader": "fabric",
+      "java": "25",
+      "module": "java/adapters/26.3-fabric",
+      "compile": "PASS",
+      "assemble": "NOT_RUN",
+      "checkBuild": "NOT_RUN"
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "neoforge",
+      "java": "25",
+      "module": "java/adapters/26.2-neoforge",
+      "compile": "NOT_RUN",
+      "assemble": "NOT_RUN",
+      "checkBuild": "NOT_RUN"
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "fabric",
+      "java": "25",
+      "module": "java/adapters/26.2-fabric",
+      "compile": "NOT_RUN",
+      "assemble": "NOT_RUN",
+      "checkBuild": "NOT_RUN"
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "neoforge",
+      "java": "25",
+      "module": "java/adapters/26.1.2-neoforge",
+      "compile": "NOT_RUN",
+      "assemble": "NOT_RUN",
+      "checkBuild": "NOT_RUN"
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "fabric",
+      "java": "25",
+      "module": "java/adapters/26.1.2-fabric",
+      "compile": "NOT_RUN",
+      "assemble": "NOT_RUN",
+      "checkBuild": "NOT_RUN"
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "neoforge",
+      "java": "21",
+      "module": "java/adapters/1.21.1-neoforge",
+      "compile": "PASS",
+      "assemble": "PASS",
+      "checkBuild": "TIMEOUT_480_SECONDS",
+      "jarInspection": "PASS"
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "fabric",
+      "java": "21",
+      "module": "java/adapters/1.21.1-fabric",
+      "compile": "UNVERIFIED",
+      "assemble": "NOT_RUN",
+      "checkBuild": "NOT_RUN",
+      "offlineDependency": "BLOCKED_FABRIC_LOOM_1.7.4",
+      "onlineAttempt": "TIMEOUT_360_SECONDS"
+    },
+    {
+      "minecraft": "1.20.1",
+      "loader": "fabric",
+      "java": "17",
+      "module": "java/adapters/1.20.1-fabric",
+      "compile": "NOT_RUN",
+      "assemble": "NOT_RUN",
+      "checkBuild": "NOT_RUN",
+      "localJava": "JDK_17_MISSING"
+    }
+  ],
+  "anvilPlanview": {
+    "visualization": "docs/acceptance/r81d_voxel_planview.png",
+    "fullPaired": 24560,
+    "unknownPaired": 22529,
+    "isGameplayScreenshot": false,
+    "gameplayVisualAcceptance": "NOT_DONE"
+  },
+  "neoforgeJar": {
+    "inspectionPassed": true,
+    "sha256": "3de08da233f5826ef38383181dc2854edc1b207cdb9e091b19a28429f216f026",
+    "version": "0.1.5-rc.4-dev",
+    "sixNativeEngines": true,
+    "published": false
+  },
+  "requiredNextChecks": [
+    "GitHub CI Windows nine-target clean check build",
+    "real Minecraft game camera screenshots at river #735 and all four known mouth cases",
+    "new sinkhole #11 at (320,6592) in-game terrain verification",
+    "real-world satellite or DEM visual comparison for release",
+    "do not bind historical worlds to new rules"
+  ]
+}
