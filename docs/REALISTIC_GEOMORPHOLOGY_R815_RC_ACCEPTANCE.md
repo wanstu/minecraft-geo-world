@@ -188,3 +188,18 @@
 - **官方 GitHub Windows 九目标 CI 和真实 Minecraft 客户端相机验收仍未完成**。不将本地开发 JAR 作为正式发布文件，不合并、不推送、不发布。
 
 详细报告：`docs/REALISTIC_GEOMORPHOLOGY_R81J_NEOFORGE_FULL_BUILD_20261112.md`。最新机器可检查矩阵：`docs/acceptance/r81j_current_rules_local_matrix.json`。
+
+
+## R8.1k（2026-11-12）v1.1.26 本地九目标完整构建全部验收
+
+**最新本地构建结果为 9/9 `clean check build` PASS**。本文先前 1/9、3/9、5/9、7/9 均为历史阶段快照，已被本节取代；**不等于 Windows 官方九目标 CI PASS**。
+
+- 新增 **26.3 NeoForge**：独立内存隔离解决原版首次反编译资源阻塞；最后 `clean check build` 通过，**3m25s，41 项 Gradle 任务（40 执行、1 缓存）**，水文 1183 区块 / 302848 列异常计数全 0，JAR 六平台原生引擎与 v1.1.26 编译身份核实通过。
+- 新增 **1.20.1 Fabric**：安装并校验 Adoptium Temurin JDK **17.0.21**，完整构建通过，**5m29s，16/16 任务执行**；JAR 元数据、六平台引擎和 v1.1.26 字节码均通过。
+- **修复 26.3 NeoForge WebUI 恢复测试误报**：强制退出后的 TCP `TIME_WAIT` 让旧端口短时不可绑定，实际 WebUI 通过新动态端口成功恢复；旧测试错误地无条件要求原端口。仅修正 NeoForge 26.3 测试断言，新增恢复后 HTTP 200 实际健康检查，**未修改生产运行时**。单独专项通过且完整 `clean check build` 重跑 PASS。
+- 最新 9 个目标都已通过本地构建，但 **GitHub Windows 正式九目标 CI 未执行**，Minecraft 客户端**实际相机/真实地貌视觉验收未完成**。现有 R8.1g 1517 个实际 Anvil 方块列是局部真实区块验收，不能替代真实游戏视觉或多种子地貌验收。
+- 本地 Gradle JAR 仍沿用开发模块 `mod_version=0.1.4`，**不得作为历史 0.1.4 或正式 0.1.5 RC 发行包**。
+- **v0.1.5 RC 继续 HOLD**：不合并、不推送、不发布。
+
+详细报告：`docs/REALISTIC_GEOMORPHOLOGY_R81K_ALL_NINE_LOCAL_BUILDS_20261112.md`。
+最新机器可核验九目标矩阵：`docs/acceptance/r81k_current_rules_local_matrix.json`；新增两目标证据：`docs/acceptance/r81k_all_nine_local_full_builds.json`。

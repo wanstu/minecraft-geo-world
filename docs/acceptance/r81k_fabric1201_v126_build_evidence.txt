@@ -1,0 +1,37 @@
+GeoWorld 1.20.1 Fabric v1.1.26 REAL local full clean check build; NOT CI or official release.
+Source baseline commit b2cb831251d45049b1298c895f884c0e383b98a4
+JDK 17.0.21 Eclipse Temurin, Gradle 8.10.2, Fabric Loom 1.7.4
+Vendor JDK17 SHA256 8b9b611d917e3dfd8419d3566b5949226f69b052fed7e109c1368add1dfe8711
+Full raw build log SHA256 f6898f15d003a1a31951629eb2707b0a5f9bbdb2bc64e2ee6dec70f7c075f2b8
+JAR SHA256 73c6f24c7a1aece17a8cc55a452005a0d527c619768255e30eca0594ff6f0c24
+
+> Task :clean
+> Task :generateGeoWorldLegacyCommonSources
+> Task :compileJava
+> Task :buildGeoWorldEngine_linux_arm64
+> Task :buildGeoWorldEngine_linux_x64
+> Task :buildGeoWorldEngine_macos_arm64
+> Task :buildGeoWorldEngine_macos_x64
+> Task :buildGeoWorldEngine_windows_arm64
+> Task :buildGeoWorldEngine_windows_x64
+> Task :processResources
+> Task :classes
+> Task :jar
+> Task :compileTestJava NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :validateAccessWidener NO-SOURCE
+> Task :verifyGeoWorldAdapter
+> Task :verifyGeoWorldModelQuery
+GeoWorld Model Verifier: passed=34/34 models=7
+> Task :verifyGeoWorldQueryLifecycle
+PASS Query facade lifecycle: A -> empty -> B, late stop, rebind, immutable snapshots, concurrent reads
+> Task :check
+> Task :processIncludeJars
+> Task :remapJar
+> Task :remapSourcesJar SKIPPED
+> Task :assemble
+> Task :build
+BUILD SUCCESSFUL in 5m 29s
+16 actionable tasks: 16 executed

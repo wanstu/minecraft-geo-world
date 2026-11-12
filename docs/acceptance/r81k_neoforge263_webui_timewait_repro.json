@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-12",
+  "status": "FIXED_TEST_INCORRECT_ALWAYS_REUSE_PORT_ASSERTION",
+  "changedSource": "java/neoforge-mod/src/main/java/geoworld/neoforge/client/GeoWorldWebUiLaunchVerifier.java",
+  "reproductionFromInitialCleanFullBuild": {
+    "failedTask": "verifyGeoWorldWebUiLaunch",
+    "originalBuildDuration": "11m 25s",
+    "firstPort": 34821,
+    "recoveredPort": 50063,
+    "rawLogSha256": "73aed068dfc419f1e8bb727022e450da9c5954663b519f3dc09231863df24d4a"
+  },
+  "reproductionIsolated": {
+    "firstPort": 58769,
+    "recoveredPort": 52351,
+    "rawLogSha256": "00de8cd8c1b3cdcd672bf35f64bc243d5715de1e7d0ea4ba9835d370abd9530e"
+  },
+  "tcpTimeWaitObserved": {
+    "port": 58769,
+    "socketState": "TIME_WAIT",
+    "javaEquivalentBindReuseAddressFalse": "EADDRINUSE",
+    "socketBindReuseAddressTrue": "AVAILABLE",
+    "note": "Manual dadm ss and Python socket probes on Linux after isolated reproduction; earlier native WebUI already stopped; no process terminated by these probes"
+  },
+  "resolvedBehavior": "Watchdog recovery may choose new dynamic port if old port is temporarily unbindable; verifier requires running native process, URI consistency and HTTP 200 /api/status",
+  "productionWebUiRuntimeChanged": false,
+  "onlyNeoForge263VerifierChanged": true,
+  "positiveIsolatedTests": {
+    "tasks": [
+      "verifyGeoWorldWebUiDynamicPort",
+      "verifyGeoWorldWebUiLaunch"
+    ],
+    "duration": "23s",
+    "rawLogSha256": "6c3448e24e3f6df4548f3d6b2eb1783a4f017fbf3d31ba8f4eb1766fdae15308",
+    "passed": true
+  },
+  "positiveFullBuild": {
+    "duration": "3m 25s",
+    "rawLogSha256": "6db882f165dec3e6b6889ca83191ebf6024e37346a035d065a0195cd932dc55a",
+    "passed": true
+  },
+  "releaseEligible": false
+}

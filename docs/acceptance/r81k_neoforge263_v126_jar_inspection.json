@@ -1,0 +1,17 @@
+{
+  "jar": "java/neoforge-mod/build/libs/geoworld-0.1.4.jar",
+  "loader": "neoforge",
+  "expectedVersion": "0.1.4",
+  "sha256": "ed51b95b01091359438ee783bc12081abc49ea2326bf1a161e303477139c94f6",
+  "bytes": 29156885,
+  "allSixNativeEngines": true,
+  "missingEntries": [],
+  "metadata": {
+    "modVersionLine": [
+      "version=\"0.1.4\""
+    ]
+  },
+  "versionMatches": true,
+  "passed": true,
+  "note": "Local build verification, not a published release"
+}

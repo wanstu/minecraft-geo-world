@@ -96,3 +96,10 @@ systemd-run --user --scope --quiet \
 - `scripts/test_r81j_neoforge_build_evidence.py`：保证不会将 7/9 本地通过、受阻目标或未执行官方 CI 误报为正式发布。
 
 本轮仅新增验收证据、文档和测试，**不修改地形算法、世界数据、旧规则或原有存档，不合并、不 push、不发布 JAR**。
+
+
+## R8.1k 后续进度更新（2026-11-12）
+
+本文 `7/9` 是 R8.1j 当时已验证的本地完整构建快照。R8.1k 已新增通过 **26.3 NeoForge**（测试修正后 `clean check build` PASS）和 **1.20.1 Fabric**（新 JDK17 环境中 `clean check build` PASS），**最新 v1.1.26 本地完整构建进度为 9/9**。
+
+最新事实与源码修改范围见 `docs/REALISTIC_GEOMORPHOLOGY_R81K_ALL_NINE_LOCAL_BUILDS_20261112.md`；最新九目标矩阵 `docs/acceptance/r81k_current_rules_local_matrix.json`。正式 Windows GitHub CI、实际游戏客户端相机验收和发布资格仍 HOLD。
