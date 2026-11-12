@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-12",
+  "branch": "adm/geoworld-r81f-spawn-height-20261112",
+  "sourceBaseCommit": "6591da761b6da69dfabc73785fd1a92128c5218a",
+  "newSourceModifications": [
+    "java/minecraft-common/src/main/java/geoworld/minecraft/common/verification/GeoWorldSpecialLandscapeVerifier.java",
+    "java/adapters/26.3-fabric/build.gradle"
+  ],
+  "rules": "geoworld-rules-v1.1.25",
+  "fullReleaseTargetCount": 9,
+  "staticPreflightPassCount": 9,
+  "locallyFullCleanCheckBuildPassCount": 2,
+  "officialWindowsCi": {
+    "started": false,
+    "passed": false,
+    "status": "NOT_RUN_ON_UNPUSHED_BRANCH"
+  },
+  "targets": [
+    {
+      "minecraft": "26.3",
+      "loader": "neoforge",
+      "java": "25",
+      "module": "java/neoforge-mod",
+      "localJdkAvailable": true,
+      "status": "NOT_FULLY_CHECKED",
+      "detail": "Not executed as a full clean check build this turn"
+    },
+    {
+      "minecraft": "26.3",
+      "loader": "fabric",
+      "java": "25",
+      "module": "java/adapters/26.3-fabric",
+      "localJdkAvailable": true,
+      "status": "LOCAL_CLEAN_CHECK_BUILD_PASS",
+      "reportedDuration": "5m 3s",
+      "executableJdk": 25,
+      "actionableTasks": "41",
+      "buildLogSha256": "b1578497b023f79b82ac759a7080c37acebcb815845bc9c7d2f0207e8841af3d",
+      "jarEvidence": "docs/acceptance/r815_rc_fabric263_jar_inspection_current.json",
+      "jarSha256": "b5eb512f007929dfac54628d6ad44e3bded4a70c842b83521609ad070e6dfda4",
+      "jarSizeBytes": 29155910,
+      "allSixNativeEngines": true,
+      "note": "Local development source built with default 0.1.4 metadata; it is NOT a released v0.1.4 binary",
+      "buildEvidenceText": "docs/acceptance/r815_rc_local_263_fabric_build_evidence.txt"
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "neoforge",
+      "java": "25",
+      "module": "java/adapters/26.2-neoforge",
+      "localJdkAvailable": true,
+      "status": "NOT_FULLY_CHECKED",
+      "detail": "Not executed as a full clean check build this turn"
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "fabric",
+      "java": "25",
+      "module": "java/adapters/26.2-fabric",
+      "localJdkAvailable": true,
+      "status": "NOT_FULLY_CHECKED",
+      "detail": "Not executed as a full clean check build this turn"
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "neoforge",
+      "java": "25",
+      "module": "java/adapters/26.1.2-neoforge",
+      "localJdkAvailable": true,
+      "status": "NOT_FULLY_CHECKED",
+      "detail": "Not executed as a full clean check build this turn"
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "fabric",
+      "java": "25",
+      "module": "java/adapters/26.1.2-fabric",
+      "localJdkAvailable": true,
+      "status": "NOT_FULLY_CHECKED",
+      "detail": "Not executed as a full clean check build this turn"
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "neoforge",
+      "java": "21",
+      "module": "java/adapters/1.21.1-neoforge",
+      "localJdkAvailable": true,
+      "status": "NOT_FULLY_CHECKED",
+      "detail": "NeoForge server saved-world/spawn acceptance and compileJava passed previously; clean check build not verified"
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "fabric",
+      "java": "21",
+      "module": "java/adapters/1.21.1-fabric",
+      "localJdkAvailable": true,
+      "status": "LOCAL_CLEAN_CHECK_BUILD_PASS",
+      "reportedDuration": "1m 39s",
+      "executableJdk": 21,
+      "actionableTasks": "17",
+      "buildLogSha256": "2cab96efba59b578d3cd197b8e97e71fda4e877718777acbb0c4a70b03e287c3",
+      "jarEvidence": "docs/acceptance/r815_rc_fabric1211_jar_inspection.json",
+      "jarSha256": "ba1d69ecdec3bdbb09eef1f6bdd6c0a230da73fc4422f858f30ac6c2af9f5c6d",
+      "jarSizeBytes": 9201975,
+      "allSixNativeEngines": true,
+      "note": "Local development source built with default 0.1.4 metadata; it is NOT a released v0.1.4 binary",
+      "buildEvidenceText": "docs/acceptance/r815_rc_local_1211_fabric_build_evidence.txt"
+    },
+    {
+      "minecraft": "1.20.1",
+      "loader": "fabric",
+      "java": "17",
+      "module": "java/adapters/1.20.1-fabric",
+      "localJdkAvailable": false,
+      "status": "NOT_FULLY_CHECKED",
+      "detail": "JDK 17 not installed locally; official workflow does provision JDK17"
+    }
+  ],
+  "priorFailedCheck": {
+    "module": "java/adapters/26.3-fabric",
+    "task": "verifyGeoWorldSpecialLandscapes",
+    "originalError": "depression center is not flat: kind=sinkhole",
+    "cause": "stale flat-floor test contract for intentionally sloped v1.1.25 sinkholes",
+    "testFixed": true,
+    "isolatedRetestPassed": true,
+    "fullCleanCheckBuildRetestPassed": true,
+    "generationAlgorithmModified": false,
+    "historicalModelsUnchanged": true
+  },
+  "legacyModelCheck": {
+    "v124SinkholesChecked": 4,
+    "oldCenterToInnerDeltasNormalized": [
+      2.276e-05,
+      0,
+      5.566e-05,
+      0
+    ],
+    "oldRulesRemainFlat": true
+  },
+  "remaining": [
+    "7 other adapter clean check builds",
+    "official Windows nine-target GitHub CI",
+    "Minecraft client game-camera landscape/spawn acceptance"
+  ],
+  "releaseEligible": false,
+  "merged": false,
+  "pushed": false,
+  "publishedJar": false
+}

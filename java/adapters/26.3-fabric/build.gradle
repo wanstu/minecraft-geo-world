@@ -228,7 +228,7 @@ tasks.named('check') {
 
 tasks.register('verifyGeoWorldSpecialLandscapes', JavaExec) {
     group = 'verification'
-    description = 'Generates a fresh v1.1.11 model and verifies persisted special landscapes through the Java runtime reader.'
+    description = 'Generates the current rules model and validates special landscapes, including versioned sinkhole slopes.'
     dependsOn tasks.named('classes')
     classpath = sourceSets.main.output.classesDirs + files(sourceSets.main.output.resourcesDir) + sourceSets.main.compileClasspath
     mainClass = 'geoworld.minecraft.common.verification.GeoWorldSpecialLandscapeVerifier'

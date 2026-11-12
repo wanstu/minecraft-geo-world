@@ -100,3 +100,17 @@
 - NeoForge 1.21.1 和 Fabric 26.3 本轮源码编译通过，**不是 9 Loader CI 全部通过**。
 - **R8.1e 固定坡面专项通过，地貌整体真实度与游戏内截图仍未通过，正式 v0.1.5 RC 发布继续 HOLD。**
 - 不合并、不推送、不发布 JAR，不覆盖旧世界；历史 v1.1.24/更早规则不变。
+
+
+## 2026-11-12 本地九目标 CI 预检补充
+
+**请以本节替代早期的构建进度表：** 本文较早的 26.3 Fabric / 1.21.1 Fabric 状态记录是 11 月 11 日的阶段快照，并非现在的最终状态。
+
+- 本地 `1.21.1 Fabric`：在**本分支当前源文件**上重跑 `clean check build`，**17/17 任务通过**。
+- 本地 `26.3 Fabric`：先发现 `verifyGeoWorldSpecialLandscapes` 还在误要求 v1.1.25 天坑有平底；升级为区分新规则连续坡面/旧规则平底的严格验证后，单项通过，完整 `clean check build` **41/41 任务通过**。
+- 两份本地 Fabric JAR 都经过独立压缩包检查（Loader 元数据、`GeoWorldV1.class`、6 个原生引擎），仅作为**开发分支测试产物，不是正式 RC**。
+- 九目标静态配置仍是 9/9 通过；但实际完成本地 `clean check build` 的只有 **2/9**；没有执行 GitHub Windows 官方九目标 CI。
+- 本阶段继续 **不发布、不推送、不合并**，游戏相机视觉验收仍未完成。
+
+详细报告：`docs/REALISTIC_GEOMORPHOLOGY_R815_RC_LOCAL_MATRIX_20261112.md`。
+完整机器可验收状态：`docs/acceptance/r815_rc_local_build_matrix_20261112.json`。
