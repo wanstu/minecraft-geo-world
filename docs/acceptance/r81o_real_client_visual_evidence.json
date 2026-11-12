@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-12",
+  "candidateRules": "geoworld-rules-v1.1.28",
+  "lockedPreviousRules": "geoworld-rules-v1.1.27",
+  "scope": "R8.1o sinkhole inner-floor asymmetry and habitable core only",
+  "modelCrossLanguage": {
+    "seeds": [
+      123456,
+      20261112
+    ],
+    "plannedSinkholesChecked": 8,
+    "pairedGoJavaSamples": 3072,
+    "sampledHeightChangedPoints": 1019,
+    "maxNormalizedHeightError": 1.11022302463e-16,
+    "comparedFields": [
+      "groundHeight",
+      "waterKind",
+      "terrainVariant"
+    ],
+    "riverGeometryIdentical": true,
+    "plannedFeaturePlacementsIdentical": true,
+    "macroSurfaceIdentical": true,
+    "coastalBackwaterVersion": [
+      2,
+      2
+    ],
+    "outputs": [
+      "docs/acceptance/r81o_seed123456_candidate.json",
+      "docs/acceptance/r81o_seed20261112_candidate.json"
+    ]
+  },
+  "minecraft": {
+    "version": "1.21.1",
+    "loader": "NeoForge",
+    "rulesBound": "geoworld-rules-v1.1.28",
+    "seed": 123456,
+    "freshDirectory": true,
+    "build": "Gradle check build PASS, 44 tasks, 6m16s",
+    "startupDoneSeconds": 27.752,
+    "worldGenerator": "geoworld:geoworld",
+    "chunkForceLoaded": 225,
+    "savedNormally": true,
+    "sourceOldWorldUnchanged": true,
+    "actualVoxelAudit": "docs/acceptance/r81o_seed123456_actual_voxels.json",
+    "anvilColumnsFull": 54,
+    "anvilColumnsExpected": 54,
+    "naturalGroundCenterY": 74,
+    "waterTopAtCenter": null,
+    "maxNaturalSlopePer8Blocks": {
+      "old_v127": {
+        "eastWest": 0.625,
+        "northSouth": 0.625
+      },
+      "candidate_v128": {
+        "eastWest": 0.875,
+        "northSouth": 0.625
+      }
+    },
+    "flatFloorSamplesEqualToCenter": {
+      "old_v127": {
+        "eastWest": 8,
+        "northSouth": 3
+      },
+      "candidate_v128": {
+        "eastWest": 9,
+        "northSouth": 3
+      }
+    }
+  },
+  "client": {
+    "realMinecraftClient": true,
+    "renderBackend": "Xvfb + Mesa llvmpipe OpenGL software rendering",
+    "siteId": 9,
+    "center": {
+      "x": 6080,
+      "z": 7744
+    },
+    "daytime": 6000,
+    "hudHidden": true,
+    "cameraTop": {
+      "x": 6080,
+      "y": 160,
+      "z": 7744,
+      "yaw": 0,
+      "pitch": 80
+    },
+    "cameraOblique": {
+      "x": 6080,
+      "y": 155,
+      "z": 7620,
+      "yaw": 0,
+      "pitch": 35
+    },
+    "visualVerdict": "FAIL",
+    "observations": [
+      "Lower bowl contour is modestly noncircular but a broad planar inner core remains obvious",
+      "Concentric height steps remain visible on exterior slopes",
+      "East-west actual voxel sample steepness increased from 0.625 to 0.875 Y per horizontal block",
+      "Software renderer temporarily exposes unloaded-sky patches during distant chunk meshing; do not treat patches as a geological collapse without separate voxel proof"
+    ],
+    "screenshots": [
+      {
+        "path": "docs/acceptance/r81o_v128_client_sinkhole_seed123456_topdown.jpg",
+        "sha256": "bf21876dabc54af83ebd4915ac82f60736c9dc3334112bfb4b3b0f503d4e8a58"
+      },
+      {
+        "path": "docs/acceptance/r81o_v128_client_sinkhole_seed123456_oblique.jpg",
+        "sha256": "80d8cb3239cdd03a248f32d4cb9201ac2da3a332455afd486576d7c92e3d2322"
+      }
+    ]
+  },
+  "releaseGate": {
+    "visualPass": false,
+    "realClientEvidenceCaptured": true,
+    "allNineWindowsTargetsCI": "NOT_RUN_FOR_V128",
+    "releaseEligible": false,
+    "mergeApproved": false,
+    "published": false
+  }
+}

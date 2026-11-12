@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "seed": 123456,
+  "legacyRules": "geoworld-rules-v1.1.27",
+  "candidateRules": "geoworld-rules-v1.1.28",
+  "riversIdentical": true,
+  "specialFeaturesIdentical": true,
+  "macroSurfaceIdentical": true,
+  "oldCoastalVersion": 2,
+  "newCoastalVersion": 2,
+  "oldDurationSeconds": 14.679806348,
+  "newDurationSeconds": 14.539387974,
+  "sites": [
+    {
+      "id": 9,
+      "x": 6080,
+      "z": 7744,
+      "radiusX": 143.46115781115657,
+      "radiusZ": 130.46296905338144,
+      "changedPoints": 137,
+      "comparedPoints": 384,
+      "maxAbsoluteHeightDifference": 0.015351507267705622,
+      "maxNormalizedStepYPerBlock": 0.8860064312668989,
+      "waterChanged": 0,
+      "groundRaised": 0
+    },
+    {
+      "id": 10,
+      "x": -14016,
+      "z": -7104,
+      "radiusX": 145.71726362658336,
+      "radiusZ": 130.47690525040585,
+      "changedPoints": 109,
+      "comparedPoints": 384,
+      "maxAbsoluteHeightDifference": 0.0088951478745668,
+      "maxNormalizedStepYPerBlock": 0.5351412211037418,
+      "waterChanged": 0,
+      "groundRaised": 0
+    },
+    {
+      "id": 11,
+      "x": 3392,
+      "z": -3520,
+      "radiusX": 169.46491404719507,
+      "radiusZ": 130.4965370156358,
+      "changedPoints": 135,
+      "comparedPoints": 384,
+      "maxAbsoluteHeightDifference": 0.011964047856568572,
+      "maxNormalizedStepYPerBlock": 0.5736945692630904,
+      "waterChanged": 0,
+      "groundRaised": 0
+    },
+    {
+      "id": 12,
+      "x": -1728,
+      "z": -9024,
+      "radiusX": 154.06280142933858,
+      "radiusZ": 130.49294491083805,
+      "changedPoints": 126,
+      "comparedPoints": 384,
+      "maxAbsoluteHeightDifference": 0.011373413466031934,
+      "maxNormalizedStepYPerBlock": 0.5783510136442274,
+      "waterChanged": 0,
+      "groundRaised": 0
+    }
+  ],
+  "notRealGameVisual": true,
+  "releaseEligible": false
+}

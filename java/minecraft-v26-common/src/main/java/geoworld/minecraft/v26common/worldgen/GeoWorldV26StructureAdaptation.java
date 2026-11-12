@@ -61,9 +61,11 @@ public final class GeoWorldV26StructureAdaptation {
                 model.manifest().generationRulesVersion()
             ) || ("geoworld-rules-v1.1.26".equals(
                 model.manifest().generationRulesVersion()
-            ) || "geoworld-rules-v1.1.27".equals(
+            ) || ("geoworld-rules-v1.1.27".equals(
                 model.manifest().generationRulesVersion()
-            ))))))))));
+            ) || "geoworld-rules-v1.1.28".equals(
+                model.manifest().generationRulesVersion()
+            )))))))))));
         AdaptationPolicy policy = policy(
             model.worldProfile().parameters().structureInfluence(),
             slopeAwareTransition

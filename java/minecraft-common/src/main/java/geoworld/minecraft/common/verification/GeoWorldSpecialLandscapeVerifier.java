@@ -38,9 +38,11 @@ public final class GeoWorldSpecialLandscapeVerifier {
             model.manifest().generationRulesVersion()
         ) || ("geoworld-rules-v1.1.26".equals(
             model.manifest().generationRulesVersion()
-        ) || "geoworld-rules-v1.1.27".equals(
+        ) || ("geoworld-rules-v1.1.27".equals(
             model.manifest().generationRulesVersion()
-        ))))))) {
+        ) || "geoworld-rules-v1.1.28".equals(
+            model.manifest().generationRulesVersion()
+        )))))))) {
             throw new AssertionError(
                 "special landscape verifier requires v1.1.22-v1.1.26, got " +
                 model.manifest().generationRulesVersion()
@@ -290,9 +292,11 @@ public final class GeoWorldSpecialLandscapeVerifier {
                 model.manifest().generationRulesVersion()
             ) || ("geoworld-rules-v1.1.26".equals(
                 model.manifest().generationRulesVersion()
-            ) || "geoworld-rules-v1.1.27".equals(
+            ) || ("geoworld-rules-v1.1.27".equals(
                 model.manifest().generationRulesVersion()
-            )));
+            ) || "geoworld-rules-v1.1.28".equals(
+                model.manifest().generationRulesVersion()
+            ))));
         if (continuousSinkhole) {
             // v1.1.25 intentionally replaced the large flat inner floor.
             // Verify a continuous descent toward the bottom rather than

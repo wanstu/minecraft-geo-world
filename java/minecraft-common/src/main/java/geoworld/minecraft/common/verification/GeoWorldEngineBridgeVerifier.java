@@ -71,9 +71,11 @@ public final class GeoWorldEngineBridgeVerifier {
             generated.model().manifest().generationRulesVersion()
         ) || ("geoworld-rules-v1.1.26".equals(
             generated.model().manifest().generationRulesVersion()
-        ) || "geoworld-rules-v1.1.27".equals(
+        ) || ("geoworld-rules-v1.1.27".equals(
             generated.model().manifest().generationRulesVersion()
-        ))))))) {
+        ) || "geoworld-rules-v1.1.28".equals(
+            generated.model().manifest().generationRulesVersion()
+        )))))))) {
             throw new AssertionError(
                 "generation rules mismatch: " +
                 generated.model().manifest().generationRulesVersion()
