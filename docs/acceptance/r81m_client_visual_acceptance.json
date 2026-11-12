@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-12",
+  "candidateRules": "geoworld-rules-v1.1.26",
+  "environment": {
+    "minecraft": "1.21.1",
+    "loader": "NeoForge",
+    "neoForge": "21.1.211",
+    "renderer": "Mesa llvmpipe OpenGL 4.5",
+    "display": "isolated Xvfb :99",
+    "client": "actual NeoForge runClient, not synthetic Anvil projection"
+  },
+  "world": {
+    "generator": "geoworld:geoworld",
+    "seed": 123456,
+    "ruleBinding": "geoworld-rules-v1.1.26",
+    "verification": "PASS",
+    "source": "R81gEstuarySeed123456 isolated server save; copied test save"
+  },
+  "windowsCI": {
+    "run": 43221769793,
+    "status": "SUCCESS",
+    "targetsPassed": 9,
+    "targetsTotal": 9
+  },
+  "observations": [
+    {
+      "id": "estuary",
+      "coord": [
+        10814,
+        2467
+      ],
+      "camera": [
+        [
+          10816,
+          90,
+          2490
+        ],
+        [
+          10815,
+          145,
+          2480
+        ]
+      ],
+      "visualStatus": "SCOPED_PASS",
+      "note": "local visible river surface and shore join; not a whole-world claim",
+      "screenshots": [
+        "docs/acceptance/r81m_v126_client_estuary_seed123456_oblique.jpg",
+        "docs/acceptance/r81m_v126_client_estuary_seed123456_topdown.jpg"
+      ]
+    },
+    {
+      "id": "sinkhole-9",
+      "coord": [
+        6080,
+        7744
+      ],
+      "camera": [
+        [
+          6080,
+          160,
+          7744
+        ],
+        [
+          6080,
+          155,
+          7620
+        ]
+      ],
+      "visualStatus": "FAIL",
+      "note": "nearly symmetric circular bowl with many equidistant concentric voxel contours; obvious procedural appearance",
+      "screenshots": [
+        "docs/acceptance/r81m_v126_client_sinkhole_seed123456_topdown.jpg",
+        "docs/acceptance/r81m_v126_client_sinkhole_seed123456_oblique.jpg"
+      ]
+    }
+  ],
+  "limitations": [
+    "Software rendering low FPS and initial unloaded chunk regions; captures use later loaded views",
+    "Not all climate regions/seed combinations checked",
+    "Client visual FAIL blocks RC despite successful CI"
+  ],
+  "releaseEligible": false,
+  "merged": false,
+  "published": false
+}
