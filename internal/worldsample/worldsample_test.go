@@ -391,3 +391,35 @@ func filled(n int, value float64) []float64 {
 	}
 	return out
 }
+
+func TestR81cCoastalBackwaterIsStrictlyVersionedAndReceiverOwned(t *testing.T) {
+	coast := waterbed.Sample{
+		FinalHeight:                 0.485,
+		RiverWeight:                 1,
+		RiverCoastalReceiverDefined: true,
+		RiverCoastalReceiverSurface: 0.5,
+	}
+	tests := []struct {
+		name   string
+		cfg    Config
+		ground waterbed.Sample
+		ocean  float64
+		want   bool
+	}{
+		{"legacy-never-flood", Config{}, coast, 0, false},
+		{"sea-connected-river", Config{CoastalBackwaterVersion: 1}, coast, 0, true},
+		{"sea-connected-low-bank", Config{CoastalBackwaterVersion: 1}, func() waterbed.Sample { v := coast; v.RiverWeight = 0; return v }(), 0.2, true},
+		{"inland-unconnected-dry-bank", Config{CoastalBackwaterVersion: 1}, func() waterbed.Sample { v := coast; v.RiverWeight = 0; return v }(), 0, false},
+		{"not-sea-receiver", Config{CoastalBackwaterVersion: 1}, func() waterbed.Sample { v := coast; v.RiverCoastalReceiverSurface = .55; return v }(), .5, false},
+		{"ground-above-sea", Config{CoastalBackwaterVersion: 1}, func() waterbed.Sample { v := coast; v.FinalHeight = .51; return v }(), .5, false},
+		{"not-receiver-owned", Config{CoastalBackwaterVersion: 1}, func() waterbed.Sample { v := coast; v.RiverCoastalReceiverDefined = false; return v }(), .5, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := qualifiesForCoastalBackwater(tc.cfg, tc.ground, 0.5, tc.ocean)
+			if got != tc.want {
+				t.Fatalf("got %v want %v", got, tc.want)
+			}
+		})
+	}
+}

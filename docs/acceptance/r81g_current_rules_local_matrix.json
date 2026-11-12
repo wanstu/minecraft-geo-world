@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-12",
+  "branch": "adm/geoworld-r81f-spawn-height-20261112",
+  "baseCommit": "d3e59e0edb5ecd9fbde58db38478b7cd5bdb0025",
+  "candidateRules": "geoworld-rules-v1.1.26",
+  "targetCount": 9,
+  "staticBuildMatrixPreflightPass": true,
+  "currentRulesLocalCleanCheckBuildPassed": 1,
+  "priorRulesLocalCleanCheckBuildPassedOnly": 2,
+  "resourceBlocked": 1,
+  "notYetCheckedCurrentRules": 8,
+  "targets": [
+    {
+      "module": "java/neoforge-mod",
+      "minecraft": "26.3",
+      "loader": "neoforge",
+      "requiredJdk": "25",
+      "status": "RESOURCE_BLOCKED",
+      "detail": "NeoForge 26.3 offline ModDev plugin missing; online first decompile exhausted machine swap; not rerun this stage"
+    },
+    {
+      "module": "java/adapters/26.3-fabric",
+      "minecraft": "26.3",
+      "loader": "fabric",
+      "requiredJdk": "25",
+      "status": "PRIOR_V125_FULL_PASS_RECHECK_REQUIRED",
+      "detail": "Historical local v1.1.25 full build passed before new water rules were introduced; v1.1.26 not yet clean-checked"
+    },
+    {
+      "module": "java/adapters/26.2-neoforge",
+      "minecraft": "26.2",
+      "loader": "neoforge",
+      "requiredJdk": "25",
+      "status": "NOT_LOCAL_FULL_CHECKED",
+      "detail": "Local v1.1.26 clean check build not executed"
+    },
+    {
+      "module": "java/adapters/26.2-fabric",
+      "minecraft": "26.2",
+      "loader": "fabric",
+      "requiredJdk": "25",
+      "status": "NOT_LOCAL_FULL_CHECKED",
+      "detail": "Local v1.1.26 clean check build not executed"
+    },
+    {
+      "module": "java/adapters/26.1.2-neoforge",
+      "minecraft": "26.1.2",
+      "loader": "neoforge",
+      "requiredJdk": "25",
+      "status": "NOT_LOCAL_FULL_CHECKED",
+      "detail": "Local v1.1.26 clean check build not executed"
+    },
+    {
+      "module": "java/adapters/26.1.2-fabric",
+      "minecraft": "26.1.2",
+      "loader": "fabric",
+      "requiredJdk": "25",
+      "status": "NOT_LOCAL_FULL_CHECKED",
+      "detail": "Local v1.1.26 clean check build not executed"
+    },
+    {
+      "module": "java/adapters/1.21.1-neoforge",
+      "minecraft": "1.21.1",
+      "loader": "neoforge",
+      "requiredJdk": "21",
+      "status": "CURRENT_V126_LOCAL_FULL_PASS",
+      "detail": "Complete clean check build passed; 45 Gradle tasks, 0 unsupported water faces, all-six-native jar verified"
+    },
+    {
+      "module": "java/adapters/1.21.1-fabric",
+      "minecraft": "1.21.1",
+      "loader": "fabric",
+      "requiredJdk": "21",
+      "status": "PRIOR_V125_FULL_PASS_RECHECK_REQUIRED",
+      "detail": "Historical local v1.1.25 full build passed before new water rules were introduced; v1.1.26 not yet clean-checked"
+    },
+    {
+      "module": "java/adapters/1.20.1-fabric",
+      "minecraft": "1.20.1",
+      "loader": "fabric",
+      "requiredJdk": "17",
+      "status": "NOT_LOCAL_FULL_CHECKED",
+      "detail": "Local v1.1.26 clean check build not executed"
+    }
+  ],
+  "currentNeoForge1211": {
+    "command": "./gradlew --offline --no-daemon --max-workers=1 clean check build",
+    "duration": "5m 15s",
+    "totalActionableTasks": 45,
+    "executedTasks": 44,
+    "fromCache": 1,
+    "fullBuildLogSha256": "6cdd1024b7bd84596b160704312ccb55b0d7978c2a66370cf55db42643656bfb",
+    "nativeJar": "java/adapters/1.21.1-neoforge/build/libs/geoworld-0.1.4.jar",
+    "jarSha256": "e12e0b782ac7563c52dd885e92f0a2fe97598603ee7b5b6df5ec443f10e8db4a",
+    "jarBytes": 29163733,
+    "sixNativeEngines": true,
+    "jarMetadataVersion": "0.1.4",
+    "notPublishedBinary": true,
+    "priorWaterFailure77Resolved": true,
+    "finalWaterFreefallFaces": 0
+  },
+  "fullGoHydrologyTestsPassed": true,
+  "goTestCommand": "go test -p 1 -count=1 ./internal/generator ./internal/worldsample ./internal/specialfeatures ./internal/runtimeworld ./internal/worldmodelio ./internal/waterbed ./cmd/geoworld-r81-hydrology-audit",
+  "goTestLogSha256": "ab3e059b64c9a0c3dbe65ce769ece17b0c650fcf034d5a772f3c638666bfa451",
+  "officialGithubWindowsNineTargetCI": "NOT_RUN",
+  "gameplayCameraAcceptance": "NOT_DONE",
+  "releaseEligible": false,
+  "pushed": false,
+  "merged": false,
+  "publishedJar": false,
+  "notes": [
+    "Prior two Fabric complete builds were conducted against v1.1.25 and MUST NOT count as current v1.1.26 full pass",
+    "The 1.21.1 NeoForge v1.1.26 local jar retained development module version 0.1.4; never use as official v0.1.4 release",
+    "Actual Anvil river mouth pass is only a bounded 1517-column local area; not whole world visual acceptance"
+  ],
+  "fabric263V126CompileJava": {
+    "status": "LOCAL_COMPILE_JAVA_PASS_NOT_FULL_CHECK_BUILD",
+    "loader": "fabric",
+    "minecraft": "26.3",
+    "jdk": 25,
+    "command": "./gradlew --offline --no-daemon --max-workers=1 compileJava",
+    "duration": "23s",
+    "note": "Cannot count in the nine-target clean check build tally"
+  }
+}

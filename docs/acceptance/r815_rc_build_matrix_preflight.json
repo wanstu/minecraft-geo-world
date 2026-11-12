@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "releaseTargetCount": 9,
+  "workflow": ".github/workflows/release.yml",
+  "targetStaticCheck": "PASS",
+  "targets": [
+    {
+      "minecraft": "26.3",
+      "loader": "neoforge",
+      "java": "25",
+      "module": "java/neoforge-mod",
+      "configuredMinecraftVersion": "26.3",
+      "configValid": true,
+      "gradleWrapperExists": true,
+      "sourceLoaderMetadataExists": true,
+      "localJdkAvailable": true,
+      "note": "Static target validation only, no compile/build implied"
+    },
+    {
+      "minecraft": "26.3",
+      "loader": "fabric",
+      "java": "25",
+      "module": "java/adapters/26.3-fabric",
+      "configuredMinecraftVersion": "26.3",
+      "configValid": true,
+      "gradleWrapperExists": true,
+      "sourceLoaderMetadataExists": true,
+      "localJdkAvailable": true,
+      "note": "Static target validation only, no compile/build implied"
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "neoforge",
+      "java": "25",
+      "module": "java/adapters/26.2-neoforge",
+      "configuredMinecraftVersion": "26.2",
+      "configValid": true,
+      "gradleWrapperExists": true,
+      "sourceLoaderMetadataExists": true,
+      "localJdkAvailable": true,
+      "note": "Static target validation only, no compile/build implied"
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "fabric",
+      "java": "25",
+      "module": "java/adapters/26.2-fabric",
+      "configuredMinecraftVersion": "26.2",
+      "configValid": true,
+      "gradleWrapperExists": true,
+      "sourceLoaderMetadataExists": true,
+      "localJdkAvailable": true,
+      "note": "Static target validation only, no compile/build implied"
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "neoforge",
+      "java": "25",
+      "module": "java/adapters/26.1.2-neoforge",
+      "configuredMinecraftVersion": "26.1.2",
+      "configValid": true,
+      "gradleWrapperExists": true,
+      "sourceLoaderMetadataExists": true,
+      "localJdkAvailable": true,
+      "note": "Static target validation only, no compile/build implied"
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "fabric",
+      "java": "25",
+      "module": "java/adapters/26.1.2-fabric",
+      "configuredMinecraftVersion": "26.1.2",
+      "configValid": true,
+      "gradleWrapperExists": true,
+      "sourceLoaderMetadataExists": true,
+      "localJdkAvailable": true,
+      "note": "Static target validation only, no compile/build implied"
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "neoforge",
+      "java": "21",
+      "module": "java/adapters/1.21.1-neoforge",
+      "configuredMinecraftVersion": "1.21.1",
+      "configValid": true,
+      "gradleWrapperExists": true,
+      "sourceLoaderMetadataExists": true,
+      "localJdkAvailable": true,
+      "note": "Static target validation only, no compile/build implied"
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "fabric",
+      "java": "21",
+      "module": "java/adapters/1.21.1-fabric",
+      "configuredMinecraftVersion": "1.21.1",
+      "configValid": true,
+      "gradleWrapperExists": true,
+      "sourceLoaderMetadataExists": true,
+      "localJdkAvailable": true,
+      "note": "Static target validation only, no compile/build implied"
+    },
+    {
+      "minecraft": "1.20.1",
+      "loader": "fabric",
+      "java": "17",
+      "module": "java/adapters/1.20.1-fabric",
+      "configuredMinecraftVersion": "1.20.1",
+      "configValid": true,
+      "gradleWrapperExists": true,
+      "sourceLoaderMetadataExists": true,
+      "localJdkAvailable": true,
+      "note": "Static target validation only, no compile/build implied"
+    }
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "seed": -1818694639628404530,
+  "rulesOld": "geoworld-rules-v1.1.24",
+  "rulesNew": "geoworld-rules-v1.1.25",
+  "worldModelSha256": {
+    "v124": "7d595e4132cca0936d60ca643ff53867eb21e9da2a5585c84bc8c5469a52ea9d",
+    "v125": "6cdf80be9d97b0aa92a42e18eb93c0bd35d69886797182220439247637fa686f"
+  },
+  "payloadChangedSections": [
+    "config"
+  ],
+  "configChangedFields": [
+    "WorldProfile"
+  ],
+  "persistedRiverNetUnchanged": true,
+  "persistedSpecialFeaturesUnchanged": true,
+  "persistedMineralsUnchanged": true,
+  "persistedTerrainUnchanged": true,
+  "riverCount": 953,
+  "oceanMouthRiseSignals": 0,
+  "sinkholeRiverOverlapSignals": 0,
+  "goJavaParity": {
+    "old": {
+      "samplePairs": 41,
+      "maxGroundDelta": 0.0,
+      "hasAnyMismatch": false
+    },
+    "new": {
+      "samplePairs": 41,
+      "maxGroundDelta": 0.0,
+      "hasAnyMismatch": false
+    }
+  },
+  "actualAnvilProfiles": {
+    "eastWest": {
+      "samplePairs": 22,
+      "exactCoordinatePairs": 22,
+      "oldMaxSampledSlope": [
+        1.875,
+        408,
+        424
+      ],
+      "newMaxSampledSlope": [
+        0.5,
+        232,
+        240
+      ],
+      "oldSameY77Count": 9,
+      "newSameY77Count": 1,
+      "changedNaturalGroundCount": 18
+    },
+    "northSouth": {
+      "samplePairs": 18,
+      "exactCoordinatePairs": 18,
+      "oldMaxSampledSlope": [
+        2.0,
+        6504,
+        6512
+      ],
+      "newMaxSampledSlope": [
+        0.5,
+        6640,
+        6656
+      ],
+      "oldSameY77Count": 9,
+      "newSameY77Count": 1,
+      "changedNaturalGroundCount": 13
+    }
+  },
+  "worldPreflight": {
+    "world": "java/adapters/1.21.1-neoforge/run/R81eVerifiedGeoWorld",
+    "checks": {
+      "generator": "geoworld:geoworld",
+      "worldSeed": -1818694639628404530,
+      "bindingRules": "geoworld-rules-v1.1.25",
+      "bindingSeed": "-1818694639628404530",
+      "bindingVersion": "2",
+      "regionFiles": 10
+    },
+    "failures": [],
+    "pass": true
+  },
+  "oldCenterGroundY": 77,
+  "newCenterGroundY": 77,
+  "oldOuterGroundY": [
+    115,
+    116,
+    115,
+    116
+  ],
+  "newOuterGroundY": [
+    115,
+    116,
+    115,
+    116
+  ],
+  "oldProfileFullSamples": 40,
+  "newProfileFullSamples": 40,
+  "releaseEligible": false,
+  "gameplayScreenshotsTaken": false,
+  "remainingGates": [
+    "actual game-camera visual realism judgement",
+    "nine-target clean CI",
+    "multi-seed geomorphology acceptance"
+  ]
+}

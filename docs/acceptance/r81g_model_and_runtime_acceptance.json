@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-12",
+  "seed": 123456,
+  "evidenceClass": "versioned_Go_Java_model_parity_plus_minecraft_NeoForge_saved_Anvil",
+  "historical": {
+    "rules": "geoworld-rules-v1.1.25",
+    "coastalBackwaterVersion": 1,
+    "savedModelSha256": "9d3f6cd9aa2ea020d1fdb39beee5379b4323c1bc4ac79dd7da3597eb41093923",
+    "a": {
+      "x": 10814,
+      "z": 2467,
+      "ground": 0.499909501491,
+      "waterKind": "River",
+      "waterSurfaceDefined": true,
+      "waterSurfaceNormalized": 0.5
+    },
+    "b": {
+      "x": 10815,
+      "z": 2467,
+      "ground": 0.500182656291,
+      "waterKind": "River",
+      "waterSurfaceDefined": true,
+      "waterSurfaceNormalized": 0.506182656291
+    }
+  },
+  "candidate": {
+    "rules": "geoworld-rules-v1.1.26",
+    "coastalBackwaterVersion": 2,
+    "generatorModelSha256": "939a249a520ac406cfe387aceb2481eeeff0678fa007a97a5a5e8a02d10102f5",
+    "serverSavedModelSha256": "0ee8f9220e94858e72713fd0f13d5b2476da40a77f0b1f3ab466a85696a51988",
+    "a": {
+      "x": 10814,
+      "z": 2467,
+      "ground": 0.499909501491,
+      "waterKind": "River",
+      "waterSurfaceDefined": true,
+      "waterSurfaceNormalized": 0.505909501491
+    },
+    "b": {
+      "x": 10815,
+      "z": 2467,
+      "ground": 0.500182656291,
+      "waterKind": "River",
+      "waterSurfaceDefined": true,
+      "waterSurfaceNormalized": 0.506182656291
+    }
+  },
+  "persistedMacroModelsIdentical": {
+    "waterbed": true,
+    "surface": true,
+    "terrain": true,
+    "specialFeatures": true
+  },
+  "nonHydrologicFixtureDifferences": {
+    "payloadKeysDiffer": [
+      "config",
+      "minerals"
+    ],
+    "configFieldsDiffer": [
+      "WorldProfile",
+      "SurfaceOrePile",
+      "WorldSample"
+    ],
+    "surfaceOrePileFromHistoricalUserSave": false,
+    "surfaceOrePileInNewCandidateWorld": true,
+    "interpretation": "Historical user test world had surface ore piles disabled; new default creation enabled. It is not introduced by the hydrology change."
+  },
+  "identicalRiverCount": 955,
+  "identicalSpecialFeaturesCount": 18,
+  "GoJavaParity": {
+    "old": {
+      "points": 141,
+      "maxDeltaNormalized": 0.0,
+      "mismatches": 0
+    },
+    "new": {
+      "points": 141,
+      "maxDeltaNormalized": 0.0,
+      "mismatches": 0
+    }
+  },
+  "fullWaterOwnershipVerification": {
+    "chunks": 1183,
+    "columns": 302848,
+    "waterColumns": 158884,
+    "unownedSurfaceWaterSources": 0,
+    "unsafeExposedWaterSources": 0,
+    "freeFallWaterFaces": 0,
+    "runtimeWaterLost": 0,
+    "riverWaterBoundaryModelMismatches": 0,
+    "riverLocalWaterPeaks": 0,
+    "wetlandPoolLeaks": 0
+  },
+  "waterVerifierPass": true,
+  "waterVerifierLogSha256": "c7928c868cb7c7c398f92c700e449fe20750adb7a4dc75b3b78af603f3ea495f",
+  "actualMinecraftAnvilEvidenceFile": "docs/acceptance/r81g_seed123456_estuary_actual_anvil.json",
+  "actualMinecraftAnvilSummary": {
+    "expectedFullColumns": 1517,
+    "actualFullColumns": 1517,
+    "missingOrIncompleteColumns": 0,
+    "adjacentWetPairs": 2762,
+    "wetWaterSurfaceStepAboveOneBlock": 0,
+    "waterToLowerDryExposureSignals": 0,
+    "originalFailurePairWaterY": [
+      65,
+      65
+    ],
+    "originalFailurePairContinuous": true
+  },
+  "clientCameraAcceptance": "NOT_DONE",
+  "officialWindowsNineTargetCI": "NOT_RUN",
+  "releaseEligible": false
+}

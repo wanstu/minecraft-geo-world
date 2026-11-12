@@ -1,0 +1,63 @@
+GeoWorld local RC evidence, 2026-11-12
+Module: java/adapters/26.3-fabric
+Command: Gradle --offline --no-daemon --max-workers=1 clean check build
+Full raw log SHA256: b1578497b023f79b82ac759a7080c37acebcb815845bc9c7d2f0207e8841af3d
+JAR SHA256: b5eb512f007929dfac54628d6ad44e3bded4a70c842b83521609ad070e6dfda4
+Source: unpushed ADM worktree, NOT GitHub CI release
+
+> Task :clean
+> Task :generateGeoWorldClientCommonSources
+> Task :compileJava
+> Task :buildGeoWorldEngine_linux_arm64
+> Task :buildGeoWorldEngine_linux_x64
+> Task :buildGeoWorldEngine_macos_arm64
+> Task :buildGeoWorldEngine_macos_x64
+> Task :buildGeoWorldEngine_windows_arm64
+> Task :buildGeoWorldEngine_windows_x64
+> Task :buildGeoWorldTool_linux_arm64
+> Task :buildGeoWorldTool_linux_x64
+> Task :buildGeoWorldTool_macos_arm64
+> Task :buildGeoWorldTool_macos_x64
+> Task :buildGeoWorldTool_windows_arm64
+> Task :buildGeoWorldTool_windows_x64
+> Task :generateGeoWorldBuildInfo
+> Task :processResources
+> Task :classes
+> Task :fingerprintGeoWorldBiomeDecisions
+BiomeDecisionFingerprint seed=123456 points=24576 fnv64=7cad8c0a851e21bc PASS
+> Task :processIncludeJars
+> Task :jar
+> Task :compileTestJava NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :validateAccessWidener NO-SOURCE
+> Task :verifyGeoWorldAdapter
+> Task :verifyGeoWorldBasinRivers
+> Task :verifyGeoWorldClientLayering
+> Task :verifyGeoWorldParameterEffects
+> Task :verifyGeoWorldCreationConfig
+> Task :verifyGeoWorldDynamicWebUiPort
+> Task :verifyGeoWorldEngineBridge
+> Task :verifyGeoWorldMineralBodies
+> Task :verifyGeoWorldMinerals
+> Task :verifyGeoWorldModelQuery
+GeoWorld Model Verifier: passed=34/34 models=7
+> Task :verifyGeoWorldPreviewModel
+> Task :verifyGeoWorldQueryLifecycle
+PASS Query facade lifecycle: A -> empty -> B, late stop, rebind, immutable snapshots, concurrent reads
+> Task :verifyGeoWorldShoreline
+GeoWorld shoreline verification passed: seed=123456, immediate=2198, stable=2198, shelves=2854, materials=4776, caneReady=2075/2126, maxLowering=1, maxRaising=3, kinds={River=7267, WetlandPool=16, Lake=362, Ocean=953}
+> Task :verifyGeoWorldSpawn
+> Task :verifyGeoWorldSpecialLandscapes
+GeoWorld special landscape verification passed: seed=123456, landscapes=6, kinds={pale_garden_island=1, volcanic_crater_snow=1, cherry_island=1, sinkhole=2, mushroom_island=1}, cacheKey=75f282ddb07bb8fee55205df0fabf8e7
+> Task :verifyGeoWorldStrongholdPreview
+> Task :verifyGeoWorldStructureAdaptation
+> Task :verifyGeoWorldStructureSnapshot
+> Task :verifyGeoWorldSurfaceBiome
+> Task :verifyGeoWorldSurfaceOutcrops
+> Task :verifyGeoWorldWebUiLaunch
+> Task :check
+> Task :assemble
+> Task :build
+BUILD SUCCESSFUL in 5m 3s

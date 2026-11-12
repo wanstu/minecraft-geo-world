@@ -1,0 +1,37 @@
+GeoWorld rules=v1.1.26 local build evidence. Not official CI or released artifact.
+Source commit: 4a64827ca302d31285f1e84075d71bddc1a7bb77
+Module: java/adapters/26.2-fabric
+JDK: 25
+Command: ./gradlew --no-daemon --max-workers=1 clean check build
+Full raw local build log SHA256: ee7e50b9e4a6bfc9886982cc6775db72cefa4ce6ac21c3cbb084d55d323ba6de
+JAR SHA256: 742f7ddd6e4aa16c131c5218bd3ddf3c025259cb763e90b576ba480c65c3a118
+
+> Task :clean UP-TO-DATE
+> Task :compileJava
+> Task :buildGeoWorldEngine_linux_arm64
+> Task :buildGeoWorldEngine_linux_x64
+> Task :buildGeoWorldEngine_macos_arm64
+> Task :buildGeoWorldEngine_macos_x64
+> Task :buildGeoWorldEngine_windows_arm64
+> Task :buildGeoWorldEngine_windows_x64
+> Task :processResources
+> Task :classes
+> Task :fingerprintGeoWorldBiomeDecisions
+BiomeDecisionFingerprint seed=123456 points=24576 fnv64=6eff9f92530b16e6 PASS
+> Task :processIncludeJars
+> Task :jar
+> Task :compileTestJava NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :validateAccessWidener NO-SOURCE
+> Task :verifyGeoWorldAdapter
+> Task :verifyGeoWorldModelQuery
+GeoWorld Model Verifier: passed=34/34 models=7
+> Task :verifyGeoWorldQueryLifecycle
+PASS Query facade lifecycle: A -> empty -> B, late stop, rebind, immutable snapshots, concurrent reads
+> Task :check
+> Task :assemble
+> Task :build
+BUILD SUCCESSFUL in 2m 18s
+15 actionable tasks: 14 executed, 1 up-to-date

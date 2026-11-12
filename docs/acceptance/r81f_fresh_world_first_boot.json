@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "two_independently_created_first_boot_neoforge_worlds_and_saved_anvil_voxels",
+  "date": "2026-11-12",
+  "sourceCommit": "08fddac",
+  "cases": [
+    {
+      "world": "R81fFreshSeed123456",
+      "seed": 123456,
+      "minecraftVersion": "1.21.1",
+      "loader": "NeoForge 21.1.211",
+      "rulesVersion": "geoworld-rules-v1.1.25",
+      "generator": "geoworld:geoworld",
+      "newWorldDirectoryAbsentBeforeStart": true,
+      "modelCachePresentAtStart": true,
+      "preflight": {
+        "world": "java/adapters/1.21.1-neoforge/run/R81fFreshSeed123456",
+        "checks": {
+          "generator": "geoworld:geoworld",
+          "worldSeed": 123456,
+          "bindingRules": "geoworld-rules-v1.1.25",
+          "bindingSeed": "123456",
+          "bindingVersion": "2",
+          "regionFiles": 8
+        },
+        "failures": [],
+        "pass": true
+      },
+      "savedSpawn": {
+        "x": 1088,
+        "y": 107,
+        "z": 448
+      },
+      "anvilGround": {
+        "x": 1088,
+        "z": 448,
+        "chunkStatus": "full",
+        "naturalSubstrateY": 106,
+        "topY": 107,
+        "topBlock": "minecraft:fern",
+        "surfaceWaterTopY": null
+      },
+      "minecraftDoneSeconds": 16.678,
+      "logMarkers": {
+        "preparingLevel": "11:10:58.981",
+        "preparingStartRegion": "11:11:15.528",
+        "done": "11:11:15.607",
+        "modelPersisted": "11:11:16.443"
+      },
+      "logFile": "2026-11-12-1.log.gz",
+      "modelSha256": "9d3f6cd9aa2ea020d1fdb39beee5379b4323c1bc4ac79dd7da3597eb41093923",
+      "regionFilesSaved": 8,
+      "spawnOneAboveGround": true,
+      "gameCameraVisualAcceptance": "NOT_DONE"
+    },
+    {
+      "world": "R81fFreshCold20261112",
+      "seed": 20261112,
+      "minecraftVersion": "1.21.1",
+      "loader": "NeoForge 21.1.211",
+      "rulesVersion": "geoworld-rules-v1.1.25",
+      "generator": "geoworld:geoworld",
+      "newWorldDirectoryAbsentBeforeStart": true,
+      "modelCachePresentAtStart": false,
+      "preflight": {
+        "world": "java/adapters/1.21.1-neoforge/run/R81fFreshCold20261112",
+        "checks": {
+          "generator": "geoworld:geoworld",
+          "worldSeed": 20261112,
+          "bindingRules": "geoworld-rules-v1.1.25",
+          "bindingSeed": "20261112",
+          "bindingVersion": "2",
+          "regionFiles": 4
+        },
+        "failures": [],
+        "pass": true
+      },
+      "savedSpawn": {
+        "x": 192,
+        "y": 104,
+        "z": 192
+      },
+      "anvilGround": {
+        "x": 192,
+        "z": 192,
+        "chunkStatus": "full",
+        "naturalSubstrateY": 103,
+        "topY": 128,
+        "topBlock": "minecraft:vine",
+        "surfaceWaterTopY": null
+      },
+      "minecraftDoneSeconds": 45.427,
+      "logMarkers": {
+        "preparingLevel": "11:13:18.460",
+        "preparingStartRegion": "11:13:42.702",
+        "done": "11:14:03.829",
+        "modelPersisted": "11:14:04.571"
+      },
+      "logFile": "latest.log",
+      "modelSha256": "9272eb8c8640813eedc76a55022d72c4ee34fc2d6fad3b3193fc57d50d515572",
+      "regionFilesSaved": 4,
+      "spawnOneAboveGround": true,
+      "gameCameraVisualAcceptance": "NOT_DONE"
+    }
+  ],
+  "firstBootWarmCacheSeconds": 16.678,
+  "firstBootColdCacheSeconds": 45.427,
+  "coldSeedNotInModelCacheBeforeStart": true,
+  "modelCacheVerificationMethod": "Inspected existing geoworld-cache/*.geoworld manifest.seed before starting the cold-case server; only seed 123456 was present",
+  "spawnXZResolvedByExistingPlanner": true,
+  "spawnYDerivedFromBoundGeoWorldModel": true,
+  "bothWorldsSuccessfullySavedAndStopped": true,
+  "previous535SecondBootReproduced": false,
+  "performanceRootCauseConfirmed": false,
+  "remainingReleaseGates": [
+    "Minecraft client game-camera spawn and terrain assessment",
+    "all nine adapters clean check build on official CI",
+    "historical 535-second first-boot outlier has no confirmed root cause"
+  ],
+  "releaseEligible": false
+}

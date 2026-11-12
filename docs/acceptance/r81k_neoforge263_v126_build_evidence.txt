@@ -1,0 +1,65 @@
+GeoWorld 26.3 NeoForge v1.1.26 local full clean check build: NOT official CI, NOT release.
+Source: b2cb831 base + R8.1k NeoForge launch verifier TIME_WAIT assertion correction
+JDK25 Gradle 9.2.1 NeoForge ModDev 2.0.147
+Raw full build log SHA256: 6db882f165dec3e6b6889ca83191ebf6024e37346a035d065a0195cd932dc55a
+JAR SHA256: ed51b95b01091359438ee783bc12081abc49ea2326bf1a161e303477139c94f6
+
+> Task :clean
+> Task :createMinecraftArtifacts
+> Task :generateGeoWorldClientCommonSources
+> Task :compileJava FROM-CACHE
+> Task :buildGeoWorldEngine
+> Task :buildGeoWorldEngine_linux_arm64
+> Task :buildGeoWorldEngine_linux_x64
+> Task :buildGeoWorldEngine_macos_arm64
+> Task :buildGeoWorldEngine_macos_x64
+> Task :buildGeoWorldEngine_windows_arm64
+> Task :buildGeoWorldTool_linux_arm64
+> Task :buildGeoWorldTool_linux_x64
+> Task :buildGeoWorldTool_macos_arm64
+> Task :buildGeoWorldTool_macos_x64
+> Task :buildGeoWorldTool_windows_arm64
+> Task :buildGeoWorldTool_windows_x64
+> Task :generateGeoWorldBuildProfile
+> Task :generateModMetadata
+> Task :processResources
+> Task :classes
+> Task :auditGeoWorldBiomeCoverage
+GeoWorld realized biome samples seed=123456 samples=80451 observed=56/required=56 missing=0
+> Task :fingerprintGeoWorldBiomeDecisions
+BiomeDecisionFingerprint seed=123456 points=24576 fnv64=7cad8c0a851e21bc PASS
+> Task :probeGeoWorldReportedCoast
+> Task :jarJar NO-SOURCE
+> Task :jar
+> Task :compileTestJava NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :verifyGeoWorldBasinRivers
+> Task :verifyGeoWorldBiomePreset
+> Task :verifyGeoWorldChunkPerformanceMode
+> Task :verifyGeoWorldDecorationPolicy
+> Task :verifyGeoWorldEngine
+> Task :verifyGeoWorldMineralBodies
+> Task :verifyGeoWorldMinerals
+> Task :verifyGeoWorldModelQuery
+GeoWorld Model Verifier: passed=34/34 models=7
+> Task :verifyGeoWorldQueryLifecycle
+> Task :verifyGeoWorldShoreline
+GeoWorld shoreline verification passed: seed=123456, immediate=2198, stable=2198, shelves=2871, materials=4807, caneReady=2075/2126, maxLowering=1, maxRaising=3, kinds={River=7267, WetlandPool=16, Lake=362, Ocean=953}
+> Task :verifyGeoWorldSurfaceBiomes
+> Task :verifyGeoWorldSurfaceOutcrops
+> Task :verifyGeoWorldWaterOwnership
+GeoWorld final water ownership: seed=123456, chunks=1183, columns=302848, waterColumns=158884, owners={WetlandPool=54, River=60163, Lake=45255, Ocean=53412}, unownedSurfaceWaterSources=0, unsafeExposedWaterSources=0, freeFallWaterFaces=0, runtimeWaterLost=0, riverWaterBoundaryModelMismatches=0, riverLocalWaterPeaks=0, wetlandPoolLeaks=0
+> Task :verifyGeoWorldWebUiDynamicPort
+GeoWorld WebUI launch verification passed: mode=occupied-port-fallback, preferred=8788, first=2026/11/12 16:28:10 POST /api/game/session 1ms
+> Task :verifyGeoWorldWebUiLaunch
+GeoWorld WebUI launch verification passed: mode=normal, preferred=8788, first=2026/11/12 16:28:12 POST /api/game/session 0s
+> Task :verifyMinecraftCommonIsolation
+> Task :verifyMinecraftV26CommonIsolation
+> Task :verifyMinecraftVersionCommonIsolation
+> Task :check
+> Task :assemble
+> Task :build
+BUILD SUCCESSFUL in 3m 25s
+41 actionable tasks: 40 executed, 1 from cache

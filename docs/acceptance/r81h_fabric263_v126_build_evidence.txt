@@ -1,0 +1,66 @@
+GeoWorld local v1.1.26 candidate, NOT official CI or release
+Source commit: fa49b91b4a1c622f6191cc61342b443d67d57b98
+Module: java/adapters/26.3-fabric
+JDK: 25
+Command: ./gradlew --offline --no-daemon --max-workers=1 clean check build
+Full local stdout/stderr log SHA256: f9857539785ac1988a150c02ca5aea6438d214f1ed6ee78bd39a70a892bc3e88
+JAR SHA256: f9ce8d72b44aceacef5363662de9da93c71ba5fa6ed0ee3c0337d272c6885e70
+
+> Task :clean
+> Task :generateGeoWorldClientCommonSources
+> Task :compileJava
+> Task :buildGeoWorldEngine_linux_arm64
+> Task :buildGeoWorldEngine_linux_x64
+> Task :buildGeoWorldEngine_macos_arm64
+> Task :buildGeoWorldEngine_macos_x64
+> Task :buildGeoWorldEngine_windows_arm64
+> Task :buildGeoWorldEngine_windows_x64
+> Task :buildGeoWorldTool_linux_arm64
+> Task :buildGeoWorldTool_linux_x64
+> Task :buildGeoWorldTool_macos_arm64
+> Task :buildGeoWorldTool_macos_x64
+> Task :buildGeoWorldTool_windows_arm64
+> Task :buildGeoWorldTool_windows_x64
+> Task :generateGeoWorldBuildInfo
+> Task :processResources
+> Task :classes
+> Task :fingerprintGeoWorldBiomeDecisions
+BiomeDecisionFingerprint seed=123456 points=24576 fnv64=7cad8c0a851e21bc PASS
+> Task :processIncludeJars
+> Task :jar
+> Task :compileTestJava NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :validateAccessWidener NO-SOURCE
+> Task :verifyGeoWorldAdapter
+> Task :verifyGeoWorldBasinRivers
+> Task :verifyGeoWorldClientLayering
+> Task :verifyGeoWorldParameterEffects
+> Task :verifyGeoWorldCreationConfig
+> Task :verifyGeoWorldDynamicWebUiPort
+> Task :verifyGeoWorldEngineBridge
+> Task :verifyGeoWorldMineralBodies
+> Task :verifyGeoWorldMinerals
+GeoWorld mineral veins PASS seed=123456 oreFamilies=8 stoneVariants=8 deepVariants=8 amethystGeode=PASS geologicalBias=PASS solidHosts=16 chunkOrder=PASS
+> Task :verifyGeoWorldModelQuery
+GeoWorld Model Verifier: passed=34/34 models=7
+> Task :verifyGeoWorldPreviewModel
+> Task :verifyGeoWorldQueryLifecycle
+PASS Query facade lifecycle: A -> empty -> B, late stop, rebind, immutable snapshots, concurrent reads
+> Task :verifyGeoWorldShoreline
+GeoWorld shoreline verification passed: seed=123456, immediate=2198, stable=2198, shelves=2871, materials=4807, caneReady=2075/2126, maxLowering=1, maxRaising=3, kinds={River=7267, WetlandPool=16, Lake=362, Ocean=953}
+> Task :verifyGeoWorldSpawn
+> Task :verifyGeoWorldSpecialLandscapes
+GeoWorld special landscape verification passed: seed=123456, landscapes=6, kinds={pale_garden_island=1, volcanic_crater_snow=1, cherry_island=1, sinkhole=2, mushroom_island=1}, cacheKey=1b99fdfc2db302ebde41adef1e869d5c
+> Task :verifyGeoWorldStrongholdPreview
+> Task :verifyGeoWorldStructureAdaptation
+> Task :verifyGeoWorldStructureSnapshot
+> Task :verifyGeoWorldSurfaceBiome
+> Task :verifyGeoWorldSurfaceOutcrops
+> Task :verifyGeoWorldWebUiLaunch
+> Task :check
+> Task :assemble
+> Task :build
+BUILD SUCCESSFUL in 3m 54s
+41 actionable tasks: 41 executed

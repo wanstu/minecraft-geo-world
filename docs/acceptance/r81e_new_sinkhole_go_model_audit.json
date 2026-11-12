@@ -1,0 +1,835 @@
+{
+  "evidenceClass": "investigation_signal",
+  "seed": -1818694639628404530,
+  "rulesVersion": "geoworld-rules-v1.1.25",
+  "seaLevelY": 63,
+  "counts": {
+    "riverSegments": 953,
+    "terminalSegments": 103,
+    "oceanTerminals": 88,
+    "lakeTerminals": 15,
+    "unclassifiedTerminals": 0,
+    "oceanMouths": 88,
+    "dryApproachSignals": 0,
+    "endpointNotOceanSignals": 0,
+    "seaAboveApproachSignals": 0,
+    "riverOceanBoundaryRiseSignals": 0,
+    "riverOceanBoundaryChecked": 88,
+    "levelJumpSignals": 0,
+    "sinkholes": 4,
+    "sinkholeRiverOverlapSignals": 0,
+    "sinkholeOverlapWithoutDrainage": 0
+  },
+  "sites": [
+    {
+      "case": {
+        "id": "SINKHOLE11-X-176",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 144,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 144,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 116
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 857.1585061232813,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X-160",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 160,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 160,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 116
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 872.8237751111772,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X-136",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 184,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 184,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 116,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 896.3438509127366,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X-112",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 208,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 208,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 112,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 919.8887192148959,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X-088",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 232,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 232,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 104,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 943.4565238571245,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X-064",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 256,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 256,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 94,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 967.0455879007549,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X-040",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 280,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 280,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 85,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 990.6543926859981,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X-020",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 300,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 300,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 79,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1010.3424780602137,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X+000",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 320,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 78,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1030.0425817400185,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X+020",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 340,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 340,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 79,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1049.754027104651,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X+040",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 360,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 360,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 84,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1069.4761870407503,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X+064",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 384,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 384,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 93,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1093.1561056486714,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X+088",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 408,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 408,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 103,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1116.849689074907,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X+112",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 432,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 432,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 112,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1140.554400444056,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X+136",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 456,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 456,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 117,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1164.2553893544916,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X+160",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 480,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 480,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 117
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1187.9683846423093,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-X+176",
+        "category": "R81d-new-sinkhole-east-west",
+        "x": 496,
+        "z": 6592,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 496,
+        "z": 6592,
+        "kind": "none",
+        "groundY": 117
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1203.7833680063773,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z-150",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6442,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6442,
+        "kind": "none",
+        "groundY": 116
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1061.0655022193494,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z-132",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6460,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6460,
+        "kind": "none",
+        "groundY": 116
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1056.4923094845508,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z-116",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6476,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6476,
+        "kind": "none",
+        "groundY": 116,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1052.6689888089227,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z-096",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6496,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6496,
+        "kind": "none",
+        "groundY": 112,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1048.2137186661887,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z-080",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6512,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6512,
+        "kind": "none",
+        "groundY": 106,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1044.9114795043645,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z-064",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6528,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6528,
+        "kind": "none",
+        "groundY": 99,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1041.8445181503812,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z-048",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6544,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6544,
+        "kind": "none",
+        "groundY": 91,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1039.01491808347,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z-024",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6568,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6568,
+        "kind": "none",
+        "groundY": 81,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1034.413708434707,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z+024",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6616,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6616,
+        "kind": "none",
+        "groundY": 81,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1026.1801699109492,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z+048",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6640,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6640,
+        "kind": "none",
+        "groundY": 90,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1022.7755086618298,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z+064",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6656,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6656,
+        "kind": "none",
+        "groundY": 98,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1020.8129478272688,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z+080",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6672,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6672,
+        "kind": "none",
+        "groundY": 105,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1019.0978401434925,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z+096",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6688,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6688,
+        "kind": "none",
+        "groundY": 112,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1017.5618207136914,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z+116",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6708,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6708,
+        "kind": "none",
+        "groundY": 117,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1015.9750943342539,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z+132",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6724,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6724,
+        "kind": "none",
+        "groundY": 117
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1014.9877137060147,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-Z+150",
+        "category": "R81d-new-sinkhole-north-south",
+        "x": 320,
+        "z": 6742,
+        "question": "Real basin cross section water ground relation",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 320,
+        "z": 6742,
+        "kind": "none",
+        "groundY": 117
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1014.177528332275,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-D-112_-080",
+        "category": "R81d-new-sinkhole-diagonal",
+        "x": 208,
+        "z": 6512,
+        "question": "Rim vs dry bank geometry",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 208,
+        "z": 6512,
+        "kind": "none",
+        "groundY": 116
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 935.4186228635818,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-D-080_-064",
+        "category": "R81d-new-sinkhole-diagonal",
+        "x": 240,
+        "z": 6528,
+        "question": "Rim vs dry bank geometry",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 240,
+        "z": 6528,
+        "kind": "none",
+        "groundY": 110,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 963.3275663033837,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-D+080_-064",
+        "category": "R81d-new-sinkhole-diagonal",
+        "x": 400,
+        "z": 6528,
+        "question": "Rim vs dry bank geometry",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 400,
+        "z": 6528,
+        "kind": "none",
+        "groundY": 111,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1120.57128287316,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-D+112_-080",
+        "category": "R81d-new-sinkhole-diagonal",
+        "x": 432,
+        "z": 6512,
+        "question": "Rim vs dry bank geometry",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 432,
+        "z": 6512,
+        "kind": "none",
+        "groundY": 117,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1154.8852756875895,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-D-112_+080",
+        "category": "R81d-new-sinkhole-diagonal",
+        "x": 208,
+        "z": 6672,
+        "question": "Rim vs dry bank geometry",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 208,
+        "z": 6672,
+        "kind": "none",
+        "groundY": 117
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 907.721217407248,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-D-080_+064",
+        "category": "R81d-new-sinkhole-diagonal",
+        "x": 240,
+        "z": 6656,
+        "question": "Rim vs dry bank geometry",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 240,
+        "z": 6656,
+        "kind": "none",
+        "groundY": 112,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 941.3880727713739,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-D+080_+064",
+        "category": "R81d-new-sinkhole-diagonal",
+        "x": 400,
+        "z": 6656,
+        "question": "Rim vs dry bank geometry",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 400,
+        "z": 6656,
+        "kind": "none",
+        "groundY": 112,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1100.321155548413,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "SINKHOLE11-D+112_+080",
+        "category": "R81d-new-sinkhole-diagonal",
+        "x": 432,
+        "z": 6672,
+        "question": "Rim vs dry bank geometry",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": 432,
+        "z": 6672,
+        "kind": "none",
+        "groundY": 117
+      },
+      "nearestRiver": 125,
+      "nearestDistanceBlocks": 1130.5576665097049,
+      "nearestOceanMouth": false
+    }
+  ],
+  "limitation": "All signals use the persisted world model. None prove a Minecraft block/water-wall bug without actual Anvil water-state and bank height inspection."
+}

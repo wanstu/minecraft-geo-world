@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-12",
+  "branch": "adm/geoworld-r81f-spawn-height-20261112",
+  "sourceBaseCommit": "6591da761b6da69dfabc73785fd1a92128c5218a",
+  "newSourceModifications": [
+    "java/minecraft-common/src/main/java/geoworld/minecraft/common/verification/GeoWorldSpecialLandscapeVerifier.java",
+    "java/adapters/26.3-fabric/build.gradle"
+  ],
+  "rules": "geoworld-rules-v1.1.25",
+  "fullReleaseTargetCount": 9,
+  "staticPreflightPassCount": 9,
+  "locallyFullCleanCheckBuildPassCount": 2,
+  "officialWindowsCi": {
+    "started": false,
+    "passed": false,
+    "status": "NOT_RUN_ON_UNPUSHED_BRANCH"
+  },
+  "targets": [
+    {
+      "minecraft": "26.3",
+      "loader": "neoforge",
+      "java": "25",
+      "module": "java/neoforge-mod",
+      "localJdkAvailable": true,
+      "status": "LOCAL_RESOURCE_BLOCKED",
+      "detail": "Not executed as a full clean check build this turn",
+      "failedStage": "createMinecraftArtifacts -> decompile",
+      "reason": "Offline moddev plugin not cached; online dependency resolution succeeded, but isolated Java decompiler reached ~4.5GB RSS and 2GB swap nearly full. This run was safely canceled before compiler/check; not a source failure",
+      "offlineAttemptLogSha256": "36ec71b455b9cc2aae537991c2b3b39befbd06c0471f319651cad4ef0eb547fc",
+      "onlineAttemptLogSha256": "8522b121035564aa3b38b4b5a15161c3949dc646925f9a12af276c0571e0ea85",
+      "safeCancelConfirmed": true
+    },
+    {
+      "minecraft": "26.3",
+      "loader": "fabric",
+      "java": "25",
+      "module": "java/adapters/26.3-fabric",
+      "localJdkAvailable": true,
+      "status": "LOCAL_CLEAN_CHECK_BUILD_PASS",
+      "reportedDuration": "5m 3s",
+      "executableJdk": 25,
+      "actionableTasks": "41",
+      "buildLogSha256": "b1578497b023f79b82ac759a7080c37acebcb815845bc9c7d2f0207e8841af3d",
+      "jarEvidence": "docs/acceptance/r815_rc_fabric263_jar_inspection_current.json",
+      "jarSha256": "b5eb512f007929dfac54628d6ad44e3bded4a70c842b83521609ad070e6dfda4",
+      "jarSizeBytes": 29155910,
+      "allSixNativeEngines": true,
+      "note": "Local development source built with default 0.1.4 metadata; it is NOT a released v0.1.4 binary",
+      "buildEvidenceText": "docs/acceptance/r815_rc_local_263_fabric_build_evidence.txt"
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "neoforge",
+      "java": "25",
+      "module": "java/adapters/26.2-neoforge",
+      "localJdkAvailable": true,
+      "status": "NOT_FULLY_CHECKED",
+      "detail": "Not executed as a full clean check build this turn"
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "fabric",
+      "java": "25",
+      "module": "java/adapters/26.2-fabric",
+      "localJdkAvailable": true,
+      "status": "NOT_FULLY_CHECKED",
+      "detail": "Not executed as a full clean check build this turn"
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "neoforge",
+      "java": "25",
+      "module": "java/adapters/26.1.2-neoforge",
+      "localJdkAvailable": true,
+      "status": "NOT_FULLY_CHECKED",
+      "detail": "Not executed as a full clean check build this turn"
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "fabric",
+      "java": "25",
+      "module": "java/adapters/26.1.2-fabric",
+      "localJdkAvailable": true,
+      "status": "NOT_FULLY_CHECKED",
+      "detail": "Not executed as a full clean check build this turn"
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "neoforge",
+      "java": "21",
+      "module": "java/adapters/1.21.1-neoforge",
+      "localJdkAvailable": true,
+      "status": "LOCAL_CLEAN_CHECK_BUILD_FAILED",
+      "detail": "NeoForge server saved-world/spawn acceptance and compileJava passed previously; clean check build not verified",
+      "failedTask": "verifyGeoWorldWaterOwnership",
+      "waterFreeFallFaces": 77,
+      "reason": "77 connected River surface adjacency faces fall more than one voxel (first example 10815,2467 to 10814,2467: 66 versus 63)",
+      "evidence": "docs/acceptance/r815_rc_neoforge1211_water_ownership_failure.json",
+      "reportedDuration": "5m 1s"
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "fabric",
+      "java": "21",
+      "module": "java/adapters/1.21.1-fabric",
+      "localJdkAvailable": true,
+      "status": "LOCAL_CLEAN_CHECK_BUILD_PASS",
+      "reportedDuration": "1m 39s",
+      "executableJdk": 21,
+      "actionableTasks": "17",
+      "buildLogSha256": "2cab96efba59b578d3cd197b8e97e71fda4e877718777acbb0c4a70b03e287c3",
+      "jarEvidence": "docs/acceptance/r815_rc_fabric1211_jar_inspection.json",
+      "jarSha256": "ba1d69ecdec3bdbb09eef1f6bdd6c0a230da73fc4422f858f30ac6c2af9f5c6d",
+      "jarSizeBytes": 9201975,
+      "allSixNativeEngines": true,
+      "note": "Local development source built with default 0.1.4 metadata; it is NOT a released v0.1.4 binary",
+      "buildEvidenceText": "docs/acceptance/r815_rc_local_1211_fabric_build_evidence.txt"
+    },
+    {
+      "minecraft": "1.20.1",
+      "loader": "fabric",
+      "java": "17",
+      "module": "java/adapters/1.20.1-fabric",
+      "localJdkAvailable": false,
+      "status": "NOT_FULLY_CHECKED",
+      "detail": "JDK 17 not installed locally; official workflow does provision JDK17"
+    }
+  ],
+  "priorFailedCheck": {
+    "module": "java/adapters/26.3-fabric",
+    "task": "verifyGeoWorldSpecialLandscapes",
+    "originalError": "depression center is not flat: kind=sinkhole",
+    "cause": "stale flat-floor test contract for intentionally sloped v1.1.25 sinkholes",
+    "testFixed": true,
+    "isolatedRetestPassed": true,
+    "fullCleanCheckBuildRetestPassed": true,
+    "generationAlgorithmModified": false,
+    "historicalModelsUnchanged": true
+  },
+  "legacyModelCheck": {
+    "v124SinkholesChecked": 4,
+    "oldCenterToInnerDeltasNormalized": [
+      2.276e-05,
+      0,
+      5.566e-05,
+      0
+    ],
+    "oldRulesRemainFlat": true
+  },
+  "remaining": [
+    "7 other adapter clean check builds",
+    "official Windows nine-target GitHub CI",
+    "Minecraft client game-camera landscape/spawn acceptance"
+  ],
+  "releaseEligible": false,
+  "merged": false,
+  "pushed": false,
+  "publishedJar": false,
+  "matrixStatus": "2 LOCAL FULL PASS; 1 LOCAL FULL FAIL; 1 RESOURCE-BLOCKED; 5 NOT FULLY CHECKED",
+  "outstanding": [
+    "Repair the 1.21.1 NeoForge connected river-to-sea water surface 3-block step; new versioned rule and actual saved Anvil acceptance required",
+    "26.3 NeoForge first-time Gradle decompilation on a resource-suitable build host; local 8GB dadm attempted but safely canceled",
+    "Five other full adapter build targets still not executed this stage",
+    "Official GitHub Windows nine-target CI not executed on unpushed branch",
+    "Minecraft game-camera visual acceptance not completed"
+  ]
+}

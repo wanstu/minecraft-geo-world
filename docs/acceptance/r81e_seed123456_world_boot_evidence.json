@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "world": "R81eSeed123456VoxelAudit",
+  "seed": 123456,
+  "rulesVersion": "geoworld-rules-v1.1.25",
+  "evidenceClass": "minecraft_server_saved_model_plus_anvil",
+  "firstBoot": {
+    "enteredPreparingLevel": "2026-11-12 09:56:18 CST",
+    "done": "2026-11-12 10:05:13 CST",
+    "reportedSeconds": 534.574,
+    "modelBoundAfterDone": true
+  },
+  "sameWorldReload": {
+    "reportedDoneSeconds": 23.917,
+    "savedModelLoaded": true
+  },
+  "serverStoppedWithSave": true,
+  "worldModelSha256": "9d3f6cd9aa2ea020d1fdb39beee5379b4323c1bc4ac79dd7da3597eb41093923",
+  "persistedRiverCount": 955,
+  "persistedSpecialFeatureCount": 18,
+  "selectedSinkholeIdsAndCenters": [
+    [
+      9,
+      6080,
+      7744
+    ],
+    [
+      10,
+      -14016,
+      -7104
+    ],
+    [
+      11,
+      3392,
+      -3520
+    ],
+    [
+      12,
+      -1728,
+      -9024
+    ]
+  ],
+  "allSinkholeSitesEqualGoMultiSeedModel": true,
+  "voxelEvidence": "docs/acceptance/r81e_seed123456_actual_voxels.json",
+  "fullRequiredVoxels": 82,
+  "missingRequiredVoxels": 0,
+  "notes": [
+    "The initial long bootstrap is a measured performance concern; no root cause proven",
+    "Other seeds have Go model-only evidence, not Minecraft Anvil chunks",
+    "Visual/game-camera evaluation and nine-target CI still pending"
+  ],
+  "releaseEligible": false
+}

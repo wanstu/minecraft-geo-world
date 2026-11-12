@@ -1,0 +1,671 @@
+{
+  "evidenceClass": "investigation_signal",
+  "seed": -1818694639628404530,
+  "rulesVersion": "geoworld-rules-v1.1.23",
+  "seaLevelY": 63,
+  "counts": {
+    "riverSegments": 953,
+    "terminalSegments": 103,
+    "oceanTerminals": 88,
+    "lakeTerminals": 15,
+    "unclassifiedTerminals": 0,
+    "oceanMouths": 88,
+    "dryApproachSignals": 0,
+    "endpointNotOceanSignals": 0,
+    "seaAboveApproachSignals": 0,
+    "riverOceanBoundaryRiseSignals": 0,
+    "riverOceanBoundaryChecked": 88,
+    "levelJumpSignals": 0,
+    "sinkholes": 4,
+    "sinkholeRiverOverlapSignals": 1,
+    "sinkholeOverlapWithoutDrainage": 1
+  },
+  "sites": [
+    {
+      "case": {
+        "id": "R81D-T064-OFF-048",
+        "category": "sinkhole-river-transect",
+        "x": -1704.292531,
+        "z": 5416.292531,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1704.292531,
+        "z": 5416.292531,
+        "kind": "none",
+        "groundY": 106
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 47.999999745196234,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T064-OFF-032",
+        "category": "sinkhole-river-transect",
+        "x": -1692.978823,
+        "z": 5404.978823,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1692.978823,
+        "z": 5404.978823,
+        "kind": "none",
+        "groundY": 105
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 32.00000045086738,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T064-OFF-016",
+        "category": "sinkhole-river-transect",
+        "x": -1681.665114,
+        "z": 5393.665114,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1681.665114,
+        "z": 5393.665114,
+        "kind": "none",
+        "groundY": 102
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 15.999999742324816,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T064-OFF+000",
+        "category": "sinkhole-river-transect",
+        "x": -1670.351406,
+        "z": 5382.351406,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1670.351406,
+        "z": 5382.351406,
+        "kind": "river",
+        "groundY": 94,
+        "waterY": 98,
+        "aboveSeaBlocks": 35
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 4.479954810711193e-7,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T064-OFF+016",
+        "category": "sinkhole-river-transect",
+        "x": -1659.037697,
+        "z": 5371.037697,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1659.037697,
+        "z": 5371.037697,
+        "kind": "none",
+        "groundY": 80,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 16.00000026054709,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T064-OFF+032",
+        "category": "sinkhole-river-transect",
+        "x": -1647.723989,
+        "z": 5359.723989,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1647.723989,
+        "z": 5359.723989,
+        "kind": "none",
+        "groundY": 70,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 31.999999554875778,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T064-OFF+048",
+        "category": "sinkhole-river-transect",
+        "x": -1636.41028,
+        "z": 5348.41028,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1636.41028,
+        "z": 5348.41028,
+        "kind": "none",
+        "groundY": 70,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 48.00000026341835,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T080-OFF-048",
+        "category": "sinkhole-river-transect",
+        "x": -1722.875501,
+        "z": 5395.440926,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1722.875501,
+        "z": 5395.440926,
+        "kind": "none",
+        "groundY": 105
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 47.999999950898705,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T080-OFF-032",
+        "category": "sinkhole-river-transect",
+        "x": -1710.390755,
+        "z": 5385.434372,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1710.390755,
+        "z": 5385.434372,
+        "kind": "none",
+        "groundY": 105
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 31.99999977466608,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T080-OFF-016",
+        "category": "sinkhole-river-transect",
+        "x": -1697.90601,
+        "z": 5375.427818,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1697.90601,
+        "z": 5375.427818,
+        "kind": "none",
+        "groundY": 101
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 16.000000378730707,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T080-OFF+000",
+        "category": "sinkhole-river-transect",
+        "x": -1685.421264,
+        "z": 5365.421264,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1685.421264,
+        "z": 5365.421264,
+        "kind": "river",
+        "groundY": 94,
+        "waterY": 98,
+        "aboveSeaBlocks": 35
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 2.0372370185087623e-7,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T080-OFF+016",
+        "category": "sinkhole-river-transect",
+        "x": -1672.936518,
+        "z": 5355.41471,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1672.936518,
+        "z": 5355.41471,
+        "kind": "none",
+        "groundY": 83,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 15.999999973733809,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T080-OFF+032",
+        "category": "sinkhole-river-transect",
+        "x": -1660.451772,
+        "z": 5345.408156,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1660.451772,
+        "z": 5345.408156,
+        "kind": "none",
+        "groundY": 70,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 32.00000014996587,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T080-OFF+048",
+        "category": "sinkhole-river-transect",
+        "x": -1647.967027,
+        "z": 5335.401602,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1647.967027,
+        "z": 5335.401602,
+        "kind": "none",
+        "groundY": 70,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 47.99999954590181,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T096-OFF-048",
+        "category": "sinkhole-river-transect",
+        "x": -1737.937908,
+        "z": 5375.486328,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1737.937908,
+        "z": 5375.486328,
+        "kind": "none",
+        "groundY": 104
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 48.00000047500047,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T096-OFF-032",
+        "category": "sinkhole-river-transect",
+        "x": -1725.017173,
+        "z": 5366.049453,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1725.017173,
+        "z": 5366.049453,
+        "kind": "none",
+        "groundY": 104
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 32.000000390442345,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T096-OFF-016",
+        "category": "sinkhole-river-transect",
+        "x": -1712.096438,
+        "z": 5356.612578,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1712.096438,
+        "z": 5356.612578,
+        "kind": "none",
+        "groundY": 101
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 16.00000030588494,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T096-OFF+000",
+        "category": "sinkhole-river-transect",
+        "x": -1699.175703,
+        "z": 5347.175703,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1699.175703,
+        "z": 5347.175703,
+        "kind": "river",
+        "groundY": 94,
+        "waterY": 98,
+        "aboveSeaBlocks": 35
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 2.2399790131308509e-7,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T096-OFF+016",
+        "category": "sinkhole-river-transect",
+        "x": -1686.254968,
+        "z": 5337.738828,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1686.254968,
+        "z": 5337.738828,
+        "kind": "none",
+        "groundY": 80,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 15.999999863231128,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T096-OFF+032",
+        "category": "sinkhole-river-transect",
+        "x": -1673.334233,
+        "z": 5328.301953,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1673.334233,
+        "z": 5328.301953,
+        "kind": "none",
+        "groundY": 70,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 31.999999947788538,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T096-OFF+048",
+        "category": "sinkhole-river-transect",
+        "x": -1660.413498,
+        "z": 5318.865078,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1660.413498,
+        "z": 5318.865078,
+        "kind": "none",
+        "groundY": 70,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 48.00000003234666,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T112-OFF-048",
+        "category": "sinkhole-river-transect",
+        "x": -1750.384379,
+        "z": 5358.949804,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1750.384379,
+        "z": 5358.949804,
+        "kind": "none",
+        "groundY": 103
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 47.99999999120176,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T112-OFF-032",
+        "category": "sinkhole-river-transect",
+        "x": -1737.899633,
+        "z": 5348.94325,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1737.899633,
+        "z": 5348.94325,
+        "kind": "none",
+        "groundY": 103
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 31.999999814969705,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T112-OFF-016",
+        "category": "sinkhole-river-transect",
+        "x": -1725.414888,
+        "z": 5338.936696,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1725.414888,
+        "z": 5338.936696,
+        "kind": "none",
+        "groundY": 101
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 16.000000419033764,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T112-OFF+000",
+        "category": "sinkhole-river-transect",
+        "x": -1712.930142,
+        "z": 5328.930142,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1712.930142,
+        "z": 5328.930142,
+        "kind": "river",
+        "groundY": 94,
+        "waterY": 98,
+        "aboveSeaBlocks": 35
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 2.44271136111387e-7,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T112-OFF+016",
+        "category": "sinkhole-river-transect",
+        "x": -1700.445396,
+        "z": 5318.923588,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1700.445396,
+        "z": 5318.923588,
+        "kind": "none",
+        "groundY": 87,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 15.999999933430752,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T112-OFF+032",
+        "category": "sinkhole-river-transect",
+        "x": -1687.96065,
+        "z": 5308.917034,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1687.96065,
+        "z": 5308.917034,
+        "kind": "none",
+        "groundY": 73,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 32.00000010966282,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-T112-OFF+048",
+        "category": "sinkhole-river-transect",
+        "x": -1675.475905,
+        "z": 5298.91048,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1675.475905,
+        "z": 5298.91048,
+        "kind": "none",
+        "groundY": 70,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 47.99999950559875,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-PIT-CENTER",
+        "category": "sinkhole-control",
+        "x": -1600,
+        "z": 5312,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1600,
+        "z": 5312,
+        "kind": "none",
+        "groundY": 70,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 99.49191204922029,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-BANK",
+        "category": "sinkhole-control",
+        "x": -1665,
+        "z": 5313,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1665,
+        "z": 5313,
+        "kind": "none",
+        "groundY": 70,
+        "specialFeature": "sinkhole"
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 47.768576462998574,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-RIVER",
+        "category": "sinkhole-control",
+        "x": -1699,
+        "z": 5347,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1699,
+        "z": 5347,
+        "kind": "river",
+        "groundY": 94,
+        "waterY": 98,
+        "aboveSeaBlocks": 35
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 0.24848134155173665,
+      "nearestOceanMouth": false
+    },
+    {
+      "case": {
+        "id": "R81D-RIVER-END",
+        "category": "sinkhole-control",
+        "x": -1728,
+        "z": 5312,
+        "question": "River #735 water datum versus sinkhole #11 dry banks",
+        "requiresVoxelTest": true
+      },
+      "point": {
+        "x": -1728,
+        "z": 5312,
+        "kind": "river",
+        "groundY": 93,
+        "waterY": 97,
+        "aboveSeaBlocks": 34
+      },
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 0,
+      "nearestOceanMouth": false
+    }
+  ],
+  "sinkholes": [
+    {
+      "id": 11,
+      "x": -1600,
+      "z": 5312,
+      "nearestRiver": 735,
+      "nearestDistanceBlocks": 99.49191204922029,
+      "riverIntersectsFootprint": true,
+      "hasPersistedDrainage": false
+    }
+  ],
+  "limitation": "All signals use the persisted world model. None prove a Minecraft block/water-wall bug without actual Anvil water-state and bank height inspection."
+}

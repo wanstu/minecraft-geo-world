@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "persisted_minecraft_geoworld_model",
+  "seed": -1818694639628404530,
+  "modelHashes": {
+    "legacy": "f3b7f470e585aec4950d52f5aec779061d521b1853359e364075c8a88aeeec1a",
+    "candidate": "7d595e4132cca0936d60ca643ff53867eb21e9da2a5585c84bc8c5469a52ea9d"
+  },
+  "oldRules": "geoworld-rules-v1.1.23",
+  "newRules": "geoworld-rules-v1.1.24",
+  "unchangedPayloadSections": [
+    "surface",
+    "climatePreview",
+    "minerals",
+    "terrain",
+    "waterbed",
+    "profile",
+    "tectonicQuery",
+    "hydrologyQuery",
+    "ecology"
+  ],
+  "changedPayloadSections": [
+    "specialFeatures",
+    "config"
+  ],
+  "identicalWaterbed": true,
+  "identicalMinerals": true,
+  "oldSpecialFeatureCount": 20,
+  "candidateSpecialFeatureCount": 20,
+  "preservedFeatureIds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+  ],
+  "modifiedFeatureId": 11,
+  "oldSinkhole11": {
+    "id": 11,
+    "centerX": -1600,
+    "centerZ": 5312
+  },
+  "candidateSinkhole11": {
+    "id": 11,
+    "centerX": 320,
+    "centerZ": 6592
+  },
+  "oldModelCounts": {
+    "riverSegments": 953,
+    "terminalSegments": 103,
+    "oceanTerminals": 88,
+    "lakeTerminals": 15,
+    "unclassifiedTerminals": 0,
+    "oceanMouths": 88,
+    "dryApproachSignals": 0,
+    "endpointNotOceanSignals": 0,
+    "seaAboveApproachSignals": 0,
+    "riverOceanBoundaryRiseSignals": 0,
+    "riverOceanBoundaryChecked": 88,
+    "levelJumpSignals": 0,
+    "sinkholes": 4,
+    "sinkholeRiverOverlapSignals": 1,
+    "sinkholeOverlapWithoutDrainage": 1
+  },
+  "candidateModelCounts": {
+    "riverSegments": 953,
+    "terminalSegments": 103,
+    "oceanTerminals": 88,
+    "lakeTerminals": 15,
+    "unclassifiedTerminals": 0,
+    "oceanMouths": 88,
+    "dryApproachSignals": 0,
+    "endpointNotOceanSignals": 0,
+    "seaAboveApproachSignals": 0,
+    "riverOceanBoundaryRiseSignals": 0,
+    "riverOceanBoundaryChecked": 88,
+    "levelJumpSignals": 0,
+    "sinkholes": 4,
+    "sinkholeRiverOverlapSignals": 0,
+    "sinkholeOverlapWithoutDrainage": 0
+  },
+  "oldVoxelEvidenceFull": 31,
+  "oldVoxelEvidenceMissing": 1,
+  "newVoxelEvidence": {
+    "path": "docs/acceptance/r81d_actual_voxel_v124_comparison.json",
+    "actualFullPairs": 30,
+    "unknownPairs": 2,
+    "fixedRiverAndBankCasePass": true,
+    "full32PointCoverage": false
+  },
+  "releaseEligible": false
+}

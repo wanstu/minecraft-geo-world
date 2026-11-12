@@ -28,11 +28,19 @@ public final class GeoWorldSpecialLandscapeVerifier {
             GeoWorldEngineBridge.generate(seed, config);
         GeoWorldV1 model = generated.model();
 
-        if (!"geoworld-rules-v1.1.22".equals(
+        if (!("geoworld-rules-v1.1.22".equals(
             model.manifest().generationRulesVersion()
-        )) {
+        ) || ("geoworld-rules-v1.1.23".equals(
+            model.manifest().generationRulesVersion()
+        ) || ("geoworld-rules-v1.1.24".equals(
+            model.manifest().generationRulesVersion()
+        ) || ("geoworld-rules-v1.1.25".equals(
+            model.manifest().generationRulesVersion()
+        ) || "geoworld-rules-v1.1.26".equals(
+            model.manifest().generationRulesVersion()
+        )))))) {
             throw new AssertionError(
-                "special landscape verifier requires v1.1.16, got " +
+                "special landscape verifier requires v1.1.22-v1.1.26, got " +
                 model.manifest().generationRulesVersion()
             );
         }
@@ -275,7 +283,44 @@ public final class GeoWorldSpecialLandscapeVerifier {
                 " inner=" + inner.biomeFamily()
             );
         }
-        if (Math.abs(center.groundHeight() - inner.groundHeight()) > 0.015) {
+        boolean continuousSinkhole = "sinkhole".equals(kind) &&
+            ("geoworld-rules-v1.1.25".equals(
+                model.manifest().generationRulesVersion()
+            ) || "geoworld-rules-v1.1.26".equals(
+                model.manifest().generationRulesVersion()
+            ));
+        if (continuousSinkhole) {
+            // v1.1.25 intentionally replaced the large flat inner floor.
+            // Verify a continuous descent toward the bottom rather than
+            // silently relaxing the older flat-floor contract.
+            GeoWorldV1.RuntimeSample middle = model.sample(
+                landscape.centerX() + landscape.radiusX() * 0.55,
+                landscape.centerZ()
+            );
+            double centerToInner =
+                inner.groundHeight() - center.groundHeight();
+            double innerToMiddle =
+                middle.groundHeight() - inner.groundHeight();
+            double middleToOuter =
+                outer.groundHeight() - middle.groundHeight();
+            if (
+                centerToInner < 0.008 || centerToInner > 0.05 ||
+                innerToMiddle < 0.010 || innerToMiddle > 0.08 ||
+                middleToOuter < 0.005 || middleToOuter > 0.08
+            ) {
+                throw new AssertionError(
+                    "new sinkhole slope is not gradual: kind=" + kind +
+                    " center=" + center.groundHeight() +
+                    " inner=" + inner.groundHeight() +
+                    " middle=" + middle.groundHeight() +
+                    " outer=" + outer.groundHeight()
+                );
+            }
+        } else if (
+            Math.abs(center.groundHeight() - inner.groundHeight()) > 0.015
+        ) {
+            // Preserve pre-v1.1.25 semantics for old sinkholes, basins,
+            // and volcanic crater floors.
             throw new AssertionError(
                 "depression center is not flat: kind=" + kind +
                 " center=" + center.groundHeight() +

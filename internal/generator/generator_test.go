@@ -920,3 +920,29 @@ func TestGenerateWorldRuntimeProfileMatchesFinalSemantics(t *testing.T) {
 		t.Fatal("test world did not contain a mixed coast cell")
 	}
 }
+
+func TestR81cCoastalBackwaterProfileIsolatedFromLockedV122(t *testing.T) {
+	cfg := testConfig(2026)
+	cfg.WorldProfile = StandardWorldProfile()
+	modern, err := resolveTopLevelConfig(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyCfg := cfg
+	legacyCfg.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.22"
+	locked, err := resolveTopLevelConfig(legacyCfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if modern.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.26" ||
+		modern.WorldSample.CoastalBackwaterVersion != 2 {
+		t.Fatalf("modern rules not isolated: version=%s coastal=%d", modern.WorldProfile.GenerationRulesVersion, modern.WorldSample.CoastalBackwaterVersion)
+	}
+	if locked.WorldSample.CoastalBackwaterVersion != 0 {
+		t.Fatalf("locked v1.1.22 changed coastal rule: %d", locked.WorldSample.CoastalBackwaterVersion)
+	}
+	if modern.Waterbed.RiverGeometryVersion != locked.Waterbed.RiverGeometryVersion ||
+		modern.WorldSample.RiverCenterDepthNormalized != locked.WorldSample.RiverCenterDepthNormalized {
+		t.Fatal("coastal backwater profile unexpectedly modified existing river geometry")
+	}
+}

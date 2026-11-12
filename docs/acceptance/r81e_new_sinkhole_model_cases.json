@@ -1,0 +1,335 @@
+{
+  "schemaVersion": 1,
+  "seed": -1818694639628404530,
+  "rulesVersion": "geoworld-rules-v1.1.25",
+  "cases": [
+    {
+      "id": "SINKHOLE11-X-176",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 144,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X-160",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 160,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X-136",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 184,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X-112",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 208,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X-088",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 232,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X-064",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 256,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X-040",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 280,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X-020",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 300,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X+000",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 320,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X+020",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 340,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X+040",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 360,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X+064",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 384,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X+088",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 408,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X+112",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 432,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X+136",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 456,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X+160",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 480,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-X+176",
+      "category": "R81d-new-sinkhole-east-west",
+      "x": 496,
+      "z": 6592,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z-150",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6442,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z-132",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6460,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z-116",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6476,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z-096",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6496,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z-080",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6512,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z-064",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6528,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z-048",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6544,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z-024",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6568,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z+024",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6616,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z+048",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6640,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z+064",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6656,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z+080",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6672,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z+096",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6688,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z+116",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6708,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z+132",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6724,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-Z+150",
+      "category": "R81d-new-sinkhole-north-south",
+      "x": 320,
+      "z": 6742,
+      "question": "Real basin cross section water ground relation",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-D-112_-080",
+      "category": "R81d-new-sinkhole-diagonal",
+      "x": 208,
+      "z": 6512,
+      "question": "Rim vs dry bank geometry",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-D-080_-064",
+      "category": "R81d-new-sinkhole-diagonal",
+      "x": 240,
+      "z": 6528,
+      "question": "Rim vs dry bank geometry",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-D+080_-064",
+      "category": "R81d-new-sinkhole-diagonal",
+      "x": 400,
+      "z": 6528,
+      "question": "Rim vs dry bank geometry",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-D+112_-080",
+      "category": "R81d-new-sinkhole-diagonal",
+      "x": 432,
+      "z": 6512,
+      "question": "Rim vs dry bank geometry",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-D-112_+080",
+      "category": "R81d-new-sinkhole-diagonal",
+      "x": 208,
+      "z": 6672,
+      "question": "Rim vs dry bank geometry",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-D-080_+064",
+      "category": "R81d-new-sinkhole-diagonal",
+      "x": 240,
+      "z": 6656,
+      "question": "Rim vs dry bank geometry",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-D+080_+064",
+      "category": "R81d-new-sinkhole-diagonal",
+      "x": 400,
+      "z": 6656,
+      "question": "Rim vs dry bank geometry",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "SINKHOLE11-D+112_+080",
+      "category": "R81d-new-sinkhole-diagonal",
+      "x": 432,
+      "z": 6672,
+      "question": "Rim vs dry bank geometry",
+      "requiresVoxelTest": true
+    }
+  ]
+}

@@ -3,9 +3,9 @@ package geoworld.minecraft.v1_21_1common.runtime;
 import geoworld.minecraft.v26common.runtime.GeoWorldV26WorldService;
 import geoworld.minecraft.v1_21_1common.Minecraft1_21_1Profile;
 import geoworld.minecraft.common.worldgen.GeoWorldSpawnPlanner;
+import geoworld.minecraft.common.worldgen.GeoWorldSpawnHeight;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.Optional;
 
@@ -64,8 +64,14 @@ public final class GeoWorldWorldService {
             // planner's center sample directly.
             int x = candidate.chunkX() * 16;
             int z = candidate.chunkZ() * 16;
-            int y = overworld.getHeight(
-                Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+            // The destination chunk may not have a populated Minecraft
+            // heightmap on first boot. An uninitialized heightmap can report
+            // minY (-64) even when GeoWorld has solid terrain above Y=100.
+            // Sample the already-bound immutable model instead, preserving
+            // the existing X/Z choice and the game's height mapping.
+            int y = GeoWorldSpawnHeight.surfaceY(
+                model,
+                Minecraft1_21_1Profile.INSTANCE.heightMapping(),
                 x,
                 z
             );

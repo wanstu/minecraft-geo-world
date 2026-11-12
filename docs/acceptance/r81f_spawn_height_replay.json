@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "saved_minecraft_server_spawn_height_replay",
+  "date": "2026-11-12",
+  "minecraft": "1.21.1",
+  "loader": "NeoForge 21.1.211",
+  "seed": 123456,
+  "rulesVersion": "geoworld-rules-v1.1.25",
+  "scenario": "isolated copy of saved v1.1.25 world; reset SpawnX/SpawnY/SpawnZ to 0/63/0 in copy only to re-enter ServerStartedEvent correction",
+  "previousWorldSpawn": {
+    "spawnX": 1088,
+    "spawnY": -64,
+    "spawnZ": 448,
+    "worldSeed": 123456,
+    "generator": "geoworld:geoworld"
+  },
+  "replayedWorldSpawn": {
+    "spawnX": 1088,
+    "spawnY": 107,
+    "spawnZ": 448,
+    "worldSeed": 123456,
+    "generator": "geoworld:geoworld"
+  },
+  "previousWorldModelSha256": "9d3f6cd9aa2ea020d1fdb39beee5379b4323c1bc4ac79dd7da3597eb41093923",
+  "replayedWorldModelSha256": "9d3f6cd9aa2ea020d1fdb39beee5379b4323c1bc4ac79dd7da3597eb41093923",
+  "previousWorldPreflightPass": true,
+  "replayedWorldPreflightPass": true,
+  "actualFullAnvilBlock": {
+    "x": 1088,
+    "z": 448,
+    "chunkStatus": "full",
+    "naturalSubstrateY": 106,
+    "topBlock": "minecraft:fern",
+    "topY": 107
+  },
+  "spawnYCorrectlyAboveNaturalGround": true,
+  "spawnXZUnchanged": true,
+  "originalSourceSaveModified": false,
+  "localServerStartedAndSaved": true,
+  "firstBootFreshWorldVerified": false,
+  "fullNineTargetCI": false,
+  "releaseEligible": false,
+  "notes": [
+    "Bug reproduced in original saved level.dat: Y=-64 at habitable land with surface Y106",
+    "Fix exercised in real NeoForge ServerStartedEvent using isolated replay save, not a fresh model build",
+    "Height comes from frozen GeoWorld RuntimeSample and MinecraftV26HeightMapping.boundaryY",
+    "Do not confuse isolated replay with all-new-world / game camera acceptance"
+  ]
+}

@@ -289,9 +289,17 @@ public final class GeoWorldMiningDistrictPlanner {
             model.manifest().generationRulesVersion()
         ) || ("geoworld-rules-v1.1.21".equals(
             model.manifest().generationRulesVersion()
-        ) || "geoworld-rules-v1.1.22".equals(
+        ) || ("geoworld-rules-v1.1.22".equals(
             model.manifest().generationRulesVersion()
-        )))));
+        ) || ("geoworld-rules-v1.1.23".equals(
+            model.manifest().generationRulesVersion()
+        ) || ("geoworld-rules-v1.1.24".equals(
+            model.manifest().generationRulesVersion()
+        ) || ("geoworld-rules-v1.1.25".equals(
+            model.manifest().generationRulesVersion()
+        ) || "geoworld-rules-v1.1.26".equals(
+            model.manifest().generationRulesVersion()
+        )))))))));
     }
 
     private static GeoWorldMineralRules.Kind chooseDistrictMineral(

@@ -1,0 +1,401 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "GO_MODEL_ONLY_not_real_Minecraft_chunks",
+  "rules": [
+    "geoworld-rules-v1.1.24",
+    "geoworld-rules-v1.1.25"
+  ],
+  "cases": [
+    {
+      "seed": 123456,
+      "generationSeconds": [
+        31.627791438,
+        32.143175107
+      ],
+      "riverCount": 955,
+      "riversSame": true,
+      "featureCount": 18,
+      "featuresSame": true,
+      "macroSurfaceSame": true,
+      "sinkholes": [
+        {
+          "id": 9,
+          "X": 6080,
+          "Z": 7744,
+          "RadiusX": 143.46115781115657,
+          "RadiusZ": 130.46296905338144,
+          "profiles": [
+            {
+              "axis": "x",
+              "oldMaxSlopeProxy": 2.102619365176891,
+              "newMaxSlopeProxy": 0.46754481706420986,
+              "oldNearFloorCount": 40,
+              "newNearFloorCount": 9,
+              "samples": 79,
+              "waterChanged": 0,
+              "groundRaised": 0
+            },
+            {
+              "axis": "z",
+              "oldMaxSlopeProxy": 2.4106741328282735,
+              "newMaxSlopeProxy": 0.5197165232220452,
+              "oldNearFloorCount": 36,
+              "newNearFloorCount": 7,
+              "samples": 71,
+              "waterChanged": 0,
+              "groundRaised": 0
+            }
+          ]
+        },
+        {
+          "id": 10,
+          "X": -14016,
+          "Z": -7104,
+          "RadiusX": 145.71726362658336,
+          "RadiusZ": 130.47690525040585,
+          "profiles": [
+            {
+              "axis": "x",
+              "oldMaxSlopeProxy": 1.947690297678885,
+              "newMaxSlopeProxy": 0.30362238957368065,
+              "oldNearFloorCount": 39,
+              "newNearFloorCount": 9,
+              "samples": 79,
+              "waterChanged": 0,
+              "groundRaised": 0
+            },
+            {
+              "axis": "z",
+              "oldMaxSlopeProxy": 1.9691520964817635,
+              "newMaxSlopeProxy": 0.35353959126942497,
+              "oldNearFloorCount": 34,
+              "newNearFloorCount": 9,
+              "samples": 71,
+              "waterChanged": 0,
+              "groundRaised": 0
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "X": 3392,
+          "Z": -3520,
+          "RadiusX": 169.46491404719507,
+          "RadiusZ": 130.4965370156358,
+          "profiles": [
+            {
+              "axis": "x",
+              "oldMaxSlopeProxy": 1.958849860444892,
+              "newMaxSlopeProxy": 0.39210727499711434,
+              "oldNearFloorCount": 47,
+              "newNearFloorCount": 10,
+              "samples": 91,
+              "waterChanged": 0,
+              "groundRaised": 0
+            },
+            {
+              "axis": "z",
+              "oldMaxSlopeProxy": 2.3300371611969197,
+              "newMaxSlopeProxy": 0.5005401330083993,
+              "oldNearFloorCount": 36,
+              "newNearFloorCount": 8,
+              "samples": 71,
+              "waterChanged": 0,
+              "groundRaised": 0
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "X": -1728,
+          "Z": -9024,
+          "RadiusX": 154.06280142933858,
+          "RadiusZ": 130.49294491083805,
+          "profiles": [
+            {
+              "axis": "x",
+              "oldMaxSlopeProxy": 1.644384413391911,
+              "newMaxSlopeProxy": 0.3650622972032932,
+              "oldNearFloorCount": 43,
+              "newNearFloorCount": 9,
+              "samples": 83,
+              "waterChanged": 0,
+              "groundRaised": 0
+            },
+            {
+              "axis": "z",
+              "oldMaxSlopeProxy": 2.160037642936361,
+              "newMaxSlopeProxy": 0.4348349875603994,
+              "oldNearFloorCount": 36,
+              "newNearFloorCount": 8,
+              "samples": 71,
+              "waterChanged": 0,
+              "groundRaised": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "seed": 20261112,
+      "generationSeconds": [
+        29.062323983,
+        30.624929779
+      ],
+      "riverCount": 873,
+      "riversSame": true,
+      "featureCount": 19,
+      "featuresSame": true,
+      "macroSurfaceSame": true,
+      "sinkholes": [
+        {
+          "id": 10,
+          "X": -3520,
+          "Z": -5824,
+          "RadiusX": 145.92819347961213,
+          "RadiusZ": 130.46555787427263,
+          "profiles": [
+            {
+              "axis": "x",
+              "oldMaxSlopeProxy": 2.8876938854881096,
+              "newMaxSlopeProxy": 0.4460724089896467,
+              "oldNearFloorCount": 39,
+              "newNearFloorCount": 9,
+              "samples": 79,
+              "waterChanged": 0,
+              "groundRaised": 0
+            },
+            {
+              "axis": "z",
+              "oldMaxSlopeProxy": 3.129213907862793,
+              "newMaxSlopeProxy": 0.5000243982729495,
+              "oldNearFloorCount": 34,
+              "newNearFloorCount": 7,
+              "samples": 71,
+              "waterChanged": 0,
+              "groundRaised": 0
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "X": 8640,
+          "Z": 8768,
+          "RadiusX": 157.72135983608533,
+          "RadiusZ": 130.50322609341535,
+          "profiles": [
+            {
+              "axis": "x",
+              "oldMaxSlopeProxy": 1.5692288558675884,
+              "newMaxSlopeProxy": 0.3143241344022585,
+              "oldNearFloorCount": 44,
+              "newNearFloorCount": 11,
+              "samples": 85,
+              "waterChanged": 0,
+              "groundRaised": 0
+            },
+            {
+              "axis": "z",
+              "oldMaxSlopeProxy": 1.676539027114201,
+              "newMaxSlopeProxy": 0.379096976660578,
+              "oldNearFloorCount": 36,
+              "newNearFloorCount": 9,
+              "samples": 71,
+              "waterChanged": 0,
+              "groundRaised": 0
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "X": 11456,
+          "Z": 9408,
+          "RadiusX": 144.52818786035243,
+          "RadiusZ": 130.47315070865807,
+          "profiles": [
+            {
+              "axis": "x",
+              "oldMaxSlopeProxy": 1.7025932074577912,
+              "newMaxSlopeProxy": 0.3874969734271018,
+              "oldNearFloorCount": 40,
+              "newNearFloorCount": 9,
+              "samples": 79,
+              "waterChanged": 0,
+              "groundRaised": 0
+            },
+            {
+              "axis": "z",
+              "oldMaxSlopeProxy": 1.8690465841564303,
+              "newMaxSlopeProxy": 0.3802800698024097,
+              "oldNearFloorCount": 36,
+              "newNearFloorCount": 9,
+              "samples": 71,
+              "waterChanged": 0,
+              "groundRaised": 0
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "X": -5568,
+          "Z": -6720,
+          "RadiusX": 171.05344834265813,
+          "RadiusZ": 130.50185768071174,
+          "profiles": [
+            {
+              "axis": "x",
+              "oldMaxSlopeProxy": 1.7570467505146217,
+              "newMaxSlopeProxy": 0.38599087237239554,
+              "oldNearFloorCount": 48,
+              "newNearFloorCount": 10,
+              "samples": 93,
+              "waterChanged": 0,
+              "groundRaised": 0
+            },
+            {
+              "axis": "z",
+              "oldMaxSlopeProxy": 2.2883673970802247,
+              "newMaxSlopeProxy": 0.5342072335247459,
+              "oldNearFloorCount": 36,
+              "newNearFloorCount": 7,
+              "samples": 71,
+              "waterChanged": 0,
+              "groundRaised": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "seed": -90210,
+      "generationSeconds": [
+        29.086426021,
+        20.761288584
+      ],
+      "riverCount": 896,
+      "riversSame": true,
+      "featureCount": 19,
+      "featuresSame": true,
+      "macroSurfaceSame": true,
+      "sinkholes": [
+        {
+          "id": 10,
+          "X": 12224,
+          "Z": 4928,
+          "RadiusX": 168.44681439254117,
+          "RadiusZ": 130.48222825436275,
+          "profiles": [
+            {
+              "axis": "x",
+              "oldMaxSlopeProxy": 2.5756709027006224,
+              "newMaxSlopeProxy": 0.3937545119441674,
+              "oldNearFloorCount": 45,
+              "newNearFloorCount": 9,
+              "samples": 91,
+              "waterChanged": 0,
+              "groundRaised": 0
+            },
+            {
+              "axis": "z",
+              "oldMaxSlopeProxy": 3.1127696176944486,
+              "newMaxSlopeProxy": 0.4987864502703891,
+              "oldNearFloorCount": 34,
+              "newNearFloorCount": 7,
+              "samples": 71,
+              "waterChanged": 0,
+              "groundRaised": 0
+            }
+          ]
+        },
+        {
+          "id": 11,
+          "X": 4672,
+          "Z": 1472,
+          "RadiusX": 165.33970864051076,
+          "RadiusZ": 130.48281765512428,
+          "profiles": [
+            {
+              "axis": "x",
+              "oldMaxSlopeProxy": 2.0404119259823883,
+              "newMaxSlopeProxy": 0.40683422685117443,
+              "oldNearFloorCount": 46,
+              "newNearFloorCount": 9,
+              "samples": 89,
+              "waterChanged": 0,
+              "groundRaised": 0
+            },
+            {
+              "axis": "z",
+              "oldMaxSlopeProxy": 2.50288844757576,
+              "newMaxSlopeProxy": 0.5399638382396765,
+              "oldNearFloorCount": 35,
+              "newNearFloorCount": 7,
+              "samples": 71,
+              "waterChanged": 0,
+              "groundRaised": 0
+            }
+          ]
+        },
+        {
+          "id": 12,
+          "X": 12352,
+          "Z": 8128,
+          "RadiusX": 149.775108426555,
+          "RadiusZ": 130.4714676860341,
+          "profiles": [
+            {
+              "axis": "x",
+              "oldMaxSlopeProxy": 2.0426480622486505,
+              "newMaxSlopeProxy": 0.4327100557053429,
+              "oldNearFloorCount": 41,
+              "newNearFloorCount": 9,
+              "samples": 81,
+              "waterChanged": 0,
+              "groundRaised": 0
+            },
+            {
+              "axis": "z",
+              "oldMaxSlopeProxy": 2.4892233047570866,
+              "newMaxSlopeProxy": 0.4992584790195714,
+              "oldNearFloorCount": 36,
+              "newNearFloorCount": 7,
+              "samples": 71,
+              "waterChanged": 0,
+              "groundRaised": 0
+            }
+          ]
+        },
+        {
+          "id": 13,
+          "X": -6592,
+          "Z": 960,
+          "RadiusX": 170.59259827516075,
+          "RadiusZ": 130.48771462819795,
+          "profiles": [
+            {
+              "axis": "x",
+              "oldMaxSlopeProxy": 1.6297099494981322,
+              "newMaxSlopeProxy": 0.3584240433193146,
+              "oldNearFloorCount": 48,
+              "newNearFloorCount": 10,
+              "samples": 93,
+              "waterChanged": 0,
+              "groundRaised": 0
+            },
+            {
+              "axis": "z",
+              "oldMaxSlopeProxy": 2.035648723610964,
+              "newMaxSlopeProxy": 0.44506184017846767,
+              "oldNearFloorCount": 36,
+              "newNearFloorCount": 7,
+              "samples": 71,
+              "waterChanged": 0,
+              "groundRaised": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "releaseEligible": false
+}

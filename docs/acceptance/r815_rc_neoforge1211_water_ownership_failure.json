@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-12",
+  "sourceCommit": "0516c3a2bd37f41e2ffcfb27a83ff39a4383e87f",
+  "evidenceClass": "minecraft_java_final_voxel_column_planner_not_saved_anvil",
+  "target": "1.21.1 NeoForge 21.1.211",
+  "seed": 123456,
+  "rules": "geoworld-rules-v1.1.25",
+  "command": "./gradlew --offline --no-daemon --max-workers=1 clean check build",
+  "status": "FAIL",
+  "failedTask": "verifyGeoWorldWaterOwnership",
+  "buildDuration": "5m 1s",
+  "buildLogSha256": "36851a36bf56ab690d28837807cd4e2073781c8502c7caeca1ace19a980179b8",
+  "generatedModelSha256": "7c6e0247649fa6305ead31b541dc4027ad12b42ed89f3b5f70bea7dcf3b617cf",
+  "verifier": {
+    "chunks": 1183,
+    "columns": 302848,
+    "waterColumns": 158884,
+    "unownedSurfaceWaterSources": 0,
+    "unsafeExposedWaterSources": 0,
+    "freeFallWaterFaces": 77,
+    "runtimeWaterLost": 0,
+    "riverWaterBoundaryModelMismatches": 0,
+    "riverLocalWaterPeaks": 0,
+    "wetlandPoolLeaks": 0
+  },
+  "firstFailure": "10815,2467 -> 10814,2467 drop=3 owner=River",
+  "face": {
+    "highSide": {
+      "x": 10815,
+      "z": 2467,
+      "waterKind": "River",
+      "groundHeightNormalized": 0.5001826562912709,
+      "waterSurfaceNormalized": 0.5061826562912709,
+      "waterSurfaceY": 66,
+      "coastalSeaReceiver": true
+    },
+    "lowSide": {
+      "x": 10814,
+      "z": 2467,
+      "waterKind": "River",
+      "groundHeightNormalized": 0.49990950149094404,
+      "nominalRiverSurfaceNormalized": 0.505909501490944,
+      "coastalWaterSurfaceNormalized": 0.5,
+      "waterSurfaceY": 63,
+      "coastalSeaReceiver": true
+    },
+    "faceDropBlocks": 3,
+    "seaLevelNormalized": 0.5,
+    "discontinuousSwitchCondition": "coastalBackwaterVersion>=1 && coastalSeaReceiver && finalHeight<0.5"
+  },
+  "local144x144Neighborhood": {
+    "window": "10736,2400..10879,2543",
+    "waterInvolvedAdjacencies": 12602,
+    "highDifferenceBothRiverPairs": 78,
+    "note": "Includes cross-chunk edges; not identical to the full verifier 77 inside-chunk faces"
+  },
+  "historicalConfig": {
+    "rules": "geoworld-rules-v1.1.24",
+    "seed": -1818694639628404530,
+    "coastalBackwaterVersion": 1,
+    "currentVersion": 1,
+    "limit": "Same code-path enabled in historical model; no same-seed historic water-surface replay performed"
+  },
+  "conclusion": "Abrupt river water-surface switch at sea-level ground threshold; fix must be versioned and physically validated",
+  "previousSavedMinecraftAnvilCheckedAtThisSite": false,
+  "geometryAlgorithmModifiedThisTurn": false,
+  "releaseEligible": false,
+  "githubWindowsCi": "NOT_RUN"
+}

@@ -95,6 +95,26 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	riverSurface, riverDepth, riverValid :=
 		m.riverWaterSurface(ground)
 
+	// R8.1c: in a sea-connected estuary the receiving sea is the water
+	// datum, not the river surface capped by a low dry bank. Extend the
+	// backwater to the connected channel and its sub-sea-level coastal
+	// banks. Never flood an unrelated enclosed inland depression.
+	if canApplyCoastalBackwater(
+		m.Config, ground, m.SeaLevelNormalized, oceanEligibility, riverSurface, riverValid,
+	) {
+		// Preserve upstream river identity in the estuary; only the
+		// receiving ocean and flooded coastal banks use Ocean ownership.
+		out.WaterKind = reconcile.WaterRiver
+		if oceanEligibility >= m.Config.OceanEligibilityThreshold ||
+			ground.RiverWeight <= 0 {
+			out.WaterKind = reconcile.WaterOcean
+		}
+		out.WaterSurfaceDefined = true
+		out.WaterSurfaceElevation = m.SeaLevelNormalized
+		out.WaterDepth = m.SeaLevelNormalized - ground.FinalHeight
+		return out
+	}
+
 	// Ocean requires both continuous below-sea terrain and continuous macro
 	// ocean eligibility. Near a river mouth, however, do not let the ocean
 	// classification cut in while the supported river surface is still more
@@ -129,6 +149,31 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		out.WaterDepth = riverDepth
 	}
 	return out
+}
+
+// canApplyCoastalBackwater keeps the already defined coastal ownership but
+// prevents a water-surface cliff at the exact block where the river bed dips
+// below sea level. v1 and earlier persisted worlds preserve their old logic.
+func canApplyCoastalBackwater(
+	cfg Config, ground waterbed.Sample, seaLevel, oceanEligibility,
+	riverSurface float64, riverValid bool,
+) bool {
+	if !qualifiesForCoastalBackwater(cfg, ground, seaLevel, oceanEligibility) {
+		return false
+	}
+	return cfg.CoastalBackwaterVersion < 2 ||
+		!riverValid ||
+		riverSurface <= seaLevel+0.5*normalizedBlockStepAbove(seaLevel)
+}
+
+// qualifiesForCoastalBackwater never infers a new hydrology endpoint.
+// The candidate must already be routed to a water receiver at sea datum.
+func qualifiesForCoastalBackwater(cfg Config, ground waterbed.Sample, seaLevel, oceanEligibility float64) bool {
+	return cfg.CoastalBackwaterVersion >= 1 &&
+		ground.RiverCoastalReceiverDefined &&
+		math.Abs(ground.RiverCoastalReceiverSurface-seaLevel) < 1e-9 &&
+		ground.FinalHeight < seaLevel &&
+		(ground.RiverWeight > 0 || oceanEligibility > 0.02)
 }
 
 func (m *Model) riverWaterSurface(

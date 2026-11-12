@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-12",
+  "branch": "adm/geoworld-r81f-spawn-height-20261112",
+  "baseCommit": "d3e59e0edb5ecd9fbde58db38478b7cd5bdb0025",
+  "candidateRules": "geoworld-rules-v1.1.26",
+  "targetCount": 9,
+  "staticBuildMatrixPreflightPass": true,
+  "currentRulesLocalCleanCheckBuildPassed": 7,
+  "priorRulesLocalCleanCheckBuildPassedOnly": 0,
+  "resourceBlocked": 1,
+  "notYetCheckedCurrentRules": 2,
+  "targets": [
+    {
+      "module": "java/neoforge-mod",
+      "minecraft": "26.3",
+      "loader": "neoforge",
+      "requiredJdk": "25",
+      "status": "RESOURCE_BLOCKED",
+      "detail": "NeoForge 26.3 offline ModDev plugin missing; online first decompile exhausted machine swap; not rerun this stage"
+    },
+    {
+      "module": "java/adapters/26.3-fabric",
+      "minecraft": "26.3",
+      "loader": "fabric",
+      "requiredJdk": "25",
+      "status": "CURRENT_V126_LOCAL_FULL_PASS",
+      "detail": "Current v1.1.26 local clean check build PASS; 41 tasks executed; complete JAR six-native inspection PASS",
+      "evidenceFile": "docs/acceptance/r81h_fabric_full_builds_20261112.json"
+    },
+    {
+      "module": "java/adapters/26.2-neoforge",
+      "minecraft": "26.2",
+      "loader": "neoforge",
+      "requiredJdk": "25",
+      "status": "CURRENT_V126_LOCAL_FULL_PASS",
+      "detail": "v1.1.26 local clean check build PASS (11m 4s); 30 tasks, 0 invalid water faces; NeoForge JAR six-platform native engines and compiled rules v1.1.26 verified",
+      "evidenceFile": "docs/acceptance/r81j_neoforge262_v126_full_build.json"
+    },
+    {
+      "module": "java/adapters/26.2-fabric",
+      "minecraft": "26.2",
+      "loader": "fabric",
+      "requiredJdk": "25",
+      "status": "CURRENT_V126_LOCAL_FULL_PASS",
+      "detail": "Current v1.1.26 real clean check build PASS; 14 executed, 1 up-to-date; JAR six native engines and compiled rules v1.1.26 verified",
+      "evidenceFile": "docs/acceptance/r81i_two_fabric_full_builds.json"
+    },
+    {
+      "module": "java/adapters/26.1.2-neoforge",
+      "minecraft": "26.1.2",
+      "loader": "neoforge",
+      "requiredJdk": "25",
+      "status": "CURRENT_V126_LOCAL_FULL_PASS",
+      "detail": "v1.1.26 local clean check build PASS (10m 44s); 30 tasks, 0 invalid water faces; NeoForge JAR six-platform native engines and compiled rules v1.1.26 verified",
+      "evidenceFile": "docs/acceptance/r81j_neoforge2612_v126_full_build.json"
+    },
+    {
+      "module": "java/adapters/26.1.2-fabric",
+      "minecraft": "26.1.2",
+      "loader": "fabric",
+      "requiredJdk": "25",
+      "status": "CURRENT_V126_LOCAL_FULL_PASS",
+      "detail": "Current v1.1.26 real clean check build PASS; 14 executed, 1 up-to-date; JAR six native engines and compiled rules v1.1.26 verified",
+      "evidenceFile": "docs/acceptance/r81i_two_fabric_full_builds.json"
+    },
+    {
+      "module": "java/adapters/1.21.1-neoforge",
+      "minecraft": "1.21.1",
+      "loader": "neoforge",
+      "requiredJdk": "21",
+      "status": "CURRENT_V126_LOCAL_FULL_PASS",
+      "detail": "Complete clean check build passed; 45 Gradle tasks, 0 unsupported water faces, all-six-native jar verified"
+    },
+    {
+      "module": "java/adapters/1.21.1-fabric",
+      "minecraft": "1.21.1",
+      "loader": "fabric",
+      "requiredJdk": "21",
+      "status": "CURRENT_V126_LOCAL_FULL_PASS",
+      "detail": "Current v1.1.26 local clean check build PASS; 17 tasks executed; complete JAR six-native inspection PASS",
+      "evidenceFile": "docs/acceptance/r81h_fabric_full_builds_20261112.json"
+    },
+    {
+      "module": "java/adapters/1.20.1-fabric",
+      "minecraft": "1.20.1",
+      "loader": "fabric",
+      "requiredJdk": "17",
+      "status": "NOT_LOCAL_FULL_CHECKED",
+      "detail": "Local v1.1.26 clean check build not executed"
+    }
+  ],
+  "currentNeoForge1211": {
+    "command": "./gradlew --offline --no-daemon --max-workers=1 clean check build",
+    "duration": "5m 15s",
+    "totalActionableTasks": 45,
+    "executedTasks": 44,
+    "fromCache": 1,
+    "fullBuildLogSha256": "6cdd1024b7bd84596b160704312ccb55b0d7978c2a66370cf55db42643656bfb",
+    "nativeJar": "java/adapters/1.21.1-neoforge/build/libs/geoworld-0.1.4.jar",
+    "jarSha256": "e12e0b782ac7563c52dd885e92f0a2fe97598603ee7b5b6df5ec443f10e8db4a",
+    "jarBytes": 29163733,
+    "sixNativeEngines": true,
+    "jarMetadataVersion": "0.1.4",
+    "notPublishedBinary": true,
+    "priorWaterFailure77Resolved": true,
+    "finalWaterFreefallFaces": 0
+  },
+  "fullGoHydrologyTestsPassed": true,
+  "goTestCommand": "go test -p 1 -count=1 ./internal/generator ./internal/worldsample ./internal/specialfeatures ./internal/runtimeworld ./internal/worldmodelio ./internal/waterbed ./cmd/geoworld-r81-hydrology-audit",
+  "goTestLogSha256": "ab3e059b64c9a0c3dbe65ce769ece17b0c650fcf034d5a772f3c638666bfa451",
+  "officialGithubWindowsNineTargetCI": "NOT_RUN",
+  "gameplayCameraAcceptance": "NOT_DONE",
+  "releaseEligible": false,
+  "pushed": false,
+  "merged": false,
+  "publishedJar": false,
+  "notes": [
+    "Local v1.1.26 full clean check build PASS: 26.3 Fabric, 26.2 Fabric, 26.1.2 Fabric, 1.21.1 Fabric, 1.21.1 NeoForge, 26.2 NeoForge, 26.1.2 NeoForge",
+    "26.3 NeoForge has NOT been full clean checked; earlier first decompile resource blocked (systemd scope approach verified only on 26.2/26.1.2)",
+    "1.20.1 Fabric has NOT been full clean checked, dadm JDK17 absent",
+    "Official Windows GitHub Actions 9-target CI not executed; Minecraft game-client camera still unverified",
+    "All local builds retain module default mod_version=0.1.4, so local JARs are NOT released v0.1.4 files",
+    "Branch local only: no merge, push or public release."
+  ],
+  "fabric263V126CompileJava": {
+    "status": "LOCAL_COMPILE_JAVA_PASS_NOT_FULL_CHECK_BUILD",
+    "loader": "fabric",
+    "minecraft": "26.3",
+    "jdk": 25,
+    "command": "./gradlew --offline --no-daemon --max-workers=1 compileJava",
+    "duration": "23s",
+    "note": "Cannot count in the nine-target clean check build tally",
+    "supersededBy": "r81h_fabric_full_builds_20261112.json"
+  },
+  "sourceCommit": "1d8dbb41f750f161efdade94c330623303cda921",
+  "stage": "R81j additional two NeoForge local full builds",
+  "currentRulesFabricFullBuildEvidence": "docs/acceptance/r81h_fabric_full_builds_20261112.json",
+  "currentRulesAdditionalFabricFullBuildEvidence": "docs/acceptance/r81i_two_fabric_full_builds.json",
+  "currentRulesAdditionalNeoForgeFullBuildEvidence": "docs/acceptance/r81j_two_neoforge_full_builds.json"
+}
