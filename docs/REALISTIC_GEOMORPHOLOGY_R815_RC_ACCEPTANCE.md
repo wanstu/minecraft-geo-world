@@ -127,3 +127,21 @@
 完整报告 `docs/REALISTIC_GEOMORPHOLOGY_R815_RC_NEOFORGE_BLOCKERS_20261112.md`；机器可复查记录 `docs/acceptance/r815_rc_neoforge1211_water_ownership_failure.json`。
 
 **正式 RC 继续 HOLD，不合并、不推送、不发布。**
+
+
+## R8.1g（2026-11-12）新河口水面版本修复验收
+
+**新的规则候选是 v1.1.26，历史 v1.1.25 保持原语义、不执行迁移。**
+
+- 前次 NeoForge 水文验证发现 77 处水面自由落差，已追溯到海面回水在低于海平面的河床上无条件将较高河面压成 Y63。新规则保留河面，待接近海面半格范围再接管。
+- 固定河口 144×144 方块规划：相邻 River 水面 >1 格落差 **78→0**。
+- 正式 Java 水域归属任务：**1183 区块、302848 列，原 77 项 freeFallWaterFaces 降为 0**，其余违规计数均为 0。
+- v1.1.25、v1.1.26 各 **141** 个 Go/Java 水文数值采样完全一致。
+- 新建独立 Minecraft 1.21.1 NeoForge 存档：**1517/1517 真正 `minecraft:full` 方块列、2762 对相邻真实水面、0 处超过一格落差**；原失败点真实水面 Y65/Y65。
+- **1.21.1 NeoForge v1.1.26 本地 `clean check build` 通过**（5m15s，45 Gradle 任务），JAR 内容及六套原生引擎通过检查；Go 7 组相关包全测试通过。
+- 26.3 Fabric v1.1.26 `compileJava` 通过，但旧版 v1.1.25 的两次 Fabric 全构建**不能充当** v1.1.26 的全构建，当前完整本地构建仅 **1/9**，Windows 官方九目标 CI 未跑。
+- 仍未执行 Minecraft 客户端游戏内相机验收；不合并、不推送、不发布。
+
+完整报告 `docs/REALISTIC_GEOMORPHOLOGY_R81G_ESTUARY_CONTINUITY.md`；
+模型/真实方块证据 `docs/acceptance/r81g_model_and_runtime_acceptance.json`；
+本轮严格九目标状态 `docs/acceptance/r81g_current_rules_local_matrix.json`。

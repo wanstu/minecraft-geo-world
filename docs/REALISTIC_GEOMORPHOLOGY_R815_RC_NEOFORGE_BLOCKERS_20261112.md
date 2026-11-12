@@ -75,3 +75,13 @@ ground.finalHeight() < manifest.seaLevelNormalized()
 - GitHub Windows 官方九目标 CI **未运行**，客户端游戏实际相机验收 **未完成**。
 
 **没有合并 master、没有 push、没有创建发布 tag、没有发布 JAR；旧存档、旧规则和 GeoWorld 真实地形算法均未更改。** 新的水文问题应先独立修复和专项验收，再继续发布门槛，不能绕过失败断言。
+
+
+## R8.1g 后续修复结果（独立新规则）
+
+上文记录的是 **v1.1.25 的真实失败事实**，本身不得删改。后续已在独立候选
+`geoworld-rules-v1.1.26` 修复相邻河面高度的突然切换，
+同一 1183 区块 Java 规划器检查中 `freeFallWaterFaces=0`，1.21.1 NeoForge 的本地 `clean check build` 已通过，原缺陷位置独立新 Minecraft 世界的 Anvil 真方块 Y65/Y65。历史 v1.1.25 存档保留旧采样语义，不做迁移。
+
+详细证据：`docs/REALISTIC_GEOMORPHOLOGY_R81G_ESTUARY_CONTINUITY.md`。
+九目标仍未完整验收，正式发布仍 HOLD。

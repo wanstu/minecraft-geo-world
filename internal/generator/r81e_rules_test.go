@@ -8,6 +8,7 @@ import (
 func TestR81eV125KeepsV124HydrologyAndMacroProfileDefaults(t *testing.T) {
 	candidate := testConfig(20261111)
 	candidate.WorldProfile = StandardWorldProfile()
+	candidate.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.25"
 	legacy := candidate
 	legacy.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.24"
 
