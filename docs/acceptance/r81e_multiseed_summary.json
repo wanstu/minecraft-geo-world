@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "model-only-multiseed-acceptance",
+  "seeds": [
+    123456,
+    20261112,
+    -90210
+  ],
+  "worldPairs": 3,
+  "sinkholes": 12,
+  "cardinalCrossSections": 24,
+  "allRiversUnchanged": true,
+  "allSpecialFeaturesUnchanged": true,
+  "allRawMacroSurfacesUnchanged": true,
+  "allWaterSamplesUnmodified": true,
+  "allGroundSamplesNeverRaised": true,
+  "allSectionsSlopeReduced": true,
+  "allSectionsFlatFloorReduced": true,
+  "maximumOldGradeProxy": 3.129213907862793,
+  "maximumNewGradeProxy": 0.5399638382396765,
+  "medianOldGradeProxy": 2.0415299941155194,
+  "medianNewGradeProxy": 0.4197721412782587,
+  "maxNewToOldGradeRatio": 0.2334446969513514,
+  "maxNewNearFloorSamples": 11,
+  "minOldNearFloorSamples": 34,
+  "warnings": [],
+  "limitations": [
+    "No Minecraft Anvil chunks generated for these three seeds by model-only audit",
+    "Cardinal profiles do not exhaust all 2D slopes",
+    "World-model slope proxy scaled by 514, not actual Minecraft voxel surface",
+    "Gameplay visual acceptance and full nine target CI outstanding"
+  ],
+  "releaseEligible": false
+}
