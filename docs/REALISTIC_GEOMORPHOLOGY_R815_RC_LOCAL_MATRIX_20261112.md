@@ -33,8 +33,8 @@ kind=sinkhole center=0.6140801788850474 inner=0.6299313323249379
 |---|---|---|
 | **1.21.1** | **Fabric** | **`clean check build` 通过，17 个 Gradle 任务，最终重跑约 1m39s** |
 | **26.3** | **Fabric** | **`clean check build` 通过，41 个 Gradle 任务，最终重跑约 5m03s** |
-| 1.21.1 | NeoForge | 已有服务端真实世界验收及 Java 编译证据，本轮**未**完成 `clean check build` |
-| 26.3 | NeoForge | 本轮未完成 `clean check build` |
+| 1.21.1 | NeoForge | **`clean check build` 失败**：`verifyGeoWorldWaterOwnership` 检出 77 处相邻 River 河面落差超过 1 格 |
+| 26.3 | NeoForge | **资源阻塞**：在线获取依赖成功，但本地 8 GB 主机反编译耗尽 Swap，安全取消 |
 | 26.2 | NeoForge / Fabric | 本轮未完成 `clean check build` |
 | 26.1.2 | NeoForge / Fabric | 本轮未完成 `clean check build` |
 | 1.20.1 | Fabric | 本轮未完成；dadm 本地缺少 JDK17，正式 CI 有 JDK17 配置 |
@@ -74,3 +74,16 @@ kind=sinkhole center=0.6140801788850474 inner=0.6299313323249379
 剩余 **7 个版本/Loader 的完整构建**、正式 GitHub Windows 九目标 CI，以及真实 Minecraft **客户端游戏相机**对出生点和关键地貌的观感验收。真实方块的 Anvil 投影图不能冒充客户端截图。
 
 目前保持 **HOLD：不推送、不合并 master、不打 tag、不发布 JAR**。后续先继续构建剩余版本，不重新修改已通过的 R8.1e 天坑坡面或 R8.1f 出生点算法。
+
+
+## 2026-11-12 12:50 NeoForge 实际构建与阻塞补充
+
+本节**更新前述 2/9 本地通过的上下文**，详细证据：
+`docs/REALISTIC_GEOMORPHOLOGY_R815_RC_NEOFORGE_BLOCKERS_20261112.md`。
+
+- 1.21.1 NeoForge 完整执行 `clean check build`，但在 `verifyGeoWorldWaterOwnership` **FAILED**；Java 最终方块列规划器检查 1183 区块、302848 列，出现 77 个相邻河流水面超过 1 格高度差（示例水面 Y66 与 Y63，相距一个方块）。**这是模型方块列规划结果，不是 Minecraft Anvil 保存的实际方块。**
+- 完整静态定位：两个相邻 River 方块都拥有 `coastalSeaReceiver`，但 `finalHeight < seaLevel` 使一侧强制海面 Y63，另一侧仍是河面 Y66。该回水规则在已保存 v1.1.24 规则中也存在；尚无同种子旧规则实际运行对照，不能确认其始发版本。
+- 26.3 NeoForge `--offline` 因 moddev 插件缓存缺失不能配置；在线重试已下载 Minecraft 26.3 工件，但首次反编译 Java 进程占约 4.5 GB、宿主机 Swap 近满，已安全取消，不误记源码错误。
+- 九目标本地实际完整构建 **2 PASS、1 FAIL、1 BLOCKED、5 未完成**。正式 Windows CI 仍未运行。R8.1e 坡面规则和 R8.1f 出生点算法此次均未修改。
+
+发布资格继续 **HOLD**。不会通过修改阈值或绕过验证来宣布通过。

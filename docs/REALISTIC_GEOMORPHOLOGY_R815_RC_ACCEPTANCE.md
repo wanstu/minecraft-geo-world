@@ -114,3 +114,16 @@
 
 详细报告：`docs/REALISTIC_GEOMORPHOLOGY_R815_RC_LOCAL_MATRIX_20261112.md`。
 完整机器可验收状态：`docs/acceptance/r815_rc_local_build_matrix_20261112.json`。
+
+
+## 2026-11-12 NeoForge 完整构建验收结果更新
+
+当前分支完成本地完整 `clean check build` 的仍只有 **2/9**（1.21.1 Fabric 与 26.3 Fabric）。
+
+1.21.1 NeoForge 全量任务在 `verifyGeoWorldWaterOwnership` 遇到真实的 River 规划水面断层：77 个高差超过 1 格的相邻水面，首次例子 `(10815,2467)` Y66 到 `(10814,2467)` Y63。该证据来自 Java 方块列规划，**不是 Minecraft 已保存 Anvil**。未放宽验证，也未修改算法。
+
+26.3 NeoForge 首次在线初始化反编译资源超出 dadm 当前内存/Swap 容量，安全取消，该目标视为资源阻塞，不能标记通过。
+
+完整报告 `docs/REALISTIC_GEOMORPHOLOGY_R815_RC_NEOFORGE_BLOCKERS_20261112.md`；机器可复查记录 `docs/acceptance/r815_rc_neoforge1211_water_ownership_failure.json`。
+
+**正式 RC 继续 HOLD，不合并、不推送、不发布。**
