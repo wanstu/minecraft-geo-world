@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-12",
+  "sourceCommit": "1d8dbb41f750f161efdade94c330623303cda921",
+  "rules": "geoworld-rules-v1.1.26",
+  "stage": "R81j isolated cgroup NeoForge 26.2 and 26.1.2",
+  "newFullBuildPasses": 2,
+  "currentRulesLocalFullBuildPasses": 7,
+  "totalReleaseTargets": 9,
+  "targets": [
+    {
+      "minecraft": "26.2",
+      "loader": "NeoForge",
+      "module": "java/adapters/26.2-neoforge",
+      "status": "LOCAL_CLEAN_CHECK_BUILD_PASS",
+      "duration": "11m 4s",
+      "jarSha256": "6b6375ca4dfcad1ee612365884810863b124fa2048d17307ba5608aa7d6adab7",
+      "jarBytes": 9157023,
+      "waterUnsupportedFaces": 0,
+      "evidence": "docs/acceptance/r81j_neoforge262_v126_full_build.json"
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "NeoForge",
+      "module": "java/adapters/26.1.2-neoforge",
+      "status": "LOCAL_CLEAN_CHECK_BUILD_PASS",
+      "duration": "10m 44s",
+      "jarSha256": "a59a6d71e139469f48903c04d2be30b67d91bae725e5df2b238130994205b082",
+      "jarBytes": 9157127,
+      "waterUnsupportedFaces": 0,
+      "evidence": "docs/acceptance/r81j_neoforge2612_v126_full_build.json"
+    }
+  ],
+  "resourceIsolation": {
+    "scope": "systemd-run --user --scope",
+    "memoryMaxBytes": 5347737600,
+    "swapMaxBytes": 268435456,
+    "noHostOOMObserved": true
+  },
+  "officialGithubWindowsCi": "NOT_RUN",
+  "gameCameraAcceptance": "NOT_DONE",
+  "releaseEligible": false,
+  "pushed": false,
+  "merged": false,
+  "publishedJar": false,
+  "historicalResourceBlockedTarget": "26.3 NeoForge remains unverified"
+}

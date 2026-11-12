@@ -69,3 +69,10 @@
 优先处理 **26.2 / 26.1.2 NeoForge** 的依赖与构建资源，再考虑 26.3 NeoForge。对高内存首次反编译应避免在 8 GB dadm 上重复无上限尝试；更适合在具备资源限制的构建机或正式 Windows CI 验证。1.20.1 Fabric 需先解决 JDK17 工具链。
 
 **尚未完成：** 九目标官方 CI、客户端画面及整版真实地貌观感验证。RC 继续 HOLD。
+
+
+## R8.1j 后续状态（2026-11-12）
+
+本文中 **5/9** 是 R8.1i 阶段快照。R8.1j 已新增通过 **26.2 NeoForge、26.1.2 NeoForge**，因此当前规则 v1.1.26 的**最新本地完整构建进度为 7/9**。两项都使用独立 cgroup 内存限额，真正执行 `clean check build` 并通过，包含零水文异常和 JAR 完整性检查。
+
+详细报告 `docs/REALISTIC_GEOMORPHOLOGY_R81J_NEOFORGE_FULL_BUILD_20261112.md`，最新九目标状态 `docs/acceptance/r81j_current_rules_local_matrix.json`。26.3 NeoForge 及 1.20.1 Fabric 尚未验收，正式 Windows CI、客户端画面验收与发布仍 HOLD。

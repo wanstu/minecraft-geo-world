@@ -1,0 +1,54 @@
+GeoWorld 26.1.2 NeoForge local source v1.1.26 full check build. NOT OFFICIAL CI.
+Build command: systemd-run --user --scope MemoryMax=5100M MemorySwapMax=256M ./gradlew clean check build
+Full log SHA256: 51336f19308ad1acbe97efaf471b64d10d52cc3e59736d087471b36091956bf6
+Jar SHA256: a59a6d71e139469f48903c04d2be30b67d91bae725e5df2b238130994205b082
+
+> Task :clean UP-TO-DATE
+> Task :createMinecraftArtifacts
+ [1m[92m✓[23;0m Completed [4mdecompile[23;0m in 215.97s
+ [1m[92m✓[23;0m Completed [4mtransformSources[23;0m in 24.21s
+ [1m[92m✓[23;0m Completed [4mrecompile[23;0m in 84.28s
+Total runtime: 363.25s
+> Task :compileJava
+> Task :buildGeoWorldEngine
+> Task :buildGeoWorldEngine_linux_arm64
+> Task :buildGeoWorldEngine_linux_x64
+> Task :buildGeoWorldEngine_macos_arm64
+> Task :buildGeoWorldEngine_macos_x64
+> Task :buildGeoWorldEngine_windows_arm64
+> Task :generateGeoWorldBuildProfile
+> Task :generateModMetadata
+> Task :processResources
+> Task :classes
+> Task :auditGeoWorldBiomeCoverage
+GeoWorld realized biome samples seed=123456 samples=80451 observed=54/required=54 missing=0
+> Task :fingerprintGeoWorldBiomeDecisions
+BiomeDecisionFingerprint seed=123456 points=24576 fnv64=599b1ee71dc2825c PASS
+> Task :probeGeoWorldReportedCoast
+> Task :jarJar NO-SOURCE
+> Task :jar
+> Task :compileTestJava NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :verifyGeoWorldBiomePreset
+> Task :verifyGeoWorldChunkPerformanceMode
+> Task :verifyGeoWorldDecorationPolicy
+> Task :verifyGeoWorldMineralBodies
+> Task :verifyGeoWorldMinerals
+> Task :verifyGeoWorldModelQuery
+GeoWorld Model Verifier: passed=34/34 models=7
+> Task :verifyGeoWorldQueryLifecycle
+> Task :verifyGeoWorldShoreline
+> Task :verifyGeoWorldSurfaceBiomes
+> Task :verifyGeoWorldSurfaceOutcrops
+> Task :verifyGeoWorldWaterOwnership
+GeoWorld final water ownership: seed=123456, chunks=1183, columns=302848, waterColumns=158884, owners={WetlandPool=54, River=60163, Lake=45255, Ocean=53412}, unownedSurfaceWaterSources=0, unsafeExposedWaterSources=0, freeFallWaterFaces=0, runtimeWaterLost=0, riverWaterBoundaryModelMismatches=0, riverLocalWaterPeaks=0, wetlandPoolLeaks=0
+> Task :verifyMinecraftCommonIsolation
+> Task :verifyMinecraftV26CommonIsolation
+> Task :verifyMinecraftVersionCommonIsolation
+> Task :check
+> Task :assemble
+> Task :build
+BUILD SUCCESSFUL in 10m 44s
+30 actionable tasks: 29 executed, 1 up-to-date

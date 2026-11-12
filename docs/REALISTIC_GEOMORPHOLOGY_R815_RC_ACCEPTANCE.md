@@ -173,3 +173,18 @@
 - **HOLD：不合并、不推送、不发布。**
 
 详细报告：`docs/REALISTIC_GEOMORPHOLOGY_R81I_FABRIC262_2612_FULL_BUILD_20261112.md`；最新可机读矩阵：`docs/acceptance/r81i_current_rules_local_matrix.json`。
+
+
+## R8.1j（2026-11-12）v1.1.26 NeoForge 内存隔离构建验收
+
+**最新本地九目标完整 `clean check build` 进度：7/9 PASS**（覆盖上文 5/9、3/9 等历史阶段快照，不是正式 CI）。
+
+本轮在 dadm 建立 **systemd 用户 cgroup 资源隔离**后，新通过：
+- **26.2 NeoForge**，`BUILD SUCCESSFUL in 11m 4s`，30 项任务 29 执行、1 UP-TO-DATE。
+- **26.1.2 NeoForge**，`BUILD SUCCESSFUL in 10m 44s`，30 项任务 29 执行、1 UP-TO-DATE。
+- 两项首次反编译约 215 秒，内存隔离上限 5100 MiB、Swap 上限 256 MiB；无 OOM，ModDev 的 Java 原版工件以及本模组最终 JAR 均成功构建。
+- 两项水文检查分别审计 **1183 区块、302848 个方块列**，所有水面自由落差和水源归属异常均为 **0**；两份 NeoForge JAR 的六平台原生引擎与 v1.1.26 运行时握手字节码均经核验。
+- 尚未通过：**26.3 NeoForge**（上次资源阻塞，本轮未重试）以及 **1.20.1 Fabric**（dadm JDK17 缺失）。
+- **官方 GitHub Windows 九目标 CI 和真实 Minecraft 客户端相机验收仍未完成**。不将本地开发 JAR 作为正式发布文件，不合并、不推送、不发布。
+
+详细报告：`docs/REALISTIC_GEOMORPHOLOGY_R81J_NEOFORGE_FULL_BUILD_20261112.md`。最新机器可检查矩阵：`docs/acceptance/r81j_current_rules_local_matrix.json`。
