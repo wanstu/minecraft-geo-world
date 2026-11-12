@@ -105,3 +105,21 @@ python3 scripts/r81e_new_sinkhole_voxel_audit.py \
   --output docs/acceptance/r81e_new_sinkhole_actual_voxels.json \
   --image docs/acceptance/r81e_new_sinkhole_anvil_planview.png
 ```
+
+
+## 2026-11-12 独立种子 123456 真实 Minecraft 复验补充
+
+最新多种子与真实方块证据详见 `docs/REALISTIC_GEOMORPHOLOGY_R81E_MULTISEED_ACCEPTANCE.md`。
+3 个额外种子的 12 个天坑在 Go 双规则模型对比中保留全部河网与 SpecialFeatures 规划；
+其中 **种子 123456 / 天坑 #9 (6080,7744)** 的 NeoForge v1.1.25 世界现在也已取得真实方块证据：
+
+- 41/41 东西、41/41 南北 `minecraft:full` 样本；中心天然地面 Y74，无地表积水，8 格采样最大坡率两方向均为 0.5。
+- 服务端保存模型严格绑定 `seed=123456` 与规则 v1.1.25，实际河段 955、特殊地貌 18，四个天坑的 ID 与中心坐标和独立 Go 模型完全一致。
+- 初次世界创建耗时约 535 秒，**不是启动失败**；重启已绑定世界只花约 24 秒。首次耗时偏长的具体根因尚不明，未改启动逻辑。
+- 本次完成后撤销目标区块 `forceload`、完整保存并正常退出；保留隔离存档。
+- 证据位于 `docs/acceptance/r81e_seed123456_actual_voxels.json`、
+  `r81e_seed123456_world_boot_evidence.json` 和 `r81e_seed123456_anvil_planview.png`。
+- **其余两个新增种子、其他天坑、整体游戏镜头视觉验收与正式九目标 CI 仍然未完成。**
+
+这项补充将多种子模型级验收推进到第二个真实 Minecraft 世界的局部方块验收，
+**不改变 R8.1e 已通过的坡面算法，不授权发布 RC。**
