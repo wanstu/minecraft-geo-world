@@ -109,7 +109,7 @@
       "configValid": true,
       "gradleWrapperExists": true,
       "sourceLoaderMetadataExists": true,
-      "localJdkAvailable": false,
+      "localJdkAvailable": true,
       "note": "Static target validation only, no compile/build implied"
     }
   ]
