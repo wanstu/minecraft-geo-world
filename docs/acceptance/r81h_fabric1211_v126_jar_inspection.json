@@ -1,0 +1,16 @@
+{
+  "jar": "java/adapters/1.21.1-fabric/build/libs/geoworld-0.1.4.jar",
+  "loader": "fabric",
+  "expectedVersion": "0.1.4",
+  "sha256": "0d45cb7b3d37ed1c087c0febab3eaf9885cc1242c63a38f1e98e7eadd6ade78f",
+  "bytes": 9206178,
+  "allSixNativeEngines": true,
+  "missingEntries": [],
+  "metadata": {
+    "id": "geoworld",
+    "version": "0.1.4"
+  },
+  "versionMatches": true,
+  "passed": true,
+  "note": "Local build verification, not a published release"
+}

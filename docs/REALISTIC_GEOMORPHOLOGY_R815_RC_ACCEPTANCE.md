@@ -145,3 +145,17 @@
 完整报告 `docs/REALISTIC_GEOMORPHOLOGY_R81G_ESTUARY_CONTINUITY.md`；
 模型/真实方块证据 `docs/acceptance/r81g_model_and_runtime_acceptance.json`；
 本轮严格九目标状态 `docs/acceptance/r81g_current_rules_local_matrix.json`。
+
+
+## R8.1h（2026-11-12）最新版本完整构建状态
+
+**R8.1g 采用新生成规则 `geoworld-rules-v1.1.26`，上文的 v1.1.25 / R8.1g 1/9 状态是历史阶段快照。当前版本最新结果：本地完整 `clean check build` 通过 3/9。**
+
+- Minecraft **1.21.1 NeoForge**：R8.1g 已通过（5m15s、45 个任务含一项缓存）。
+- Minecraft **1.21.1 Fabric**：R8.1h 重新执行新规则完整构建，通过（1m38s、17/17）。
+- Minecraft **26.3 Fabric**：R8.1h 重新执行新规则完整构建，通过（3m54s、41/41）。
+- Fabric 两份 JAR 的 Loader 元数据、六平台原生引擎完整；字节码中的 `GeoWorldEngineBridge` 明确使用 v1.1.26。开发模块默认 0.1.4 文件名不是发布版。
+- 26.3 NeoForge 依旧本机资源受限；另五个适配目标未完成完整构建。
+- 正式 Windows 九目标 GitHub CI、真实游戏客户端视觉验收仍未做。**不合并、不推送、不发布。**
+
+详细报告 `docs/REALISTIC_GEOMORPHOLOGY_R81H_FABRIC_FULL_BUILD_20261112.md`，最新机器可核验矩阵 `docs/acceptance/r81h_current_rules_local_matrix.json`。

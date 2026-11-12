@@ -132,3 +132,12 @@ Python `scripts/test_r81g_estuary_acceptance.py` 对 141×2 的 Go/Java 数值�
 仍未完成：其他 Loader/版本的九目标官方 GitHub Windows CI，真实 Minecraft 客户端游戏视角，其他种子/地貌气候的河口覆盖。旧世界不做自动迁移或修复；v1.1.25 仍以旧规则加载。
 
 **当前仍不合并、不推送、不发布任何 JAR，不赋予整版 v0.1.5 RC 发布资格。**
+
+
+## R8.1h（2026-11-12）后续构建复验
+
+此报告中“1/9 完整构建通过”的数据是当时的阶段快照。后续已在**同一个 v1.1.26 规则源码提交 `fa49b91`**上，分别为 1.21.1 Fabric、26.3 Fabric 完整执行 `clean check build` 并通过（17/17、41/41），并验证两个 JAR 含有编译后的 v1.1.26 引擎身份常量。
+
+**当前本地完整构建通过 3/9**，而不是 1/9。其它 6 个目标尚未确认（26.3 NeoForge 资源阻塞 1；5 个未完整测试）。GitHub Windows 九目标 CI / Minecraft 客户端视觉验收仍未完成；发布资格仍为 HOLD。
+
+参见 `docs/REALISTIC_GEOMORPHOLOGY_R81H_FABRIC_FULL_BUILD_20261112.md` 和 `docs/acceptance/r81h_current_rules_local_matrix.json`。

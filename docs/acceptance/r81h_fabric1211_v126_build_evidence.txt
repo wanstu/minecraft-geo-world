@@ -1,0 +1,41 @@
+GeoWorld local v1.1.26 candidate, NOT official CI or release
+Source commit: fa49b91b4a1c622f6191cc61342b443d67d57b98
+Module: java/adapters/1.21.1-fabric
+JDK: 21
+Command: ./gradlew --offline --no-daemon --max-workers=1 clean check build
+Full local stdout/stderr log SHA256: bdbdf11787dd595bcb43dc388684f306df34f02d88d33853c231ff033c04569a
+JAR SHA256: 0d45cb7b3d37ed1c087c0febab3eaf9885cc1242c63a38f1e98e7eadd6ade78f
+
+> Task :clean
+> Task :compileJava
+> Task :buildGeoWorldEngine_linux_arm64
+> Task :buildGeoWorldEngine_linux_x64
+> Task :buildGeoWorldEngine_macos_arm64
+> Task :buildGeoWorldEngine_macos_x64
+> Task :buildGeoWorldEngine_windows_arm64
+> Task :buildGeoWorldEngine_windows_x64
+> Task :processResources
+> Task :classes
+> Task :fingerprintGeoWorldBiomeDecisions
+BiomeDecisionFingerprint seed=123456 points=24576 fnv64=9e813f623713f390 PASS
+> Task :jar
+> Task :compileTestJava NO-SOURCE
+> Task :processTestResources NO-SOURCE
+> Task :testClasses UP-TO-DATE
+> Task :test NO-SOURCE
+> Task :validateAccessWidener NO-SOURCE
+> Task :verifyGeoWorldAdapter
+> Task :verifyGeoWorldMiningMaterials
+MINING_MATERIALS PASS seed=123456 families=9 districts=35 mappings=140 extraPrimary=2 extraCompanion=1 nativeOre=86762 nativeExtra=44420 pileBlocks=815 waterFloorPileBlocks=147 protected=12 peaks=3 removed=3 disabled=PASS frozen=PASS
+> Task :verifyGeoWorldModelQuery
+GeoWorld Model Verifier: passed=34/34 models=7
+> Task :verifyGeoWorldQueryLifecycle
+PASS Query facade lifecycle: A -> empty -> B, late stop, rebind, immutable snapshots, concurrent reads
+> Task :check
+> Task :processIncludeJars
+> Task :remapJar
+> Task :remapSourcesJar SKIPPED
+> Task :assemble
+> Task :build
+BUILD SUCCESSFUL in 1m 38s
+17 actionable tasks: 17 executed
