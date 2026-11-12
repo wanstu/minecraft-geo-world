@@ -159,3 +159,17 @@
 - 正式 Windows 九目标 GitHub CI、真实游戏客户端视觉验收仍未做。**不合并、不推送、不发布。**
 
 详细报告 `docs/REALISTIC_GEOMORPHOLOGY_R81H_FABRIC_FULL_BUILD_20261112.md`，最新机器可核验矩阵 `docs/acceptance/r81h_current_rules_local_matrix.json`。
+
+
+## R8.1i（2026-11-12）v1.1.26 本地完整构建最新进度
+
+**当前规则本地真实 `clean check build`：5/9 通过**，替代本文件旧章节关于 1/9、2/9、3/9 的历史阶段快照。
+
+- 新增 **26.2 Fabric** 完整构建 PASS，2m18s；**26.1.2 Fabric** 完整构建 PASS，2m01s，均使用 JDK25、Gradle 9.5.1。
+- 两个 JAR 均通过 Loader 元数据、六平台原生引擎及编译后 `v1.1.26` 规则握手检查。
+- 已通过名单：26.3 Fabric、26.2 Fabric、26.1.2 Fabric、1.21.1 Fabric、1.21.1 NeoForge。
+- 26.3 NeoForge 依旧因本地首次反编译内存/Swap 资源受限而未验收；26.2 NeoForge、26.1.2 NeoForge、1.20.1 Fabric 尚未完整构建。
+- **正式 Windows 九目标 CI 未执行；客户端实际游戏画面未验收。** 本地文件名仍是模块默认 `geoworld-0.1.4.jar`，不是正式安装包。
+- **HOLD：不合并、不推送、不发布。**
+
+详细报告：`docs/REALISTIC_GEOMORPHOLOGY_R81I_FABRIC262_2612_FULL_BUILD_20261112.md`；最新可机读矩阵：`docs/acceptance/r81i_current_rules_local_matrix.json`。

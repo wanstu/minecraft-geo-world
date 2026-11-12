@@ -67,3 +67,10 @@
 本轮只执行构建与验收，**没有修改河口水文算法、天坑坡面、旧世界存档或新玩法内容**。
 
 **发布资格继续 HOLD：未合并 master、未推送、未创建 tag、未发布任何 JAR。** 下一个可控验收阶段优先检查 **26.2 Fabric**（先检查离线依赖和构建环境；不把未运行目标标记成功）。正式 Windows CI 应在有授权并具备完整分支后运行。
+
+
+## R8.1i 后续状态更新（2026-11-12）
+
+本文本地完整构建 **3/9** 是 R8.1h 当时的阶段快照。R8.1i 已在同一个 `geoworld-rules-v1.1.26` 源提交 `4a64827` 上完成 26.2 Fabric 和 26.1.2 Fabric 的完整 `clean check build`，均 PASS，JAR 内容完整，**最新本地真实完整构建现为 5/9**。
+
+新报告 `docs/REALISTIC_GEOMORPHOLOGY_R81I_FABRIC262_2612_FULL_BUILD_20261112.md`；最新状态 `docs/acceptance/r81i_current_rules_local_matrix.json`。原 26.3 NeoForge 资源阻塞及 GitHub Windows CI / 客户端视觉验收未完成的状态保持不变。
