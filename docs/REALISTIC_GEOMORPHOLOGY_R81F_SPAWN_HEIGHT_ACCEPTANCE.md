@@ -94,3 +94,17 @@ PASS seed=123456 spawnX=1088 spawnY=107 spawnZ=448 ground=0.585156080473 candida
 全新 v1.1.25 世界真实创建并检查 SpawnY（最好再验一个非相同种子）；真实 Minecraft 客户端出生点落点/碰撞视觉验收；九个正式 Loader/游戏版本 CI；首次世界启动耗时独立性能分析。
 
 **本阶段无推送、无主干合并、无 Jar 发布，不改旧存档、不动地貌算法。**
+
+
+
+## 2026-11-12 更新：新世界首次创建验收已经通过
+
+之前文档第 5、6 节中的“尚未完成全新世界首次创建”系编写当时状态。现已在**两个独立空目录新世界**完成首次创建、`save-all flush`、正常 `stop`，逐一读取其持久化 `level.dat` 和真实 `minecraft:full` Anvil 区块。
+
+- **种子 123456（创建时已有模型缓存）**：`Done (16.678s)`，Spawn=(1088,107,448)，地面 Y106。
+- **种子 20261112（创建时无对应模型缓存）**：`Done (45.427s)`，Spawn=(192,104,192)，地面 Y103。
+- 两种情况的种子、世界生成器 `geoworld:geoworld`、绑定规则 v1.1.25 均正确；出生点 Y 相比真实自然地面高 1 格，没有落到 -64。
+- 完整验收文档：`docs/REALISTIC_GEOMORPHOLOGY_R81F_FRESH_WORLD_FIRST_BOOT.md`。
+- 证据：`docs/acceptance/r81f_fresh_world_first_boot.json`；回归脚本：`scripts/test_r81f_fresh_world_first_boot.py`。
+
+**更新后的结论：R8.1f 出生点高度专项通过实际全新世界首次创建验收。** 之前 535 秒的偶发启动耗时未复现，也未找到最终根因，不能说性能问题已彻底修复；客户端游戏画面和九目标正式 CI 仍没有完成，因此 RC 仍 HOLD。没有修改任何历史存档。
