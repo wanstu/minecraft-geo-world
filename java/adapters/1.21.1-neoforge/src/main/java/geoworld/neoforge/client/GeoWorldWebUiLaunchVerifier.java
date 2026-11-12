@@ -33,11 +33,32 @@ public final class GeoWorldWebUiLaunchVerifier {
             killManagedProcess();
             long recoveredPid = waitForAutomaticRecovery(firstPid);
             int recoveredPort = GeoWorldGameWebUi.currentWebUiPort();
-            if (recoveredPort != firstPort) {
+            // A just-terminated HTTP service can leave the old port
+            // temporarily unavailable (e.g., TCP TIME_WAIT). Recovery may
+            // legitimately choose another free dynamic port. Verify the new
+            // process actually serves requests rather than comparing ports.
+            var recoveredUri = GeoWorldGameWebUi.currentWebUiUri();
+            if (
+                recoveredPort <= 0 ||
+                recoveredUri == null ||
+                recoveredUri.getPort() != recoveredPort
+            ) {
                 throw new AssertionError(
-                    "GeoWorld WebUI watchdog should reuse the previous port " +
-                    "when it is available: first=" + firstPort +
-                    " recovered=" + recoveredPort
+                    "GeoWorld WebUI watchdog recovered with a stale URI/port: " +
+                    recoveredUri + " / " + recoveredPort
+                );
+            }
+            var status = java.net.http.HttpClient.newHttpClient().send(
+                java.net.http.HttpRequest.newBuilder(
+                    recoveredUri.resolve("api/status")
+                ).timeout(java.time.Duration.ofSeconds(3)).GET().build(),
+                java.net.http.HttpResponse.BodyHandlers.discarding()
+            );
+            if (status.statusCode() != 200) {
+                throw new AssertionError(
+                    "GeoWorld WebUI watchdog recovered without a healthy " +
+                    "native HTTP service: port=" + recoveredPort +
+                    " status=" + status.statusCode()
                 );
             }
 

@@ -46,9 +46,11 @@ public final class GeoWorldV26MiningDistrictVerifier {
             model.manifest().generationRulesVersion()
         ) || ("geoworld-rules-v1.1.25".equals(
             model.manifest().generationRulesVersion()
-        ) || "geoworld-rules-v1.1.26".equals(
+        ) || ("geoworld-rules-v1.1.26".equals(
             model.manifest().generationRulesVersion()
-        )))))) {
+        ) || "geoworld-rules-v1.1.27".equals(
+            model.manifest().generationRulesVersion()
+        ))))))) {
             throw new AssertionError(
                 "mining district verifier requires v1.1.16, got " +
                 model.manifest().generationRulesVersion()

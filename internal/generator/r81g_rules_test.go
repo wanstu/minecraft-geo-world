@@ -11,6 +11,7 @@ import (
 func TestR81gV126KeepsV125WorldConfigExceptCoastalHandoff(t *testing.T) {
 	current := testConfig(123456)
 	current.WorldProfile = StandardWorldProfile()
+	current.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.26"
 	previous := current
 	previous.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.25"
 	a, err := resolveTopLevelConfig(current)

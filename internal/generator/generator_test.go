@@ -934,7 +934,7 @@ func TestR81cCoastalBackwaterProfileIsolatedFromLockedV122(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if modern.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.26" ||
+	if modern.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.27" ||
 		modern.WorldSample.CoastalBackwaterVersion != 2 {
 		t.Fatalf("modern rules not isolated: version=%s coastal=%d", modern.WorldProfile.GenerationRulesVersion, modern.WorldSample.CoastalBackwaterVersion)
 	}

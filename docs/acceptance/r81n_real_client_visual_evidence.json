@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-12",
+  "branch": "adm/geoworld-r81n-natural-sinkhole-20261112",
+  "candidateRules": "geoworld-rules-v1.1.27",
+  "priorLockedRules": "geoworld-rules-v1.1.26",
+  "testWorld": {
+    "worldName": "R81nFreshSeed123456",
+    "seed": 123456,
+    "minecraft": "1.21.1",
+    "loader": "NeoForge",
+    "loaderVersion": "21.1.211",
+    "generator": "geoworld:geoworld",
+    "serverColdFirstBootDoneSeconds": 29.349,
+    "serverFreshEmptyDirectory": true,
+    "worldModelBinding": "geoworld-rules-v1.1.27",
+    "worldIsIsolatedCopy": true,
+    "sourceOldSaveUnchanged": true
+  },
+  "verification": {
+    "serverFirstBoot": "PASS",
+    "serverSavedAndStoppedNormally": true,
+    "actualSavedMinecraftVoxelColumnsExpected": 54,
+    "actualSavedMinecraftVoxelColumnsFull": 54,
+    "actualVoxelCenterNaturalGroundY": 74,
+    "actualVoxelCenterWaterTopY": null,
+    "actualVoxelMaxNaturalSlopeYPerBlock": {
+      "eastWest": 0.625,
+      "northSouth": 0.625
+    },
+    "actualVoxelEvidence": "docs/acceptance/r81n_seed123456_actual_voxels.json",
+    "goJavaCandidateSamplesSeed123456": 1536,
+    "goJavaCandidateSamplesChanged": 661,
+    "goJavaWorstNormalizedHeightError": 1.11022302463e-16,
+    "allNineTargetsWindowsCIForV127": "NOT_RUN",
+    "localNeoForge1211FullCheckBuild": "PASS",
+    "legacyV126WindowsCI9of9": "PREVIOUSLY_PASS_DOES_NOT_APPLY_TO_V127"
+  },
+  "visual": {
+    "evidenceClass": "actual_Minecraft_NeoForge_client_camera",
+    "softwareOpenGLRenderer": "Mesa llvmpipe",
+    "seed": 123456,
+    "sinkholeId": 9,
+    "centerX": 6080,
+    "centerZ": 7744,
+    "topCamera": {
+      "x": 6080,
+      "y": 160,
+      "z": 7744,
+      "yaw": 0,
+      "pitch": 80
+    },
+    "obliqueCamera": {
+      "x": 6080,
+      "y": 155,
+      "z": 7620,
+      "yaw": 0,
+      "pitch": 35
+    },
+    "daylightSetToNoon": true,
+    "verdict": "IMPROVED_BUT_FAIL",
+    "observations": [
+      "Directional gullies interrupt some uniform concentric terraces compared with v1.1.26",
+      "Bowl footprint still appears too circular and inner floor too flat",
+      "Multiple concentric rings remain visible on outer slopes",
+      "Some distant sky patches arise from incomplete chunk rendering under slow software renderer; not accepted as proof of missing terrain"
+    ],
+    "screenshots": [
+      {
+        "path": "docs/acceptance/r81n_v127_client_sinkhole_seed123456_topdown.jpg",
+        "sha256": "f478f5b775ea93867e6f86a6cbea0a55dd01b41170e7b68908c6ceb4766dfca5"
+      },
+      {
+        "path": "docs/acceptance/r81n_v127_client_sinkhole_seed123456_oblique.jpg",
+        "sha256": "1ebb39db8ee8faeaa11567dc8bdb08859d96b1f9659f8a2386577cc8fbbc0185"
+      }
+    ]
+  },
+  "unchangedContracts": {
+    "riverNetwork": true,
+    "featurePlacements": true,
+    "macroSurface": true,
+    "coastalBackwaterVersion": [
+      2,
+      2
+    ],
+    "oldModelGoJavaReadable": true
+  },
+  "releaseEligible": false,
+  "merged": false,
+  "published": false
+}
