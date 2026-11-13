@@ -42,6 +42,16 @@ class StableReleaseGate(unittest.TestCase):
         self.assertIn("workflow_dispatch:",WORKFLOW)
         self.assertIn("pull_request:",WORKFLOW)
 
+    def test_webui_watchdog_verifies_live_http_not_impossible_port_reuse(self):
+        for relative in (
+            "java/neoforge-mod/src/main/java/geoworld/neoforge/client/GeoWorldWebUiLaunchVerifier.java",
+            "java/adapters/1.21.1-neoforge/src/main/java/geoworld/neoforge/client/GeoWorldWebUiLaunchVerifier.java"
+        ):
+            content=(ROOT/relative).read_text()
+            self.assertIn("recoveredStatus.statusCode() != 200",content)
+            self.assertIn('recoveredUri.resolve("api/status")',content)
+            self.assertNotIn("watchdog should reuse the previous port",content)
+
     def test_published_files_are_built_from_tagged_master_with_version(self):
         self.assertIn("Release tag must point to current master.",WORKFLOW)
         self.assertIn("-Pmod_version=$env:MOD_VERSION",WORKFLOW)

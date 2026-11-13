@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-13",
+  "releaseCandidate": "v0.1.5-stable",
+  "sourceBaseCommit": "2cb180bd2ecb32d101de055663aa6bbfb25cab03",
+  "rulesDefault": "geoworld-rules-v1.1.22",
+  "experimentalSinkholesExcluded": true,
+  "goFullRegression": "PASS, go test -p 1 -count=1 -timeout=25m ./...",
+  "javaGoldenModels": {
+    "status": "PASS",
+    "fixtures": 7
+  },
+  "windowsCI": {
+    "status": "PASS on initial draft commit",
+    "commit": "b34b019887979aa0c14738b7e59eac2fd3b72f05",
+    "runId": 43367867590,
+    "coreTests": "success",
+    "adapterJobsPassed": 9,
+    "releaseBuildJobs": "skipped",
+    "publishJob": "skipped",
+    "note": "Must rerun on final commit after WebUI verifier portability fix"
+  },
+  "historicalCacheModels": {
+    "versions": [
+      "geoworld-rules-v1.1.16",
+      "geoworld-rules-v1.1.22"
+    ],
+    "goChecksum": "PASS",
+    "javaLoadedAndSampled": "PASS 4 points each"
+  },
+  "minecraftLegacyWorld": {
+    "world": "StableLegacyV121",
+    "source": "real Minecraft 1.21.1 NeoForge save copy",
+    "seed": -1818694639628404530,
+    "rules": "geoworld-rules-v1.1.21",
+    "runServer": "PASS",
+    "modelBoundCorrectly": "PASS",
+    "savedAndStopped": "PASS",
+    "modelHashUnchanged": true,
+    "modelSha256": "b1f7945e2e6f10e0a9238a5418d72ab280ef6d197c236b413ee1725e78a99e10",
+    "modelBytes": 2918856
+  },
+  "minecraftFreshWorld": {
+    "world": "StableFreshSeed123456",
+    "seed": 123456,
+    "rules": "geoworld-rules-v1.1.22",
+    "generator": "geoworld:geoworld",
+    "runServer": "PASS",
+    "modelGoValidate": "PASS",
+    "savedAndStopped": "PASS",
+    "forcedRiverAreaChunks": 81,
+    "regionFileCount": 14,
+    "modelSha256": "50c2bc34a22cab7ef2352db557bab80476da15a453f8fdfb9b9338fa6a2e65a4",
+    "realClient": {
+      "minecraft": "Java 1.21.1",
+      "loader": "NeoForge",
+      "openedExistingFreshSavedWorld": true,
+      "playerJoinLogged": true,
+      "playerName": "Dev",
+      "integratedServerBoundRules": "geoworld-rules-v1.1.22",
+      "savedAndQuit": true,
+      "savedModelHashUnchanged": true,
+      "serverWorldModelSha256": "50c2bc34a22cab7ef2352db557bab80476da15a453f8fdfb9b9338fa6a2e65a4",
+      "note": "Game boot and save/quit smoke only; no new visually adjudicated geomorphology screenshot"
+    }
+  },
+  "linuxLocalBuild": {
+    "initial263NeoForge": "FAIL due WebUI verifier requiring immediate reuse of a port still in OS TIME_WAIT",
+    "verifierPortabilityFix": "Targeted task PASS; real HTTP status 200 after recovery",
+    "fullBuildAfterFix": "PASS NeoForge 26.3 check build, 40 tasks, 0.1.5 candidate",
+    "candidateJar": "PASS metadata 0.1.5 and all six native engine resources"
+  },
+  "releaseGate": {
+    "finalCommitWindowsCI": false,
+    "allLocalBuilds": false,
+    "nativeClientVisual": false,
+    "versionedTagCreated": false,
+    "published": false,
+    "status": "HOLD",
+    "nativeClientSmoke": true,
+    "windowsCIInitialDraft": true
+  }
+}
