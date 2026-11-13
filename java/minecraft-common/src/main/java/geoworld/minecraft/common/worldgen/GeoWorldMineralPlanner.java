@@ -72,7 +72,7 @@ public final class GeoWorldMineralPlanner {
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || ("geoworld-rules-v1.1.25".equals(rules) || ("geoworld-rules-v1.1.26".equals(rules) || ("geoworld-rules-v1.1.27".equals(rules) || "geoworld-rules-v1.1.28".equals(rules)))))))))));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || ("geoworld-rules-v1.1.25".equals(rules) || ("geoworld-rules-v1.1.26".equals(rules) || ("geoworld-rules-v1.1.27".equals(rules) || ("geoworld-rules-v1.1.28".equals(rules) || "geoworld-rules-v1.1.29".equals(rules))))))))))));
     }
 
     private static boolean usesV115MiningDistricts(GeoWorldV1 model) {
@@ -100,9 +100,11 @@ public final class GeoWorldMineralPlanner {
             model.manifest().generationRulesVersion()
         ) || ("geoworld-rules-v1.1.27".equals(
             model.manifest().generationRulesVersion()
-        ) || "geoworld-rules-v1.1.28".equals(
+        ) || ("geoworld-rules-v1.1.28".equals(
             model.manifest().generationRulesVersion()
-        )))))))))));
+        ) || "geoworld-rules-v1.1.29".equals(
+            model.manifest().generationRulesVersion()
+        ))))))))))));
     }
 
     public void planSurfaceOutcrops(

@@ -301,20 +301,62 @@ func Plan(
 func usesNaturalSinkholeSlope(version string) bool {
 	return version == "geoworld-rules-v1.1.25" ||
 		version == "geoworld-rules-v1.1.26" ||
-		(version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28")
+		(version == "geoworld-rules-v1.1.27" || (version == "geoworld-rules-v1.1.28" || version == "geoworld-rules-v1.1.29"))
 }
 
 // Only v1.1.27 may change the geometry confirmed visually artificial in R8.1m.
 // All persisted v1.1.26 and earlier worlds use their original radial slope.
 func usesDirectionalSinkholeErosion(version string) bool {
 	return version == "geoworld-rules-v1.1.27" ||
-		version == "geoworld-rules-v1.1.28"
+		(version == "geoworld-rules-v1.1.28" || version == "geoworld-rules-v1.1.29")
 }
 
 // Only candidate v1.1.28 changes the floor profile. Persisted v1.1.27
 // and earlier worlds retain their exact original bowl and terrain labels.
 func usesAsymmetricSinkholeFloor(version string) bool {
 	return version == "geoworld-rules-v1.1.28"
+}
+
+// R8.1p: an isolated candidate. Do not silently reinterpret v1.1.28 or
+// any existing saved world as the new transport-inspired sinkhole profile.
+func usesSedimentFanSinkhole(version string) bool {
+	return version == "geoworld-rules-v1.1.29"
+}
+
+// Sediment is removed from upper gullies and spread into broad, overlapping
+// toeslope fans. All distances and directions derive from persisted Feature;
+// there is no runtime randomness, new model field, or angle-dependent center
+// singularity (the near-center envelope is zero). This is a deterministic
+// erosion/deposition *approximation*, not a physical sediment simulation.
+// Returned signed height is in normalized world-height units.
+func sinkholeSedimentTransfer(f Feature, x, z, radial float64) (height, eroded, deposited float64) {
+	if radial <= 0.025 || radial >= 0.97 {
+		return 0, 0, 0
+	}
+	dx := (x - f.CenterX) / math.Max(1, f.RadiusX)
+	dz := (z - f.CenterZ) / math.Max(1, f.RadiusZ)
+	theta := math.Atan2(dz, dx)
+	phase := float64(f.ID) * 0.413
+	axes := [3]float64{-0.24, 1.32, 3.27}
+	weights := [3]float64{1.0, 0.77, 0.64}
+	sourceBand := math.Exp(-0.5*math.Pow((radial-0.60)/0.165, 2)) *
+		smoothstepRange(0.28, 0.39, radial) *
+		(1 - smoothstepRange(0.82, 0.96, radial))
+	fanBand := math.Exp(-0.5*math.Pow((radial-0.22)/0.14, 2)) *
+		smoothstepRange(0.015, 0.22, radial) *
+		(1 - smoothstepRange(0.53, 0.74, radial))
+	for i, direction := range axes {
+		axis := phase*0.74 + direction +
+			0.15*math.Sin(radial*3.5+phase+float64(i)*1.29)
+		diff := math.Atan2(math.Sin(theta-axis), math.Cos(theta-axis))
+		sourceWidth := 0.22 + 0.09*(1-radial)
+		fanWidth := 0.28 + 0.30*(1-radial)
+		channel := math.Exp(-0.5 * math.Pow(diff/sourceWidth, 2))
+		spread := math.Exp(-0.5 * math.Pow(diff/fanWidth, 2))
+		eroded += 0.014 * weights[i] * sourceBand * channel
+		deposited += 0.0183 * weights[i] * fanBand * spread
+	}
+	return deposited - eroded, eroded, deposited
 }
 
 // Warp only the central floor and lower shoulder, not the planned outer rim.
@@ -376,7 +418,7 @@ func sinkholeTalusVariation(f Feature, x, z float64) float64 {
 }
 
 func usesRiverSafeSinkholeSites(version string) bool {
-	return (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28"))))
+	return (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || (version == "geoworld-rules-v1.1.28" || version == "geoworld-rules-v1.1.29")))))
 }
 
 // sinkholeConflictsRiver checks the existing persisted river centerline,
@@ -864,7 +906,22 @@ func Apply(
 					slopeRadius += floorRadius - radial
 					habitableRadius = 0.28
 				}
+				sedimentFan := usesSedimentFanSinkhole(rulesVersion)
+				if sedimentFan {
+					// Keep the pre-existing winding channel network, but
+					// reduce angular warp and replace its uncompensated
+					// incision with explicitly paired gully/fan transfer.
+					slopeRadius = radial + 0.75*(slopeRadius-radial)
+					incision = 0
+					habitableRadius = 0.22
+				}
 				slope := smoothstepRange(0.035, 0.98, slopeRadius)
+				if sedimentFan {
+					r := math.Max(0, math.Min(1, slopeRadius))
+					// The nonzero radial derivative removes the large
+					// integer-Y flat disc caused by smoothstep near zero.
+					slope = 0.65*r + 0.35*smoothstepRange(0, 1, r)
+				}
 				if usesAsymmetricSinkholeFloor(rulesVersion) {
 					// Preserve the planned minimum at the exact center, but
 					// reduce the broad low-gradient center that becomes a flat
@@ -874,8 +931,12 @@ func Apply(
 					slope += (linear - slope) * blend
 				}
 				talus := sinkholeTalusVariation(selected, x, z) * (1 - slope) * (1 - slope)
+				transfer := 0.0
+				if sedimentFan {
+					transfer, _, _ = sinkholeSedimentTransfer(selected, x, z, radial)
+				}
 				target := math.Min(base.World.GroundHeight,
-					lerp(floor, base.World.GroundHeight, slope)+talus-
+					lerp(floor, base.World.GroundHeight, slope)+talus+transfer-
 						math.Max(0, base.World.GroundHeight-floor)*incision)
 				if usesDirectionalSinkholeErosion(rulesVersion) {
 					target = math.Max(math.Min(floor, base.World.GroundHeight), target)
@@ -1033,7 +1094,7 @@ func Apply(
 					if rulesVersion == "geoworld-rules-v1.1.16" ||
 						rulesVersion == "geoworld-rules-v1.1.18" ||
 						rulesVersion == "geoworld-rules-v1.1.19" ||
-						(rulesVersion == "geoworld-rules-v1.1.20" || (rulesVersion == "geoworld-rules-v1.1.21" || (rulesVersion == "geoworld-rules-v1.1.22" || (rulesVersion == "geoworld-rules-v1.1.23" || (rulesVersion == "geoworld-rules-v1.1.24" || (rulesVersion == "geoworld-rules-v1.1.25" || (rulesVersion == "geoworld-rules-v1.1.26" || (rulesVersion == "geoworld-rules-v1.1.27" || rulesVersion == "geoworld-rules-v1.1.28")))))))) {
+						(rulesVersion == "geoworld-rules-v1.1.20" || (rulesVersion == "geoworld-rules-v1.1.21" || (rulesVersion == "geoworld-rules-v1.1.22" || (rulesVersion == "geoworld-rules-v1.1.23" || (rulesVersion == "geoworld-rules-v1.1.24" || (rulesVersion == "geoworld-rules-v1.1.25" || (rulesVersion == "geoworld-rules-v1.1.26" || (rulesVersion == "geoworld-rules-v1.1.27" || (rulesVersion == "geoworld-rules-v1.1.28" || rulesVersion == "geoworld-rules-v1.1.29"))))))))) {
 						// v1.1.16 locked interpretation.
 						// Deform the shared water datum, then translate the bed by
 						// the same amount. This fixed crowned rivers but can bend
@@ -1117,7 +1178,7 @@ func usesV112DepressionGeometry(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28"))))))))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || (version == "geoworld-rules-v1.1.28" || version == "geoworld-rules-v1.1.29")))))))))
 }
 
 func usesCarvedDepressionGeometry(version string) bool {
@@ -1126,7 +1187,7 @@ func usesCarvedDepressionGeometry(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28"))))))))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || (version == "geoworld-rules-v1.1.28" || version == "geoworld-rules-v1.1.29")))))))))
 }
 
 func usesHydrologyConformingDepressions(version string) bool {
@@ -1134,7 +1195,7 @@ func usesHydrologyConformingDepressions(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28"))))))))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || (version == "geoworld-rules-v1.1.28" || version == "geoworld-rules-v1.1.29")))))))))
 }
 
 func usesLakeIslandClearance(version string) bool {
@@ -1142,13 +1203,13 @@ func usesLakeIslandClearance(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28"))))))))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || (version == "geoworld-rules-v1.1.28" || version == "geoworld-rules-v1.1.29")))))))))
 }
 
 func usesBasinDrainageCorridors(version string) bool {
 	return version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28"))))))))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || (version == "geoworld-rules-v1.1.28" || version == "geoworld-rules-v1.1.29")))))))))
 }
 
 func hasDepressionHeights(f Feature) bool {

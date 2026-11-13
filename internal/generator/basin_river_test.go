@@ -25,8 +25,8 @@ func TestCurrentBasinRiverDrainageIsContainedAndMonotonic(t *testing.T) {
 		ContinentFragmentation: 0.35000000000000003,
 		ContinentSeparation:    0.65,
 	}
-	if cfg.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.28" {
-		t.Fatalf("current rules=%q want geoworld-rules-v1.1.28", cfg.WorldProfile.GenerationRulesVersion)
+	if cfg.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.29" {
+		t.Fatalf("current rules=%q want geoworld-rules-v1.1.29", cfg.WorldProfile.GenerationRulesVersion)
 	}
 
 	model, err := GenerateWorld(context.Background(), cfg, nil)

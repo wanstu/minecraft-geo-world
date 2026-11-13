@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "stage": "R8.1p",
+  "date": "2026-11-13",
+  "candidateRules": "geoworld-rules-v1.1.29",
+  "previousLockedRules": "geoworld-rules-v1.1.28",
+  "branch": "adm/geoworld-r81p-sediment-fans-20261113",
+  "scope": "Sinkhole profile only: directional source erosion and depositional toeslope fans",
+  "model": {
+    "seeds": [
+      123456,
+      20261112
+    ],
+    "sinkholeSites": 8,
+    "goJavaComparisons": 3072,
+    "maxNormalizedGroundDifferenceGoJava": 1.11022302463e-16,
+    "fieldsCompared": [
+      "groundHeight",
+      "waterKind",
+      "terrainVariant"
+    ],
+    "riversIdentical": true,
+    "featurePlacementsIdentical": true,
+    "macroSurfaceIdentical": true,
+    "coastalBackwaterVersion": [
+      2,
+      2
+    ],
+    "candidateA": [
+      "docs/acceptance/r81p_seed123456_candidate_a.json",
+      "docs/acceptance/r81p_seed20261112_candidate_a.json"
+    ],
+    "candidateB": [
+      "docs/acceptance/r81p_seed123456_candidate_b.json",
+      "docs/acceptance/r81p_seed20261112_candidate_b.json"
+    ],
+    "changedPointsB": 1433
+  },
+  "engine": {
+    "server": "Minecraft 1.21.1 NeoForge 21.1.211",
+    "client": "Minecraft 1.21.1 NeoForge 21.1.211",
+    "runServerAndClient": "PASS v129b",
+    "goFullSuites": "PASS v129a; candidateB targeted R81p Go tests PASS",
+    "neoForgeCheckBuild": "PASS v129a (44 tasks); v129b NOT_RUN",
+    "windowsNineTargetCI": "NOT_RUN v129b",
+    "minecraftSeed": 123456,
+    "candidateAFreshWorld": "R81pFreshSeed123456",
+    "candidateBFreshWorld": "R81pBFreshSeed123456",
+    "actualAnvilColumns": 54,
+    "worldModelBinding": "geoworld-rules-v1.1.29",
+    "oldWorldsUntouched": true,
+    "candidateAVoxelSummary": {
+      "columnsExpected": 54,
+      "columnsFull": 54,
+      "crossSectionsFull": true,
+      "groundAtCenter": 74,
+      "waterAtCenter": null,
+      "maxNaturalSlopePer8Blocks": {
+        "eastWest": 0.375,
+        "northSouth": 0.375
+      },
+      "fullCounts": {
+        "eastWest": 27,
+        "northSouth": 27
+      },
+      "flatFloorCounts": {
+        "eastWest": 1,
+        "northSouth": 1
+      }
+    },
+    "candidateBVoxelSummary": {
+      "columnsExpected": 54,
+      "columnsFull": 54,
+      "crossSectionsFull": true,
+      "groundAtCenter": 74,
+      "waterAtCenter": null,
+      "maxNaturalSlopePer8Blocks": {
+        "eastWest": 0.5,
+        "northSouth": 0.5
+      },
+      "fullCounts": {
+        "eastWest": 27,
+        "northSouth": 27
+      },
+      "flatFloorCounts": {
+        "eastWest": 1,
+        "northSouth": 1
+      }
+    }
+  },
+  "visual": {
+    "evidenceType": "real_minecraft_client_xvfb_llvmpipe_software_rendering",
+    "siteId": 9,
+    "seed": 123456,
+    "center": {
+      "x": 6080,
+      "z": 7744
+    },
+    "top": {
+      "x": 6080,
+      "y": 160,
+      "z": 7744,
+      "yaw": 0,
+      "pitch": 80
+    },
+    "oblique": {
+      "x": 6080,
+      "y": 155,
+      "z": 7620,
+      "yaw": 0,
+      "pitch": 35
+    },
+    "candidateAResult": "FAIL_CIRCULAR_FUNNEL",
+    "candidateBResult": "FAIL_RINGS_REMAIN",
+    "whatChanged": "Stronger directional channels broadened and softened; some rim and flanks differ from symmetric bowl",
+    "whatFailed": "Concentric nested height contours around center remain obvious in both overhead and oblique actual gameplay screenshots",
+    "softwareRenderingCaveat": "Far missing-sky patches may be incomplete software-rendered chunks, not evidence of geological voids",
+    "screenshots": [
+      {
+        "stage": "a",
+        "view": "topdown",
+        "path": "docs/acceptance/r81p_v129a_client_seed123456_topdown_FAIL.jpg",
+        "sha256": "7e414f34f42857a54f319e211c304d7b2e4a0c604206f0f3fa6183e8f8a7138c",
+        "bytes": 118575
+      },
+      {
+        "stage": "a",
+        "view": "oblique",
+        "path": "docs/acceptance/r81p_v129a_client_seed123456_oblique_FAIL.jpg",
+        "sha256": "a3ac4adb19001e83df01fae55db39e1bbd9ed45979645c9b75a458d8d5384110",
+        "bytes": 71052
+      },
+      {
+        "stage": "b",
+        "view": "topdown",
+        "path": "docs/acceptance/r81p_v129b_client_seed123456_topdown.jpg",
+        "sha256": "929bbd737e84ab143e5dd906e7b757c45c4878a2f297ec74060f34bfb7cb1f9f",
+        "bytes": 84576
+      },
+      {
+        "stage": "b",
+        "view": "oblique",
+        "path": "docs/acceptance/r81p_v129b_client_seed123456_oblique.jpg",
+        "sha256": "ef3b3431c73bc805ca74ef296452062239e630bd021681dedf19db34abd1bfd5",
+        "bytes": 82037
+      }
+    ]
+  },
+  "releaseGate": {
+    "releaseEligible": false,
+    "visualPass": false,
+    "merged": false,
+    "published": false,
+    "rc": "HOLD"
+  }
+}
