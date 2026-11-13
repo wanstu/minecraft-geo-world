@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "stage": "R8.1r",
+  "date": "2026-11-13",
+  "baseCommit": "fa8ede64dc70eeabea88e02616c453c2ed6f958c",
+  "baselineRules": "geoworld-rules-v1.1.29",
+  "candidateRules": "geoworld-rules-v1.1.31",
+  "candidateBranch": "adm/geoworld-r81r-flow-aligned-sinkhole-20261113",
+  "model": {
+    "seeds": [
+      123456,
+      20261112
+    ],
+    "sinkholes": 8,
+    "pairedSamples": 3072,
+    "changedSamples": 1021,
+    "parityMaxNormalizedError": 1.11022302463e-16,
+    "riverAndFeaturePlanningUnchanged": true,
+    "macroSurfaceUnchanged": true,
+    "waterChanges": 0,
+    "naturalGroundRaisedSamples": 0
+  },
+  "build": {
+    "goRelatedModules": "PASS",
+    "neoForge1211": "BUILD SUCCESSFUL, 44/44 actionable tasks, 5m19s",
+    "realServer": "PASS",
+    "realClient": "PASS",
+    "Windows9Targets": "NOT_RUN",
+    "NeoForge263": "NOT_RUN",
+    "Fabric1201": "NOT_RUN"
+  },
+  "nativeVoxel": {
+    "world": "R81rFreshSeed123456",
+    "seed": 123456,
+    "generator": "geoworld:geoworld",
+    "rulesBinding": "geoworld-rules-v1.1.31",
+    "forceLoadedChunks": 225,
+    "columnsFull": 54,
+    "baselineV129": {
+      "columnsExpected": 54,
+      "columnsFull": 54,
+      "crossSectionsFull": true,
+      "groundAtCenter": 74,
+      "waterAtCenter": null,
+      "maxNaturalSlopePer8Blocks": {
+        "eastWest": 0.5,
+        "northSouth": 0.5
+      },
+      "fullCounts": {
+        "eastWest": 27,
+        "northSouth": 27
+      },
+      "flatFloorCounts": {
+        "eastWest": 1,
+        "northSouth": 1
+      }
+    },
+    "candidateV131": {
+      "columnsExpected": 54,
+      "columnsFull": 54,
+      "crossSectionsFull": true,
+      "groundAtCenter": 74,
+      "waterAtCenter": null,
+      "maxNaturalSlopePer8Blocks": {
+        "eastWest": 0.5,
+        "northSouth": 0.5
+      },
+      "fullCounts": {
+        "eastWest": 27,
+        "northSouth": 27
+      },
+      "flatFloorCounts": {
+        "eastWest": 1,
+        "northSouth": 1
+      }
+    }
+  },
+  "visual": {
+    "verdict": "FAIL",
+    "summary": "Main nested concentric rings persist, with a smaller secondary closed depression despite replacing the separate v130 distance-field basin with a continuous flow-aligned channel/apron",
+    "topCamera": {
+      "x": 6080,
+      "y": 160,
+      "z": 7744,
+      "yaw": 0,
+      "pitch": 80
+    },
+    "obliqueCamera": {
+      "x": 6080,
+      "y": 155,
+      "z": 7620,
+      "yaw": 0,
+      "pitch": 35
+    },
+    "renderer": "Real Minecraft Java 1.21.1 NeoForge client; Xvfb :104 + llvmpipe; daytime; HUD hidden",
+    "screenshots": [
+      {
+        "view": "topdown",
+        "path": "docs/acceptance/r81r_v131_client_seed123456_topdown_FAIL.jpg",
+        "sha256": "8976cf9940a0817ac6c2dad9824a36646e5b64b24866ae56acd17a09fdd0108d"
+      },
+      {
+        "view": "oblique",
+        "path": "docs/acceptance/r81r_v131_client_seed123456_oblique_FAIL.jpg",
+        "sha256": "ddb8232d407404ab420869ed16d4b72cf5c8e5f9cbcec282c07b30d11650a139"
+      }
+    ]
+  },
+  "release": {
+    "visualPass": false,
+    "slopeNotWorse": true,
+    "build1211Pass": true,
+    "crossPlatformReleaseChecksPass": false,
+    "releaseEligible": false,
+    "merged": false,
+    "published": false,
+    "officialRC": "HOLD"
+  }
+}
