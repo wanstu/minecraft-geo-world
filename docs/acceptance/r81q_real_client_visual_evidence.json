@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "stage": "R8.1q",
+  "date": "2026-11-13",
+  "candidateRules": "geoworld-rules-v1.1.30",
+  "lockedPreviousRules": "geoworld-rules-v1.1.29",
+  "branch": "adm/geoworld-r81q-nonconcentric-sinkhole-20261113",
+  "scope": "Sinkhole only: two offset troughs blended into existing v1.1.29 erosion/deposition floor; rim and source hydrology preserved",
+  "model": {
+    "seeds": [
+      123456,
+      20261112
+    ],
+    "plannedSinkholeSites": 8,
+    "goJavaPairedSamples": 3072,
+    "comparedFields": [
+      "groundHeight",
+      "waterKind",
+      "terrainVariant"
+    ],
+    "maxNormalizedHeightError": 1.11022302463e-16,
+    "riversIdentical": true,
+    "featurePlacementsIdentical": true,
+    "macroSurfaceIdentical": true,
+    "coastalBackwaterVersion": [
+      2,
+      2
+    ],
+    "siteSampleMaxNormalizedYPerBlock": 0.937,
+    "candidateOutputs": [
+      "docs/acceptance/r81q_seed123456_candidate.json",
+      "docs/acceptance/r81q_seed20261112_candidate.json"
+    ],
+    "changedPoints": 1036
+  },
+  "minecraft": {
+    "edition": "Java",
+    "version": "1.21.1",
+    "loader": "NeoForge",
+    "build": "Gradle check build PASS, 44 tasks, BUILD SUCCESSFUL in 5m24s",
+    "realClient": true,
+    "realServer": true,
+    "freshWorld": "R81qFreshSeed123456",
+    "seed": 123456,
+    "generator": "geoworld:geoworld",
+    "boundRules": "geoworld-rules-v1.1.30",
+    "forceLoadedChunks": 225,
+    "savedNormally": true,
+    "actualAnvilColumns": 54,
+    "actualAnvilExpected": 54,
+    "baseWorldUntouched": true,
+    "voxelAudit": "docs/acceptance/r81q_seed123456_actual_voxels.json",
+    "previousV129ActualVoxelSummary": {
+      "columnsExpected": 54,
+      "columnsFull": 54,
+      "crossSectionsFull": true,
+      "groundAtCenter": 74,
+      "waterAtCenter": null,
+      "maxNaturalSlopePer8Blocks": {
+        "eastWest": 0.5,
+        "northSouth": 0.5
+      },
+      "fullCounts": {
+        "eastWest": 27,
+        "northSouth": 27
+      },
+      "flatFloorCounts": {
+        "eastWest": 1,
+        "northSouth": 1
+      }
+    },
+    "candidateV130ActualVoxelSummary": {
+      "columnsExpected": 54,
+      "columnsFull": 54,
+      "crossSectionsFull": true,
+      "groundAtCenter": 74,
+      "waterAtCenter": null,
+      "maxNaturalSlopePer8Blocks": {
+        "eastWest": 0.875,
+        "northSouth": 0.625
+      },
+      "fullCounts": {
+        "eastWest": 27,
+        "northSouth": 27
+      },
+      "flatFloorCounts": {
+        "eastWest": 1,
+        "northSouth": 1
+      }
+    }
+  },
+  "client": {
+    "visualVerdict": "FAIL",
+    "observations": [
+      "The main near-circular stepped floor survives inside the central depression",
+      "An additional offset near-circular sub-basin appears on the right: the result reads as two overlapping artificial funnels",
+      "The new angular contours are less uniform but do not resemble natural directional drainage or mass-wasting deposits",
+      "Some sky cutouts around distant chunks reflect incomplete llvmpipe chunk meshing and are not evidence of actual voxel holes"
+    ],
+    "siteId": 9,
+    "center": {
+      "x": 6080,
+      "z": 7744
+    },
+    "cameraTop": {
+      "x": 6080,
+      "y": 160,
+      "z": 7744,
+      "yaw": 0,
+      "pitch": 80
+    },
+    "cameraOblique": {
+      "x": 6080,
+      "y": 155,
+      "z": 7620,
+      "yaw": 0,
+      "pitch": 35
+    },
+    "rendering": "real Minecraft 1.21.1 NeoForge, Xvfb :103 + Mesa llvmpipe, noon, HUD hidden",
+    "screenshots": [
+      {
+        "view": "topdown",
+        "path": "docs/acceptance/r81q_v130_client_seed123456_topdown_FAIL.jpg",
+        "sha256": "f575647ad7db7a8e38cc9ec7b9733dc2b8ffe869e585b9556b56db9d4697756f",
+        "bytes": 93804
+      },
+      {
+        "view": "oblique",
+        "path": "docs/acceptance/r81q_v130_client_seed123456_oblique_FAIL.jpg",
+        "sha256": "a94f8c43b181400c1c06b3cba5be213cea916d333dfe9cb5df4a76c862333754",
+        "bytes": 79783
+      }
+    ]
+  },
+  "releaseGate": {
+    "visualPass": false,
+    "slopeNotWorse": false,
+    "releaseEligible": false,
+    "WindowsNineTargetCI": "NOT_RUN",
+    "merged": false,
+    "published": false,
+    "rc": "HOLD"
+  }
+}

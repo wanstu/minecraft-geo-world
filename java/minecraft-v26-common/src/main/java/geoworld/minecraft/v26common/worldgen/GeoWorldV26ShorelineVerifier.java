@@ -370,10 +370,13 @@ public final class GeoWorldV26ShorelineVerifier {
                                         ) || ("geoworld-rules-v1.1.28".equals(
                                             runtime.manifest()
                                                 .generationRulesVersion()
-                                        ) || "geoworld-rules-v1.1.29".equals(
+                                        ) || ("geoworld-rules-v1.1.29".equals(
                                             runtime.manifest()
                                                 .generationRulesVersion()
-                                        ))))))))))))
+                                        ) || "geoworld-rules-v1.1.30".equals(
+                                            runtime.manifest()
+                                                .generationRulesVersion()
+                                        )))))))))))))
                                     )
                                         ? heights.boundaryYFloor(
                                             riverColumn.sample()
@@ -598,9 +601,11 @@ public final class GeoWorldV26ShorelineVerifier {
                                             runtime.manifest().generationRulesVersion()
                                         ) || ("geoworld-rules-v1.1.28".equals(
                                             runtime.manifest().generationRulesVersion()
-                                        ) || "geoworld-rules-v1.1.29".equals(
+                                        ) || ("geoworld-rules-v1.1.29".equals(
                                             runtime.manifest().generationRulesVersion()
-                                        ))))))))))))
+                                        ) || "geoworld-rules-v1.1.30".equals(
+                                            runtime.manifest().generationRulesVersion()
+                                        )))))))))))))
                                     ) &&
                                     "River".equals(column.shoreWaterKind())
                                 ) {
@@ -804,7 +809,7 @@ public final class GeoWorldV26ShorelineVerifier {
                 "geoworld-rules-v1.1.12".equals(generationRulesVersion) ||
                 "geoworld-rules-v1.1.13".equals(generationRulesVersion) ||
                 "geoworld-rules-v1.1.14".equals(generationRulesVersion) ||
-                ("geoworld-rules-v1.1.15".equals(generationRulesVersion) || "geoworld-rules-v1.1.16".equals(generationRulesVersion) || ("geoworld-rules-v1.1.18".equals(generationRulesVersion) || "geoworld-rules-v1.1.19".equals(generationRulesVersion) || ("geoworld-rules-v1.1.20".equals(generationRulesVersion) || ("geoworld-rules-v1.1.21".equals(generationRulesVersion) || ("geoworld-rules-v1.1.22".equals(generationRulesVersion) || ("geoworld-rules-v1.1.23".equals(generationRulesVersion) || ("geoworld-rules-v1.1.24".equals(generationRulesVersion) || ("geoworld-rules-v1.1.25".equals(generationRulesVersion) || ("geoworld-rules-v1.1.26".equals(generationRulesVersion) || ("geoworld-rules-v1.1.27".equals(generationRulesVersion) || ("geoworld-rules-v1.1.28".equals(generationRulesVersion) || "geoworld-rules-v1.1.29".equals(generationRulesVersion))))))))))))
+                ("geoworld-rules-v1.1.15".equals(generationRulesVersion) || "geoworld-rules-v1.1.16".equals(generationRulesVersion) || ("geoworld-rules-v1.1.18".equals(generationRulesVersion) || "geoworld-rules-v1.1.19".equals(generationRulesVersion) || ("geoworld-rules-v1.1.20".equals(generationRulesVersion) || ("geoworld-rules-v1.1.21".equals(generationRulesVersion) || ("geoworld-rules-v1.1.22".equals(generationRulesVersion) || ("geoworld-rules-v1.1.23".equals(generationRulesVersion) || ("geoworld-rules-v1.1.24".equals(generationRulesVersion) || ("geoworld-rules-v1.1.25".equals(generationRulesVersion) || ("geoworld-rules-v1.1.26".equals(generationRulesVersion) || ("geoworld-rules-v1.1.27".equals(generationRulesVersion) || ("geoworld-rules-v1.1.28".equals(generationRulesVersion) || ("geoworld-rules-v1.1.29".equals(generationRulesVersion) || "geoworld-rules-v1.1.30".equals(generationRulesVersion)))))))))))))
             )
                 ? 1
                 : (
