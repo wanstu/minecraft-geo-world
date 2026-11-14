@@ -391,3 +391,69 @@ func filled(n int, value float64) []float64 {
 	}
 	return out
 }
+
+func TestR81cCoastalBackwaterIsStrictlyVersionedAndOceanMouthOwned(t *testing.T) {
+	coast := waterbed.Sample{
+		FinalHeight:                 0.485,
+		RiverWeight:                 1,
+		RiverCoastalReceiverDefined: true,
+		RiverCoastalReceiverSurface: 0.5,
+		RiverOceanMouthNearby:       true,
+	}
+	tests := []struct {
+		name             string
+		cfg              Config
+		ground           waterbed.Sample
+		oceanEligibility float64
+		want             bool
+	}{
+		{"legacy-never-backwater", Config{}, coast, 0.20, false},
+		{"sea-connected-low-corridor", Config{CoastalBackwaterVersion: 1}, coast, 0.20, true},
+		{"overlapping-lake-does-not-break-estuary", Config{CoastalBackwaterVersion: 1}, func() waterbed.Sample {
+			v := coast
+			v.WaterKind = reconcile.WaterLake
+			v.WaterSurfaceDefined = true
+			v.WaterSurfaceElevation = 0.507
+			return v
+		}(), 0.20, true},
+		{"at-sea-needs-no-fill", Config{CoastalBackwaterVersion: 1}, func() waterbed.Sample {
+			v := coast
+			v.FinalHeight = 0.5
+			return v
+		}(), 0.20, false},
+		{"above-sea-must-not-be-lowered", Config{CoastalBackwaterVersion: 1}, func() waterbed.Sample {
+			v := coast
+			v.FinalHeight = 0.507
+			return v
+		}(), 0.20, false},
+		{"no-coastal-ocean-influence", Config{CoastalBackwaterVersion: 1}, coast, coastalBackwaterMinOceanEligibility, false},
+		{"not-ocean-mouth", Config{CoastalBackwaterVersion: 1}, func() waterbed.Sample {
+			v := coast
+			v.RiverOceanMouthNearby = false
+			return v
+		}(), 0.20, false},
+		{"not-sea-receiver", Config{CoastalBackwaterVersion: 1}, func() waterbed.Sample {
+			v := coast
+			v.RiverCoastalReceiverSurface = 0.55
+			return v
+		}(), 0.20, false},
+		{"not-receiver-owned", Config{CoastalBackwaterVersion: 1}, func() waterbed.Sample {
+			v := coast
+			v.RiverCoastalReceiverDefined = false
+			return v
+		}(), 0.20, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := qualifiesForCoastalBackwater(
+				tc.cfg,
+				tc.ground,
+				0.5,
+				tc.oceanEligibility,
+			)
+			if got != tc.want {
+				t.Fatalf("got %v want %v", got, tc.want)
+			}
+		})
+	}
+}

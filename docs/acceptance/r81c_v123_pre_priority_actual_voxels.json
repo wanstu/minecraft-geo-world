@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-14",
+  "evidenceClass": "saved_minecraft_1.21.1_neoforge_anvil_blockstate",
+  "world": "R81cFreshSeedLegacy",
+  "seed": -1818694639628404530,
+  "rulesVersion": "geoworld-rules-v1.1.23",
+  "knownRegression509": {
+    "coordinates": [
+      [
+        -1069,
+        -1026
+      ],
+      [
+        -1069,
+        -1027
+      ]
+    ],
+    "oldProblem": "one-block downstream rise in v1.1.22 actual voxel evidence",
+    "candidateColumns": [
+      {
+        "status": "full",
+        "topY": 62,
+        "topBlock": "minecraft:water",
+        "aquatic": true,
+        "iced": false
+      },
+      {
+        "status": "full",
+        "topY": 62,
+        "topBlock": "minecraft:water",
+        "aquatic": true,
+        "iced": false
+      }
+    ],
+    "resolved": true
+  },
+  "river509Audit": {
+    "name": "river509",
+    "bounds": [
+      -1136,
+      -1104,
+      -993,
+      -961
+    ],
+    "columns": 20736,
+    "fullColumns": 20736,
+    "aquaticSurfaceColumns": 14961,
+    "icedAquaticColumns": 0,
+    "adjacentAquaticSurfaceJumpsGt1": 50,
+    "waterAgainstLowerDryGt1": 0,
+    "jumpExamples": [
+      [
+        -1093,
+        -999,
+        -1093,
+        -998,
+        62,
+        64,
+        2
+      ],
+      [
+        -1094,
+        -998,
+        -1093,
+        -998,
+        62,
+        64,
+        2
+      ],
+      [
+        -1094,
+        -998,
+        -1094,
+        -997,
+        62,
+        64,
+        2
+      ],
+      [
+        -1093,
+        -998,
+        -1092,
+        -998,
+        64,
+        62,
+        2
+      ],
+      [
+        -1093,
+        -998,
+        -1093,
+        -997,
+        64,
+        62,
+        2
+      ],
+      [
+        -1095,
+        -997,
+        -1094,
+        -997,
+        62,
+        64,
+        2
+      ],
+      [
+        -1094,
+        -997,
+        -1093,
+        -997,
+        64,
+        62,
+        2
+      ],
+      [
+        -1094,
+        -997,
+        -1094,
+        -996,
+        64,
+        62,
+        2
+      ],
+      [
+        -1097,
+        -996,
+        -1097,
+        -995,
+        62,
+        64,
+        2
+      ],
+      [
+        -1098,
+        -995,
+        -1097,
+        -995,
+        62,
+        64,
+        2
+      ]
+    ],
+    "exposedExamples": []
+  },
+  "river915Audit": {
+    "name": "river915",
+    "bounds": [
+      1632,
+      10400,
+      1711,
+      10479
+    ],
+    "columns": 6400,
+    "fullColumns": 6400,
+    "aquaticSurfaceColumns": 5788,
+    "icedAquaticColumns": 5737,
+    "adjacentAquaticSurfaceJumpsGt1": 0,
+    "waterAgainstLowerDryGt1": 32,
+    "jumpExamples": [],
+    "exposedExamples": [
+      [
+        1654,
+        10400,
+        1654,
+        10401,
+        62,
+        60,
+        2
+      ],
+      [
+        1655,
+        10400,
+        1655,
+        10401,
+        62,
+        60,
+        2
+      ],
+      [
+        1656,
+        10400,
+        1656,
+        10401,
+        62,
+        60,
+        2
+      ],
+      [
+        1657,
+        10400,
+        1658,
+        10400,
+        62,
+        60,
+        2
+      ],
+      [
+        1657,
+        10400,
+        1657,
+        10401,
+        62,
+        60,
+        2
+      ],
+      [
+        1651,
+        10401,
+        1651,
+        10402,
+        62,
+        60,
+        2
+      ],
+      [
+        1652,
+        10401,
+        1652,
+        10402,
+        62,
+        60,
+        2
+      ],
+      [
+        1653,
+        10401,
+        1654,
+        10401,
+        62,
+        60,
+        2
+      ],
+      [
+        1653,
+        10401,
+        1653,
+        10402,
+        62,
+        60,
+        2
+      ],
+      [
+        1647,
+        10402,
+        1647,
+        10403,
+        62,
+        60,
+        2
+      ]
+    ]
+  },
+  "pass": false,
+  "notes": [
+    "River #915 is a cold-water mouth: surface block ice at Y=62 with water directly below; this represents a continuous sea-level water surface boundary at Y=63.",
+    "This evidence covers the two locked mouth regressions and their loaded local neighborhoods; it does not claim all world hydrology is visually accepted."
+  ]
+}

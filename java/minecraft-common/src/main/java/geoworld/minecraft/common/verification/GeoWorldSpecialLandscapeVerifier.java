@@ -28,9 +28,11 @@ public final class GeoWorldSpecialLandscapeVerifier {
             GeoWorldEngineBridge.generate(seed, config);
         GeoWorldV1 model = generated.model();
 
-        if (!"geoworld-rules-v1.1.22".equals(
+        if (!("geoworld-rules-v1.1.22".equals(
             model.manifest().generationRulesVersion()
-        )) {
+        ) || "geoworld-rules-v1.1.23".equals(
+            model.manifest().generationRulesVersion()
+        ))) {
             throw new AssertionError(
                 "special landscape verifier requires v1.1.16, got " +
                 model.manifest().generationRulesVersion()

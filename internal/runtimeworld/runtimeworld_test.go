@@ -308,8 +308,8 @@ func TestV119OuterOceanSeafloorInheritsV118RegionalRelief(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m.GenerationRulesVersion != "geoworld-rules-v1.1.22" {
-		t.Fatalf("current outer-world rules=%q want v1.1.20", m.GenerationRulesVersion)
+	if m.GenerationRulesVersion != "geoworld-rules-v1.1.23" {
+		t.Fatalf("current outer-world rules=%q want v1.1.23", m.GenerationRulesVersion)
 	}
 
 	sea := m.SeaLevelNormalized

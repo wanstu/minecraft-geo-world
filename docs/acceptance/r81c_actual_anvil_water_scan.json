@@ -1,0 +1,30 @@
+{
+  "r509": {
+    "bounds": [
+      -1136,
+      -1104,
+      -1008,
+      -976
+    ],
+    "fullColumns": 16384,
+    "missingColumns": 0,
+    "wetColumns": 15217,
+    "maxAdjacentWetTopDrop": 0,
+    "waterWallsGt1": 0,
+    "examples": []
+  },
+  "r915": {
+    "bounds": [
+      1632,
+      10400,
+      1712,
+      10480
+    ],
+    "fullColumns": 6400,
+    "missingColumns": 0,
+    "wetColumns": 51,
+    "maxAdjacentWetTopDrop": 0,
+    "waterWallsGt1": 0,
+    "examples": []
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "status": "voxel_verified_candidate_not_release",
+  "seed": -1818694639628404530,
+  "legacyRules": "geoworld-rules-v1.1.22",
+  "candidateRules": "geoworld-rules-v1.1.23",
+  "legacyModelSha256": "eb1ffcbc19ee43e55495f2007716b1ca0a907dcedf7b493303358d689e20512f",
+  "candidateModelSha256": "9024476e6ce6f59dea5196e600048575c63b792d7926050e1dfbb1d62b9d89b2",
+  "receiverAudit": {
+    "riverSegments": 953,
+    "terminalSegments": 103,
+    "oceanTerminals": 88,
+    "lakeTerminals": 15,
+    "unclassifiedTerminals": 0,
+    "oceanMouths": 88,
+    "dryApproachSignals": 0,
+    "endpointNotOceanSignals": 0,
+    "seaAboveApproachSignals": 0,
+    "riverOceanBoundaryRiseSignals": 0,
+    "riverOceanBoundaryChecked": 88,
+    "levelJumpSignals": 0,
+    "sinkholes": 4,
+    "sinkholeRiverOverlapSignals": 1,
+    "sinkholeOverlapWithoutDrainage": 1
+  },
+  "coastalReceiverBefore": {
+    "509": 1,
+    "535": 1,
+    "851": 1,
+    "915": 4
+  },
+  "coastalReceiverAfterPositiveRiseCount": 0,
+  "riverbedGeometryVersion": 7,
+  "modelGroundChangesAt11352MouthCenterlineSamples": 0,
+  "modelRiverCenterlineWaterChanges": 293,
+  "parity": {
+    "sampleCount": 1014,
+    "goJavaIdenticalWaterDeltaPositions": 108,
+    "existingGoJavaDryTerrainMismatches": 16,
+    "newlyIntroducedGoJavaMismatches": 0,
+    "knownPreexistingMaxGroundHeightMismatchNormalized": 0.002784283
+  },
+  "minecraftVoxelAcceptance": "passed_neoforge_1.21.1_full_anvil",
+  "legacyBindingRejectedSwappedModel": "confirmed_correctly_prevented",
+  "generatorModified": true,
+  "published": false,
+  "finalOwnershipPriorityFix": {
+    "rootCause": "formal OceanMouth receiver was evaluated after local Lake ownership",
+    "directCoastalLakeCellsChanged": 14,
+    "waterSurfaceChange": "lake overlap cells Y64 -> sea-level Y62 in saved Minecraft blocks",
+    "riverGeometryChanged": false
+  },
+  "actualAnvilAcceptance": {
+    "mouth509": {
+      "bounds": [
+        -1136,
+        -1104,
+        -1008,
+        -976
+      ],
+      "fullColumns": 16384,
+      "missingColumns": 0,
+      "waterWallsGt1Before": 50,
+      "waterWallsGt1After": 0,
+      "maxAdjacentWetTopDropBefore": 2,
+      "maxAdjacentWetTopDropAfter": 0
+    },
+    "mouth915": {
+      "bounds": [
+        1632,
+        10400,
+        1712,
+        10480
+      ],
+      "fullColumns": 6400,
+      "missingColumns": 0,
+      "waterWallsGt1After": 0,
+      "maxAdjacentWetTopDropAfter": 0
+    },
+    "oldWorldNegativeControlDetectedWalls": 50
+  },
+  "verification": {
+    "goTestAll": "passed",
+    "neoforgeCompileJava": "passed",
+    "neoforgeGradleTestTask": "passed_no_test_sources",
+    "actualVoxelAudit": "passed"
+  },
+  "actualWorldModelSha256": "f3b7f470e585aec4950d52f5aec779061d521b1853359e364075c8a88aeeec1a",
+  "actualWorldModelPlainSha256": "22da46fb1d856c3a2e3a1fbcd63c5686531a6324fd562575148abdeb4b1808cc",
+  "actualWorldBeforeAfterModelBytesIdentical": true,
+  "candidateModelSha256Note": "historical model-stage candidate artifact; actual NeoForge persisted-world evidence uses actualWorldModelSha256"
+}

@@ -80,8 +80,30 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		RiverWeight:      ground.RiverWeight,
 	}
 
-	// Explicit lakes are hydrology-owned basins and override the broad ocean
-	// eligibility transition if their local bed is actually below lake datum.
+	// R8.1c: a formal OceanMouth receiver owns the connected below-sea
+	// estuary before local lake ownership is considered. This is deliberately
+	// narrower than the ordinary ocean transition: it requires persisted
+	// OceanMouth receiver metadata, coastal ocean influence and low terrain.
+	// Without this precedence, a lake cell overlapping the mouth can retain a
+	// higher lake datum beside sea-level river cells and create a voxel water wall.
+	if qualifiesForCoastalBackwater(
+		m.Config,
+		ground,
+		m.SeaLevelNormalized,
+		oceanEligibility,
+	) {
+		out.WaterKind = reconcile.WaterRiver
+		if oceanEligibility >= m.Config.OceanEligibilityThreshold {
+			out.WaterKind = reconcile.WaterOcean
+		}
+		out.WaterSurfaceDefined = true
+		out.WaterSurfaceElevation = m.SeaLevelNormalized
+		out.WaterDepth = m.SeaLevelNormalized - ground.FinalHeight
+		return out
+	}
+
+	// Explicit lakes remain hydrology-owned basins everywhere except the
+	// versioned OceanMouth corridor handled above.
 	if ground.WaterKind == reconcile.WaterLake &&
 		ground.WaterSurfaceDefined &&
 		ground.FinalHeight < ground.WaterSurfaceElevation {
@@ -129,6 +151,29 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		out.WaterDepth = riverDepth
 	}
 	return out
+}
+
+const coastalBackwaterMinOceanEligibility = 0.02
+
+// qualifiesForCoastalBackwater never invents a hydrology endpoint. It extends
+// the flat sea datum only across the low bank corridor of a formal OceanMouth.
+// That corridor is topographically bounded on the inland side and joins the
+// ordinary macro ocean on the seaward side. Filling the whole connected
+// below-sea corridor avoids a sea-level river column standing beside lower dry
+// terrain; requiring the formal mouth flag prevents lake/downstream receiver
+// metadata from flooding unrelated lowlands.
+func qualifiesForCoastalBackwater(
+	cfg Config,
+	ground waterbed.Sample,
+	seaLevel,
+	oceanEligibility float64,
+) bool {
+	return cfg.CoastalBackwaterVersion >= 1 &&
+		ground.RiverCoastalReceiverDefined &&
+		ground.RiverOceanMouthNearby &&
+		math.Abs(ground.RiverCoastalReceiverSurface-seaLevel) < 1e-9 &&
+		oceanEligibility > coastalBackwaterMinOceanEligibility &&
+		ground.FinalHeight < seaLevel-1e-12
 }
 
 func (m *Model) riverWaterSurface(
