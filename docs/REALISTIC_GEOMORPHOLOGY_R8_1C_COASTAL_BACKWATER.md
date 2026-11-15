@@ -1,6 +1,6 @@
 # GeoWorld R8.1c — 河口接收水位与低岸统一（测试候选）
 
-日期：2026-11-14。状态：规则 v1.1.23 已实现，**NeoForge 1.21.1 真实 Anvil 方块验收已通过；仍未发布，下一步为游戏内视觉截图验收**。
+日期：2026-11-14。状态：规则 v1.1.23 已实现，**NeoForge 1.21.1 真实 Anvil 方块验收、9 目标构建矩阵与 v0.1.6 候选 JAR 校验均已通过；仍未发布，唯一剩余门槛为游戏内视觉截图验收**。
 
 ## 原始缺陷
 
@@ -45,10 +45,17 @@ eb1ffcbc19ee43e55495f2007716b1ca0a907dcedf7b493303358d689e20512f。
 
 证据：`docs/acceptance/r81c_actual_mouth_voxels.json`、`docs/acceptance/r81c_actual_anvil_water_scan.json`、`docs/acceptance/r81c_receiver_model_candidate.json`。
 
+## 发布收敛（2026-11-15）
+
+- 发布矩阵 9/9 目标已完成 `clean check build`：26.3、26.2、26.1.2 的 NeoForge/Fabric，1.21.1 的 NeoForge/Fabric，以及 1.20.1 Fabric。
+- 9 个候选包均使用 `-Pmod_version=0.1.6` 实际构建，Loader 元数据版本均为 0.1.6。
+- 每个候选 JAR 均验证包含 Windows/Linux/macOS × x64/arm64 六套 GeoWorld 原生引擎。
+- 自动发布门槛记录在 `docs/acceptance/v016_release_readiness.json`；当前 `automatedReleaseReadiness=passed`，但 `manualVisualAcceptance=pending`，因此 `releaseAllowed=false`。
+- 当前未创建 `v0.1.6` tag，也未发布 GitHub Release。
+
 ## 剩余门槛
 
 1. 进入游戏对 #509 河口、#915 控制区及新补齐的低岸海水范围做视觉截图验收，确认没有“数学连续但视觉不自然”的海岸/河口形态。
-2. 保持旧 v1.1.22 模型读取和旧世界不迁移语义，并在发布前完成必要的多 Loader 构建/发布矩阵。
-3. 上述视觉验收通过后再决定 v0.1.6 RC/发布；当前仍是测试候选，不提交为稳定发布。
+2. 视觉验收通过后，将发布就绪记录改为通过，再创建 `v0.1.6` tag / GitHub Release；在此之前保持候选状态。
 
 另外，天坑 #11 对河段 #735 的未规划排水冲突仍属于 R8.1d，岛屿及雪山盆地选址属于 R8.2。本轮不同时修改这些功能。
