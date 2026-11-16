@@ -75,15 +75,40 @@ class V016ReleaseGate(unittest.TestCase):
         self.assertTrue(candidate["sixNativeEnginesVerified"])
         self.assertEqual(candidate["cleanCheckBuild"], "passed")
         self.assertEqual(candidate["fullGoTest"], "passed")
+        self.assertEqual(candidate["engineBridgeCacheVerifier"], "passed")
+        self.assertEqual(candidate["expectedRiverGeometryVersion"], 8)
+        self.assertEqual(candidate["cacheFormatVersion"], "v27")
+
+    def test_stale_model_cache_is_versioned_by_engine_and_geometry(self):
+        incident = FRAGMENTATION["staleCacheIncident"]
+        self.assertEqual(incident["status"], "confirmed")
+        self.assertEqual(incident["saveModel"]["riverGeometryVersion"], 7)
+        self.assertEqual(
+            incident["saveModel"]["sha256"],
+            incident["matchingCache"]["sha256"],
+        )
+        self.assertEqual(incident["fix"]["cacheFormatVersion"], "v27")
+        self.assertEqual(incident["fix"]["expectedRiverGeometryVersion"], 8)
+        self.assertIn("embeddedNativeEngineSha256", incident["fix"]["cacheKeyIncludes"])
+        self.assertRegex(ENGINE, r'CACHE_FORMAT_VERSION\s*=\s*"v27"')
+        self.assertRegex(ENGINE, r'EXPECTED_RIVER_GEOMETRY_VERSION\s*=\s*8')
+        self.assertIn("engineFingerprint", ENGINE)
+        self.assertIn("model.riverGeometryVersion()", ENGINE)
 
     def test_release_remains_blocked_until_visual_and_full_matrix_revalidation(self):
         self.assertEqual(READINESS["automatedReleaseReadiness"], "revalidation_pending")
-        self.assertEqual(READINESS["manualVisualAcceptance"], "pending_retest")
+        self.assertEqual(
+            READINESS["manualVisualAcceptance"],
+            "pending_actual_geom_v8_retest",
+        )
         self.assertEqual(READINESS["releaseMatrix"]["postV8CurrentMatrix"], "pending_full_rebuild_after_visual_acceptance")
         self.assertEqual(READINESS["releaseMatrix"]["currentValidatedTargets"], 1)
         self.assertFalse(READINESS["releaseAllowed"])
         self.assertFalse(READINESS["published"])
-        self.assertEqual(FRAGMENTATION["manualVisualRetest"], "pending")
+        self.assertEqual(
+            FRAGMENTATION["manualVisualRetest"],
+            "pending_actual_geom_v8_save_verification",
+        )
         self.assertEqual(FRAGMENTATION["fullNineTargetPostV8Matrix"], "pending")
 
 

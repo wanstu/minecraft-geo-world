@@ -22,13 +22,14 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public final class GeoWorldEngineBridge {
-    private static final String CACHE_FORMAT_VERSION = "v26";
+    private static final String CACHE_FORMAT_VERSION = "v27";
     private static final String EXPECTED_WORLD_PROFILE_VERSION =
         "geoworld-profile-v1.1";
     private static final String EXPECTED_GENERATION_RULES_VERSION =
         "geoworld-rules-v1.1.23";
     private static final String EXPECTED_WORLD_MODEL_VERSION =
         "geoworld-model-v1";
+    private static final int EXPECTED_RIVER_GEOMETRY_VERSION = 8;
     private static final Duration GENERATION_TIMEOUT = Duration.ofMinutes(5);
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "GeoWorld-Engine");
@@ -74,8 +75,29 @@ public final class GeoWorldEngineBridge {
             throw new IllegalArgumentException(errors.get(0));
         }
 
+        Path engine = resolveEngine();
         MineralContext mineralContext = resolveMineralContext();
-        String cacheKey = cacheKey(seed, config, mineralContext);
+        String engineFingerprint = engineFingerprint(engine);
+        return loadCached(
+            seed,
+            config,
+            mineralContext,
+            engineFingerprint
+        );
+    }
+
+    private static Optional<GeneratedModel> loadCached(
+        long seed,
+        GeoWorldCreationConfig config,
+        MineralContext mineralContext,
+        String engineFingerprint
+    ) throws IOException {
+        String cacheKey = cacheKey(
+            seed,
+            config,
+            mineralContext,
+            engineFingerprint
+        );
         Path output = resolveCacheRoot().resolve(cacheKey + ".geoworld");
         if (!Files.isRegularFile(output)) {
             return Optional.empty();
@@ -111,13 +133,24 @@ public final class GeoWorldEngineBridge {
 
         Path engine = resolveEngine();
         MineralContext mineralContext = resolveMineralContext();
-        String cacheKey = cacheKey(seed, config, mineralContext);
+        String engineFingerprint = engineFingerprint(engine);
+        String cacheKey = cacheKey(
+            seed,
+            config,
+            mineralContext,
+            engineFingerprint
+        );
         Path cacheRoot = resolveCacheRoot();
         Files.createDirectories(cacheRoot);
         Path output = cacheRoot.resolve(cacheKey + ".geoworld");
 
         long started = System.nanoTime();
-        Optional<GeneratedModel> cached = loadCached(seed, config);
+        Optional<GeneratedModel> cached = loadCached(
+            seed,
+            config,
+            mineralContext,
+            engineFingerprint
+        );
         if (cached.isPresent()) {
             return cached.get();
         }
@@ -310,7 +343,8 @@ public final class GeoWorldEngineBridge {
     private static String cacheKey(
         long seed,
         GeoWorldCreationConfig config,
-        MineralContext mineralContext
+        MineralContext mineralContext,
+        String engineFingerprint
     ) {
         String canonical = String.join(
             "|",
@@ -318,6 +352,8 @@ public final class GeoWorldEngineBridge {
             EXPECTED_WORLD_PROFILE_VERSION,
             EXPECTED_GENERATION_RULES_VERSION,
             EXPECTED_WORLD_MODEL_VERSION,
+            Integer.toString(EXPECTED_RIVER_GEOMETRY_VERSION),
+            engineFingerprint,
             Long.toString(seed),
             Integer.toString(config.width()),
             Integer.toString(config.height()),
@@ -337,6 +373,24 @@ public final class GeoWorldEngineBridge {
                 .getInstance("SHA-256")
                 .digest(canonical.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest, 0, 16);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
+    }
+
+    private static String engineFingerprint(Path engine) throws IOException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (InputStream input = Files.newInputStream(engine)) {
+                byte[] buffer = new byte[64 * 1024];
+                int read;
+                while ((read = input.read(buffer)) >= 0) {
+                    if (read > 0) {
+                        digest.update(buffer, 0, read);
+                    }
+                }
+            }
+            return HexFormat.of().formatHex(digest.digest());
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 unavailable", e);
         }
@@ -403,6 +457,13 @@ public final class GeoWorldEngineBridge {
                 "GeoWorld cache world-model mismatch: model=" +
                 model.manifest().worldModelVersion() +
                 " expected=" + EXPECTED_WORLD_MODEL_VERSION
+            );
+        }
+        if (model.riverGeometryVersion() != EXPECTED_RIVER_GEOMETRY_VERSION) {
+            throw new IllegalArgumentException(
+                "GeoWorld cache river-geometry mismatch: model=" +
+                model.riverGeometryVersion() +
+                " expected=" + EXPECTED_RIVER_GEOMETRY_VERSION
             );
         }
         if (!model.manifest().preset().equals(config.worldPreset().id())) {

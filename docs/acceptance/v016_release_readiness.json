@@ -6,10 +6,10 @@
   "riverGeometryVersionForNewV123Worlds": 8,
   "legacyPersistedRiverGeometryVersion": 7,
   "automatedReleaseReadiness": "revalidation_pending",
-  "manualVisualAcceptance": "pending_retest",
+  "manualVisualAcceptance": "pending_actual_geom_v8_retest",
   "releaseAllowed": false,
   "published": false,
-  "reasonReleaseBlocked": "The 2026-11-15 in-game visual candidate failed with severe terrain fragmentation. RiverGeometryVersion 8 removes the reproduced fragmentation in fixed-seed model scans and the new 1.21.1 NeoForge candidate passes automated validation, but a fresh in-game visual retest and a post-v8 full 9-target release matrix rebuild are still required before release.",
+  "reasonReleaseBlocked": "The 2026-11-16 screenshot retest was proven to use a stale cached RiverGeometryVersion 7 model, not v8. Cache identity now binds the native-engine SHA256 and expected RiverGeometryVersion 8, but a fresh in-game world must first be verified on disk as geomV8 and then visually accepted; the full post-v8 nine-target release matrix also remains pending.",
   "visualHistory": {
     "rejectedCandidateDate": "2026-11-15",
     "result": "failed_terrain_fragmentation",
@@ -30,11 +30,14 @@
     "loader": "neoforge",
     "module": "java/adapters/1.21.1-neoforge",
     "version": "0.1.6",
-    "bytes": 29164469,
-    "sha256": "6b5f56afd95fe605e65eafd4428d2f2593ba9c4f47cb4d2a62aac52f94881117",
+    "bytes": 29165307,
+    "sha256": "f186dabaae5a20fd70a3791937e89f603555e41c4f1428afec7ab22610b94b24",
     "sixNativeEnginesVerified": true,
     "cleanCheckBuild": "passed",
-    "fullGoTest": "passed"
+    "fullGoTest": "passed",
+    "engineBridgeCacheVerifier": "passed",
+    "expectedRiverGeometryVersion": 8,
+    "cacheFormatVersion": "v27"
   },
   "releaseMatrix": {
     "definedTargets": 9,
@@ -131,5 +134,14 @@
       "sha256": "8bcdd44ea4d4eb0d6633633c736aaf56459ec1692cbc512cbc78a18c9cd9f054",
       "sixNativeEnginesVerified": true
     }
-  ]
+  ],
+  "staleCacheIncident": {
+    "confirmed": true,
+    "saveModelSha256": "eb96a9168259d9a8f1ce6f9583e12834904bf63da2ea3bc578a0accab17b70b8",
+    "matchingOldCacheFile": "446c3c5c195674ed8b8d565eceba8e10.geoworld",
+    "matchingOldCacheSha256": "eb96a9168259d9a8f1ce6f9583e12834904bf63da2ea3bc578a0accab17b70b8",
+    "actualScreenshotWorldRiverGeometryVersion": 7,
+    "screenshotCountsAsV8VisualAcceptance": false,
+    "fixedBy": "cache v27 + native-engine SHA256 + hard RiverGeometryVersion validation"
+  }
 }

@@ -1040,6 +1040,10 @@ public final class GeoWorldV1 {
         return surfaceOrePileEnabled;
     }
 
+    public int riverGeometryVersion() {
+        return waterbedConfig.riverGeometryVersion();
+    }
+
     public List<MineralDistrictAssignment> mineralDistrictAssignments() {
         return mineralDistrictAssignments;
     }

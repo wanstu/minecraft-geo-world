@@ -85,3 +85,12 @@ eb1ffcbc19ee43e55495f2007716b1ca0a907dcedf7b493303358d689e20512f。
 3. 上述两项通过前，`releaseAllowed=false`，不创建 `v0.1.6` tag，不发布 GitHub Release。
 
 另外，天坑 #11 对河段 #735 的未规划排水冲突仍属于 R8.1d，岛屿及雪山盆地选址属于 R8.2。本轮不同时修改这些功能。
+## v8 视觉复测被旧模型缓存污染（2026-11-16）
+
+2026-11-16 的第二次游戏截图仍显示放射状/同心圆式沙墙。直接读取该新存档的 `data/geoworld/world.geoworld` 后确认：模型仍是 `RiverGeometryVersion=7`，并非 v8。存档模型 SHA256 `eb96a9168259d9a8f1ce6f9583e12834904bf63da2ea3bc578a0accab17b70b8` 与 eadm `geoworld-cache/446c3c5c195674ed8b8d565eceba8e10.geoworld` 完全一致；缓存创建时间为 2026-11-15 17:40，而该文件在 2026-11-16 18:18 被复制持久化到新世界。
+
+根因位于 `GeoWorldEngineBridge` 的模型缓存身份：旧 key 包含 rules/profile/config，但没有 native engine 内容指纹；`validateModel()` 也未校验 `RiverGeometryVersion`。因为 v7 与 v8 候选仍都叫 `geoworld-rules-v1.1.23`，旧 v7 缓存被错误视为合法。
+
+修复后缓存格式为 `v27`，key 额外包含期望 `RiverGeometryVersion=8` 和实际嵌入 native engine SHA256；加载缓存时再硬校验模型内部 geometry version。桥接 verifier 已真实执行首次 engine 生成与第二次缓存命中，两次均要求 geomV8；1.21.1 NeoForge 完整 `clean check build` 通过。
+
+这意味着该截图**不构成 v8 视觉失败或通过证据**。后续人工视觉验收必须先确认实际存档 `world.geoworld` 为 geomV8，再观察地形。

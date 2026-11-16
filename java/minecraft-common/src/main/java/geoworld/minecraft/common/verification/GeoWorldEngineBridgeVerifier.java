@@ -61,14 +61,18 @@ public final class GeoWorldEngineBridgeVerifier {
                 generated.model().manifest().worldProfileVersion()
             );
         }
-        if (!("geoworld-rules-v1.1.22".equals(
+        if (!"geoworld-rules-v1.1.23".equals(
             generated.model().manifest().generationRulesVersion()
-        ) || "geoworld-rules-v1.1.23".equals(
-            generated.model().manifest().generationRulesVersion()
-        ))) {
+        )) {
             throw new AssertionError(
                 "generation rules mismatch: " +
                 generated.model().manifest().generationRulesVersion()
+            );
+        }
+        if (generated.model().riverGeometryVersion() != 8) {
+            throw new AssertionError(
+                "river geometry mismatch: " +
+                generated.model().riverGeometryVersion()
             );
         }
         if (!"geoworld-model-v1".equals(
@@ -97,6 +101,24 @@ public final class GeoWorldEngineBridgeVerifier {
                 geometry.spanXBlocks() +
                 "x" +
                 geometry.spanZBlocks()
+            );
+        }
+
+        GeoWorldEngineBridge.GeneratedModel cached =
+            GeoWorldEngineBridge.generate(seed, config);
+        if (!cached.cached()) {
+            throw new AssertionError("second generation did not reuse current-engine cache");
+        }
+        if (!generated.cacheKey().equals(cached.cacheKey())) {
+            throw new AssertionError(
+                "cache key changed within one engine build: " +
+                generated.cacheKey() + " -> " + cached.cacheKey()
+            );
+        }
+        if (cached.model().riverGeometryVersion() != 8) {
+            throw new AssertionError(
+                "cached river geometry mismatch: " +
+                cached.model().riverGeometryVersion()
             );
         }
 

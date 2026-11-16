@@ -88,13 +88,55 @@
   },
   "candidateJar": {
     "path": "java/adapters/1.21.1-neoforge/build/libs/geoworld-0.1.6.jar",
-    "bytes": 29164469,
-    "sha256": "6b5f56afd95fe605e65eafd4428d2f2593ba9c4f47cb4d2a62aac52f94881117",
+    "bytes": 29165307,
+    "sha256": "f186dabaae5a20fd70a3791937e89f603555e41c4f1428afec7ab22610b94b24",
     "loaderMetadataVersion": "0.1.6",
     "sixNativeEnginesVerified": true
   },
-  "manualVisualRetest": "pending",
+  "manualVisualRetest": "pending_actual_geom_v8_save_verification",
   "fullNineTargetPostV8Matrix": "pending",
   "releaseAllowed": false,
-  "published": false
+  "published": false,
+  "staleCacheIncident": {
+    "date": "2026-11-16",
+    "status": "confirmed",
+    "screenshotWorldSeed": -1818694639628404530,
+    "screenshotApproxPosition": {
+      "x": -1608,
+      "y": 118,
+      "z": -1082
+    },
+    "visualResult": "failed_but_invalid_as_v8_evidence",
+    "reason": "The newly created save persisted a byte-identical RiverGeometryVersion 7 model from the previous day's geoworld-cache, so the screenshot did not exercise RiverGeometryVersion 8.",
+    "saveModel": {
+      "sha256": "eb96a9168259d9a8f1ce6f9583e12834904bf63da2ea3bc578a0accab17b70b8",
+      "bytes": 2919017,
+      "riverGeometryVersion": 7,
+      "generationRules": "geoworld-rules-v1.1.23",
+      "persistedAt": "2026-11-16T18:18:27+08:00",
+      "fileLastWriteTime": "2026-11-15T17:40:15+08:00"
+    },
+    "matchingCache": {
+      "file": "geoworld-cache/446c3c5c195674ed8b8d565eceba8e10.geoworld",
+      "sha256": "eb96a9168259d9a8f1ce6f9583e12834904bf63da2ea3bc578a0accab17b70b8",
+      "createdAt": "2026-11-15T17:40:14+08:00",
+      "lastWriteTime": "2026-11-15T17:40:15+08:00"
+    },
+    "rootCause": "GeoWorldEngineBridge cache identity included generation-rules/profile/config but not the embedded native engine content fingerprint or expected RiverGeometryVersion; v1.1.23 therefore accepted a stale pre-v8 model.",
+    "fix": {
+      "cacheFormatVersion": "v27",
+      "cacheKeyIncludes": [
+        "expectedRiverGeometryVersion",
+        "embeddedNativeEngineSha256"
+      ],
+      "loadValidation": [
+        "generationRules",
+        "worldModelVersion",
+        "riverGeometryVersion"
+      ],
+      "expectedRiverGeometryVersion": 8,
+      "engineBridgeVerifier": "passed_current_engine_generate_then_cache_reuse_geom_v8",
+      "neoforge1211CleanCheckBuild": "passed"
+    }
+  }
 }
