@@ -1,6 +1,6 @@
 # GeoWorld R8.1c — 河口接收水位与低岸统一（测试候选）
 
-日期：2026-11-14。状态更新至 2026-11-16：规则 v1.1.23 已实现；2026-11-15 首轮游戏内视觉验收因严重地形破碎失败。现已以 RiverGeometryVersion 8 修复并完成 1.21.1 NeoForge 自动复验，**新的游戏内视觉复测与 post-v8 全 9 目标发布矩阵仍待完成，当前禁止发布**。
+日期：2026-11-14。状态更新至 2026-11-16：规则 v1.1.23 已实现；2026-11-15 首轮游戏内视觉验收失败后已升级 RiverGeometryVersion 8 并修复缓存污染。**实际 geomV8 新世界视觉复测已通过，post-v8 全 9 目标发布矩阵 9/9 通过；当前 releaseAllowed=true，但尚未执行正式发布。**
 
 ## 原始缺陷
 
@@ -49,7 +49,7 @@ eb1ffcbc19ee43e55495f2007716b1ca0a907dcedf7b493303358d689e20512f。
 
 - 当时的发布矩阵 9/9 目标完成了 `clean check build`：26.3、26.2、26.1.2 的 NeoForge/Fabric，1.21.1 的 NeoForge/Fabric，以及 1.20.1 Fabric。
 - 当时的 9 个候选包均使用 `-Pmod_version=0.1.6` 实际构建，Loader 元数据版本为 0.1.6，并验证包含 Windows/Linux/macOS × x64/arm64 六套 GeoWorld 原生引擎。
-- **该矩阵已被 2026-11-15 的游戏内地形破碎失败作废为发布证据**；它只作为 pre-v8 历史记录保留。当前 `docs/acceptance/v016_release_readiness.json` 为 schema 2，明确标记 `automatedReleaseReadiness=revalidation_pending`、`manualVisualAcceptance=pending_retest`、`releaseAllowed=false`。
+- **该矩阵已被 2026-11-15 的游戏内地形破碎失败作废为发布证据**；它只作为 pre-v8 历史记录保留。当时的 schema 2 就绪记录曾标记 `automatedReleaseReadiness=revalidation_pending`、`manualVisualAcceptance=pending_retest`、`releaseAllowed=false`；这些字段现已在最终 geomV8 验收后更新为通过。
 - 当前未创建 `v0.1.6` tag，也未发布 GitHub Release。
 
 ## 游戏内视觉失败与 RiverGeometryVersion 8 修复（2026-11-15～16）
@@ -74,15 +74,16 @@ eb1ffcbc19ee43e55495f2007716b1ca0a907dcedf7b493303358d689e20512f。
 
 兼容性复验中 v7 的四区原始计数完整恢复，确认新逻辑只由 RiverGeometryVersion 8 启用，不热改已持久化 v7 模型。
 
-最终代码状态的 `go test ./...` 通过；Minecraft 1.21.1 NeoForge `clean check build -Pmod_version=0.1.6` 通过。WaterOwnership 的 `unownedSurfaceWaterSources`、`unsafeExposedWaterSources`、`freeFallWaterFaces`、`runtimeWaterLost`、`riverWaterBoundaryModelMismatches`、`riverLocalWaterPeaks`、`wetlandPoolLeaks` 均为 0。新的 1.21.1 NeoForge 候选 JAR SHA256 为 `6b5f56afd95fe605e65eafd4428d2f2593ba9c4f47cb4d2a62aac52f94881117`。
+该阶段的 `go test ./...` 通过；Minecraft 1.21.1 NeoForge `clean check build -Pmod_version=0.1.6` 通过。WaterOwnership 的 `unownedSurfaceWaterSources`、`unsafeExposedWaterSources`、`freeFallWaterFaces`、`runtimeWaterLost`、`riverWaterBoundaryModelMismatches`、`riverLocalWaterPeaks`、`wetlandPoolLeaks` 均为 0。当时、缓存 v27 修复前的 1.21.1 NeoForge 候选 JAR SHA256 为 `6b5f56afd95fe605e65eafd4428d2f2593ba9c4f47cb4d2a62aac52f94881117`，仅保留为阶段历史证据。
 
 证据：`docs/acceptance/r81c_fragmentation_fix.json`。
 
-## 当前剩余门槛（更新于 2026-11-16）
+## 最终候选验收状态（2026-11-16）
 
-1. 必须使用新 v8 候选包**新建世界**重新做游戏内视觉验收；pre-v8 失败世界不能作为新候选验收结果。
-2. 视觉通过后，对当前 v8 代码重新执行完整 9 目标发布矩阵。2026-11-15 的 9/9 结果仅为 pre-v8 历史证据，不再代表当前发布候选。
-3. 上述两项通过前，`releaseAllowed=false`，不创建 `v0.1.6` tag，不发布 GitHub Release。
+- 实际新存档已确认 `RiverGeometryVersion=8`，SHA256 `5b8eb7c9aa823d9a6f15a6ee510d6c387e5eadb1deee01de4bc6803bee280469`。
+- `(-1608,-1082)` 与四个原始回归区域均完成人工视觉复测并通过。
+- 当前 v8/cache-v27 代码的 9 目标发布矩阵重新构建完成，**9/9 通过**；所有候选包版本为 0.1.6，六套 native engine 校验通过。
+- `releaseAllowed=true`；但尚未 merge、push、创建 `v0.1.6` tag 或发布 GitHub Release。
 
 另外，天坑 #11 对河段 #735 的未规划排水冲突仍属于 R8.1d，岛屿及雪山盆地选址属于 R8.2。本轮不同时修改这些功能。
 ## v8 视觉复测被旧模型缓存污染（2026-11-16）

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""GeoWorld v0.1.6 release-state gate.
+"""GeoWorld v0.1.6 release-readiness gate.
 
-This gate validates the current blocked candidate state. It does not replace
-the manual in-game visual acceptance or the post-v8 nine-target release rebuild.
+This gate validates the accepted geomV8 candidate state: automated checks,
+manual visual acceptance evidence, and the post-v8 nine-target release matrix.
+It does not perform merge, tag creation, push, or publication.
 """
 import json
 import re
@@ -95,21 +96,32 @@ class V016ReleaseGate(unittest.TestCase):
         self.assertIn("engineFingerprint", ENGINE)
         self.assertIn("model.riverGeometryVersion()", ENGINE)
 
-    def test_release_remains_blocked_until_visual_and_full_matrix_revalidation(self):
-        self.assertEqual(READINESS["automatedReleaseReadiness"], "revalidation_pending")
-        self.assertEqual(
-            READINESS["manualVisualAcceptance"],
-            "pending_actual_geom_v8_retest",
-        )
-        self.assertEqual(READINESS["releaseMatrix"]["postV8CurrentMatrix"], "pending_full_rebuild_after_visual_acceptance")
-        self.assertEqual(READINESS["releaseMatrix"]["currentValidatedTargets"], 1)
-        self.assertFalse(READINESS["releaseAllowed"])
+    def test_release_is_ready_but_not_published(self):
+        self.assertEqual(READINESS["automatedReleaseReadiness"], "passed")
+        self.assertEqual(READINESS["manualVisualAcceptance"], "passed")
+        self.assertEqual(READINESS["releaseMatrix"]["postV8CurrentMatrix"], "passed_9_of_9")
+        self.assertEqual(READINESS["releaseMatrix"]["currentValidatedTargets"], 9)
+        self.assertTrue(READINESS["releaseMatrix"]["allCandidateJarsSixNativeEnginesVerified"])
+        self.assertTrue(READINESS["releaseAllowed"])
         self.assertFalse(READINESS["published"])
-        self.assertEqual(
-            FRAGMENTATION["manualVisualRetest"],
-            "pending_actual_geom_v8_save_verification",
-        )
-        self.assertEqual(FRAGMENTATION["fullNineTargetPostV8Matrix"], "pending")
+        self.assertEqual(READINESS["releaseState"], "ready_for_merge_tag_release_not_executed")
+        self.assertEqual(FRAGMENTATION["manualVisualRetest"], "passed_actual_geom_v8")
+        self.assertEqual(FRAGMENTATION["fullNineTargetPostV8Matrix"], "passed_9_of_9")
+        self.assertTrue(FRAGMENTATION["releaseAllowed"])
+        self.assertFalse(FRAGMENTATION["published"])
+        visual = READINESS["visualAcceptance"]
+        self.assertEqual(visual["result"], "passed")
+        self.assertEqual(visual["actualSaveModel"]["riverGeometryVersion"], 8)
+        self.assertEqual(len(visual["locations"]), 5)
+        self.assertTrue(all(item["result"] == "passed" for item in visual["locations"]))
+        artifacts = READINESS["postV8Artifacts"]
+        self.assertEqual(len(artifacts), 9)
+        self.assertEqual(len({(a["minecraft"], a["loader"]) for a in artifacts}), 9)
+        for artifact in artifacts:
+            self.assertEqual(artifact["version"], "0.1.6")
+            self.assertTrue(artifact["sixNativeEnginesVerified"])
+            self.assertGreater(artifact["bytes"], 0)
+            self.assertRegex(artifact["sha256"], r"^[0-9a-f]{64}$")
 
 
 if __name__ == "__main__":

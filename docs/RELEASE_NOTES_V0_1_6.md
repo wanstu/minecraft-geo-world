@@ -1,6 +1,6 @@
 # GeoWorld v0.1.6 — 发布候选说明
 
-状态：**2026-11-15 首轮游戏内视觉验收失败；R8.1c 地形破碎根因已修复并完成自动复验，新的 1.21.1 NeoForge 候选包待人工视觉复测。当前禁止正式发布。**
+状态：**2026-11-16 实际 geomV8 新世界人工视觉验收通过，post-v8 完整 9 目标发布矩阵 9/9 通过。当前已具备发布资格，但尚未 merge、push、创建 `v0.1.6` tag 或 GitHub Release。**
 
 ## 当前修复
 
@@ -22,17 +22,19 @@ v0.1.6 仍使用 `geoworld-rules-v1.1.23`。首轮候选虽然通过河口水位
 - Model Verifier：34/34。
 - WaterOwnership：`unownedSurfaceWaterSources=0`、`unsafeExposedWaterSources=0`、`freeFallWaterFaces=0`、`runtimeWaterLost=0`、`riverWaterBoundaryModelMismatches=0`、`riverLocalWaterPeaks=0`、`wetlandPoolLeaks=0`。
 - Java 适配器的 `test` 任务为 `NO-SOURCE`，这里只声明构建/验证链通过，不声明存在 Java 单元测试。
-- 新 1.21.1 NeoForge JAR：`29,164,469` 字节，SHA256 `6b5f56afd95fe605e65eafd4428d2f2593ba9c4f47cb4d2a62aac52f94881117`；Loader 元数据为 0.1.6，并包含六套 native engine。
+- 地形破碎修复阶段、缓存 v27 修复前的 1.21.1 NeoForge 候选 JAR：`29,164,469` 字节，SHA256 `6b5f56afd95fe605e65eafd4428d2f2593ba9c4f47cb4d2a62aac52f94881117`；该 SHA 仅作为阶段历史证据，不是当前发布矩阵产物。
 
 2026-11-15 视觉失败的旧候选 SHA256 `eae4a66ab738504505f8e69bc38b2f71b5ade4c8846c56501f40e19a527f72c4` 已废弃，不能继续用于验收。
 
 ## 发布状态
 
-v8 修改发生在此前 9 目标候选矩阵验收之后，因此此前的 9/9 结果只保留为 **pre-v8 历史证据**，不能代表当前代码。当前只重新验证了 1.21.1 NeoForge。
+2026-11-16 使用种子 `-1818694639628404530` 的实际新存档已读取确认：`generationRules=geoworld-rules-v1.1.23`、`RiverGeometryVersion=8`；存档 `world.geoworld` SHA256 为 `5b8eb7c9aa823d9a6f15a6ee510d6c387e5eadb1deee01de4bc6803bee280469`，并与本轮新缓存完全一致。
 
-下一步先用新的候选 JAR、新建世界重新做游戏内视觉验收。视觉通过后，再对当前 v8 代码完整重跑 9 目标发布矩阵并生成最终候选包；在这两项都完成前：
+人工视觉复测通过 `(-1608,-1082)` 以及四个回归区域 `(-1047,-1076)`、`(-1015,-988)`、`(-1100,-1070)`、`(1653,10405)`。此前的放射状沙墙、薄墙、尖柱和单格断层未再出现。
 
-**不创建 `v0.1.6` tag，不发布 GitHub Release。**
+随后对当前 v8/cache-v27 代码完整重跑 9 目标发布矩阵，**9/9 全部 `clean check build` 成功**；每个候选 JAR 均验证版本为 0.1.6，并包含 Windows/Linux/macOS × x64/arm64 六套 native engine。
+
+因此当前 `releaseAllowed=true`。但发布动作尚未执行：**未 merge、未 push、未创建 `v0.1.6` tag、未发布 GitHub Release。**
 ## 2026-11-16 缓存复用事故
 
 当天第二次视觉截图仍出现严重放射状沙墙，但该截图后来被证明**不是 RiverGeometryVersion 8 的结果**。新建存档中的 `world.geoworld` 为 `RiverGeometryVersion=7`，SHA256 为 `eb96a9168259d9a8f1ce6f9583e12834904bf63da2ea3bc578a0accab17b70b8`；eadm 的 `geoworld-cache/446c3c5c195674ed8b8d565eceba8e10.geoworld` 与之字节级 SHA 相同，且缓存文件创建于前一天。
@@ -41,6 +43,6 @@ v8 修改发生在此前 9 目标候选矩阵验收之后，因此此前的 9/9 
 
 现已修复：缓存格式升级到 `v27`，cache key 加入 `expected RiverGeometryVersion=8` 与嵌入 native engine 的 SHA256；缓存加载再次硬校验模型内部 `riverGeometryVersion()`。`GeoWorldEngineBridgeVerifier` 已实际验证“当前 engine 首次生成 geomV8 → 第二次命中当前缓存仍为 geomV8”，随后 1.21.1 NeoForge 完整 `clean check build` 通过。
 
-新的候选 JAR SHA256：`f186dabaae5a20fd70a3791937e89f603555e41c4f1428afec7ab22610b94b24`。
+当时用于实际视觉复测的 1.21.1 NeoForge 候选 JAR SHA256：`f186dabaae5a20fd70a3791937e89f603555e41c4f1428afec7ab22610b94b24`。后续 post-v8 发布矩阵从同一代码状态重新打包，JAR SHA 另行记录在 `docs/acceptance/v016_release_readiness.json`；最终发布产物仍由 CI 从 tag commit 重建。
 
 因此 2026-11-16 这张异常截图只能作为**旧 v7 缓存污染的证据**，不能作为 v8 视觉验收结果。下一次验收开始前，必须先从实际新存档中读取并确认 `RiverGeometryVersion=8`。

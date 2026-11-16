@@ -5,16 +5,16 @@
   "generationRules": "geoworld-rules-v1.1.23",
   "riverGeometryVersionForNewV123Worlds": 8,
   "legacyPersistedRiverGeometryVersion": 7,
-  "automatedReleaseReadiness": "revalidation_pending",
-  "manualVisualAcceptance": "pending_actual_geom_v8_retest",
-  "releaseAllowed": false,
+  "automatedReleaseReadiness": "passed",
+  "manualVisualAcceptance": "passed",
+  "releaseAllowed": true,
   "published": false,
-  "reasonReleaseBlocked": "The 2026-11-16 screenshot retest was proven to use a stale cached RiverGeometryVersion 7 model, not v8. Cache identity now binds the native-engine SHA256 and expected RiverGeometryVersion 8, but a fresh in-game world must first be verified on disk as geomV8 and then visually accepted; the full post-v8 nine-target release matrix also remains pending.",
+  "reasonReleaseBlocked": null,
   "visualHistory": {
     "rejectedCandidateDate": "2026-11-15",
     "result": "failed_terrain_fragmentation",
     "seed": -1818694639628404530,
-    "retest": "pending_new_world"
+    "retest": "passed_actual_geom_v8"
   },
   "r81c": {
     "originalWaterWallAcceptance": "passed_neoforge_1.21.1_full_anvil",
@@ -31,19 +31,22 @@
     "module": "java/adapters/1.21.1-neoforge",
     "version": "0.1.6",
     "bytes": 29165307,
-    "sha256": "f186dabaae5a20fd70a3791937e89f603555e41c4f1428afec7ab22610b94b24",
+    "sha256": "cf4762962fad6e7e6abe699fe92dbcd1a59aca70656b2ed33180d5fbdfa0ec1e",
     "sixNativeEnginesVerified": true,
     "cleanCheckBuild": "passed",
     "fullGoTest": "passed",
     "engineBridgeCacheVerifier": "passed",
     "expectedRiverGeometryVersion": 8,
-    "cacheFormatVersion": "v27"
+    "cacheFormatVersion": "v27",
+    "note": "post-v8 release-matrix rebuild artifact; visual acceptance used the same source state but an earlier local packaging of the 1.21.1 NeoForge candidate"
   },
   "releaseMatrix": {
     "definedTargets": 9,
     "preV8HistoricalMatrix": "passed_9_of_9_but_superseded_by_fragmentation_fix",
-    "postV8CurrentMatrix": "pending_full_rebuild_after_visual_acceptance",
-    "currentValidatedTargets": 1
+    "postV8CurrentMatrix": "passed_9_of_9",
+    "currentValidatedTargets": 9,
+    "allCandidateJarsVersion": "0.1.6",
+    "allCandidateJarsSixNativeEnginesVerified": true
   },
   "rejectedHistoricalCandidate": {
     "minecraft": "1.21.1",
@@ -143,5 +146,136 @@
     "actualScreenshotWorldRiverGeometryVersion": 7,
     "screenshotCountsAsV8VisualAcceptance": false,
     "fixedBy": "cache v27 + native-engine SHA256 + hard RiverGeometryVersion validation"
-  }
+  },
+  "releaseState": "ready_for_merge_tag_release_not_executed",
+  "visualAcceptance": {
+    "date": "2026-11-16",
+    "seed": -1818694639628404530,
+    "actualSaveModel": {
+      "riverGeometryVersion": 8,
+      "generationRules": "geoworld-rules-v1.1.23",
+      "bytes": 2919022,
+      "sha256": "5b8eb7c9aa823d9a6f15a6ee510d6c387e5eadb1deee01de4bc6803bee280469",
+      "cacheSha256": "5b8eb7c9aa823d9a6f15a6ee510d6c387e5eadb1deee01de4bc6803bee280469",
+      "generatedAt": "2026-11-16T21:12:58+08:00"
+    },
+    "testedJar": {
+      "minecraft": "1.21.1",
+      "loader": "neoforge",
+      "version": "0.1.6",
+      "bytes": 29165307,
+      "sha256": "f186dabaae5a20fd70a3791937e89f603555e41c4f1428afec7ab22610b94b24"
+    },
+    "locations": [
+      {
+        "x": -1608,
+        "z": -1082,
+        "result": "passed"
+      },
+      {
+        "x": -1047,
+        "z": -1076,
+        "result": "passed"
+      },
+      {
+        "x": -1015,
+        "z": -988,
+        "result": "passed"
+      },
+      {
+        "x": -1100,
+        "z": -1070,
+        "result": "passed"
+      },
+      {
+        "x": 1653,
+        "z": 10405,
+        "result": "passed"
+      }
+    ],
+    "result": "passed"
+  },
+  "postV8Artifacts": [
+    {
+      "minecraft": "26.3",
+      "loader": "neoforge",
+      "module": "java/neoforge-mod",
+      "version": "0.1.6",
+      "bytes": 29157847,
+      "sha256": "a912c37cbb8cf543243d6aa3f3a1f1ba46b92d323f7dadde12e31293a7378be1",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "26.3",
+      "loader": "fabric",
+      "module": "java/adapters/26.3-fabric",
+      "version": "0.1.6",
+      "bytes": 29164648,
+      "sha256": "ab311597468743abad647143a9e1ec434ced5d6454bd1de062f06a15a8927097",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "neoforge",
+      "module": "java/adapters/26.2-neoforge",
+      "version": "0.1.6",
+      "bytes": 9161706,
+      "sha256": "8831544b3a881dfc1af6ab85851c0e4afdb49d6f0ec483d0efb48f2bc0c03279",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "fabric",
+      "module": "java/adapters/26.2-fabric",
+      "version": "0.1.6",
+      "bytes": 9169167,
+      "sha256": "1d7bcfafce82dcacca994fe0957b844f2ec4538cdfe6abdb24682d6a17b3bd76",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "neoforge",
+      "module": "java/adapters/26.1.2-neoforge",
+      "version": "0.1.6",
+      "bytes": 9161810,
+      "sha256": "e388abab5309807ed43d8170ca13bcfb9c54aa3b9fefb39c558d8ddfafc9101d",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "fabric",
+      "module": "java/adapters/26.1.2-fabric",
+      "version": "0.1.6",
+      "bytes": 9169302,
+      "sha256": "fa79da524e1b1a9b98784e28564d43028fbd9f211e0152501ae4cd44ecd6d7c6",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "neoforge",
+      "module": "java/adapters/1.21.1-neoforge",
+      "version": "0.1.6",
+      "bytes": 29165307,
+      "sha256": "cf4762962fad6e7e6abe699fe92dbcd1a59aca70656b2ed33180d5fbdfa0ec1e",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "fabric",
+      "module": "java/adapters/1.21.1-fabric",
+      "version": "0.1.6",
+      "bytes": 9210896,
+      "sha256": "3b0db4c359191ce7cf78a3220a879f1da0bccf2f5f1621554261a4162b63f0fe",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "1.20.1",
+      "loader": "fabric",
+      "module": "java/adapters/1.20.1-fabric",
+      "version": "0.1.6",
+      "bytes": 9182198,
+      "sha256": "cba074a2779c84ae94132d2f86ed526f41ab41bab1c79595ecf72e9f09c72d5e",
+      "sixNativeEnginesVerified": true
+    }
+  ]
 }

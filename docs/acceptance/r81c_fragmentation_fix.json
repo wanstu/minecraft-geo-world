@@ -89,13 +89,14 @@
   "candidateJar": {
     "path": "java/adapters/1.21.1-neoforge/build/libs/geoworld-0.1.6.jar",
     "bytes": 29165307,
-    "sha256": "f186dabaae5a20fd70a3791937e89f603555e41c4f1428afec7ab22610b94b24",
+    "sha256": "cf4762962fad6e7e6abe699fe92dbcd1a59aca70656b2ed33180d5fbdfa0ec1e",
     "loaderMetadataVersion": "0.1.6",
-    "sixNativeEnginesVerified": true
+    "sixNativeEnginesVerified": true,
+    "scope": "post-v8 release-matrix rebuild"
   },
-  "manualVisualRetest": "pending_actual_geom_v8_save_verification",
-  "fullNineTargetPostV8Matrix": "pending",
-  "releaseAllowed": false,
+  "manualVisualRetest": "passed_actual_geom_v8",
+  "fullNineTargetPostV8Matrix": "passed_9_of_9",
+  "releaseAllowed": true,
   "published": false,
   "staleCacheIncident": {
     "date": "2026-11-16",
@@ -138,5 +139,115 @@
       "engineBridgeVerifier": "passed_current_engine_generate_then_cache_reuse_geom_v8",
       "neoforge1211CleanCheckBuild": "passed"
     }
-  }
+  },
+  "manualVisualEvidence": {
+    "saveModelSha256": "5b8eb7c9aa823d9a6f15a6ee510d6c387e5eadb1deee01de4bc6803bee280469",
+    "riverGeometryVersion": 8,
+    "testedJarSha256": "f186dabaae5a20fd70a3791937e89f603555e41c4f1428afec7ab22610b94b24",
+    "locationsPassed": [
+      [
+        -1608,
+        -1082
+      ],
+      [
+        -1047,
+        -1076
+      ],
+      [
+        -1015,
+        -988
+      ],
+      [
+        -1100,
+        -1070
+      ],
+      [
+        1653,
+        10405
+      ]
+    ]
+  },
+  "postV8Artifacts": [
+    {
+      "minecraft": "26.3",
+      "loader": "neoforge",
+      "module": "java/neoforge-mod",
+      "version": "0.1.6",
+      "bytes": 29157847,
+      "sha256": "a912c37cbb8cf543243d6aa3f3a1f1ba46b92d323f7dadde12e31293a7378be1",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "26.3",
+      "loader": "fabric",
+      "module": "java/adapters/26.3-fabric",
+      "version": "0.1.6",
+      "bytes": 29164648,
+      "sha256": "ab311597468743abad647143a9e1ec434ced5d6454bd1de062f06a15a8927097",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "neoforge",
+      "module": "java/adapters/26.2-neoforge",
+      "version": "0.1.6",
+      "bytes": 9161706,
+      "sha256": "8831544b3a881dfc1af6ab85851c0e4afdb49d6f0ec483d0efb48f2bc0c03279",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "fabric",
+      "module": "java/adapters/26.2-fabric",
+      "version": "0.1.6",
+      "bytes": 9169167,
+      "sha256": "1d7bcfafce82dcacca994fe0957b844f2ec4538cdfe6abdb24682d6a17b3bd76",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "neoforge",
+      "module": "java/adapters/26.1.2-neoforge",
+      "version": "0.1.6",
+      "bytes": 9161810,
+      "sha256": "e388abab5309807ed43d8170ca13bcfb9c54aa3b9fefb39c558d8ddfafc9101d",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "fabric",
+      "module": "java/adapters/26.1.2-fabric",
+      "version": "0.1.6",
+      "bytes": 9169302,
+      "sha256": "fa79da524e1b1a9b98784e28564d43028fbd9f211e0152501ae4cd44ecd6d7c6",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "neoforge",
+      "module": "java/adapters/1.21.1-neoforge",
+      "version": "0.1.6",
+      "bytes": 29165307,
+      "sha256": "cf4762962fad6e7e6abe699fe92dbcd1a59aca70656b2ed33180d5fbdfa0ec1e",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "fabric",
+      "module": "java/adapters/1.21.1-fabric",
+      "version": "0.1.6",
+      "bytes": 9210896,
+      "sha256": "3b0db4c359191ce7cf78a3220a879f1da0bccf2f5f1621554261a4162b63f0fe",
+      "sixNativeEnginesVerified": true
+    },
+    {
+      "minecraft": "1.20.1",
+      "loader": "fabric",
+      "module": "java/adapters/1.20.1-fabric",
+      "version": "0.1.6",
+      "bytes": 9182198,
+      "sha256": "cba074a2779c84ae94132d2f86ed526f41ab41bab1c79595ecf72e9f09c72d5e",
+      "sixNativeEnginesVerified": true
+    }
+  ]
 }
