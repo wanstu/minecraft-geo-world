@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-11-16",
+  "version": "0.1.6",
+  "generationRules": "geoworld-rules-v1.1.23",
+  "seed": -1818694639628404530,
+  "visualFailureDate": "2026-11-15",
+  "visualFailure": "severe terrain fragmentation: thin walls, needles and one-block vertical discontinuities around river mouths and frozen-river transitions",
+  "rootCause": {
+    "primary": "legacy curved river nearest-point Newton refinement could jump to the wrong endpoint for adjacent blocks",
+    "secondary": "overlapping river-bank protection applied a higher neighboring river surface at full strength even when that neighbor only touched the outer bank corridor with near-zero influence",
+    "wetBoundary": "fixed minimum visible river depth could reclassify geometrically wet edge cells as dry"
+  },
+  "geometryVersion": {
+    "old": 7,
+    "new": 8,
+    "compatibility": "persisted v7 models retain legacy nearest-point and bank-protection semantics; new v1.1.23 worlds use v8"
+  },
+  "fixedSeedModelComparison": {
+    "definition": "artificial edge = adjacent final-height jump >=4 blocks and >=3 blocks larger than the original base-terrain jump",
+    "regions": [
+      {
+        "name": "shot1",
+        "center": {
+          "x": -1047,
+          "z": -1076
+        },
+        "radius": 72,
+        "oldArtificialEdges": 618,
+        "newArtificialEdges": 0,
+        "oldMaxArtificialJump": 14,
+        "newMaxArtificialJump": 0
+      },
+      {
+        "name": "shot2",
+        "center": {
+          "x": -1015,
+          "z": -988
+        },
+        "radius": 96,
+        "oldArtificialEdges": 625,
+        "newArtificialEdges": 0,
+        "oldMaxArtificialJump": 11,
+        "newMaxArtificialJump": 0
+      },
+      {
+        "name": "shot3",
+        "center": {
+          "x": -1100,
+          "z": -1070
+        },
+        "radius": 112,
+        "oldArtificialEdges": 714,
+        "newArtificialEdges": 0,
+        "oldMaxArtificialJump": 14,
+        "newMaxArtificialJump": 0
+      },
+      {
+        "name": "shot4",
+        "center": {
+          "x": 1653,
+          "z": 10405
+        },
+        "radius": 112,
+        "oldArtificialEdges": 342,
+        "newArtificialEdges": 0,
+        "oldMaxArtificialJump": 6,
+        "newMaxArtificialJump": 0
+      }
+    ],
+    "oldTotalArtificialEdges": 2299,
+    "newTotalArtificialEdges": 0,
+    "compatibilityBaselineRestored": true
+  },
+  "automatedValidation": {
+    "goTestAll": "passed",
+    "neoforge1211CleanCheckBuild": "passed",
+    "modelVerifier": "34_of_34",
+    "waterOwnership": {
+      "unownedSurfaceWaterSources": 0,
+      "unsafeExposedWaterSources": 0,
+      "freeFallWaterFaces": 0,
+      "runtimeWaterLost": 0,
+      "riverWaterBoundaryModelMismatches": 0,
+      "riverLocalWaterPeaks": 0,
+      "wetlandPoolLeaks": 0
+    }
+  },
+  "candidateJar": {
+    "path": "java/adapters/1.21.1-neoforge/build/libs/geoworld-0.1.6.jar",
+    "bytes": 29164469,
+    "sha256": "6b5f56afd95fe605e65eafd4428d2f2593ba9c4f47cb4d2a62aac52f94881117",
+    "loaderMetadataVersion": "0.1.6",
+    "sixNativeEnginesVerified": true
+  },
+  "manualVisualRetest": "pending",
+  "fullNineTargetPostV8Matrix": "pending",
+  "releaseAllowed": false,
+  "published": false
+}

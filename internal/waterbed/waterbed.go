@@ -865,30 +865,46 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	}
 
 	riverIDs := m.riverBuckets[bucket]
-	activeRiverBankProtected := riverBankProtectedAt(
+	activeRiverBankProtected := riverBankProtectedAtForGeometry(
+		m.Config.RiverGeometryVersion,
+		m.Rivers,
+		riverIDs,
+		worldX,
+		worldZ,
+	)
+	activeRiverBankProtectionWeight := riverBankProtectionWeightAtForGeometry(
+		m.Config.RiverGeometryVersion,
 		m.Rivers,
 		riverIDs,
 		worldX,
 		worldZ,
 	)
 	activeRiverBankSurface := math.Inf(-1)
+	activeRiverBankSurfaceWeight := 0.0
 	if m.Config.RiverGeometryVersion >= 4 {
-		if surface, ok := m.riverBankProtectionSurfaceAt(
+		if surface, weight, ok := m.riverBankProtectionSurfaceAt(
 			riverIDs,
 			worldX,
 			worldZ,
 		); ok {
 			activeRiverBankSurface = surface
+			activeRiverBankSurfaceWeight = weight
 		}
 	}
 
 	riverDatumWeight := -1.0
 	riverDatumT := 2.0
 	geometryWetOwned := false
+	geometryWetDepthWeight := 0.0
 	bestOxbowSurface := math.Inf(-1)
 	for _, id := range riverIDs {
 		seg := m.Rivers[id]
-		t, distance := pointRiverSegment(worldX, worldZ, seg)
+		t, distance := pointRiverSegmentForGeometry(
+			m.Config.RiverGeometryVersion,
+			worldX,
+			worldZ,
+			seg,
+		)
 		halfWidth := riverMouthHalfWidth(seg, t)
 		bankRadius := halfWidth + riverBankBlendForSegment(seg, t)
 		fluvialReach := math.Max(bankRadius, riverFluvialReach(seg))
@@ -933,12 +949,22 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 				math.Min(surface, bankCeiling),
 			)
 		}
+		if m.Config.RiverGeometryVersion >= 8 {
+			surface = riverProtectedSurface(
+				surface,
+				activeRiverBankSurface,
+				activeRiverBankSurfaceWeight,
+			)
+		}
 
 		if deltaInBank && !deltaInWater {
 			// Delta distributaries own a real dry bank corridor too. This keeps
 			// each branch connected to the surrounding floodplain without turning
 			// the split into a water trench cut through untouched terrain.
-			bankSurface := math.Max(surface, activeRiverBankSurface)
+			bankSurface := surface
+			if m.Config.RiverGeometryVersion < 8 {
+				bankSurface = math.Max(surface, activeRiverBankSurface)
+			}
 			innerBank := math.Min(baseHeight, bankSurface+0.0018)
 			bankWeight := 1 - smoothstep(
 				deltaHalfWidth,
@@ -961,7 +987,10 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			// the untouched broad surface instead of meeting water as a noisy
 			// staircase or vertical trench wall.
 			if distance < bankRadius {
-				bankSurface := math.Max(surface, activeRiverBankSurface)
+				bankSurface := surface
+				if m.Config.RiverGeometryVersion < 8 {
+					bankSurface = math.Max(surface, activeRiverBankSurface)
+				}
 				innerBank := math.Min(baseHeight, bankSurface+0.0022)
 				bankWeight := 1 - smoothstep(
 					halfWidth,
@@ -978,15 +1007,14 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 				}
 			}
 
-			// Floodplain, abandoned-meander and oxbow detail belongs outside
-			// every active river-bank protection corridor, not merely outside
-			// the parent segment's bank. At confluences/overlaps an old meander
-			// from one segment must never excavate another segment's live bank.
-			if !activeRiverBankProtected {
-				// v1.1.7 broadens a small subset of wide, low-gradient reaches
-				// into a floodplain/terrace envelope. This code existed before but
-				// was not connected to Runtime sampling.
-				finalHeight = applyRiverFluvialDryDetail(
+			// Geometry v8 replaces the old all-or-nothing bank-protection
+			// gate with a continuous bank-corridor weight. A neighboring live
+			// bank therefore suppresses floodplain/terrace carving gradually
+			// instead of creating a one-block vertical seam at its outer edge.
+			if m.Config.RiverGeometryVersion >= 8 {
+				undetailedHeight := finalHeight
+				detailedHeight := applyRiverFluvialDryDetail(
+					m.Config.RiverGeometryVersion,
 					seg,
 					t,
 					worldX,
@@ -996,6 +1024,29 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 					surface,
 					distance,
 				)
+				finalHeight = lerp(
+					detailedHeight,
+					undetailedHeight,
+					activeRiverBankProtectionWeight,
+				)
+			}
+
+			// Retain the hard protection gate for oxbow water and for legacy
+			// geometry. Oxbow pools must never occupy a live river bank.
+			if !activeRiverBankProtected {
+				if m.Config.RiverGeometryVersion < 8 {
+					finalHeight = applyRiverFluvialDryDetail(
+						m.Config.RiverGeometryVersion,
+						seg,
+						t,
+						worldX,
+						worldZ,
+						baseHeight,
+						finalHeight,
+						surface,
+						distance,
+					)
+				}
 
 				// A still rarer subset of those abandoned meanders retains shallow,
 				// flat water. Record the candidate here but do not assign ownership
@@ -1085,7 +1136,10 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			riverDatumWeight = weight
 			riverDatumT = t
 		}
-		channelShoulder := math.Min(baseHeight, surface+0.0022)
+		channelShoulder := riverChannelShoulder(
+			baseHeight,
+			surface,
+		)
 		if outletWeight := lakeOutletSourceWeight(seg, t); outletWeight > 0 {
 			// A formal lake outlet must remain wet across its near-shore throat.
 			// Blend the channel shoulder below the inherited lake surface, then
@@ -1132,14 +1186,27 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		if v4WetCore && insideWetCore {
 			geometryWetOwned = true
 			// The visible bank is a geometric river boundary, not another
-			// threshold against broad-terrain noise. Keep the full ordinary
-			// hydraulic corridor at least half a center-depth below the surface;
-			// the dry transition begins outside halfWidth in bankRadius.
-			minimumWetDepth := 0.5 * centerDepth
-			candidate = math.Min(
-				candidate,
-				math.Max(0, surface-minimumWetDepth),
+			// threshold against broad-terrain noise. Geometry v8 keeps the
+			// original inner wet core but fades the forced minimum depth through
+			// the outer hydraulic corridor so it can meet the dry bank smoothly.
+			minimumWetDepth := riverMinimumWetDepth(
+				m.Config.RiverGeometryVersion,
+				centerDepth,
+				channelDistance,
+				channelHalfWidth,
 			)
+			if centerDepth > 1e-12 {
+				geometryWetDepthWeight = math.Max(
+					geometryWetDepthWeight,
+					clamp(minimumWetDepth/(0.5*centerDepth), 0, 1),
+				)
+			}
+			if minimumWetDepth > 0 {
+				candidate = math.Min(
+					candidate,
+					math.Max(0, surface-minimumWetDepth),
+				)
+			}
 		}
 		if candidate < finalHeight {
 			finalHeight = candidate
@@ -1166,10 +1233,25 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			sample.RiverReceiverSurface > ownerSurface {
 			ownerSurface = sample.RiverReceiverSurface
 		}
-		finalHeight = math.Min(
-			finalHeight,
-			math.Max(0, ownerSurface-0.5*ownerDepth),
+		ownerMinimumWetDepth := 0.5 * ownerDepth
+		if m.Config.RiverGeometryVersion >= 8 {
+			ownerMinimumWetDepth *= clamp(
+				geometryWetDepthWeight,
+				0,
+				1,
+			)
+		}
+		ownerCandidate := math.Max(
+			0,
+			ownerSurface-ownerMinimumWetDepth,
 		)
+		if ownerCandidate < finalHeight {
+			finalHeight = ownerCandidate
+			sample.RiverCarve = math.Max(
+				sample.RiverCarve,
+				baseHeight-ownerCandidate,
+			)
+		}
 	}
 
 	if sample.WaterKind == reconcile.WaterNone &&
@@ -2732,7 +2814,12 @@ func (m *Model) NavigationSampleAt(
 	best := math.Inf(1)
 	out := RiverNavigationSample{}
 	for i, seg := range m.Rivers {
-		t, centerDistance := pointRiverSegment(worldX, worldZ, seg)
+		t, centerDistance := pointRiverSegmentForGeometry(
+			m.Config.RiverGeometryVersion,
+			worldX,
+			worldZ,
+			seg,
+		)
 		halfWidth := riverMouthHalfWidth(seg, t)
 		bankDistance := math.Max(0, centerDistance-halfWidth)
 		if bankDistance >= best {
@@ -3031,6 +3118,7 @@ func riverNaturalLeveeLift(
 }
 
 func applyRiverFluvialDryDetail(
+	geometryVersion uint8,
 	seg RiverSegment,
 	t,
 	worldX,
@@ -3052,13 +3140,26 @@ func applyRiverFluvialDryDetail(
 	}
 
 	phase := riverFluvialPhase(seg)
+	entryWeight := 1.0
+	if geometryVersion >= 8 {
+		// Floodplain/terrace morphology must grow out of the live dry bank
+		// continuously. The legacy implementation started at full envelope
+		// strength immediately outside bankRadius, creating 6-8 block
+		// one-cell cliffs along curved bank boundaries.
+		entryBlend := clamp(0.35*seg.HalfWidth, 10, 18)
+		entryWeight = smoothstep(
+			0,
+			entryBlend,
+			math.Max(0, distance-bankRadius),
+		)
+	}
 	if distance >= bankRadius {
 		n := clamp(
 			(distance-bankRadius)/math.Max(1e-9, reach-bankRadius),
 			0,
 			1,
 		)
-		envelope := (1 - smoothstep(0, 1, n)) * strength
+		envelope := entryWeight * (1 - smoothstep(0, 1, n)) * strength
 		terrace := smoothstep(0.38, 0.56, n) *
 			(1 - smoothstep(0.74, 0.92, n)) *
 			strength
@@ -3100,7 +3201,8 @@ func applyRiverFluvialDryDetail(
 		offset := riverAbandonedMeanderOffset(seg, t, key)
 		oldDistance := math.Abs(lateral - offset)
 		radius := clamp(0.18*seg.HalfWidth, 4, 11)
-		grooveWeight := (1 - smoothstep(0.35*radius, radius, oldDistance)) *
+		grooveWeight := entryWeight *
+			(1 - smoothstep(0.35*radius, radius, oldDistance)) *
 			s * s * strength
 		if grooveWeight > 0 {
 			oldTarget := surface +
@@ -3561,7 +3663,19 @@ func riverBankBlendBlocks(halfWidth float64) float64 {
 	return clamp(10+0.65*halfWidth, 12, 24)
 }
 
-func pointRiverSegment(
+func pointRiverSegmentForGeometry(
+	geometryVersion uint8,
+	px,
+	pz float64,
+	seg RiverSegment,
+) (float64, float64) {
+	if geometryVersion < 8 {
+		return pointRiverSegmentLegacy(px, pz, seg)
+	}
+	return pointRiverSegment(px, pz, seg)
+}
+
+func pointRiverSegmentLegacy(
 	px,
 	pz float64,
 	seg RiverSegment,
@@ -3580,11 +3694,6 @@ func pointRiverSegment(
 		0,
 		1,
 	)
-
-	// Newton-refine the nearest point on the curved centerline. Legacy
-	// reaches use sin(pi*t); v3 uses sin(pi*t)^2 so the meander has zero
-	// lateral derivative at both macro-node endpoints. Offsets are modest,
-	// so the chord projection remains a stable starting point.
 	for iter := 0; iter < 4 && math.Abs(seg.MeanderOffset) > 1e-9; iter++ {
 		shape, shapeDerivative, shapeSecondDerivative :=
 			riverMeanderShapeForSegment(seg, t)
@@ -3608,9 +3717,114 @@ func pointRiverSegment(
 		}
 		t = next
 	}
-
 	x, z, _, _ := riverCenterAndNormalForSegment(seg, t)
 	return t, math.Hypot(px-x, pz-z)
+}
+
+// pointRiverSegment uses a safeguarded Newton refinement. The old unconstrained
+// Newton step could jump from one endpoint to the other for points just beyond
+// a curved reach, making adjacent blocks alternate between river and dry land.
+// Every accepted step must reduce squared distance, and endpoint/initial
+// candidates are retained so the solver can never return a worse solution.
+func pointRiverSegment(
+	px,
+	pz float64,
+	seg RiverSegment,
+) (float64, float64) {
+	dx := seg.X1 - seg.X0
+	dz := seg.Z1 - seg.Z0
+	len2 := dx*dx + dz*dz
+	if len2 <= 1e-18 {
+		return 0, math.Hypot(px-seg.X0, pz-seg.Z0)
+	}
+	length := math.Sqrt(len2)
+	nx := -dz / length
+	nz := dx / length
+	distanceSquared := func(t float64) float64 {
+		x, z, _, _ := riverCenterAndNormalForSegment(seg, t)
+		rx := x - px
+		rz := z - pz
+		return rx*rx + rz*rz
+	}
+
+	t := clamp(
+		((px-seg.X0)*dx+(pz-seg.Z0)*dz)/len2,
+		0,
+		1,
+	)
+	bestT := t
+	bestD2 := distanceSquared(t)
+
+	// A single chord-projection seed is not sufficient for a visibly curved
+	// reach: the distance function can have more than one local minimum.
+	// Sample the whole normalized reach at a small fixed grid first, then let
+	// safeguarded Newton refine the globally best coarse basin. Eight
+	// intervals are enough for the single-hump sine/sine² centerlines used by
+	// GeoWorld while keeping per-block runtime cost bounded and deterministic.
+	if math.Abs(seg.MeanderOffset) > 1e-9 {
+		const coarseIntervals = 8
+		for i := 0; i <= coarseIntervals; i++ {
+			candidateT := float64(i) / coarseIntervals
+			if d2 := distanceSquared(candidateT); d2 < bestD2 {
+				bestT, bestD2 = candidateT, d2
+			}
+		}
+	} else {
+		for _, endpoint := range [...]float64{0, 1} {
+			if d2 := distanceSquared(endpoint); d2 < bestD2 {
+				bestT, bestD2 = endpoint, d2
+			}
+		}
+	}
+	t = bestT
+
+	for iter := 0; iter < 6 && math.Abs(seg.MeanderOffset) > 1e-9; iter++ {
+		shape, shapeDerivative, shapeSecondDerivative :=
+			riverMeanderShapeForSegment(seg, t)
+		x := seg.X0 + dx*t + nx*seg.MeanderOffset*shape
+		z := seg.Z0 + dz*t + nz*seg.MeanderOffset*shape
+		tx := dx + nx*seg.MeanderOffset*shapeDerivative
+		tz := dz + nz*seg.MeanderOffset*shapeDerivative
+		ax := nx * seg.MeanderOffset * shapeSecondDerivative
+		az := nz * seg.MeanderOffset * shapeSecondDerivative
+		rx := x - px
+		rz := z - pz
+		currentD2 := rx*rx + rz*rz
+		if currentD2 < bestD2 {
+			bestT, bestD2 = t, currentD2
+		}
+		f := rx*tx + rz*tz
+		fp := tx*tx + tz*tz + rx*ax + rz*az
+		if math.Abs(fp) <= 1e-12 {
+			break
+		}
+		next := clamp(t-f/fp, 0, 1)
+		if math.Abs(next-t) <= 1e-8 {
+			break
+		}
+
+		accepted := false
+		for backtrack := 0; backtrack < 8; backtrack++ {
+			nextD2 := distanceSquared(next)
+			if nextD2 <= currentD2+1e-12 {
+				t = next
+				if nextD2 < bestD2 {
+					bestT, bestD2 = next, nextD2
+				}
+				accepted = true
+				break
+			}
+			next = 0.5 * (t + next)
+			if math.Abs(next-t) <= 1e-8 {
+				break
+			}
+		}
+		if !accepted {
+			break
+		}
+	}
+
+	return bestT, math.Sqrt(bestD2)
 }
 
 func pointSegment(px, pz, x0, z0, x1, z1 float64) (float64, float64) {
@@ -3789,21 +4003,43 @@ func (m *Model) riverBankProtectionSurfaceAt(
 	ids []int,
 	worldX,
 	worldZ float64,
-) (float64, bool) {
+) (float64, float64, bool) {
 	highest := math.Inf(-1)
+	highestWeight := 0.0
 	found := false
 	for _, id := range ids {
 		if id < 0 || id >= len(m.Rivers) {
 			continue
 		}
 		seg := m.Rivers[id]
-		t, distance := pointRiverSegment(worldX, worldZ, seg)
+		t, distance := pointRiverSegmentForGeometry(
+			m.Config.RiverGeometryVersion,
+			worldX,
+			worldZ,
+			seg,
+		)
 		halfWidth := riverMouthHalfWidth(seg, t)
 		bankRadius := halfWidth + riverBankBlendForSegment(seg, t)
-		_, deltaDistance, _, deltaBankRadius, deltaOK :=
+		_, deltaDistance, deltaHalfWidth, deltaBankRadius, deltaOK :=
 			riverDeltaPoint(seg, t, worldX, worldZ)
-		if distance >= bankRadius &&
-			!(deltaOK && deltaDistance < deltaBankRadius) {
+
+		influence := 0.0
+		if distance < bankRadius {
+			influence = 1 - smoothstep(
+				halfWidth,
+				bankRadius,
+				distance,
+			)
+		}
+		if deltaOK && deltaDistance < deltaBankRadius {
+			deltaInfluence := 1 - smoothstep(
+				deltaHalfWidth,
+				deltaBankRadius,
+				deltaDistance,
+			)
+			influence = math.Max(influence, deltaInfluence)
+		}
+		if influence <= 0 {
 			continue
 		}
 
@@ -3821,13 +4057,122 @@ func (m *Model) riverBankProtectionSurfaceAt(
 		)
 		if !found || surface > highest {
 			highest = surface
+			highestWeight = influence
 			found = true
 		}
 	}
-	return highest, found
+	return highest, highestWeight, found
+}
+
+func riverProtectedSurface(
+	surface,
+	activeSurface,
+	activeWeight float64,
+) float64 {
+	if math.IsInf(activeSurface, -1) || activeSurface <= surface {
+		return surface
+	}
+	return lerp(
+		surface,
+		activeSurface,
+		clamp(activeWeight, 0, 1),
+	)
+}
+
+func riverBankProtectionWeightAtForGeometry(
+	geometryVersion uint8,
+	rivers []RiverSegment,
+	ids []int,
+	worldX,
+	worldZ float64,
+) float64 {
+	if geometryVersion < 8 {
+		return 0
+	}
+	weight := 0.0
+	for _, id := range ids {
+		if id < 0 || id >= len(rivers) {
+			continue
+		}
+		seg := rivers[id]
+		t, distance := pointRiverSegmentForGeometry(
+			geometryVersion,
+			worldX,
+			worldZ,
+			seg,
+		)
+		halfWidth := riverMouthHalfWidth(seg, t)
+		bankRadius := halfWidth + riverBankBlendForSegment(seg, t)
+		if distance < bankRadius {
+			bankWeight := 1 - smoothstep(
+				halfWidth,
+				bankRadius,
+				distance,
+			)
+			weight = math.Max(weight, bankWeight)
+		}
+		_, deltaDistance, deltaHalfWidth, deltaBankRadius, deltaOK :=
+			riverDeltaPoint(seg, t, worldX, worldZ)
+		if deltaOK && deltaDistance < deltaBankRadius {
+			deltaWeight := 1 - smoothstep(
+				deltaHalfWidth,
+				deltaBankRadius,
+				deltaDistance,
+			)
+			weight = math.Max(weight, deltaWeight)
+		}
+	}
+	return clamp(weight, 0, 1)
+}
+
+func riverChannelShoulder(
+	baseHeight,
+	surface float64,
+) float64 {
+	return math.Min(baseHeight, surface+0.0022)
+}
+
+func riverMinimumWetDepth(
+	geometryVersion uint8,
+	centerDepth,
+	channelDistance,
+	channelHalfWidth float64,
+) float64 {
+	depth := 0.5 * centerDepth
+	if geometryVersion < 8 || channelHalfWidth <= 1e-9 {
+		return depth
+	}
+	// Keep the navigable inner channel unchanged, but let the forced minimum
+	// depth disappear smoothly through the outer fifth of the hydraulic
+	// corridor. The geometric bank profile can then meet the dry bank without
+	// a one-block 5-8 block-deep trench wall.
+	const fadeStartFraction = 0.80
+	fadeStart := fadeStartFraction * channelHalfWidth
+	weight := 1 - smoothstep(
+		fadeStart,
+		channelHalfWidth,
+		channelDistance,
+	)
+	return depth * clamp(weight, 0, 1)
 }
 
 func riverBankProtectedAt(
+	rivers []RiverSegment,
+	ids []int,
+	worldX,
+	worldZ float64,
+) bool {
+	return riverBankProtectedAtForGeometry(
+		8,
+		rivers,
+		ids,
+		worldX,
+		worldZ,
+	)
+}
+
+func riverBankProtectedAtForGeometry(
+	geometryVersion uint8,
 	rivers []RiverSegment,
 	ids []int,
 	worldX,
@@ -3838,7 +4183,12 @@ func riverBankProtectedAt(
 			continue
 		}
 		seg := rivers[id]
-		t, distance := pointRiverSegment(worldX, worldZ, seg)
+		t, distance := pointRiverSegmentForGeometry(
+			geometryVersion,
+			worldX,
+			worldZ,
+			seg,
+		)
 		bankRadius := riverMouthHalfWidth(seg, t) +
 			riverBankBlendForSegment(seg, t)
 		if distance < bankRadius {
@@ -3861,7 +4211,12 @@ func (m *Model) riverOverlapCount(worldX, worldZ float64) int {
 	count := 0
 	for _, id := range m.riverBuckets[bucket] {
 		seg := m.Rivers[id]
-		t, distance := pointRiverSegment(worldX, worldZ, seg)
+		t, distance := pointRiverSegmentForGeometry(
+			m.Config.RiverGeometryVersion,
+			worldX,
+			worldZ,
+			seg,
+		)
 		if distance < riverMouthHalfWidth(seg, t) {
 			count++
 		}

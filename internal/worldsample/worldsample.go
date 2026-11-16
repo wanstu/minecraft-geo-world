@@ -207,7 +207,19 @@ func (m *Model) riverWaterSurface(
 	}
 	surface = math.Min(1, surface)
 	localDepth := surface - ground.FinalHeight
-	if localDepth < m.Config.MinRiverWaterDepthNormalized {
+	minimumVisibleDepth := m.Config.MinRiverWaterDepthNormalized
+	if m.Ground.Config.RiverGeometryVersion >= 8 {
+		// Geometry v8 owns the whole curved hydraulic half-width continuously.
+		// Fade the visibility threshold toward the lateral edge so a shallow
+		// river margin cannot be reclassified as a one-block dry hole after the
+		// Waterbed geometry already marked it as river. Keep a quarter-threshold
+		// floor to reject numerical puddles and near-zero residual depth.
+		minimumVisibleDepth *= math.Max(
+			0.25,
+			math.Max(0, math.Min(1, ground.RiverWeight)),
+		)
+	}
+	if localDepth < minimumVisibleDepth {
 		return 0, 0, false
 	}
 	return surface, localDepth, true

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""GeoWorld v0.1.6 automated release-readiness gate.
+"""GeoWorld v0.1.6 release-state gate.
 
-This gate intentionally does not replace the manual in-game visual acceptance.
+This gate validates the current blocked candidate state. It does not replace
+the manual in-game visual acceptance or the post-v8 nine-target release rebuild.
 """
 import json
 import re
@@ -14,25 +15,42 @@ PROFILE = (ROOT / "internal/generator/profile.go").read_text(encoding="utf-8")
 ENGINE = (ROOT / "java/minecraft-common/src/main/java/geoworld/minecraft/common/engine/GeoWorldEngineBridge.java").read_text(encoding="utf-8")
 R81C = json.loads((ROOT / "docs/acceptance/r81c_receiver_model_candidate.json").read_text(encoding="utf-8"))
 ANVIL = json.loads((ROOT / "docs/acceptance/r81c_actual_anvil_water_scan.json").read_text(encoding="utf-8"))
+FRAGMENTATION = json.loads((ROOT / "docs/acceptance/r81c_fragmentation_fix.json").read_text(encoding="utf-8"))
 READINESS = json.loads((ROOT / "docs/acceptance/v016_release_readiness.json").read_text(encoding="utf-8"))
 
+
 class V016ReleaseGate(unittest.TestCase):
-    def test_rules_identity_is_v123(self):
+    def test_rules_identity_and_geometry_versioning(self):
         self.assertRegex(PROFILE, r'CurrentGenerationRulesVersion\s*=\s*"geoworld-rules-v1\.1\.23"')
         self.assertRegex(ENGINE, r'EXPECTED_GENERATION_RULES_VERSION\s*=\s*\r?\n?\s*"geoworld-rules-v1\.1\.23"')
+        self.assertRegex(PROFILE, r'case "geoworld-rules-v1\.1\.23":\s*\n\s*cfg\.Waterbed\.RiverGeometryVersion = 8')
+        self.assertRegex(PROFILE, r'case "geoworld-rules-v1\.1\.22":\s*\n\s*cfg\.Waterbed\.RiverGeometryVersion = 7')
 
-    def test_r81c_actual_anvil_acceptance(self):
+    def test_original_r81c_anvil_water_wall_acceptance_remains_recorded(self):
         self.assertEqual(R81C["candidateRules"], "geoworld-rules-v1.1.23")
         self.assertEqual(R81C["minecraftVoxelAcceptance"], "passed_neoforge_1.21.1_full_anvil")
         self.assertFalse(R81C["published"])
-        self.assertTrue(R81C["actualWorldBeforeAfterModelBytesIdentical"])
         self.assertEqual(R81C["actualAnvilAcceptance"]["oldWorldNegativeControlDetectedWalls"], 50)
         for key in ("r509", "r915"):
             self.assertEqual(ANVIL[key]["missingColumns"], 0)
             self.assertEqual(ANVIL[key]["waterWallsGt1"], 0)
             self.assertEqual(ANVIL[key]["maxAdjacentWetTopDrop"], 0)
 
-    def test_ci_release_matrix_is_nine_targets(self):
+    def test_fragmentation_regression_is_zero_in_all_reported_regions(self):
+        comparison = FRAGMENTATION["fixedSeedModelComparison"]
+        self.assertEqual(FRAGMENTATION["geometryVersion"]["old"], 7)
+        self.assertEqual(FRAGMENTATION["geometryVersion"]["new"], 8)
+        self.assertTrue(comparison["compatibilityBaselineRestored"])
+        self.assertEqual(comparison["oldTotalArtificialEdges"], 2299)
+        self.assertEqual(comparison["newTotalArtificialEdges"], 0)
+        self.assertEqual(len(comparison["regions"]), 4)
+        for region in comparison["regions"]:
+            self.assertGreater(region["oldArtificialEdges"], 0)
+            self.assertEqual(region["newArtificialEdges"], 0)
+            self.assertGreater(region["oldMaxArtificialJump"], 0)
+            self.assertEqual(region["newMaxArtificialJump"], 0)
+
+    def test_ci_release_matrix_definition_is_nine_targets(self):
         def matrix(job, next_job):
             section = WORKFLOW.split(f"  {job}:\n", 1)[1].split(f"  {next_job}:\n", 1)[0]
             return re.findall(
@@ -45,26 +63,29 @@ class V016ReleaseGate(unittest.TestCase):
         self.assertEqual(len(set(verify)), 9)
         self.assertEqual(verify, release)
 
-    def test_release_workflow_injects_tag_version_and_requires_master(self):
-        self.assertIn("-Pmod_version=$env:MOD_VERSION", WORKFLOW)
-        self.assertIn("Release tag must point to current master.", WORKFLOW)
-        self.assertIn("Exactly nine verified Minecraft/loader artifacts are required.", WORKFLOW)
+    def test_current_1211_neoforge_candidate_is_revalidated(self):
+        candidate = READINESS["currentCandidate"]
+        evidence = FRAGMENTATION["candidateJar"]
+        self.assertEqual(candidate["minecraft"], "1.21.1")
+        self.assertEqual(candidate["loader"], "neoforge")
+        self.assertEqual(candidate["version"], "0.1.6")
+        self.assertEqual(candidate["sha256"], evidence["sha256"])
+        self.assertEqual(candidate["bytes"], evidence["bytes"])
+        self.assertRegex(candidate["sha256"], r"^[0-9a-f]{64}$")
+        self.assertTrue(candidate["sixNativeEnginesVerified"])
+        self.assertEqual(candidate["cleanCheckBuild"], "passed")
+        self.assertEqual(candidate["fullGoTest"], "passed")
 
-    def test_candidate_artifact_evidence_is_complete(self):
-        artifacts = READINESS["candidateArtifacts"]
-        self.assertEqual(len(artifacts), 9)
-        self.assertEqual(len({(a["minecraft"], a["loader"]) for a in artifacts}), 9)
-        for artifact in artifacts:
-            self.assertEqual(artifact["version"], "0.1.6")
-            self.assertRegex(artifact["sha256"], r"^[0-9a-f]{64}$")
-            self.assertGreater(artifact["bytes"], 0)
-            self.assertTrue(artifact["sixNativeEnginesVerified"])
-
-    def test_manual_visual_gate_remains_explicitly_pending(self):
-        self.assertEqual(READINESS["automatedReleaseReadiness"], "passed")
-        self.assertEqual(READINESS["manualVisualAcceptance"], "pending")
+    def test_release_remains_blocked_until_visual_and_full_matrix_revalidation(self):
+        self.assertEqual(READINESS["automatedReleaseReadiness"], "revalidation_pending")
+        self.assertEqual(READINESS["manualVisualAcceptance"], "pending_retest")
+        self.assertEqual(READINESS["releaseMatrix"]["postV8CurrentMatrix"], "pending_full_rebuild_after_visual_acceptance")
+        self.assertEqual(READINESS["releaseMatrix"]["currentValidatedTargets"], 1)
         self.assertFalse(READINESS["releaseAllowed"])
         self.assertFalse(READINESS["published"])
+        self.assertEqual(FRAGMENTATION["manualVisualRetest"], "pending")
+        self.assertEqual(FRAGMENTATION["fullNineTargetPostV8Matrix"], "pending")
+
 
 if __name__ == "__main__":
     unittest.main()

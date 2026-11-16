@@ -10,6 +10,108 @@ import (
 	"geoworld/internal/world"
 )
 
+func TestRiverGeometryV8SafeguardsCurvedMouthNearestPoint(t *testing.T) {
+	seg := RiverSegment{
+		X0:                     -1088,
+		Z0:                     -960,
+		X1:                     -1088,
+		Z1:                     -1088,
+		HalfWidth:              43.357989436504546,
+		MeanderOffset:          19.105479156720644,
+		OceanMouth:             true,
+		ReceiverSurfaceDefined: true,
+		ReceiverSurface:        0.5,
+		MouthExpansionVersion:  5,
+	}
+
+	tests := []struct {
+		x, z float64
+	}{
+		{-1045, -1144},
+		{-1044, -1144},
+		{-1021, -1132},
+		{-1020, -1132},
+	}
+	previousDistance := 0.0
+	for i, tt := range tests {
+		gotT, gotDistance := pointRiverSegmentForGeometry(8, tt.x, tt.z, seg)
+
+		bestT := 0.0
+		bestDistance := math.Inf(1)
+		for sample := 0; sample <= 8192; sample++ {
+			candidateT := float64(sample) / 8192
+			x, z := RiverCenterPoint(seg, candidateT)
+			distance := math.Hypot(tt.x-x, tt.z-z)
+			if distance < bestDistance {
+				bestT = candidateT
+				bestDistance = distance
+			}
+		}
+		if math.Abs(gotDistance-bestDistance) > 0.02 {
+			t.Fatalf(
+				"point (%.0f,%.0f) nearest distance=%.6f want %.6f at t=%.6f, got t=%.6f",
+				tt.x, tt.z, gotDistance, bestDistance, bestT, gotT,
+			)
+		}
+		if gotT < 0.999 {
+			t.Fatalf(
+				"point (%.0f,%.0f) jumped away from receiver endpoint: t=%.9f distance=%.6f",
+				tt.x, tt.z, gotT, gotDistance,
+			)
+		}
+		if i > 0 && math.Abs(gotDistance-previousDistance) > 10 {
+			t.Fatalf(
+				"adjacent curved-mouth probes are discontinuous: previous=%.6f current=%.6f",
+				previousDistance, gotDistance,
+			)
+		}
+		previousDistance = gotDistance
+	}
+
+	legacyT, legacyDistance := pointRiverSegmentForGeometry(
+		7,
+		-1044,
+		-1144,
+		seg,
+	)
+	if legacyT != 0 || legacyDistance < 180 {
+		t.Fatalf(
+			"v7 compatibility path unexpectedly changed: t=%.9f distance=%.6f",
+			legacyT,
+			legacyDistance,
+		)
+	}
+}
+
+func TestRiverGeometryV8WeightsOverlappingBankSurfaceInfluence(t *testing.T) {
+	const (
+		lowSurface  = 0.477374300
+		highSurface = 0.494499248
+		edgeWeight  = 0.002606
+	)
+
+	got := riverProtectedSurface(
+		lowSurface,
+		highSurface,
+		edgeWeight,
+	)
+	want := lerp(lowSurface, highSurface, edgeWeight)
+	if math.Abs(got-want) > 1e-12 {
+		t.Fatalf("v8 weighted bank surface=%.12f want %.12f", got, want)
+	}
+	if highSurface-got < 0.99*(highSurface-lowSurface) {
+		t.Fatalf(
+			"near-zero neighboring bank weight still applied most of the high datum: got=%.9f low=%.9f high=%.9f",
+			got,
+			lowSurface,
+			highSurface,
+		)
+	}
+	if got := riverProtectedSurface(lowSurface, highSurface, 1); math.Abs(got-highSurface) > 1e-12 {
+		t.Fatalf("full bank influence did not preserve connected high datum: %.12f", got)
+	}
+}
+
 func TestRareMacroLakeScaleIsLockedAndPhysical(t *testing.T) {
 	large := hydrology.Lake{
 		ID:          7,
@@ -58,6 +160,72 @@ func TestV5FluvialDetailExtendsBeyondLegacyBank(t *testing.T) {
 	}
 	if got := riverFluvialReach(modern); got <= legacyBank+40 {
 		t.Fatalf("v5 floodplain reach did not extend materially: bank=%.3f reach=%.3f", legacyBank, got)
+	}
+}
+
+func TestRiverGeometryV8FluvialDetailEntersContinuouslyOutsideBank(t *testing.T) {
+	seg := RiverSegment{
+		X0: 0, Z0: 0, X1: 256, Z1: 0,
+		Bed0: 0.55, Bed1: 0.55,
+		HalfWidth:             32,
+		MouthExpansionVersion: 5,
+	}
+	tValue := 0.5
+	cx, cz, nx, nz := RiverCenterFrame(seg, tValue)
+	bankRadius := riverMouthHalfWidth(seg, tValue) +
+		riverBankBlendBlocks(seg.HalfWidth)
+	baseHeight := 0.62
+	surface := 0.55
+
+	insideDistance := bankRadius - 0.1
+	inside := applyRiverFluvialDryDetail(
+		8,
+		seg,
+		tValue,
+		cx+nx*insideDistance,
+		cz+nz*insideDistance,
+		baseHeight,
+		baseHeight,
+		surface,
+		insideDistance,
+	)
+	outsideDistance := bankRadius + 0.1
+	outside := applyRiverFluvialDryDetail(
+		8,
+		seg,
+		tValue,
+		cx+nx*outsideDistance,
+		cz+nz*outsideDistance,
+		baseHeight,
+		baseHeight,
+		surface,
+		outsideDistance,
+	)
+	if math.Abs(inside-outside) > 1e-4 {
+		t.Fatalf(
+			"v8 fluvial bank edge is discontinuous: inside=%.9f outside=%.9f",
+			inside,
+			outside,
+		)
+	}
+
+	legacyOutside := applyRiverFluvialDryDetail(
+		7,
+		seg,
+		tValue,
+		cx+nx*outsideDistance,
+		cz+nz*outsideDistance,
+		baseHeight,
+		baseHeight,
+		surface,
+		outsideDistance,
+	)
+	if baseHeight-legacyOutside < 0.005 {
+		t.Fatalf(
+			"legacy control no longer demonstrates hard bank-edge entry: base=%.6f legacy=%.6f",
+			baseHeight,
+			legacyOutside,
+		)
 	}
 }
 
@@ -147,6 +315,7 @@ func TestV5NaturalLeveeIsSparseInterruptedAndLegacyLocked(t *testing.T) {
 	reach := riverFluvialReach(modern)
 	distance := bankRadius + 0.10*(reach-bankRadius)
 	got := applyRiverFluvialDryDetail(
+		7,
 		modern,
 		tValue,
 		cx+nx*distance,
@@ -515,6 +684,7 @@ func TestV5OxbowWaterIsClosedAndUsesOneFlatDatum(t *testing.T) {
 		t.Fatal("oxbow must not invade the active river bank protection corridor")
 	}
 	if got := applyRiverFluvialDryDetail(
+		7,
 		seg,
 		tMid,
 		insideX,

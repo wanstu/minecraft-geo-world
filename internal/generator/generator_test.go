@@ -325,8 +325,8 @@ func TestV122NaturalHeadwatersPreserveLegacyWorldGraph(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if legacy.Config.Waterbed.RiverGeometryVersion != 6 || modern.Config.Waterbed.RiverGeometryVersion != 7 {
-		t.Fatalf("unexpected locked geometry versions %d and %d", legacy.Config.Waterbed.RiverGeometryVersion, modern.Config.Waterbed.RiverGeometryVersion)
+	if legacy.Config.Waterbed.RiverGeometryVersion != 6 || modern.Config.Waterbed.RiverGeometryVersion != 8 {
+		t.Fatalf("unexpected locked/current geometry versions %d and %d", legacy.Config.Waterbed.RiverGeometryVersion, modern.Config.Waterbed.RiverGeometryVersion)
 	}
 	if len(legacy.Waterbed.Rivers) != len(modern.Waterbed.Rivers) {
 		t.Fatalf("river topology changed %d -> %d", len(legacy.Waterbed.Rivers), len(modern.Waterbed.Rivers))
@@ -431,8 +431,8 @@ func TestRiverDepthDefaultsAreGenerationRuleLocked(t *testing.T) {
 	if got := current.WorldSample.RiverCenterDepthNormalized; math.Abs(got-0.004) > 1e-12 {
 		t.Fatalf("current river center depth=%v want=0.004", got)
 	}
-	if got := current.Waterbed.RiverGeometryVersion; got != 7 {
-		t.Fatalf("current river geometry version=%d want=7", got)
+	if got := current.Waterbed.RiverGeometryVersion; got != 8 {
+		t.Fatalf("current river geometry version=%d want=8", got)
 	}
 	if got := current.Geomorph.LongitudinalGradeVersion; got != 1 {
 		t.Fatalf("current longitudinal grade version=%d want=1", got)
@@ -941,8 +941,15 @@ func TestR81cCoastalBackwaterProfileIsolatedFromLockedV122(t *testing.T) {
 	if locked.WorldSample.CoastalBackwaterVersion != 0 {
 		t.Fatalf("locked v1.1.22 changed coastal rule: %d", locked.WorldSample.CoastalBackwaterVersion)
 	}
-	if modern.Waterbed.RiverGeometryVersion != locked.Waterbed.RiverGeometryVersion ||
-		modern.WorldSample.RiverCenterDepthNormalized != locked.WorldSample.RiverCenterDepthNormalized {
-		t.Fatal("coastal backwater profile unexpectedly modified existing river geometry")
+	if modern.Waterbed.RiverGeometryVersion != 8 ||
+		locked.Waterbed.RiverGeometryVersion != 7 {
+		t.Fatalf(
+			"nearest-point geometry version isolation failed: modern=%d locked=%d",
+			modern.Waterbed.RiverGeometryVersion,
+			locked.Waterbed.RiverGeometryVersion,
+		)
+	}
+	if modern.WorldSample.RiverCenterDepthNormalized != locked.WorldSample.RiverCenterDepthNormalized {
+		t.Fatal("coastal backwater profile unexpectedly modified river depth")
 	}
 }

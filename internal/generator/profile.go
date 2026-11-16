@@ -388,7 +388,9 @@ func applyWorldProfile(cfg *Config, geometry world.GridGeometry) {
 	}
 	if cfg.Waterbed.RiverGeometryVersion == 0 {
 		switch cfg.WorldProfile.GenerationRulesVersion {
-		case "geoworld-rules-v1.1.23", "geoworld-rules-v1.1.22":
+		case "geoworld-rules-v1.1.23":
+			cfg.Waterbed.RiverGeometryVersion = 8
+		case "geoworld-rules-v1.1.22":
 			cfg.Waterbed.RiverGeometryVersion = 7
 		case "geoworld-rules-v1.1.21":
 			cfg.Waterbed.RiverGeometryVersion = 6

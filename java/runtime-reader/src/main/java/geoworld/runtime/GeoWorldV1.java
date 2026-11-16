@@ -431,7 +431,13 @@ public final class GeoWorldV1 {
     private record WaterbedConfig(
         double minRiverHalfWidthBlocks,
         double maxRiverHalfWidthBlocks,
-        double minLakeWaterDepthNormalized
+        double minLakeWaterDepthNormalized,
+        int riverGeometryVersion
+    ) {}
+
+    private record RiverBankProtection(
+        double surface,
+        double weight
     ) {}
 
     private static final class RiverBankCeilingCache {
@@ -469,12 +475,18 @@ public final class GeoWorldV1 {
         void prepare(
             List<RiverSegment> candidates,
             double x,
-            double z
+            double z,
+            int riverGeometryVersion
         ) {
             ensureCapacity(candidates.size());
             for (int i = 0, n = candidates.size(); i < n; i++) {
                 RiverSegment segment = candidates.get(i);
-                PointSegment point = pointRiverSegment(x, z, segment);
+                PointSegment point = pointRiverSegmentForGeometry(
+                    riverGeometryVersion,
+                    x,
+                    z,
+                    segment
+                );
                 points[i] = point;
                 deltas[i] = riverDeltaPoint(
                     segment,
@@ -808,13 +820,15 @@ public final class GeoWorldV1 {
         );
     }
 
-    private double riverBankProtectionSurfaceAt(
+    private RiverBankProtection riverBankProtectionSurfaceAt(
         List<RiverSegment> candidates,
         RiverGeometryScratch geometry,
         double x,
         double z
     ) {
         double highest = Double.NEGATIVE_INFINITY;
+        double highestWeight = 0.0;
+        boolean found = false;
         for (int i = 0, n = candidates.size(); i < n; i++) {
             RiverSegment segment = candidates.get(i);
             PointSegment point = geometry.point(i);
@@ -823,10 +837,28 @@ public final class GeoWorldV1 {
             double bankRadius =
                 halfWidth + riverBankBlendForSegment(segment, point.t());
             DeltaPoint delta = geometry.delta(i);
-            boolean inBank = point.distance() < bankRadius;
-            boolean inDeltaBank =
-                delta != null && delta.distance() < delta.bankRadius();
-            if (!inBank && !inDeltaBank) {
+
+            double influence = 0.0;
+            if (point.distance() < bankRadius) {
+                influence =
+                    1.0 -
+                    smoothstep(
+                        halfWidth,
+                        bankRadius,
+                        point.distance()
+                    );
+            }
+            if (delta != null && delta.distance() < delta.bankRadius()) {
+                double deltaInfluence =
+                    1.0 -
+                    smoothstep(
+                        delta.halfWidth(),
+                        delta.bankRadius(),
+                        delta.distance()
+                    );
+                influence = Math.max(influence, deltaInfluence);
+            }
+            if (influence <= 0.0) {
                 continue;
             }
 
@@ -851,9 +883,99 @@ public final class GeoWorldV1 {
                 naturalSurface,
                 Math.min(surface, bankCeiling)
             );
-            highest = Math.max(highest, surface);
+            if (!found || surface > highest) {
+                highest = surface;
+                highestWeight = influence;
+                found = true;
+            }
         }
-        return highest;
+        return found
+            ? new RiverBankProtection(highest, highestWeight)
+            : null;
+    }
+
+    private static double riverProtectedSurface(
+        double surface,
+        double activeSurface,
+        double activeWeight
+    ) {
+        if (
+            !Double.isFinite(activeSurface) ||
+            activeSurface <= surface
+        ) {
+            return surface;
+        }
+        return lerp(
+            surface,
+            activeSurface,
+            clamp(activeWeight, 0.0, 1.0)
+        );
+    }
+
+    private static double riverBankProtectionWeightAt(
+        List<RiverSegment> candidates,
+        RiverGeometryScratch geometry
+    ) {
+        double weight = 0.0;
+        for (int i = 0, n = candidates.size(); i < n; i++) {
+            RiverSegment segment = candidates.get(i);
+            PointSegment point = geometry.point(i);
+            double halfWidth =
+                riverMouthHalfWidth(segment, point.t());
+            double bankRadius =
+                halfWidth + riverBankBlendForSegment(segment, point.t());
+            if (point.distance() < bankRadius) {
+                double bankWeight =
+                    1 -
+                    smoothstep(
+                        halfWidth,
+                        bankRadius,
+                        point.distance()
+                    );
+                weight = Math.max(weight, bankWeight);
+            }
+            DeltaPoint delta = geometry.delta(i);
+            if (delta != null && delta.distance() < delta.bankRadius()) {
+                double deltaWeight =
+                    1 -
+                    smoothstep(
+                        delta.halfWidth(),
+                        delta.bankRadius(),
+                        delta.distance()
+                    );
+                weight = Math.max(weight, deltaWeight);
+            }
+        }
+        return clamp(weight, 0, 1);
+    }
+
+    private static double riverChannelShoulder(
+        double baseHeight,
+        double surface
+    ) {
+        return Math.min(baseHeight, surface + 0.0022);
+    }
+
+    private static double riverMinimumWetDepth(
+        int geometryVersion,
+        double centerDepth,
+        double channelDistance,
+        double channelHalfWidth
+    ) {
+        double depth = 0.5 * centerDepth;
+        if (geometryVersion < 8 || channelHalfWidth <= 1.0e-9) {
+            return depth;
+        }
+        final double fadeStartFraction = 0.80;
+        double fadeStart = fadeStartFraction * channelHalfWidth;
+        double weight =
+            1.0 -
+            smoothstep(
+                fadeStart,
+                channelHalfWidth,
+                channelDistance
+            );
+        return depth * clamp(weight, 0.0, 1.0);
     }
 
     private static boolean riverBankProtectedAt(
@@ -863,7 +985,7 @@ public final class GeoWorldV1 {
     ) {
         for (int i = 0, n = candidates.size(); i < n; i++) {
             RiverSegment segment = candidates.get(i);
-            PointSegment point = pointRiverSegment(x, z, segment);
+            PointSegment point = pointRiverSegmentLegacy(x, z, segment);
             double bankRadius =
                 riverMouthHalfWidth(segment, point.t()) +
                 riverBankBlendForSegment(segment, point.t());
@@ -1381,7 +1503,12 @@ public final class GeoWorldV1 {
                     continue;
                 }
             }
-            PointSegment point = pointRiverSegment(worldX, worldZ, segment);
+            PointSegment point = pointRiverSegmentForGeometry(
+                this.waterbedConfig.riverGeometryVersion(),
+                worldX,
+                worldZ,
+                segment
+            );
             double bankDistance = Math.max(
                 0.0,
                 point.distance() - riverMouthHalfWidth(segment, point.t())
@@ -1501,7 +1628,12 @@ public final class GeoWorldV1 {
 
         for (int i = 0; i < this.rivers.size(); i++) {
             RiverSegment segment = this.rivers.get(i);
-            PointSegment point = pointRiverSegment(worldX, worldZ, segment);
+            PointSegment point = pointRiverSegmentForGeometry(
+                this.waterbedConfig.riverGeometryVersion(),
+                worldX,
+                worldZ,
+                segment
+            );
             double halfWidth = riverMouthHalfWidth(segment, point.t());
             double bankDistance = Math.max(
                 0.0,
@@ -3443,7 +3575,10 @@ public final class GeoWorldV1 {
                     waterbedConfigObject,
                     "MinLakeWaterDepthNormalized"
                 )
-                : 0.003
+                : 0.003,
+            waterbedConfigObject.containsKey("RiverGeometryVersion")
+                ? Json.intValue(waterbedConfigObject, "RiverGeometryVersion")
+                : 0
         );
         List<RiverSegment> rivers = parseRivers(
             Json.arrayOrEmpty(
@@ -3761,9 +3896,15 @@ public final class GeoWorldV1 {
             }
             riverSurface = Math.min(1.0, riverSurface);
             riverDepth = riverSurface - ground.finalHeight();
-            riverValid =
-                riverDepth >=
+            double minimumVisibleDepth =
                 worldSampleConfig.minRiverWaterDepthNormalized();
+            if (this.waterbedConfig.riverGeometryVersion() >= 8) {
+                minimumVisibleDepth *= Math.max(
+                    0.25,
+                    clamp(ground.riverWeight(), 0.0, 1.0)
+                );
+            }
+            riverValid = riverDepth >= minimumVisibleDepth;
         }
 
         if (
@@ -3842,7 +3983,12 @@ public final class GeoWorldV1 {
 
         List<RiverSegment> riverCandidates = this.riverCandidates(x, z);
         RiverGeometryScratch riverGeometry = RIVER_GEOMETRY_SCRATCH.get();
-        riverGeometry.prepare(riverCandidates, x, z);
+        riverGeometry.prepare(
+            riverCandidates,
+            x,
+            z,
+            this.waterbedConfig.riverGeometryVersion()
+        );
         String rulesVersion = this.worldProfile.generationRulesVersion();
         boolean boundedRiverBanks =
             "geoworld-rules-v1.1.12".equals(rulesVersion) ||
@@ -3850,18 +3996,30 @@ public final class GeoWorldV1 {
             "geoworld-rules-v1.1.14".equals(rulesVersion) ||
             ("geoworld-rules-v1.1.15".equals(rulesVersion) || "geoworld-rules-v1.1.16".equals(rulesVersion) || "geoworld-rules-v1.1.18".equals(rulesVersion) || "geoworld-rules-v1.1.19".equals(rulesVersion) || ("geoworld-rules-v1.1.20".equals(rulesVersion) || ("geoworld-rules-v1.1.21".equals(rulesVersion) || ("geoworld-rules-v1.1.22".equals(rulesVersion) || "geoworld-rules-v1.1.23".equals(rulesVersion)))));
         double activeRiverBankSurface = Double.NEGATIVE_INFINITY;
+        double activeRiverBankSurfaceWeight = 0.0;
         boolean activeRiverBankProtected;
+        double activeRiverBankProtectionWeight =
+            this.waterbedConfig.riverGeometryVersion() >= 8
+                ? riverBankProtectionWeightAt(
+                    riverCandidates,
+                    riverGeometry
+                )
+                : 0.0;
         if (boundedRiverBanks) {
-            activeRiverBankSurface = riverBankProtectionSurfaceAt(
-                riverCandidates,
-                riverGeometry,
-                x,
-                z
-            );
-            // The protection-surface pass uses exactly the same bank/delta
-            // membership test, so its finite result also answers protection.
-            activeRiverBankProtected =
-                activeRiverBankSurface > Double.NEGATIVE_INFINITY;
+            RiverBankProtection protection =
+                riverBankProtectionSurfaceAt(
+                    riverCandidates,
+                    riverGeometry,
+                    x,
+                    z
+                );
+            if (protection != null) {
+                activeRiverBankSurface = protection.surface();
+                activeRiverBankSurfaceWeight = protection.weight();
+                activeRiverBankProtected = true;
+            } else {
+                activeRiverBankProtected = false;
+            }
         } else {
             // Preserve locked behavior for pre-v1.1.12 models.
             activeRiverBankProtected = riverBankProtectedAt(
@@ -3939,12 +4097,22 @@ public final class GeoWorldV1 {
                     Math.min(surface, bankCeiling)
                 );
             }
+            if (this.waterbedConfig.riverGeometryVersion() >= 8) {
+                surface = riverProtectedSurface(
+                    surface,
+                    activeRiverBankSurface,
+                    activeRiverBankSurfaceWeight
+                );
+            }
 
             if (deltaInBank && !deltaInWater) {
-                double bankSurface = Math.max(
-                    surface,
-                    activeRiverBankSurface
-                );
+                double bankSurface = surface;
+                if (this.waterbedConfig.riverGeometryVersion() < 8) {
+                    bankSurface = Math.max(
+                        surface,
+                        activeRiverBankSurface
+                    );
+                }
                 double innerBank =
                     Math.min(baseHeight, bankSurface + 0.0018);
                 double bankWeight =
@@ -3963,10 +4131,13 @@ public final class GeoWorldV1 {
 
             if (point.distance() >= mouthHalfWidth && !deltaInWater) {
                 if (point.distance() < bankRadius) {
-                    double bankSurface = Math.max(
-                        surface,
-                        activeRiverBankSurface
-                    );
+                    double bankSurface = surface;
+                    if (this.waterbedConfig.riverGeometryVersion() < 8) {
+                        bankSurface = Math.max(
+                            surface,
+                            activeRiverBankSurface
+                        );
+                    }
                     double innerBank =
                         Math.min(baseHeight, bankSurface + 0.0022);
                     double bankWeight =
@@ -3983,11 +4154,14 @@ public final class GeoWorldV1 {
                     }
                 }
 
-                // Fluvial dry detail belongs outside every active river-bank
-                // protection corridor. A meander from one segment must not
-                // excavate another live segment at a confluence or overlap.
-                if (!activeRiverBankProtected) {
-                    finalHeight = applyRiverFluvialDryDetail(
+                // Geometry v8 suppresses dry fluvial detail continuously
+                // across a live bank corridor instead of switching it off at
+                // one block. This removes vertical seams where floodplains of
+                // neighboring reaches meet an active channel.
+                if (this.waterbedConfig.riverGeometryVersion() >= 8) {
+                    double undetailedHeight = finalHeight;
+                    double detailedHeight = applyRiverFluvialDryDetail(
+                        this.waterbedConfig.riverGeometryVersion(),
                         segment,
                         point.t(),
                         x,
@@ -3997,6 +4171,29 @@ public final class GeoWorldV1 {
                         surface,
                         point.distance()
                     );
+                    finalHeight = lerp(
+                        detailedHeight,
+                        undetailedHeight,
+                        activeRiverBankProtectionWeight
+                    );
+                }
+
+                // Oxbow water still uses hard live-bank exclusion. Legacy
+                // geometry also keeps the historical all-or-nothing behavior.
+                if (!activeRiverBankProtected) {
+                    if (this.waterbedConfig.riverGeometryVersion() < 8) {
+                        finalHeight = applyRiverFluvialDryDetail(
+                            this.waterbedConfig.riverGeometryVersion(),
+                            segment,
+                            point.t(),
+                            x,
+                            z,
+                            baseHeight,
+                            finalHeight,
+                            surface,
+                            point.distance()
+                        );
+                    }
 
                     double[] oxbow = riverOxbowWater(
                         segment,
@@ -4087,8 +4284,10 @@ public final class GeoWorldV1 {
                 riverDatumWeight = weight;
                 riverDatumT = point.t();
             }
-            double channelShoulder =
-                Math.min(baseHeight, surface + 0.0022);
+            double channelShoulder = riverChannelShoulder(
+                baseHeight,
+                surface
+            );
             double outletWeight =
                 lakeOutletSourceWeight(segment, point.t());
             if (outletWeight > 0) {
@@ -4136,11 +4335,18 @@ public final class GeoWorldV1 {
                     channelHalfWidth * RIVER_WET_CORE_FRACTION;
             if (v4WetCore && insideWetCore) {
                 geometryWetOwned = true;
-                double minimumWetDepth = 0.5 * centerDepth;
-                candidate = Math.min(
-                    candidate,
-                    Math.max(0.0, surface - minimumWetDepth)
+                double minimumWetDepth = riverMinimumWetDepth(
+                    this.waterbedConfig.riverGeometryVersion(),
+                    centerDepth,
+                    channelDistance,
+                    channelHalfWidth
                 );
+                if (minimumWetDepth > 0.0) {
+                    candidate = Math.min(
+                        candidate,
+                        Math.max(0.0, surface - minimumWetDepth)
+                    );
+                }
             }
             if (candidate < finalHeight) {
                 finalHeight = candidate;
@@ -4905,6 +5111,7 @@ public final class GeoWorldV1 {
     }
 
     private static double applyRiverFluvialDryDetail(
+        int geometryVersion,
         RiverSegment segment,
         double t,
         double worldX,
@@ -4927,6 +5134,16 @@ public final class GeoWorldV1 {
         }
 
         double phase = riverFluvialPhase(segment);
+        double entryWeight = 1.0;
+        if (geometryVersion >= 8) {
+            double entryBlend =
+                clamp(0.35 * segment.halfWidth(), 10.0, 18.0);
+            entryWeight = smoothstep(
+                0.0,
+                entryBlend,
+                Math.max(0.0, distance - bankRadius)
+            );
+        }
         if (distance >= bankRadius) {
             double n = clamp(
                 (distance - bankRadius) /
@@ -4935,6 +5152,7 @@ public final class GeoWorldV1 {
                 1.0
             );
             double envelope =
+                entryWeight *
                 (1.0 - smoothstep(0.0, 1.0, n)) * strength;
             double terrace =
                 smoothstep(0.38, 0.56, n) *
@@ -4996,6 +5214,7 @@ public final class GeoWorldV1 {
             double radius =
                 clamp(0.18 * segment.halfWidth(), 4.0, 11.0);
             double grooveWeight =
+                entryWeight *
                 (1.0 -
                     smoothstep(
                         0.35 * radius,
@@ -5703,7 +5922,203 @@ public final class GeoWorldV1 {
             tx / tangentLength
         );
     }
+    private static PointSegment pointRiverSegmentForGeometry(
+        int geometryVersion,
+        double px,
+        double pz,
+        RiverSegment segment
+    ) {
+        if (geometryVersion < 8) {
+            return pointRiverSegmentLegacy(px, pz, segment);
+        }
+        return pointRiverSegment(px, pz, segment);
+    }
+
+    private static double riverCenterDistanceSquared(
+        double px,
+        double pz,
+        RiverSegment segment,
+        double t
+    ) {
+        t = clamp(t, 0, 1);
+        double dx = segment.x1() - segment.x0();
+        double dz = segment.z1() - segment.z0();
+        double length = Math.hypot(dx, dz);
+        if (length <= 1.0e-12) {
+            double rx = segment.x0() - px;
+            double rz = segment.z0() - pz;
+            return rx * rx + rz * rz;
+        }
+        double nx = -dz / length;
+        double nz = dx / length;
+        double phase = Math.PI * t;
+        double s = Math.sin(phase);
+        double shape = segment.mouthExpansionVersion() >= 3
+            ? s * s
+            : s;
+        double x =
+            segment.x0() +
+            dx * t +
+            nx * segment.meanderOffset() * shape;
+        double z =
+            segment.z0() +
+            dz * t +
+            nz * segment.meanderOffset() * shape;
+        double rx = x - px;
+        double rz = z - pz;
+        return rx * rx + rz * rz;
+    }
+
+    // Safeguarded Newton nearest-point refinement. The legacy solver could
+    // jump between endpoints for adjacent blocks on a curved river mouth,
+    // producing one-block gaps and tall terrain needles. Geometry v8 keeps
+    // the best initial/endpoint candidate and only accepts distance-reducing
+    // Newton steps.
     private static PointSegment pointRiverSegment(
+        double px,
+        double pz,
+        RiverSegment segment
+    ) {
+        double dx = segment.x1() - segment.x0();
+        double dz = segment.z1() - segment.z0();
+        double len2 = dx * dx + dz * dz;
+        if (len2 <= 1.0e-18) {
+            return new PointSegment(
+                0,
+                Math.hypot(px - segment.x0(), pz - segment.z0())
+            );
+        }
+        double length = Math.sqrt(len2);
+        double nx = -dz / length;
+        double nz = dx / length;
+        double t = clamp(
+            (
+                (px - segment.x0()) * dx +
+                (pz - segment.z0()) * dz
+            ) / len2,
+            0,
+            1
+        );
+
+        double bestT = t;
+        double bestD2 = riverCenterDistanceSquared(px, pz, segment, t);
+        if (Math.abs(segment.meanderOffset()) > 1.0e-9) {
+            final int coarseIntervals = 8;
+            for (int i = 0; i <= coarseIntervals; i++) {
+                double candidateT =
+                    (double) i / (double) coarseIntervals;
+                double candidateD2 = riverCenterDistanceSquared(
+                    px,
+                    pz,
+                    segment,
+                    candidateT
+                );
+                if (candidateD2 < bestD2) {
+                    bestT = candidateT;
+                    bestD2 = candidateD2;
+                }
+            }
+        } else {
+            double startD2 =
+                riverCenterDistanceSquared(px, pz, segment, 0);
+            if (startD2 < bestD2) {
+                bestT = 0;
+                bestD2 = startD2;
+            }
+            double endD2 =
+                riverCenterDistanceSquared(px, pz, segment, 1);
+            if (endD2 < bestD2) {
+                bestT = 1;
+                bestD2 = endD2;
+            }
+        }
+        t = bestT;
+
+        for (
+            int iter = 0;
+            iter < 6 && Math.abs(segment.meanderOffset()) > 1.0e-9;
+            iter++
+        ) {
+            double phase = Math.PI * t;
+            double s = Math.sin(phase);
+            double c = Math.cos(phase);
+            double shape;
+            double shapeDerivative;
+            double shapeSecondDerivative;
+            if (segment.mouthExpansionVersion() >= 3) {
+                shape = s * s;
+                shapeDerivative = 2 * Math.PI * s * c;
+                shapeSecondDerivative =
+                    2 * Math.PI * Math.PI * (c * c - s * s);
+            } else {
+                shape = s;
+                shapeDerivative = Math.PI * c;
+                shapeSecondDerivative = -Math.PI * Math.PI * s;
+            }
+            double x =
+                segment.x0() +
+                dx * t +
+                nx * segment.meanderOffset() * shape;
+            double z =
+                segment.z0() +
+                dz * t +
+                nz * segment.meanderOffset() * shape;
+            double tx =
+                dx + nx * segment.meanderOffset() * shapeDerivative;
+            double tz =
+                dz + nz * segment.meanderOffset() * shapeDerivative;
+            double ax =
+                nx * segment.meanderOffset() * shapeSecondDerivative;
+            double az =
+                nz * segment.meanderOffset() * shapeSecondDerivative;
+            double rx = x - px;
+            double rz = z - pz;
+            double currentD2 = rx * rx + rz * rz;
+            if (currentD2 < bestD2) {
+                bestT = t;
+                bestD2 = currentD2;
+            }
+            double f = rx * tx + rz * tz;
+            double fp =
+                tx * tx +
+                tz * tz +
+                rx * ax +
+                rz * az;
+            if (Math.abs(fp) <= 1.0e-12) {
+                break;
+            }
+            double next = clamp(t - f / fp, 0, 1);
+            if (Math.abs(next - t) <= 1.0e-8) {
+                break;
+            }
+
+            boolean accepted = false;
+            for (int backtrack = 0; backtrack < 8; backtrack++) {
+                double nextD2 =
+                    riverCenterDistanceSquared(px, pz, segment, next);
+                if (nextD2 <= currentD2 + 1.0e-12) {
+                    t = next;
+                    if (nextD2 < bestD2) {
+                        bestT = next;
+                        bestD2 = nextD2;
+                    }
+                    accepted = true;
+                    break;
+                }
+                next = 0.5 * (t + next);
+                if (Math.abs(next - t) <= 1.0e-8) {
+                    break;
+                }
+            }
+            if (!accepted) {
+                break;
+            }
+        }
+
+        return new PointSegment(bestT, Math.sqrt(bestD2));
+    }
+
+    private static PointSegment pointRiverSegmentLegacy(
         double px,
         double pz,
         RiverSegment segment

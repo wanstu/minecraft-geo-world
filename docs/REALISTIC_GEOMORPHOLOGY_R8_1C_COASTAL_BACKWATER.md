@@ -1,6 +1,6 @@
 # GeoWorld R8.1c — 河口接收水位与低岸统一（测试候选）
 
-日期：2026-11-14。状态：规则 v1.1.23 已实现，**NeoForge 1.21.1 真实 Anvil 方块验收、9 目标构建矩阵与 v0.1.6 候选 JAR 校验均已通过；仍未发布，唯一剩余门槛为游戏内视觉截图验收**。
+日期：2026-11-14。状态更新至 2026-11-16：规则 v1.1.23 已实现；2026-11-15 首轮游戏内视觉验收因严重地形破碎失败。现已以 RiverGeometryVersion 8 修复并完成 1.21.1 NeoForge 自动复验，**新的游戏内视觉复测与 post-v8 全 9 目标发布矩阵仍待完成，当前禁止发布**。
 
 ## 原始缺陷
 
@@ -11,7 +11,7 @@ Waterbed 的 riverBankSurfaceCeiling 用实际低岸限制河面，但 WorldSamp
 ## 修复设计与历史隔离
 
 - 新世界规则 v1.1.23 启用持久化 WorldSample.CoastalBackwaterVersion=1；老世界配置缺省为 0，保存的 v1.1.22 及更早规则不变。
-- RiverGeometryVersion 仍为 7；不调整 RiverSegment 的 profile、河宽、河网拓扑、特殊地貌选址。
+- 初始 R8.1c 水位修复阶段 RiverGeometryVersion 为 7；2026-11-15 视觉验收发现 v7 曲线河道最近点求解会造成地形破碎，因此新建 v1.1.23 世界现升级为 RiverGeometryVersion 8。已持久化 v7 与 v1.1.22 仍保留旧语义。
 - Waterbed.Sample 只增加附近河道原始接收水位的元数据，保留已存在的低岸保护计算。
 - 仅当河道有匹配海平面的正式 receiver，最终地面低于海平面、且河道实际湿区或沿岸已有宏观海水影响时，以海平面作为相连水体水位。
 - 保留海水资格阈值边界：河口上游湿区继续标 River，真正海洋仍标 Ocean；仅对与接收河道相邻、海洋影响大于 0.02 的低岸补充自然海水。没有 receiver 的内陆低地不被强制淹没。
@@ -39,23 +39,49 @@ eb1ffcbc19ee43e55495f2007716b1ca0a907dcedf7b493303358d689e20512f。
 
 - #509 全区域扫描范围为 x[-1136,-1008)、z[-1104,-976)，共 16,384 列，缺失 0。旧世界相邻湿格 >1 格水墙为 50 对、最大水面差 2 格；新世界为 **0 对、最大水面差 0**。
 - #915 全区域扫描范围为 x[1632,1712)、z[10400,10480)，共 6,400 列，缺失 0；相邻湿格 >1 格水墙为 **0 对、最大水面差 0**，Y61/Y62 连续水体检查仍通过。
-- 最后一处 #509 水墙根因不是 OceanMouth 接收器半径不足，而是 14 个河口 Lake 重叠格在 WorldSample/Java Runtime 中先命中 Lake 所有权，保留了更高湖面。v1.1.23 现在仅在正式 OceanMouth、低于海平面且存在沿岸海洋影响的版本化走廊内，让海平面接收器先于局部 Lake；RiverGeometryVersion 仍为 7。
+- 最后一处 #509 水墙根因不是 OceanMouth 接收器半径不足，而是 14 个河口 Lake 重叠格在 WorldSample/Java Runtime 中先命中 Lake 所有权，保留了更高湖面。该阶段 v1.1.23 仅在正式 OceanMouth、低于海平面且存在沿岸海洋影响的版本化走廊内，让海平面接收器先于局部 Lake；当时 RiverGeometryVersion 仍为 7。后续视觉破碎修复见下节。
 - 该最后优先级修复直接改变 14 个 Lake 重叠格，旧方块 Y64 统一到新方块海平面 Y62。旧验收世界由增强后的全区域脚本重新检查时会明确失败并报告 50 对水墙；新世界通过，因此验收脚本不再存在只检查中心线而漏掉内部湿格水墙的问题。
 - Go 全仓 `go test ./...` 通过；NeoForge `compileJava` 通过；Gradle `test` 构建链通过（适配器当前无 Java test source）。
 
 证据：`docs/acceptance/r81c_actual_mouth_voxels.json`、`docs/acceptance/r81c_actual_anvil_water_scan.json`、`docs/acceptance/r81c_receiver_model_candidate.json`。
 
-## 发布收敛（2026-11-15）
+## pre-v8 发布收敛历史（2026-11-15）
 
-- 发布矩阵 9/9 目标已完成 `clean check build`：26.3、26.2、26.1.2 的 NeoForge/Fabric，1.21.1 的 NeoForge/Fabric，以及 1.20.1 Fabric。
-- 9 个候选包均使用 `-Pmod_version=0.1.6` 实际构建，Loader 元数据版本均为 0.1.6。
-- 每个候选 JAR 均验证包含 Windows/Linux/macOS × x64/arm64 六套 GeoWorld 原生引擎。
-- 自动发布门槛记录在 `docs/acceptance/v016_release_readiness.json`；当前 `automatedReleaseReadiness=passed`，但 `manualVisualAcceptance=pending`，因此 `releaseAllowed=false`。
+- 当时的发布矩阵 9/9 目标完成了 `clean check build`：26.3、26.2、26.1.2 的 NeoForge/Fabric，1.21.1 的 NeoForge/Fabric，以及 1.20.1 Fabric。
+- 当时的 9 个候选包均使用 `-Pmod_version=0.1.6` 实际构建，Loader 元数据版本为 0.1.6，并验证包含 Windows/Linux/macOS × x64/arm64 六套 GeoWorld 原生引擎。
+- **该矩阵已被 2026-11-15 的游戏内地形破碎失败作废为发布证据**；它只作为 pre-v8 历史记录保留。当前 `docs/acceptance/v016_release_readiness.json` 为 schema 2，明确标记 `automatedReleaseReadiness=revalidation_pending`、`manualVisualAcceptance=pending_retest`、`releaseAllowed=false`。
 - 当前未创建 `v0.1.6` tag，也未发布 GitHub Release。
 
-## 剩余门槛
+## 游戏内视觉失败与 RiverGeometryVersion 8 修复（2026-11-15～16）
 
-1. 进入游戏对 #509 河口、#915 控制区及新补齐的低岸海水范围做视觉截图验收，确认没有“数学连续但视觉不自然”的海岸/河口形态。
-2. 视觉验收通过后，将发布就绪记录改为通过，再创建 `v0.1.6` tag / GitHub Release；在此之前保持候选状态。
+2026-11-15 使用种子 `-1818694639628404530` 的新世界进行人工视觉验收时，#509 周边沙岸、河口大尺度区域及 #915 冻河区域出现明显薄墙、尖柱、机械断崖和一格宽地形裂缝，因此 **pre-v8 v0.1.6 候选被明确判定为视觉验收失败**。此前“水墙为 0”的自动指标不足以覆盖这种地表形态破坏。
+
+根因通过相邻方块反查确认：
+
+- v7 的曲线河道 `pointRiverSegment` 使用无保护 Newton 精化。#509 的相邻方块中，正确最近距离约为 71 格的点会错误跳到 `t=0`，算成约 189 格，从而让相邻一格在“河槽/非河槽”之间离散翻转。
+- 修正最近点后，又暴露出固定最小水深阈值会把几何湿区边缘重新判为干地；v8 将可见水深阈值与 RiverWeight 一致化。
+- 多河交汇处，旧逻辑会把“只以约 0.2% 权重擦入 bankRadius”的较高河段水面全量传给另一河段的干岸塑形；v8 改为按实际 bank/delta 权重连续混合。
+
+同参数 v7→v8 固定种子复扫使用“相邻最终高度跳变 ≥4 格，且比原始地形相邻跳变至少多 3 格”作为人工断层判据：
+
+| 区域 | v7 人工断层边 | v8 人工断层边 | v7 最大人工跳变 | v8 最大人工跳变 |
+|---|---:|---:|---:|---:|
+| `(-1047,-1076) r=72` | 618 | **0** | 14 | **0** |
+| `(-1015,-988) r=96` | 625 | **0** | 11 | **0** |
+| `(-1100,-1070) r=112` | 714 | **0** | 14 | **0** |
+| `(1653,10405) r=112` | 342 | **0** | 6 | **0** |
+| 合计 | **2299** | **0** | — | — |
+
+兼容性复验中 v7 的四区原始计数完整恢复，确认新逻辑只由 RiverGeometryVersion 8 启用，不热改已持久化 v7 模型。
+
+最终代码状态的 `go test ./...` 通过；Minecraft 1.21.1 NeoForge `clean check build -Pmod_version=0.1.6` 通过。WaterOwnership 的 `unownedSurfaceWaterSources`、`unsafeExposedWaterSources`、`freeFallWaterFaces`、`runtimeWaterLost`、`riverWaterBoundaryModelMismatches`、`riverLocalWaterPeaks`、`wetlandPoolLeaks` 均为 0。新的 1.21.1 NeoForge 候选 JAR SHA256 为 `6b5f56afd95fe605e65eafd4428d2f2593ba9c4f47cb4d2a62aac52f94881117`。
+
+证据：`docs/acceptance/r81c_fragmentation_fix.json`。
+
+## 当前剩余门槛（更新于 2026-11-16）
+
+1. 必须使用新 v8 候选包**新建世界**重新做游戏内视觉验收；pre-v8 失败世界不能作为新候选验收结果。
+2. 视觉通过后，对当前 v8 代码重新执行完整 9 目标发布矩阵。2026-11-15 的 9/9 结果仅为 pre-v8 历史证据，不再代表当前发布候选。
+3. 上述两项通过前，`releaseAllowed=false`，不创建 `v0.1.6` tag，不发布 GitHub Release。
 
 另外，天坑 #11 对河段 #735 的未规划排水冲突仍属于 R8.1d，岛屿及雪山盆地选址属于 R8.2。本轮不同时修改这些功能。

@@ -167,7 +167,13 @@ func (m *Model) AcceptanceFluvialCandidates() []FluvialAcceptanceCandidate {
 					z := cz + nz*side*distance
 					bucket := m.bucketIndexForWorld(x, z)
 					if bucket < 0 ||
-						riverBankProtectedAt(m.Rivers, m.riverBuckets[bucket], x, z) {
+						riverBankProtectedAtForGeometry(
+							m.Config.RiverGeometryVersion,
+							m.Rivers,
+							m.riverBuckets[bucket],
+							x,
+							z,
+						) {
 						continue
 					}
 					baseHeight := m.Base.SampleNormalized(x, z)
@@ -189,7 +195,13 @@ func (m *Model) AcceptanceFluvialCandidates() []FluvialAcceptanceCandidate {
 					z := cz + nz*side*distance
 					bucket := m.bucketIndexForWorld(x, z)
 					if bucket >= 0 &&
-						!riverBankProtectedAt(m.Rivers, m.riverBuckets[bucket], x, z) {
+						!riverBankProtectedAtForGeometry(
+							m.Config.RiverGeometryVersion,
+							m.Rivers,
+							m.riverBuckets[bucket],
+							x,
+							z,
+						) {
 						lift := riverNaturalLeveeLift(seg, t, x, z, n)
 						if lift > 0.00012 {
 							baseHeight := m.Base.SampleNormalized(x, z)
@@ -217,7 +229,13 @@ func (m *Model) AcceptanceFluvialCandidates() []FluvialAcceptanceCandidate {
 				activeDistance := math.Abs(offset)
 				bucket := m.bucketIndexForWorld(x, z)
 				if bucket < 0 ||
-					riverBankProtectedAt(m.Rivers, m.riverBuckets[bucket], x, z) {
+					riverBankProtectedAtForGeometry(
+						m.Config.RiverGeometryVersion,
+						m.Rivers,
+						m.riverBuckets[bucket],
+						x,
+						z,
+					) {
 					continue
 				}
 				_, _, weight, ok := riverOxbowWater(
