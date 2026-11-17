@@ -132,7 +132,8 @@ v0.1.7 **不默认实现地下排水或凭空增加地表支流**。
 
 - **Slice A：完成。** 已用 v1.1.23 / geomV8 的真实 1.21.1 NeoForge Anvil 方块确认天坑 #11 与河 #735 的单侧岸坡冲突。
 - **Slice B：完成。** v1.1.24 在候选阶段拒绝河道冲突天坑；固定 seed 模型冲突 1→0，真实 voxel 右岸低于河面的样本 12/12→0/12，河 #735 水面保持 Y96；旧 v1.1.23 世界实测可直接加载且模型 SHA 不变。
-- **下一步：Slice C / R8.2。** 先做 Ocean / Lake island 水下根部与 moat 的只读取证，再决定最小选址约束。
+- **Slice C：完成候选验收，待提交。** v1.1.25 Ocean island 只落在真实水下高地；固定 seed 8 个 Ocean island 全部通过 root/moat 资格，Lake island 2→0；水下根部由旧 32 格/4 格柱壁收敛到天然基底最大 4 格/4 格，真实 Anvil 74/74 full。
+- **下一步：Slice D / R8.2。** Snow basin / crater 增加 mountain + relief + climate + drainage 背景资格；先保持 island / river / sinkhole 结果完全锁定。
 
 
 ### Slice A — R8.1d 只读现场证据

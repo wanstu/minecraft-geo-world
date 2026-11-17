@@ -95,14 +95,17 @@ func Plan(
 	nextID := 1
 	used := make([]candidate, 0, 32)
 
-	spaced := func(c candidate, radius float64) bool {
+	spacedAgainst := func(previous []candidate, c candidate, radius float64) bool {
 		minGap := math.Max(1800, radius*5)
-		for _, previous := range used {
-			if math.Hypot(c.x-previous.x, c.z-previous.z) < minGap {
+		for _, site := range previous {
+			if math.Hypot(c.x-site.x, c.z-site.z) < minGap {
 				return false
 			}
 		}
 		return true
+	}
+	spaced := func(c candidate, radius float64) bool {
+		return spacedAgainst(used, c, radius)
 	}
 
 	add := func(kind Kind, c candidate, radius float64, waterContext string, salt uint64) bool {
@@ -163,6 +166,17 @@ func Plan(
 					continue
 				}
 			}
+			if isIslandKind(kind) && usesSubmergedIslandSiting(rulesVersion) {
+				metrics, ok := submergedIslandRootMetrics(
+					waterContext,
+					c.x,
+					c.z,
+					runtime,
+				)
+				if !ok || !qualifiesSubmergedIslandRoot(waterContext, metrics) {
+					continue
+				}
+			}
 			if kind == Sinkhole &&
 				usesRiverSafeSinkholeSites(rulesVersion) &&
 				runtime.Ground != nil &&
@@ -193,6 +207,52 @@ func Plan(
 		}
 	}
 
+	// v1.1.25 changes island siting only. Preserve the previous island
+	// occupancy sequence as a shadow reservation for later land features so
+	// rejecting/reselecting an island cannot perturb sinkhole/crater/basin IDs
+	// or spacing. The shadow sites are not emitted as features.
+	legacyIslandReservations := []candidate(nil)
+	if usesSubmergedIslandSiting(rulesVersion) {
+		reserveTake := func(
+			candidates []candidate,
+			count int,
+			radius float64,
+			waterContext string,
+			salt uint64,
+		) {
+			added := 0
+			for _, c := range candidates {
+				candidateRadius := radius * (0.86 + 0.28*hashUnit(c.score^salt))
+				if waterContext == "lake" && usesLakeIslandClearance(rulesVersion) {
+					if c.clearance <= 0 {
+						continue
+					}
+					candidateRadius = math.Min(candidateRadius, c.clearance*0.45)
+					if candidateRadius < 48 {
+						continue
+					}
+				}
+				if !spacedAgainst(legacyIslandReservations, c, candidateRadius) {
+					continue
+				}
+				legacyIslandReservations = append(legacyIslandReservations, c)
+				added++
+				if added >= count {
+					return
+				}
+			}
+		}
+		if len(lakes) > 0 {
+			reserveTake(lakes, 1, 180, "lake", 0x11)
+			if len(lakes) > 1 {
+				reserveTake(lakes[1:], 1, 170, "lake", 0x17)
+			}
+		}
+		reserveTake(ocean, base, 240, "ocean", 0x21)
+		reserveTake(ocean, clampInt((base+1)/2, 1, 3), 220, "ocean", 0x31)
+		reserveTake(ocean, clampInt(base, 1, 4), 210, "ocean", 0x41)
+	}
+
 	if len(lakes) > 0 {
 		take(MushroomIsland, lakes, 1, 180, "lake", 0x11)
 		if len(lakes) > 1 {
@@ -202,6 +262,11 @@ func Plan(
 	take(MushroomIsland, ocean, base, 240, "ocean", 0x21)
 	take(PaleGardenIsland, ocean, clampInt((base+1)/2, 1, 3), 220, "ocean", 0x31)
 	take(CherryIsland, ocean, clampInt(base, 1, 4), 210, "ocean", 0x41)
+
+	if usesSubmergedIslandSiting(rulesVersion) {
+		used = append([]candidate(nil), legacyIslandReservations...)
+		nextID = len(legacyIslandReservations) + 1
+	}
 
 	sinkCandidates := filterTerrain(land, profile,
 		mcprofile.TerrainRollingPlain, mcprofile.TerrainHills, mcprofile.TerrainPlateau)
@@ -268,12 +333,119 @@ func Plan(
 		}
 	}
 
+	if len(features) == 0 {
+		return nil
+	}
 	sort.Slice(features, func(i, j int) bool { return features[i].ID < features[j].ID })
 	return features
 }
 
+type submergedIslandMetrics struct {
+	RootLiftBlocks       float64
+	CenterDepthBlocks    float64
+	MatchingWaterSamples int
+	Samples              int
+}
+
+func usesSubmergedIslandSiting(version string) bool {
+	return version == "geoworld-rules-v1.1.25"
+}
+
+func usesSubmergedIslandShoulder(version string) bool {
+	return version == "geoworld-rules-v1.1.25"
+}
+
+func isIslandKind(kind Kind) bool {
+	switch kind {
+	case MushroomIsland, PaleGardenIsland, CherryIsland:
+		return true
+	default:
+		return false
+	}
+}
+
+func submergedIslandRootMetrics(
+	waterContext string,
+	x, z float64,
+	runtime *worldsample.Model,
+) (submergedIslandMetrics, bool) {
+	if runtime == nil {
+		return submergedIslandMetrics{}, false
+	}
+
+	expected := reconcile.WaterOcean
+	ringRadius := 384.0
+	if waterContext == "lake" {
+		expected = reconcile.WaterLake
+		ringRadius = 160
+	} else if waterContext != "ocean" {
+		return submergedIslandMetrics{}, false
+	}
+
+	center := runtime.Sample(x, z)
+	if center.WaterKind != expected || !center.WaterSurfaceDefined {
+		return submergedIslandMetrics{}, false
+	}
+
+	const samples = 32
+	ringHeights := make([]float64, 0, samples)
+	matchingWater := 0
+	for i := 0; i < samples; i++ {
+		angle := 2 * math.Pi * float64(i) / samples
+		sample := runtime.Sample(
+			x+math.Cos(angle)*ringRadius,
+			z+math.Sin(angle)*ringRadius,
+		)
+		ringHeights = append(
+			ringHeights,
+			normalizedHeightBlockY(sample.GroundHeight),
+		)
+		if sample.WaterKind == expected {
+			matchingWater++
+		}
+	}
+	sort.Float64s(ringHeights)
+	median := (ringHeights[samples/2-1] + ringHeights[samples/2]) * 0.5
+	centerGround := normalizedHeightBlockY(center.GroundHeight)
+	centerWater := normalizedHeightBlockY(center.WaterSurfaceElevation)
+	return submergedIslandMetrics{
+		RootLiftBlocks:       centerGround - median,
+		CenterDepthBlocks:    centerWater - centerGround,
+		MatchingWaterSamples: matchingWater,
+		Samples:              samples,
+	}, true
+}
+
+func qualifiesSubmergedIslandRoot(
+	waterContext string,
+	metrics submergedIslandMetrics,
+) bool {
+	if metrics.Samples <= 0 ||
+		metrics.MatchingWaterSamples != metrics.Samples {
+		return false
+	}
+	switch waterContext {
+	case "ocean":
+		return metrics.RootLiftBlocks >= 8 &&
+			metrics.CenterDepthBlocks <= 48
+	case "lake":
+		return metrics.RootLiftBlocks >= 4 &&
+			metrics.CenterDepthBlocks <= 24
+	default:
+		return false
+	}
+}
+
+func normalizedHeightBlockY(height float64) float64 {
+	height = clamp(height, 0, 1)
+	if height <= 0.5 {
+		return -64 + 254*height
+	}
+	return 63 + 514*(height-0.5)
+}
+
 func usesRiverSafeSinkholeSites(version string) bool {
-	return version == "geoworld-rules-v1.1.24"
+	return version == "geoworld-rules-v1.1.24" || version == "geoworld-rules-v1.1.25"
 }
 
 func sinkholeConflictsRiver(
@@ -731,7 +903,28 @@ func Apply(
 		if base.World.WaterSurfaceDefined {
 			water = base.World.WaterSurfaceElevation
 		}
-		setLand(math.Max(base.World.GroundHeight, water+0.008+0.052*best))
+		if usesSubmergedIslandShoulder(rulesVersion) {
+			peak := math.Max(
+				base.World.GroundHeight,
+				water+0.008+0.052*best,
+			)
+			shoulder := best
+			target := lerp(base.World.GroundHeight, peak, shoulder)
+			if target < water {
+				out.World.GroundHeight = clamp(target, 0.001, 0.999)
+				out.World.WaterDepth = math.Max(
+					0,
+					water-out.World.GroundHeight,
+				)
+				return out
+			}
+			setLand(target)
+		} else {
+			setLand(math.Max(
+				base.World.GroundHeight,
+				water+0.008+0.052*best,
+			))
+		}
 		switch selected.Kind {
 		case MushroomIsland:
 			out.EcoRegion = ecology.RegionTemperateGrassland
@@ -909,7 +1102,7 @@ func Apply(
 					if rulesVersion == "geoworld-rules-v1.1.16" ||
 						rulesVersion == "geoworld-rules-v1.1.18" ||
 						rulesVersion == "geoworld-rules-v1.1.19" ||
-						(rulesVersion == "geoworld-rules-v1.1.20" || (rulesVersion == "geoworld-rules-v1.1.21" || (rulesVersion == "geoworld-rules-v1.1.22" || (rulesVersion == "geoworld-rules-v1.1.23" || rulesVersion == "geoworld-rules-v1.1.24")))) {
+						(rulesVersion == "geoworld-rules-v1.1.20" || (rulesVersion == "geoworld-rules-v1.1.21" || (rulesVersion == "geoworld-rules-v1.1.22" || (rulesVersion == "geoworld-rules-v1.1.23" || (rulesVersion == "geoworld-rules-v1.1.24" || rulesVersion == "geoworld-rules-v1.1.25"))))) {
 						// v1.1.16 locked interpretation.
 						// Deform the shared water datum, then translate the bed by
 						// the same amount. This fixed crowned rivers but can bend
@@ -993,7 +1186,7 @@ func usesV112DepressionGeometry(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || version == "geoworld-rules-v1.1.24"))))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || version == "geoworld-rules-v1.1.25")))))
 }
 
 func usesCarvedDepressionGeometry(version string) bool {
@@ -1002,7 +1195,7 @@ func usesCarvedDepressionGeometry(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || version == "geoworld-rules-v1.1.24"))))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || version == "geoworld-rules-v1.1.25")))))
 }
 
 func usesHydrologyConformingDepressions(version string) bool {
@@ -1010,7 +1203,7 @@ func usesHydrologyConformingDepressions(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || version == "geoworld-rules-v1.1.24"))))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || version == "geoworld-rules-v1.1.25")))))
 }
 
 func usesLakeIslandClearance(version string) bool {
@@ -1018,13 +1211,13 @@ func usesLakeIslandClearance(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || version == "geoworld-rules-v1.1.24"))))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || version == "geoworld-rules-v1.1.25")))))
 }
 
 func usesBasinDrainageCorridors(version string) bool {
 	return version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || version == "geoworld-rules-v1.1.24"))))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || version == "geoworld-rules-v1.1.25")))))
 }
 
 func hasDepressionHeights(f Feature) bool {

@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "version": "0.1.7-slice-c",
+  "seed": -1818694639628404530,
+  "baselineRules": "geoworld-rules-v1.1.24",
+  "candidateRules": "geoworld-rules-v1.1.25",
+  "riverGeometryVersion": 8,
+  "scope": "R8.2 island siting and submerged shoulder only",
+  "isolation": {
+    "riverSegmentsBaseline": 953,
+    "riverSegmentsCandidate": 953,
+    "riverSegmentsEqual": true,
+    "nonIslandFeatureCount": 10,
+    "nonIslandFeaturesDeepEqual": true,
+    "snowRulesChanged": false
+  },
+  "islandCounts": {
+    "baselineOcean": 8,
+    "baselineLake": 2,
+    "candidateOcean": 8,
+    "candidateLake": 0
+  },
+  "oceanQualification": {
+    "requiredRootLiftBlocks": 8.0,
+    "maxCenterDepthBlocks": 48.0,
+    "requiredMatchingOceanRingSamples": 32,
+    "ringSamples": 32,
+    "ringRadiusBlocks": 384.0
+  },
+  "candidateOceanIslands": [
+    {
+      "id": 1,
+      "kind": "mushroom_island",
+      "center": [
+        16448,
+        -2880
+      ],
+      "rootLiftBlocks": 9.070521,
+      "centerDepthBlocks": 29.075016,
+      "matchingOceanRing": "32/32"
+    },
+    {
+      "id": 2,
+      "kind": "mushroom_island",
+      "center": [
+        18368,
+        -1600
+      ],
+      "rootLiftBlocks": 10.286078,
+      "centerDepthBlocks": 35.430274,
+      "matchingOceanRing": "32/32"
+    },
+    {
+      "id": 3,
+      "kind": "mushroom_island",
+      "center": [
+        -15808,
+        -3008
+      ],
+      "rootLiftBlocks": 8.082841,
+      "centerDepthBlocks": 29.547862,
+      "matchingOceanRing": "32/32"
+    },
+    {
+      "id": 4,
+      "kind": "pale_garden_island",
+      "center": [
+        -19520,
+        4416
+      ],
+      "rootLiftBlocks": 9.320077,
+      "centerDepthBlocks": 19.759513,
+      "matchingOceanRing": "32/32"
+    },
+    {
+      "id": 5,
+      "kind": "pale_garden_island",
+      "center": [
+        -13376,
+        -7616
+      ],
+      "rootLiftBlocks": 8.386122,
+      "centerDepthBlocks": 30.785236,
+      "matchingOceanRing": "32/32"
+    },
+    {
+      "id": 6,
+      "kind": "cherry_island",
+      "center": [
+        -10816,
+        -9792
+      ],
+      "rootLiftBlocks": 8.865782,
+      "centerDepthBlocks": 27.840442,
+      "matchingOceanRing": "32/32"
+    },
+    {
+      "id": 7,
+      "kind": "cherry_island",
+      "center": [
+        -9152,
+        -10816
+      ],
+      "rootLiftBlocks": 8.322663,
+      "centerDepthBlocks": 30.779365,
+      "matchingOceanRing": "32/32"
+    },
+    {
+      "id": 8,
+      "kind": "cherry_island",
+      "center": [
+        -8128,
+        -5312
+      ],
+      "rootLiftBlocks": 8.958204,
+      "centerDepthBlocks": 17.934418,
+      "matchingOceanRing": "32/32"
+    }
+  ],
+  "lakeDecision": {
+    "largeLakeGroups": 4,
+    "observedRootLiftBlocks": [
+      0,
+      -2,
+      -5,
+      -12
+    ],
+    "qualifiedLakeIslandSites": 0,
+    "result": "no_lake_island_generated_for_this_seed"
+  },
+  "submergedShoulder": {
+    "formula": "lerp(baseGround, oldIslandPeak, influence)",
+    "historicalRulesLockedThrough": "geoworld-rules-v1.1.24",
+    "representativeIsland": {
+      "id": 1,
+      "kind": "mushroom_island",
+      "center": [
+        16448,
+        -2880
+      ]
+    },
+    "beforeNaturalSubstrateDelta4": 32,
+    "afterMaxNaturalSubstrateDelta4": 4,
+    "actualVoxelResult": "passed_actual_voxel_submerged_island_shoulder"
+  },
+  "serverWorldModelSHA256": "b430975fd9f8f67183c1b33c7cd37c33444fe52eb1a503db6989014af97e658f",
+  "actualVoxelEvidence": "docs/acceptance/v017_r82_slicec_island_actual_voxels.json",
+  "result": "passed_model_siting_and_actual_voxel_submerged_root",
+  "releaseEligible": false,
+  "next": "R8.2 Slice D snow basin/crater siting"
+}

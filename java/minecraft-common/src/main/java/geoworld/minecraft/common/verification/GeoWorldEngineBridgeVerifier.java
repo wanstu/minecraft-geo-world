@@ -61,7 +61,7 @@ public final class GeoWorldEngineBridgeVerifier {
                 generated.model().manifest().worldProfileVersion()
             );
         }
-        if (!"geoworld-rules-v1.1.24".equals(
+        if (!"geoworld-rules-v1.1.25".equals(
             generated.model().manifest().generationRulesVersion()
         )) {
             throw new AssertionError(

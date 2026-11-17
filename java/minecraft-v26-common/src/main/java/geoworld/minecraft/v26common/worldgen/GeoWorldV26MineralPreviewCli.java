@@ -143,9 +143,11 @@ public final class GeoWorldV26MineralPreviewCli {
             model.manifest().generationRulesVersion()
         ) || ("geoworld-rules-v1.1.23".equals(
             model.manifest().generationRulesVersion()
-        ) || "geoworld-rules-v1.1.24".equals(
+        ) || ("geoworld-rules-v1.1.24".equals(
             model.manifest().generationRulesVersion()
-        )))))));
+        ) || "geoworld-rules-v1.1.25".equals(
+            model.manifest().generationRulesVersion()
+        ))))))));
 
         List<PreviewBody> bodies = new ArrayList<>(limit);
         List<PreviewDistrict> districts = new ArrayList<>();
