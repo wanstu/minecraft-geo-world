@@ -185,7 +185,34 @@ v0.1.7 **不默认实现地下排水或凭空增加地表支流**。
 - 坑缘与周围山体连续；
 - 内部水体和出口遵守正式 Hydrology。
 
-### Slice E — v0.1.7 RC 收敛
+### Slice E — 河流可航行性与河口群系
+
+R8.2 Snow 收尾后，单独处理河流相关优化，不与特殊地貌选址混改。
+
+#### 河口群系
+
+- 正式河流出海口 / 河口河道范围内不得被 `warm_ocean` 群系覆盖；
+- 先核对当前 SurfaceBiome / Hydrology / WaterOwnership 的优先级，确认问题发生在模型、Runtime 还是 Minecraft biome realization；
+- 只约束河口河道与必要过渡带，不能粗暴删除周边真实暖水海洋；
+- 河外侧海域若气候与海洋模型本来属于 Warm Ocean，仍可保持 Warm Ocean；
+- 固定 #509 / #915 以及新增至少一个 Warm Ocean 河口作为模型 + voxel + biome 回归样本。
+
+#### 河流水深
+
+- 正式河流的可航行水体目标最小水深为 **3 格**；
+- 验收必须读取真实 Minecraft 方块，按 `water surface Y - river bed Y` 统计，不能只看 normalized model depth；
+- 河道核心不得再出现 1～2 格深的浅槽；
+- 岸边允许自然渐浅，但不能让整条河的有效航道被 1～2 格浅水截断；
+- 最小深度修复不能制造水墙、局部水峰、悬空水、过深直槽或破坏纵向单调性；
+- 必须继续保持 RiverGeometryVersion / R8.1c 河口水位 / R8.1d 特殊地貌隔离回归。
+
+建议先做只读 audit：
+1. 统计固定 seed 全部正式河段的真实模型水深分布；
+2. 找出 1 格 / 2 格浅水的典型位置；
+3. 在 1.21.1 NeoForge 实际 Anvil 中复核；
+4. 再决定最小修改点位于 Waterbed、WorldSample 还是 Minecraft voxel realization。
+
+### Slice F — v0.1.7 RC 收敛
 
 必须完成：
 
