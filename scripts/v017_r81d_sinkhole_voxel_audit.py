@@ -210,25 +210,46 @@ def audit(world: Path, fixture: dict) -> dict:
     if summary["missingCount"] != 0:
         raise ValueError(f"incomplete voxel evidence: {summary['missingCount']} samples missing")
 
-    return {
+    rules = manifest["generationRulesVersion"]
+    if rules == "geoworld-rules-v1.1.24":
+        scope = "v0.1.7 Slice B R8.1d river-safe sinkhole siting candidate"
+        conclusion_key = "sliceBConclusion"
+        conclusion = (
+            "passed_actual_voxel_sinkhole_river_conflict_removed"
+            if summary["rightBankRiverAboveSubstrate"]["positiveCount"] == 0
+            else "failed_actual_voxel_sinkhole_river_conflict_remains"
+        )
+        notes = [
+            "Actual saved Minecraft 1.21.1 NeoForge Anvil evidence from rules v1.1.24 / RiverGeometryVersion 8.",
+            "The authoritative river remains fixed; only new sinkhole site selection may change.",
+            "Positive riverWaterAboveSubstrate means dry substrate is below the same-transect river water surface.",
+        ]
+    else:
+        scope = "v0.1.6 geomV8 read-only R8.1d sinkhole #11 / river #735 baseline"
+        conclusion_key = "sliceAConclusion"
+        conclusion = "confirmed_specialfeatures_siting_conflict"
+        notes = [
+            "Read-only Slice A evidence; no generator change.",
+            "not_generated never counts as dry land.",
+            "Positive riverWaterAboveSubstrate means the sampled dry substrate is below the same-transect river water surface.",
+        ]
+
+    result = {
         "schemaVersion": 1,
         "evidenceClass": "real_saved_full_minecraft_anvil_section_block_states",
-        "scope": "v0.1.6 geomV8 read-only R8.1d sinkhole #11 / river #735 baseline",
+        "scope": scope,
         "seed": manifest["seed"],
-        "generationRules": manifest["generationRulesVersion"],
+        "generationRules": rules,
         "riverGeometryVersion": config["RiverGeometryVersion"],
         "worldModelSHA256": sha256(model),
         "regionSHA256": sha256(region),
         "summary": summary,
         "transects": transects,
         "samples": rows,
-        "sliceAConclusion": "confirmed_specialfeatures_siting_conflict",
-        "notes": [
-            "Read-only Slice A evidence; no generator change.",
-            "not_generated never counts as dry land.",
-            "Positive riverWaterAboveSubstrate means the sampled dry substrate is below the same-transect river water surface.",
-        ],
+        "notes": notes,
     }
+    result[conclusion_key] = conclusion
+    return result
 
 
 def main() -> None:

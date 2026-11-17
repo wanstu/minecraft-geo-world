@@ -28,6 +28,17 @@ class SinkholeVoxelAuditTest(unittest.TestCase):
         self.assertEqual(got["max"], 27)
         self.assertEqual(got["min"], -4)
 
+    def test_candidate_pass_requires_no_positive_bank_deficit(self):
+        got = mod.deficit_summary(
+            [
+                {"riverWaterAboveSubstrate": -4},
+                {"riverWaterAboveSubstrate": -7},
+                {"riverWaterAboveSubstrate": -5},
+            ]
+        )
+        self.assertEqual(got["positiveCount"], 0)
+        self.assertLessEqual(got["max"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -352,10 +352,13 @@ public final class GeoWorldV26ShorelineVerifier {
                                         ) || ("geoworld-rules-v1.1.22".equals(
                                             runtime.manifest()
                                                 .generationRulesVersion()
-                                        ) || "geoworld-rules-v1.1.23".equals(
+                                        ) || ("geoworld-rules-v1.1.23".equals(
                                             runtime.manifest()
                                                 .generationRulesVersion()
-                                        ))))))
+                                        ) || "geoworld-rules-v1.1.24".equals(
+                                            runtime.manifest()
+                                                .generationRulesVersion()
+                                        )))))))
                                     )
                                         ? heights.boundaryYFloor(
                                             riverColumn.sample()
@@ -568,9 +571,11 @@ public final class GeoWorldV26ShorelineVerifier {
                                             runtime.manifest().generationRulesVersion()
                                         ) || ("geoworld-rules-v1.1.22".equals(
                                             runtime.manifest().generationRulesVersion()
-                                        ) || "geoworld-rules-v1.1.23".equals(
+                                        ) || ("geoworld-rules-v1.1.23".equals(
                                             runtime.manifest().generationRulesVersion()
-                                        ))))))
+                                        ) || "geoworld-rules-v1.1.24".equals(
+                                            runtime.manifest().generationRulesVersion()
+                                        )))))))
                                     ) &&
                                     "River".equals(column.shoreWaterKind())
                                 ) {
@@ -774,7 +779,7 @@ public final class GeoWorldV26ShorelineVerifier {
                 "geoworld-rules-v1.1.12".equals(generationRulesVersion) ||
                 "geoworld-rules-v1.1.13".equals(generationRulesVersion) ||
                 "geoworld-rules-v1.1.14".equals(generationRulesVersion) ||
-                ("geoworld-rules-v1.1.15".equals(generationRulesVersion) || "geoworld-rules-v1.1.16".equals(generationRulesVersion) || ("geoworld-rules-v1.1.18".equals(generationRulesVersion) || "geoworld-rules-v1.1.19".equals(generationRulesVersion) || ("geoworld-rules-v1.1.20".equals(generationRulesVersion) || ("geoworld-rules-v1.1.21".equals(generationRulesVersion) || ("geoworld-rules-v1.1.22".equals(generationRulesVersion) || "geoworld-rules-v1.1.23".equals(generationRulesVersion))))))
+                ("geoworld-rules-v1.1.15".equals(generationRulesVersion) || "geoworld-rules-v1.1.16".equals(generationRulesVersion) || ("geoworld-rules-v1.1.18".equals(generationRulesVersion) || "geoworld-rules-v1.1.19".equals(generationRulesVersion) || ("geoworld-rules-v1.1.20".equals(generationRulesVersion) || ("geoworld-rules-v1.1.21".equals(generationRulesVersion) || ("geoworld-rules-v1.1.22".equals(generationRulesVersion) || ("geoworld-rules-v1.1.23".equals(generationRulesVersion) || "geoworld-rules-v1.1.24".equals(generationRulesVersion)))))))
             )
                 ? 1
                 : (
