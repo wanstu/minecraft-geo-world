@@ -4,6 +4,7 @@ import (
 	"math"
 	"sort"
 
+	"geoworld/internal/climate"
 	"geoworld/internal/ecology"
 	"geoworld/internal/hydrology"
 	"geoworld/internal/mcprofile"
@@ -73,11 +74,12 @@ func Plan(
 	surface *world.Surface,
 	hydro *hydrology.Model,
 	profile *mcprofile.Model,
+	climateModel *climate.Model,
 	runtime *worldsample.Model,
 	rareMacroStrength float64,
 	rulesVersion string,
 ) []Feature {
-	if surface == nil || hydro == nil || profile == nil || runtime == nil {
+	if surface == nil || hydro == nil || profile == nil || climateModel == nil || runtime == nil {
 		return nil
 	}
 	if rareMacroStrength <= 0 {
@@ -288,7 +290,9 @@ func Plan(
 
 	take(Sinkhole, sinkCandidates, clampInt(base+1, 2, 6), sinkRadius, "", 0x51)
 
-	craterAdded := 0
+	craterTarget := clampInt(base, 1, 4)
+	craterSlots := 0
+	missingSnowCraters := 0
 	for i, c := range craterCandidates {
 		kind := VolcanicCraterCherry
 		if i%2 == 0 {
@@ -298,15 +302,36 @@ func Plan(
 		if carved {
 			radius = craterRadius * (0.90 + 0.20*hashUnit(c.score^0x61))
 		}
+		if !spaced(c, radius) {
+			continue
+		}
+		if kind == VolcanicCraterSnow && usesSnowMountainSiting(rulesVersion) {
+			metrics, ok := snowSiteMetricsForCandidate(c, profile, climateModel, runtime)
+			if !ok || !qualifiesSnowCraterSite(metrics) {
+				// Count this as the same deterministic legacy slot, but emit no
+				// invalid snow crater. The reservation keeps later legacy features
+				// at the same positions and IDs.
+				used = append(used, c)
+				nextID++
+				craterSlots++
+				missingSnowCraters++
+				if craterSlots >= craterTarget {
+					break
+				}
+				continue
+			}
+		}
 		if add(kind, c, radius, "", 0x61+uint64(i)) {
-			craterAdded++
-			if craterAdded >= clampInt(base, 1, 4) {
+			craterSlots++
+			if craterSlots >= craterTarget {
 				break
 			}
 		}
 	}
 
-	basinAdded := 0
+	basinTarget := clampInt(base, 1, 4)
+	basinSlots := 0
+	missingSnowBasins := 0
 	for i, c := range basinCandidates {
 		kind := BasinCherry
 		if i%3 == 2 {
@@ -316,10 +341,75 @@ func Plan(
 		if carved {
 			radius = basinRadius * (0.90 + 0.22*hashUnit(c.score^0x71))
 		}
+		if !spaced(c, radius) {
+			continue
+		}
+		if kind == BasinSnow && usesSnowMountainSiting(rulesVersion) {
+			metrics, ok := snowSiteMetricsForCandidate(c, profile, climateModel, runtime)
+			if !ok || !qualifiesSnowBasinSite(metrics) {
+				// Preserve the old basin slot exactly like the crater schedule.
+				// A qualified snow basin is filled later from a dedicated pool.
+				used = append(used, c)
+				nextID++
+				basinSlots++
+				missingSnowBasins++
+				if basinSlots >= basinTarget {
+					break
+				}
+				continue
+			}
+		}
 		if add(kind, c, radius, "", 0x71+uint64(i)) {
-			basinAdded++
-			if basinAdded >= clampInt(base, 1, 4) {
+			basinSlots++
+			if basinSlots >= basinTarget {
 				break
+			}
+		}
+	}
+
+	if usesSnowMountainSiting(rulesVersion) {
+		// Fill only the rejected snow slots, after the complete legacy schedule
+		// is reserved. This lets snow terrain move to a valid background without
+		// perturbing established cherry terrain or sinkholes.
+		for i, c := range craterCandidates {
+			if missingSnowCraters <= 0 {
+				break
+			}
+			radius := craterRadius * (0.90 + 0.20*hashUnit(c.score^0x69))
+			if !spaced(c, radius) {
+				continue
+			}
+			metrics, ok := snowSiteMetricsForCandidate(c, profile, climateModel, runtime)
+			if !ok || !qualifiesSnowCraterSite(metrics) {
+				continue
+			}
+			if add(VolcanicCraterSnow, c, radius, "", 0x69+uint64(i)) {
+				missingSnowCraters--
+			}
+		}
+
+		snowBasinCandidates := filterTerrain(
+			land,
+			profile,
+			mcprofile.TerrainHills,
+			mcprofile.TerrainFoothills,
+			mcprofile.TerrainMountain,
+			mcprofile.TerrainPlateau,
+		)
+		for i, c := range snowBasinCandidates {
+			if missingSnowBasins <= 0 {
+				break
+			}
+			radius := basinRadius * (0.90 + 0.22*hashUnit(c.score^0x79))
+			if !spaced(c, radius) {
+				continue
+			}
+			metrics, ok := snowSiteMetricsForCandidate(c, profile, climateModel, runtime)
+			if !ok || !qualifiesSnowBasinSite(metrics) {
+				continue
+			}
+			if add(BasinSnow, c, radius, "", 0x79+uint64(i)) {
+				missingSnowBasins--
 			}
 		}
 	}
@@ -442,6 +532,106 @@ func normalizedHeightBlockY(height float64) float64 {
 		return -64 + 254*height
 	}
 	return 63 + 514*(height-0.5)
+}
+
+type snowSiteMetrics struct {
+	AnnualMeanTempC  float64
+	CenterY          float64
+	ReliefBlocks     float64
+	BasinDepthBlocks float64
+	DrySamples       int
+	Samples          int
+	TerrainVariant   mcprofile.TerrainVariant
+}
+
+func usesSnowMountainSiting(version string) bool {
+	return version == "geoworld-rules-v1.1.25"
+}
+
+func snowSiteMetricsForCandidate(
+	c candidate,
+	profile *mcprofile.Model,
+	climateModel *climate.Model,
+	runtime *worldsample.Model,
+) (snowSiteMetrics, bool) {
+	if profile == nil || climateModel == nil || runtime == nil ||
+		c.index < 0 ||
+		c.index >= len(profile.TerrainVariant) ||
+		c.index >= len(climateModel.AnnualMeanTempC) {
+		return snowSiteMetrics{}, false
+	}
+	center := runtime.Sample(c.x, c.z)
+	if center.WaterKind != reconcile.WaterNone {
+		return snowSiteMetrics{}, false
+	}
+
+	const samples = 32
+	heights := make([]float64, 0, samples)
+	minY := math.Inf(1)
+	maxY := math.Inf(-1)
+	dry := 0
+	for i := 0; i < samples; i++ {
+		angle := 2 * math.Pi * float64(i) / samples
+		sample := runtime.Sample(
+			c.x+math.Cos(angle)*512,
+			c.z+math.Sin(angle)*512,
+		)
+		y := normalizedHeightBlockY(sample.GroundHeight)
+		heights = append(heights, y)
+		minY = math.Min(minY, y)
+		maxY = math.Max(maxY, y)
+		if sample.WaterKind == reconcile.WaterNone {
+			dry++
+		}
+	}
+	if len(heights) != samples || math.IsInf(minY, 0) || math.IsInf(maxY, 0) {
+		return snowSiteMetrics{}, false
+	}
+	sort.Float64s(heights)
+	median := (heights[samples/2-1] + heights[samples/2]) * 0.5
+	centerY := normalizedHeightBlockY(center.GroundHeight)
+	return snowSiteMetrics{
+		AnnualMeanTempC:  climateModel.AnnualMeanTempC[c.index],
+		CenterY:          centerY,
+		ReliefBlocks:     maxY - minY,
+		BasinDepthBlocks: median - centerY,
+		DrySamples:       dry,
+		Samples:          samples,
+		TerrainVariant:   profile.TerrainVariant[c.index],
+	}, true
+}
+
+func qualifiesSnowCraterSite(metrics snowSiteMetrics) bool {
+	if metrics.Samples <= 0 ||
+		metrics.DrySamples < 28 ||
+		metrics.AnnualMeanTempC > 5 ||
+		metrics.CenterY < 120 ||
+		metrics.ReliefBlocks < 50 {
+		return false
+	}
+	switch metrics.TerrainVariant {
+	case mcprofile.TerrainFoothills, mcprofile.TerrainMountain, mcprofile.TerrainPlateau:
+		return true
+	default:
+		return false
+	}
+}
+
+func qualifiesSnowBasinSite(metrics snowSiteMetrics) bool {
+	if metrics.Samples <= 0 ||
+		metrics.DrySamples < 28 ||
+		metrics.AnnualMeanTempC > 5 ||
+		metrics.CenterY < 90 ||
+		metrics.ReliefBlocks < 50 ||
+		metrics.BasinDepthBlocks < 4 {
+		return false
+	}
+	switch metrics.TerrainVariant {
+	case mcprofile.TerrainHills, mcprofile.TerrainFoothills, mcprofile.TerrainMountain, mcprofile.TerrainPlateau:
+		return true
+	default:
+		return false
+	}
 }
 
 func usesRiverSafeSinkholeSites(version string) bool {

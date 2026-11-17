@@ -120,7 +120,7 @@ v0.1.7 **不默认实现地下排水或凭空增加地表支流**。
 
 如果 R8.1d / R8.2 改变新世界选址语义：
 
-- 新世界规则升级到 **`geoworld-rules-v1.1.24`**；
+- R8.1d baseline 使用 **`geoworld-rules-v1.1.24`**；R8.2 Slice C / D 新世界使用 **`geoworld-rules-v1.1.25`**；
 - v0.1.6 / v1.1.23 世界保持原持久化模型语义；
 - 不对已经生成的 `.geoworld` 重新选择特殊地貌；
 - Engine cache 继续使用 v27 的 native-engine SHA256 身份，不允许旧模型静默命中新实现；
@@ -132,8 +132,9 @@ v0.1.7 **不默认实现地下排水或凭空增加地表支流**。
 
 - **Slice A：完成。** 已用 v1.1.23 / geomV8 的真实 1.21.1 NeoForge Anvil 方块确认天坑 #11 与河 #735 的单侧岸坡冲突。
 - **Slice B：完成。** v1.1.24 在候选阶段拒绝河道冲突天坑；固定 seed 模型冲突 1→0，真实 voxel 右岸低于河面的样本 12/12→0/12，河 #735 水面保持 Y96；旧 v1.1.23 世界实测可直接加载且模型 SHA 不变。
-- **Slice C：完成候选验收，待提交。** v1.1.25 Ocean island 只落在真实水下高地；固定 seed 8 个 Ocean island 全部通过 root/moat 资格，Lake island 2→0；水下根部由旧 32 格/4 格柱壁收敛到天然基底最大 4 格/4 格，真实 Anvil 74/74 full。
-- **下一步：Slice D / R8.2。** Snow basin / crater 增加 mountain + relief + climate + drainage 背景资格；先保持 island / river / sinkhole 结果完全锁定。
+- **Slice C：完成并已提交。** v1.1.25 Ocean island 只落在真实水下高地；固定 seed 8 个 Ocean island 全部通过 root/moat 资格，Lake island 2→0；水下根部由旧 32 格/4 格柱壁收敛到天然基底最大 4 格/4 格，真实 Anvil 74/74 full。
+- **Slice D：完成验收，待提交。** Snow crater / basin 增加 mountain + relief + climate + dry-ring / depression 背景资格；固定 seed 953 条正式河流与 4 个 sinkhole 完全不动，Cherry crater #16 / basin #20 完全不动；fresh NeoForge Anvil 232/232 full，234/234 模型剖面与实际 voxel 高度完全一致。
+- **下一步：河口体系 + 3 格航道深度。** 正式河口/主河道不允许被 warm_ocean 覆盖；可航河道实际 Minecraft 水深最浅 3 格，然后进入 RC 总回归。
 
 
 ### Slice A — R8.1d 只读现场证据

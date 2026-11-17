@@ -238,6 +238,7 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 			w.Surface,
 			h,
 			p,
+			c,
 			runtimeModel,
 			resolved.WorldProfile.Parameters.RareMacroTerrain,
 			resolved.WorldProfile.GenerationRulesVersion,

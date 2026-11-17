@@ -25,59 +25,71 @@ public final class GeoWorldV26BasinRiverVerifier {
         int rawRaised = 0;
         int voxelRaised = 0;
         int dryChannel = 0;
-        for (int z = 2500; z <= 3000; z += 4) {
-            for (int x = 5200; x <= 5700; x += 4) {
-                var river = model.sample(x, z);
-                if (!"River".equals(river.waterKind()) || !isBasin(river)) {
-                    continue;
-                }
-                int nearest = Integer.MAX_VALUE;
-                GeoWorldV1.RuntimeSample bank = null;
-                for (int a = 0; a < 16; a++) {
-                    double angle = 2.0 * Math.PI * a / 16.0;
-                    for (int d = 4; d <= 64; d += 4) {
-                        int bx = x + (int)Math.round(Math.cos(angle) * d);
-                        int bz = z + (int)Math.round(Math.sin(angle) * d);
-                        var candidate = model.sample(bx, bz);
-                        if (!"None".equals(candidate.waterKind()) || !isBasin(candidate)) {
-                            continue;
-                        }
-                        if (d < nearest) {
-                            nearest = d;
-                            bank = candidate;
-                        }
-                        break;
+        // Slice D is allowed to relocate a basin to a geographically valid
+        // mountain background. Verify each basin where it actually exists
+        // instead of pinning this contract to one historical world rectangle.
+        for (var feature : model.specialLandscapes()) {
+            if (!isBasinKind(feature.kind())) {
+                continue;
+            }
+            int minX = (int)Math.floor(feature.centerX() - feature.radiusX());
+            int maxX = (int)Math.ceil(feature.centerX() + feature.radiusX());
+            int minZ = (int)Math.floor(feature.centerZ() - feature.radiusZ());
+            int maxZ = (int)Math.ceil(feature.centerZ() + feature.radiusZ());
+            for (int z = minZ; z <= maxZ; z += 4) {
+                for (int x = minX; x <= maxX; x += 4) {
+                    var river = model.sample(x, z);
+                    if (!"River".equals(river.waterKind()) || !isBasin(river)) {
+                        continue;
                     }
-                }
-                if (bank == null) {
-                    continue;
-                }
-                checked++;
-                if (river.waterSurfaceElevation() > bank.groundHeight() + 0.002) {
-                    rawRaised++;
-                }
-                var channelColumn = shoreline.planModel(model, x, z);
-                // Test fluid-facing cardinal faces. A bank several blocks
-                // downstream may legitimately follow a lower river terrace.
-                for (int[] delta : new int[][]{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}) {
-                    int nx = x + delta[0];
-                    int nz = z + delta[1];
-                    var neighbor = shoreline.planModel(model, nx, nz);
-                    if ("None".equals(neighbor.sample().waterKind()) &&
-                        neighbor.waterBoundary() <= neighbor.groundBoundary() &&
-                        channelColumn.waterBoundary() > neighbor.groundBoundary()) {
-                        voxelRaised++;
-                        if (voxelRaised <= 5) {
-                            System.out.printf(
-                                "LEAK x=%d z=%d waterY=%d bedY=%d bank=(%d,%d) rawBankY=%d bankY=%d%n",
-                                x, z, channelColumn.waterBoundary(), channelColumn.groundBoundary(),
-                                nx, nz, neighbor.originalGroundBoundary(), neighbor.groundBoundary()
-                            );
+                    int nearest = Integer.MAX_VALUE;
+                    GeoWorldV1.RuntimeSample bank = null;
+                    for (int a = 0; a < 16; a++) {
+                        double angle = 2.0 * Math.PI * a / 16.0;
+                        for (int d = 4; d <= 64; d += 4) {
+                            int bx = x + (int)Math.round(Math.cos(angle) * d);
+                            int bz = z + (int)Math.round(Math.sin(angle) * d);
+                            var candidate = model.sample(bx, bz);
+                            if (!"None".equals(candidate.waterKind()) || !isBasin(candidate)) {
+                                continue;
+                            }
+                            if (d < nearest) {
+                                nearest = d;
+                                bank = candidate;
+                            }
+                            break;
                         }
                     }
-                }
-                if (channelColumn.waterBoundary() <= channelColumn.groundBoundary()) {
-                    dryChannel++;
+                    if (bank == null) {
+                        continue;
+                    }
+                    checked++;
+                    if (river.waterSurfaceElevation() > bank.groundHeight() + 0.002) {
+                        rawRaised++;
+                    }
+                    var channelColumn = shoreline.planModel(model, x, z);
+                    // Test fluid-facing cardinal faces. A bank several blocks
+                    // downstream may legitimately follow a lower river terrace.
+                    for (int[] delta : new int[][]{{-1, 0}, {1, 0}, {0, -1}, {0, 1}}) {
+                        int nx = x + delta[0];
+                        int nz = z + delta[1];
+                        var neighbor = shoreline.planModel(model, nx, nz);
+                        if ("None".equals(neighbor.sample().waterKind()) &&
+                            neighbor.waterBoundary() <= neighbor.groundBoundary() &&
+                            channelColumn.waterBoundary() > neighbor.groundBoundary()) {
+                            voxelRaised++;
+                            if (voxelRaised <= 5) {
+                                System.out.printf(
+                                    "LEAK x=%d z=%d waterY=%d bedY=%d bank=(%d,%d) rawBankY=%d bankY=%d%n",
+                                    x, z, channelColumn.waterBoundary(), channelColumn.groundBoundary(),
+                                    nx, nz, neighbor.originalGroundBoundary(), neighbor.groundBoundary()
+                                );
+                            }
+                        }
+                    }
+                    if (channelColumn.waterBoundary() <= channelColumn.groundBoundary()) {
+                        dryChannel++;
+                    }
                 }
             }
         }
@@ -91,7 +103,10 @@ public final class GeoWorldV26BasinRiverVerifier {
     }
 
     private static boolean isBasin(GeoWorldV1.RuntimeSample sample) {
-        return "basin_cherry".equals(sample.specialFeature()) ||
-            "basin_snow".equals(sample.specialFeature());
+        return isBasinKind(sample.specialFeature());
+    }
+
+    private static boolean isBasinKind(String kind) {
+        return "basin_cherry".equals(kind) || "basin_snow".equals(kind);
     }
 }
