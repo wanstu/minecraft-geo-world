@@ -22,7 +22,8 @@ public final class GeoWorldSpecialLandscapeVerifier {
             0.65,
             ContinentPreset.DEFAULT
         );
-        long seed = 123456L;
+        // This compact seed supplies all three island kinds under the current siting rules.
+        long seed = -563659577384754347L;
 
         GeoWorldEngineBridge.GeneratedModel generated =
             GeoWorldEngineBridge.generate(seed, config);
