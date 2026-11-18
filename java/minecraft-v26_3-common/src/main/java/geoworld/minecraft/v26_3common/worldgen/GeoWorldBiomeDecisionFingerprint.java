@@ -11,9 +11,9 @@ public final class GeoWorldBiomeDecisionFingerprint {
         GeoWorldV26BiomeDecisionFingerprint.run(
             Minecraft26_3Profile.INSTANCE,
             java.util.Map.of(
-                // v1.1.27 surface biome distribution, sampled at 24,576 positions per seed.
-                123456L, 0xb6960a337d5d8b21L,
-                -563659577384754347L, 0x5dc58ce52a87a3e0L
+                // v1.1.28 coastal bathymetry and surface biome distribution, sampled at 24,576 positions per seed.
+                123456L, 0x59c05de109371b59L,
+                -563659577384754347L, 0x3604e5dfa830d878L
             ),
             args
         );

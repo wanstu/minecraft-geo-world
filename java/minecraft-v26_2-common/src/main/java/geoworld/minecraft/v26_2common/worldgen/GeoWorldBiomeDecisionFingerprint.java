@@ -10,10 +10,10 @@ public final class GeoWorldBiomeDecisionFingerprint {
     public static void main(String[] args) throws Exception {
         GeoWorldV26BiomeDecisionFingerprint.run(
             Minecraft26_2Profile.INSTANCE,
-            // v1.1.27 surface biome distribution, sampled at 24,576 positions per seed.
+            // v1.1.28 coastal bathymetry and surface biome distribution, sampled at 24,576 positions per seed.
             java.util.Map.of(
-                123456L, 0x47ad3bb89998ec1fL,
-                -563659577384754347L, 0xcece3d706c8725e6L
+                123456L, 0x49de0d5905aa28f7L,
+                -563659577384754347L, 0x647128003a630a3eL
             ),
             args
         );
