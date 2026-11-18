@@ -10,6 +10,7 @@ import (
 func TestSliceEV126KeepsV125MacroAndHydrologySettings(t *testing.T) {
 	current := testConfig(20261117)
 	current.WorldProfile = StandardWorldProfile()
+	current.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.26"
 
 	locked := current
 	locked.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.25"
@@ -70,5 +71,30 @@ func TestSliceEV126KeepsV125MacroAndHydrologySettings(t *testing.T) {
 			a.Waterbed.RiverGeometryVersion,
 			b.Waterbed.RiverGeometryVersion,
 		)
+	}
+}
+
+func TestSliceFV127InheritsV126HydrologySettings(t *testing.T) {
+	current := testConfig(20261118)
+	current.WorldProfile = StandardWorldProfile()
+	locked := current
+	locked.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.26"
+
+	changed, err := resolveTopLevelConfig(current)
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseline, err := resolveTopLevelConfig(locked)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.27" ||
+		changed.Ecology.DistributionVersion != 1 || baseline.Ecology.DistributionVersion != 0 {
+		t.Fatalf("biome distribution settings not versioned: current=%+v legacy=%+v", changed.Ecology, baseline.Ecology)
+	}
+	changed.WorldProfile.GenerationRulesVersion = baseline.WorldProfile.GenerationRulesVersion
+	changed.Ecology.DistributionVersion = baseline.Ecology.DistributionVersion
+	if !reflect.DeepEqual(changed, baseline) {
+		t.Fatal("v1.1.27 unexpectedly changes generation settings outside biome distribution")
 	}
 }

@@ -120,7 +120,7 @@ v0.1.7 **不默认实现地下排水或凭空增加地表支流**。
 
 如果 R8.1d / R8.2 改变新世界选址语义：
 
-- R8.1d baseline 使用 **`geoworld-rules-v1.1.24`**；R8.2 Slice C / D 新世界使用 **`geoworld-rules-v1.1.25`**；Slice E 河口航运使用 **`geoworld-rules-v1.1.26`**；
+- R8.1d baseline 使用 **`geoworld-rules-v1.1.24`**；R8.2 Slice C / D 新世界使用 **`geoworld-rules-v1.1.25`**；Slice E 河口航运使用 **`geoworld-rules-v1.1.26`**；Slice F 群系分布使用 **`geoworld-rules-v1.1.27`**；
 - v0.1.6 / v1.1.23 世界保持原持久化模型语义；
 - 不对已经生成的 `.geoworld` 重新选择特殊地貌；
 - Engine cache 继续使用 v27 的 native-engine SHA256 身份，不允许旧模型静默命中新实现；
@@ -134,8 +134,8 @@ v0.1.7 **不默认实现地下排水或凭空增加地表支流**。
 - **Slice B：完成。** v1.1.24 在候选阶段拒绝河道冲突天坑；固定 seed 模型冲突 1→0，真实 voxel 右岸低于河面的样本 12/12→0/12，河 #735 水面保持 Y96；旧 v1.1.23 世界实测可直接加载且模型 SHA 不变。
 - **Slice C：完成并已提交。** v1.1.25 Ocean island 只落在真实水下高地；固定 seed 8 个 Ocean island 全部通过 root/moat 资格，Lake island 2→0；水下根部由旧 32 格/4 格柱壁收敛到天然基底最大 4 格/4 格，真实 Anvil 74/74 full。
 - **Slice D：完成并已提交（112111d）。** Snow crater / basin 增加 mountain + relief + climate + inland-continuity / depression 背景资格；固定 seed 953 条正式河流与 4 个 sinkhole 完全不动，Cherry crater #16 / basin #20 完全不动；原完整几何验收 232/232 full，最终坐标 fresh-world spot 验收 10/10 full、12/12 模型与 voxel 0 格误差。
-- **Slice E：完成，待提交。** v1.1.26 河道核心实际最浅 3 格；88 个 OceanMouth 中心样本保持 River；河口影响区 Warm Ocean 降为无珊瑚航道，fresh 1.21.1 Anvil 49/49 FULL、1558 个可航核心最浅 3 格、河口影响区实际 coral=0，影响区外同一区域 coral=84；v1.1.25 已持久化世界不变。
-- **Slice F：生态 / 群系覆盖率校正。** 陆地森林基线 45.72%；新增海岸暖海 / 珊瑚礁分布调查，固定 seed 最近岸 Warm Ocean family 49.15%，外海约 34.19%。
+- **Slice E：完成并已提交（afd7499）。** v1.1.26 河道核心实际最浅 3 格；88 个 OceanMouth 的 828 个中心采样保持 River；河口影响区 Warm Ocean 降为无珊瑚航道，fresh 1.21.1 Anvil 49/49 FULL、1558 个可航核心最浅 3 格、河口影响区实际 coral=0，影响区外同一区域 coral=84；v1.1.25 已持久化世界不变。
+- **Slice F：实现及验收完成。** v1.1.27 四种子平均森林类 34.38% → 27.55%，近岸珊瑚暖海 43.15% → 15.82%；NeoForge 新世界实际礁区有 1,810 个珊瑚方块，暖水对照和 #43 河口均为 0。详见 [群系覆盖率验收](REALISTIC_GEOMORPHOLOGY_R8_2_BIOME_DISTRIBUTION_ACCEPTANCE.md)。
 
 
 ### Slice A — R8.1d 只读现场证据
@@ -257,6 +257,7 @@ Slice E 的硬约束：
 - Web 地图位置对照
 - v0.1.6 五个 geomV8 视觉回归点不退化
 - #509 / #915 河口水墙回归不退化
+- 逐点核对全图严格河流审计的历史问题。固定 seed 的 v1.1.25 至 v1.1.27 均有 6 次逆升、27 处相邻水面高差超 1 格。
 - 9 目标 `clean check build`
 - 9 个候选 JAR loader metadata + 六套 native engine 校验
 - 最终人工视觉验收后才允许 tag

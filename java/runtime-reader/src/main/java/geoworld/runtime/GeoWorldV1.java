@@ -573,6 +573,7 @@ public final class GeoWorldV1 {
     private final WaterbedConfig waterbedConfig;
     private final ScalarGrid oceanEligibility;
     private final WorldSampleConfig worldSampleConfig;
+    private final ScalarGrid climateSeaSurfaceTemp;
     private final ScalarGrid climateTemp;
     private final ScalarGrid climatePrecip;
     private final ScalarGrid climateMonsoon;
@@ -603,6 +604,7 @@ public final class GeoWorldV1 {
         List<MineralDistrictAssignment> mineralDistrictAssignments,
         WaterbedConfig waterbedConfig,
         WorldSampleConfig worldSampleConfig,
+        ScalarGrid climateSeaSurfaceTemp,
         ScalarGrid climateTemp,
         ScalarGrid climatePrecip,
         ScalarGrid climateMonsoon,
@@ -642,6 +644,7 @@ public final class GeoWorldV1 {
         this.coastSegments = this.buildCoastSegments();
         this.waterbedConfig = waterbedConfig;
         this.worldSampleConfig = worldSampleConfig;
+        this.climateSeaSurfaceTemp = climateSeaSurfaceTemp;
         this.climateTemp = climateTemp;
         this.climatePrecip = climatePrecip;
         this.climateMonsoon = climateMonsoon;
@@ -833,6 +836,9 @@ public final class GeoWorldV1 {
         double highest = Double.NEGATIVE_INFINITY;
         double highestWeight = 0.0;
         boolean found = false;
+        boolean useProfileWidth = "geoworld-rules-v1.1.27".equals(
+            this.worldProfile.generationRulesVersion()
+        );
         for (int i = 0, n = candidates.size(); i < n; i++) {
             RiverSegment segment = candidates.get(i);
             PointSegment point = geometry.point(i);
@@ -866,7 +872,11 @@ public final class GeoWorldV1 {
                 continue;
             }
 
-            double centerDepth = centerDepthForWidth(halfWidth);
+            // Mouth flare widens the bank footprint without changing its
+            // hydraulic datum. Only a tapered headwater changes profile width.
+            double depthHalfWidth = useProfileWidth && !segment.headwaterTaper()
+                ? segment.halfWidth() : halfWidth;
+            double centerDepth = centerDepthForWidth(depthHalfWidth);
             double bed = sampleRiverProfile(segment, point.t());
             if (segment.headwaterTaper()) {
                 bed += centerDepthForWidth(segment.halfWidth()) - centerDepth;
@@ -1406,6 +1416,28 @@ public final class GeoWorldV1 {
         );
     }
 
+    /** Returns ocean-only SST, or NaN when the saved model has no marine sample. */
+    public double sampleSeaSurfaceTemperature(double worldX, double worldZ) {
+        if (this.climateSeaSurfaceTemp == null) {
+            return Double.NaN;
+        }
+        double marineWeight = this.oceanEligibility.sampleSmoothstepBilinear(
+            worldX, worldZ
+        );
+        if (marineWeight <= 0) {
+            return Double.NaN;
+        }
+        // The climate grid stores zero on land. Divide by the marine
+        // interpolation weight so those land nodes cannot cool the coast.
+        double temp = this.climateSeaSurfaceTemp.sampleSmoothstepBilinear(
+            worldX, worldZ
+        ) / marineWeight;
+        if (outsideModel(worldX, worldZ)) {
+            temp = lerp(temp, -1.8, polarFactor(worldZ));
+        }
+        return temp;
+    }
+
     public ClimateSample sampleClimate(double worldX, double worldZ) {
         if (!this.hasClimatePreview()) {
             return new ClimateSample(false, 0, 0, 0, 0, 0);
@@ -1802,7 +1834,7 @@ public final class GeoWorldV1 {
                     this.worldProfile.generationRulesVersion()
                 ) || ("geoworld-rules-v1.1.24".equals(
                     this.worldProfile.generationRulesVersion()
-                ) || ("geoworld-rules-v1.1.25".equals(this.worldProfile.generationRulesVersion()) || "geoworld-rules-v1.1.26".equals(this.worldProfile.generationRulesVersion()))))))))
+                ) || ("geoworld-rules-v1.1.25".equals(this.worldProfile.generationRulesVersion()) || "geoworld-rules-v1.1.26".equals(this.worldProfile.generationRulesVersion()) || "geoworld-rules-v1.1.27".equals(this.worldProfile.generationRulesVersion()))))))))
             ) ||
             this.specialFeatures.isEmpty()
         ) {
@@ -1852,13 +1884,13 @@ public final class GeoWorldV1 {
             "geoworld-rules-v1.1.16".equals(specialRulesVersion) ||
             "geoworld-rules-v1.1.18".equals(specialRulesVersion) ||
             "geoworld-rules-v1.1.19".equals(specialRulesVersion) ||
-            ("geoworld-rules-v1.1.20".equals(specialRulesVersion) || ("geoworld-rules-v1.1.21".equals(specialRulesVersion) || ("geoworld-rules-v1.1.22".equals(specialRulesVersion) || ("geoworld-rules-v1.1.23".equals(specialRulesVersion) || ("geoworld-rules-v1.1.24".equals(specialRulesVersion) || ("geoworld-rules-v1.1.25".equals(specialRulesVersion) || "geoworld-rules-v1.1.26".equals(specialRulesVersion)))))));
+            ("geoworld-rules-v1.1.20".equals(specialRulesVersion) || ("geoworld-rules-v1.1.21".equals(specialRulesVersion) || ("geoworld-rules-v1.1.22".equals(specialRulesVersion) || ("geoworld-rules-v1.1.23".equals(specialRulesVersion) || ("geoworld-rules-v1.1.24".equals(specialRulesVersion) || ("geoworld-rules-v1.1.25".equals(specialRulesVersion) || "geoworld-rules-v1.1.26".equals(specialRulesVersion) || "geoworld-rules-v1.1.27".equals(specialRulesVersion)))))));
         boolean hydrologyConformingDepression =
             "geoworld-rules-v1.1.15".equals(specialRulesVersion) ||
             "geoworld-rules-v1.1.16".equals(specialRulesVersion) ||
             "geoworld-rules-v1.1.18".equals(specialRulesVersion) ||
             "geoworld-rules-v1.1.19".equals(specialRulesVersion) ||
-            ("geoworld-rules-v1.1.20".equals(specialRulesVersion) || ("geoworld-rules-v1.1.21".equals(specialRulesVersion) || ("geoworld-rules-v1.1.22".equals(specialRulesVersion) || ("geoworld-rules-v1.1.23".equals(specialRulesVersion) || ("geoworld-rules-v1.1.24".equals(specialRulesVersion) || ("geoworld-rules-v1.1.25".equals(specialRulesVersion) || "geoworld-rules-v1.1.26".equals(specialRulesVersion)))))));
+            ("geoworld-rules-v1.1.20".equals(specialRulesVersion) || ("geoworld-rules-v1.1.21".equals(specialRulesVersion) || ("geoworld-rules-v1.1.22".equals(specialRulesVersion) || ("geoworld-rules-v1.1.23".equals(specialRulesVersion) || ("geoworld-rules-v1.1.24".equals(specialRulesVersion) || ("geoworld-rules-v1.1.25".equals(specialRulesVersion) || "geoworld-rules-v1.1.26".equals(specialRulesVersion) || "geoworld-rules-v1.1.27".equals(specialRulesVersion)))))));
         if (carvedDepression && isCarvedDepression(kind)) {
             double dx = (x - selected.centerX()) /
                 Math.max(1.0, selected.radiusX());
@@ -1927,6 +1959,8 @@ public final class GeoWorldV1 {
             if (("geoworld-rules-v1.1.25".equals(
                 this.worldProfile.generationRulesVersion()
             ) || "geoworld-rules-v1.1.26".equals(
+                this.worldProfile.generationRulesVersion()
+            ) || "geoworld-rules-v1.1.27".equals(
                 this.worldProfile.generationRulesVersion()
             ))) {
                 double peak = Math.max(
@@ -2028,7 +2062,7 @@ public final class GeoWorldV1 {
                         this.worldProfile.generationRulesVersion()
                     ) || ("geoworld-rules-v1.1.24".equals(
                         this.worldProfile.generationRulesVersion()
-                    ) || ("geoworld-rules-v1.1.25".equals(this.worldProfile.generationRulesVersion()) || "geoworld-rules-v1.1.26".equals(this.worldProfile.generationRulesVersion()))))))))
+                    ) || ("geoworld-rules-v1.1.25".equals(this.worldProfile.generationRulesVersion()) || "geoworld-rules-v1.1.26".equals(this.worldProfile.generationRulesVersion()) || "geoworld-rules-v1.1.27".equals(this.worldProfile.generationRulesVersion()))))))))
                 ) &&
                 selected.baseHeight() > 0.0 &&
                 selected.floorHeight() > 0.0 &&
@@ -2145,7 +2179,7 @@ public final class GeoWorldV1 {
                         this.worldProfile.generationRulesVersion()
                     ) || ("geoworld-rules-v1.1.24".equals(
                         this.worldProfile.generationRulesVersion()
-                    ) || ("geoworld-rules-v1.1.25".equals(this.worldProfile.generationRulesVersion()) || "geoworld-rules-v1.1.26".equals(this.worldProfile.generationRulesVersion()))))))))
+                    ) || ("geoworld-rules-v1.1.25".equals(this.worldProfile.generationRulesVersion()) || "geoworld-rules-v1.1.26".equals(this.worldProfile.generationRulesVersion()) || "geoworld-rules-v1.1.27".equals(this.worldProfile.generationRulesVersion()))))))))
                 ) &&
                 selected.baseHeight() > 0.0 &&
                 selected.floorHeight() > 0.0 &&
@@ -2331,7 +2365,7 @@ public final class GeoWorldV1 {
                         this.worldProfile.generationRulesVersion()
                     ) || ("geoworld-rules-v1.1.24".equals(
                         this.worldProfile.generationRulesVersion()
-                    ) || ("geoworld-rules-v1.1.25".equals(this.worldProfile.generationRulesVersion()) || "geoworld-rules-v1.1.26".equals(this.worldProfile.generationRulesVersion()))))))))
+                    ) || ("geoworld-rules-v1.1.25".equals(this.worldProfile.generationRulesVersion()) || "geoworld-rules-v1.1.26".equals(this.worldProfile.generationRulesVersion()) || "geoworld-rules-v1.1.27".equals(this.worldProfile.generationRulesVersion()))))))))
                 ) &&
                 selected.baseHeight() > 0.0 &&
                 selected.floorHeight() > 0.0 &&
@@ -2356,7 +2390,7 @@ public final class GeoWorldV1 {
                 boolean drainageCorridor =
                     ("geoworld-rules-v1.1.18".equals(specialRulesVersion) ||
                         "geoworld-rules-v1.1.19".equals(specialRulesVersion) ||
-                        ("geoworld-rules-v1.1.20".equals(specialRulesVersion) || ("geoworld-rules-v1.1.21".equals(specialRulesVersion) || ("geoworld-rules-v1.1.22".equals(specialRulesVersion) || ("geoworld-rules-v1.1.23".equals(specialRulesVersion) || ("geoworld-rules-v1.1.24".equals(specialRulesVersion) || ("geoworld-rules-v1.1.25".equals(specialRulesVersion) || "geoworld-rules-v1.1.26".equals(specialRulesVersion)))))))) &&
+                        ("geoworld-rules-v1.1.20".equals(specialRulesVersion) || ("geoworld-rules-v1.1.21".equals(specialRulesVersion) || ("geoworld-rules-v1.1.22".equals(specialRulesVersion) || ("geoworld-rules-v1.1.23".equals(specialRulesVersion) || ("geoworld-rules-v1.1.24".equals(specialRulesVersion) || ("geoworld-rules-v1.1.25".equals(specialRulesVersion) || "geoworld-rules-v1.1.26".equals(specialRulesVersion) || "geoworld-rules-v1.1.27".equals(specialRulesVersion)))))))) &&
                     !selected.drainage().isEmpty();
                 if (!riverConforming && drainageCorridor) {
                     ground = applyBasinDrainageCorridor(
@@ -2382,7 +2416,7 @@ public final class GeoWorldV1 {
                             "geoworld-rules-v1.1.16".equals(specialRulesVersion) ||
                             "geoworld-rules-v1.1.18".equals(specialRulesVersion) ||
                             "geoworld-rules-v1.1.19".equals(specialRulesVersion) ||
-                            ("geoworld-rules-v1.1.20".equals(specialRulesVersion) || ("geoworld-rules-v1.1.21".equals(specialRulesVersion) || ("geoworld-rules-v1.1.22".equals(specialRulesVersion) || ("geoworld-rules-v1.1.23".equals(specialRulesVersion) || ("geoworld-rules-v1.1.24".equals(specialRulesVersion) || ("geoworld-rules-v1.1.25".equals(specialRulesVersion) || "geoworld-rules-v1.1.26".equals(specialRulesVersion)))))))
+                            ("geoworld-rules-v1.1.20".equals(specialRulesVersion) || ("geoworld-rules-v1.1.21".equals(specialRulesVersion) || ("geoworld-rules-v1.1.22".equals(specialRulesVersion) || ("geoworld-rules-v1.1.23".equals(specialRulesVersion) || ("geoworld-rules-v1.1.24".equals(specialRulesVersion) || ("geoworld-rules-v1.1.25".equals(specialRulesVersion) || "geoworld-rules-v1.1.26".equals(specialRulesVersion) || "geoworld-rules-v1.1.27".equals(specialRulesVersion)))))))
                         ) {
                             // v1.1.16 locked interpretation and v1.1.18
                             // fallback for persisted features without drainage.
@@ -3058,7 +3092,7 @@ public final class GeoWorldV1 {
             !"geoworld-rules-v1.1.12".equals(generationRulesVersion) &&
             !"geoworld-rules-v1.1.13".equals(generationRulesVersion) &&
             !"geoworld-rules-v1.1.14".equals(generationRulesVersion) &&
-            (!"geoworld-rules-v1.1.15".equals(generationRulesVersion) && !"geoworld-rules-v1.1.16".equals(generationRulesVersion) && !"geoworld-rules-v1.1.18".equals(generationRulesVersion) && !"geoworld-rules-v1.1.19".equals(generationRulesVersion) && (!"geoworld-rules-v1.1.20".equals(generationRulesVersion) && (!"geoworld-rules-v1.1.21".equals(generationRulesVersion) && !("geoworld-rules-v1.1.22".equals(generationRulesVersion) || ("geoworld-rules-v1.1.23".equals(generationRulesVersion) || ("geoworld-rules-v1.1.24".equals(generationRulesVersion) || ("geoworld-rules-v1.1.25".equals(generationRulesVersion) || "geoworld-rules-v1.1.26".equals(generationRulesVersion))))))))
+            (!"geoworld-rules-v1.1.15".equals(generationRulesVersion) && !"geoworld-rules-v1.1.16".equals(generationRulesVersion) && !"geoworld-rules-v1.1.18".equals(generationRulesVersion) && !"geoworld-rules-v1.1.19".equals(generationRulesVersion) && (!"geoworld-rules-v1.1.20".equals(generationRulesVersion) && (!"geoworld-rules-v1.1.21".equals(generationRulesVersion) && !("geoworld-rules-v1.1.22".equals(generationRulesVersion) || ("geoworld-rules-v1.1.23".equals(generationRulesVersion) || ("geoworld-rules-v1.1.24".equals(generationRulesVersion) || ("geoworld-rules-v1.1.25".equals(generationRulesVersion) || "geoworld-rules-v1.1.26".equals(generationRulesVersion) || "geoworld-rules-v1.1.27".equals(generationRulesVersion))))))))
         ) {
             return legacy;
         }
@@ -3694,6 +3728,7 @@ public final class GeoWorldV1 {
                 ? Json.intValue(worldSampleObject, "MinNavigableRiverDepthBlocks") : 0
         );
 
+        ScalarGrid climateSeaSurfaceTemp = null;
         ScalarGrid climateTemp = null;
         ScalarGrid climatePrecip = null;
         ScalarGrid climateMonsoon = null;
@@ -3705,6 +3740,13 @@ public final class GeoWorldV1 {
                 climatePreviewRaw,
                 "payload.climatePreview"
             );
+            Object seaSurfaceTemp = climatePreview.get("seaSurfaceTempC");
+            if (seaSurfaceTemp != null) {
+                climateSeaSurfaceTemp = new ScalarGrid(
+                    manifest.geometry(),
+                    doubleArray(seaSurfaceTemp, "climatePreview.seaSurfaceTempC")
+                );
+            }
             if (climatePreview.get("annualMeanTempC") != null) {
                 double[] temp = doubleArray(
                     Json.required(climatePreview, "annualMeanTempC"),
@@ -3873,6 +3915,7 @@ public final class GeoWorldV1 {
             List.copyOf(mineralDistrictAssignments),
             waterbedConfig,
             worldSampleConfig,
+            climateSeaSurfaceTemp,
             climateTemp,
             climatePrecip,
             climateMonsoon,
@@ -4138,7 +4181,7 @@ public final class GeoWorldV1 {
             "geoworld-rules-v1.1.12".equals(rulesVersion) ||
             "geoworld-rules-v1.1.13".equals(rulesVersion) ||
             "geoworld-rules-v1.1.14".equals(rulesVersion) ||
-            ("geoworld-rules-v1.1.15".equals(rulesVersion) || "geoworld-rules-v1.1.16".equals(rulesVersion) || "geoworld-rules-v1.1.18".equals(rulesVersion) || "geoworld-rules-v1.1.19".equals(rulesVersion) || ("geoworld-rules-v1.1.20".equals(rulesVersion) || ("geoworld-rules-v1.1.21".equals(rulesVersion) || ("geoworld-rules-v1.1.22".equals(rulesVersion) || ("geoworld-rules-v1.1.23".equals(rulesVersion) || ("geoworld-rules-v1.1.24".equals(rulesVersion) || ("geoworld-rules-v1.1.25".equals(rulesVersion) || "geoworld-rules-v1.1.26".equals(rulesVersion))))))));
+            ("geoworld-rules-v1.1.15".equals(rulesVersion) || "geoworld-rules-v1.1.16".equals(rulesVersion) || "geoworld-rules-v1.1.18".equals(rulesVersion) || "geoworld-rules-v1.1.19".equals(rulesVersion) || ("geoworld-rules-v1.1.20".equals(rulesVersion) || ("geoworld-rules-v1.1.21".equals(rulesVersion) || ("geoworld-rules-v1.1.22".equals(rulesVersion) || ("geoworld-rules-v1.1.23".equals(rulesVersion) || ("geoworld-rules-v1.1.24".equals(rulesVersion) || ("geoworld-rules-v1.1.25".equals(rulesVersion) || "geoworld-rules-v1.1.26".equals(rulesVersion) || "geoworld-rules-v1.1.27".equals(rulesVersion))))))));
         double activeRiverBankSurface = Double.NEGATIVE_INFINITY;
         double activeRiverBankSurfaceWeight = 0.0;
         boolean activeRiverBankProtected;

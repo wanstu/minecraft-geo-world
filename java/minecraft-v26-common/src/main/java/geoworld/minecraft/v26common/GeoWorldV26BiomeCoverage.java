@@ -206,9 +206,11 @@ public final class GeoWorldV26BiomeCoverage {
                 // family, but the navigation influence corridor must not be
                 // reintroduced as a coral-bearing warm_ocean by a coverage
                 // habitat override.
-                if ("geoworld-rules-v1.1.26".equals(
+                if (("geoworld-rules-v1.1.26".equals(
                         model.manifest().generationRulesVersion()
-                    ) &&
+                    ) || "geoworld-rules-v1.1.27".equals(
+                        model.manifest().generationRulesVersion()
+                    )) &&
                     sample.coastalSeaReceiver() &&
                     "minecraft:warm_ocean".equals(biome)) {
                     continue;

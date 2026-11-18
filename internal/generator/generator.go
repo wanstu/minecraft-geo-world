@@ -231,7 +231,7 @@ func GenerateWorld(ctx context.Context, cfg Config, progress ProgressFunc) (*Wor
 			resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.16" ||
 			resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.18" ||
 			resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.19" ||
-			(resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.20" || (resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.21" || (resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.22" || (resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.23" || (resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.24" || (resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.25" || resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.26"))))))) {
+			(resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.20" || (resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.21" || (resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.22" || (resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.23" || (resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.24" || (resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.25" || (resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.26" || resolved.WorldProfile.GenerationRulesVersion == "geoworld-rules-v1.1.27")))))))) {
 		special = specialfeatures.Plan(
 			resolved.Seed,
 			w.Geometry,

@@ -77,6 +77,7 @@ type RuntimeModel struct {
 }
 
 type ClimatePreview struct {
+	SeaSurfaceTempC []float64
 	AnnualMeanTempC []float64
 	AnnualPrecipMM  []float64
 	MonsoonIndex    []float64
@@ -113,7 +114,7 @@ func (m *RuntimeModel) Sample(worldX, worldZ float64) runtimeprofile.Sample {
 			m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.16" ||
 			m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.18" ||
 			m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.19" ||
-			(m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.20" || (m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.21" || (m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.22" || (m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.23" || (m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.24" || (m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.25" || m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.26")))))))) && len(m.SpecialFeatures) > 0 {
+			(m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.20" || (m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.21" || (m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.22" || (m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.23" || (m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.24" || (m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.25" || (m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.26" || m.Manifest.GenerationRulesVersion == "geoworld-rules-v1.1.27"))))))))) && len(m.SpecialFeatures) > 0 {
 		out = specialfeatures.Apply(
 			m.SpecialFeatures,
 			out,
@@ -177,6 +178,7 @@ type waterbedSnapshot struct {
 }
 
 type climatePreviewSnapshot struct {
+	SeaSurfaceTempC []float64 `json:"seaSurfaceTempC,omitempty"`
 	AnnualMeanTempC []float64 `json:"annualMeanTempC,omitempty"`
 	AnnualPrecipMM  []float64 `json:"annualPrecipMM,omitempty"`
 	MonsoonIndex    []float64 `json:"monsoonIndex,omitempty"`

@@ -508,6 +508,51 @@ public final class GeoWorldV26SurfaceBiomeVerifier {
             materials += 2;
         }
 
+        String reefBiome = "minecraft:warm_ocean";
+        if (!checked.contains(reefBiome)) {
+            // Slice F reefs are natural habitats. Sample their actual
+            // underwater surface rather than checking a reserved circle.
+            var grid = runtime.manifest().geometry();
+            int reefColumns = 0;
+            for (int iz = 0; iz < grid.height() && reefColumns < 3; iz++) {
+                int z = (int)Math.round(grid.originZ() + iz * grid.spacingZ());
+                for (int ix = 0; ix < grid.width() && reefColumns < 3; ix++) {
+                    int x = (int)Math.round(grid.originX() + ix * grid.spacingX());
+                    var sample = runtime.sample(x, z);
+                    if (!"Warm Ocean".equals(sample.biomeFamily()) ||
+                        !reefBiome.equals(BIOMES.surfaceBiomeIdFromSample(runtime, x, 319, z, sample))) {
+                        continue;
+                    }
+                    var column = SHORELINE.planModel(runtime, x, z);
+                    int groundY = column.groundBoundary() - 1;
+                    String actual = BIOMES.biomeId(runtime, x, groundY, z);
+                    if (!"Ocean".equals(sample.waterKind()) || sample.coastalSeaReceiver() ||
+                        !(runtime.sampleSeaSurfaceTemperature(x, z) >= 24.0) ||
+                        column.waterBoundary() <= column.groundBoundary() || !reefBiome.equals(actual)) {
+                        throw new AssertionError("invalid coral reef column at " + x + ", " + z);
+                    }
+                    String soil = sample.surfaceProfile();
+                    String top = GeoWorldV26SurfaceMaterials.top(actual, soil, column.surfaceOverride());
+                    String expected = column.surfaceOverride() != null
+                        ? column.surfaceOverride() : PROFILE.surfaceProfileMapping().surfaceBlock(soil);
+                    String subsoil = GeoWorldV26SurfaceMaterials.below(
+                        actual, soil, column.underOverride(), x, groundY - 2, z, 2
+                    );
+                    if (!top.equals(expected) || subsoil == null) {
+                        throw new AssertionError("invalid reef surface materials at " + x + ", " + z);
+                    }
+                    reefColumns++;
+                }
+            }
+            if (reefColumns > 0) {
+                checked.add(reefBiome);
+                specialSurfacePatches++;
+                columns += reefColumns;
+                materials += 2 * reefColumns;
+            }
+            System.out.printf("GeoWorld natural coral reef material checks=%d%n", reefColumns);
+        }
+
         if (!checked.equals(required)) {
             var missing = new HashSet<>(required);
             missing.removeAll(checked);
@@ -593,9 +638,11 @@ public final class GeoWorldV26SurfaceBiomeVerifier {
         int mouthWarmFamilyOcean = 0;
         int mouthWarmOceanViolations = 0;
         int mouthRiverBiomeViolations = 0;
-        if ("geoworld-rules-v1.1.26".equals(
+        if (("geoworld-rules-v1.1.26".equals(
             runtime.manifest().generationRulesVersion()
-        )) {
+        ) || "geoworld-rules-v1.1.27".equals(
+            runtime.manifest().generationRulesVersion()
+        ))) {
             final double navigationStep = 32.0;
             for (double x = geometry.originX() + navigationStep / 2;
                  x < geometry.originX() + geometry.spanXBlocks();

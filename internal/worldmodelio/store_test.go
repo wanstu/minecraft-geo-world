@@ -53,6 +53,9 @@ func TestSaveLoadRoundTripPreservesRuntimeSamplesExactly(t *testing.T) {
 	if !reflect.DeepEqual(reopened.Config, original.Config) {
 		t.Fatal("resolved config changed after reopen")
 	}
+	if !reflect.DeepEqual(reopened.ClimatePreview.SeaSurfaceTempC, original.Climate.SeaSurfaceTempC) {
+		t.Fatal("marine surface temperatures changed after reopen")
+	}
 	if reopened.Geometry != original.Geometry {
 		t.Fatalf("geometry changed after reopen: got=%+v want=%+v", reopened.Geometry, original.Geometry)
 	}

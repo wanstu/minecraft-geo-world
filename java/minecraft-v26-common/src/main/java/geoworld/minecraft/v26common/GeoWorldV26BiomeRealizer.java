@@ -64,6 +64,11 @@ public final class GeoWorldV26BiomeRealizer {
         LinkedHashSet<String> filtered = new LinkedHashSet<>(required);
         filtered.remove("minecraft:mushroom_fields");
         filtered.remove("minecraft:pale_garden");
+        if (usesBiomeDistributionRules(model)) {
+            // A guaranteed habitat can force a reef outside its physical
+            // envelope. Warm ocean is still registered and generated naturally.
+            filtered.remove("minecraft:warm_ocean");
+        }
         return Set.copyOf(filtered);
     }
 
@@ -211,7 +216,14 @@ public final class GeoWorldV26BiomeRealizer {
                     ? climate.annualMeanTempC()
                     : 12.0)
                 : model.sampleBiomeTemperature(blockX, blockZ, 12.0);
-            String oceanBiome = oceanBiomeId(sample, temp);
+            String oceanBiome = oceanBiomeId(
+                model,
+                sample,
+                climate,
+                blockX,
+                blockZ,
+                temp
+            );
             if (usesRiverMouthNavigationRules(model) &&
                 sample.coastalSeaReceiver() &&
                 "minecraft:warm_ocean".equals(oceanBiome)) {
@@ -301,7 +313,11 @@ public final class GeoWorldV26BiomeRealizer {
     }
 
     private String oceanBiomeId(
+        GeoWorldV1 model,
         GeoWorldV1.RuntimeSample sample,
+        GeoWorldV1.BiomeClimateSample climate,
+        double x,
+        double z,
         double temp
     ) {
         String family = sample.biomeFamily();
@@ -312,6 +328,18 @@ public final class GeoWorldV26BiomeRealizer {
             case "Warm Ocean" -> {
                 if (deep) {
                     yield "minecraft:deep_lukewarm_ocean";
+                }
+                if (usesBiomeDistributionRules(model)) {
+                    yield isCoralReefSuitable(
+                        model,
+                        sample,
+                        climate,
+                        x,
+                        z,
+                        depth
+                    )
+                        ? "minecraft:warm_ocean"
+                        : "minecraft:lukewarm_ocean";
                 }
                 yield temp >= 23.0
                     ? "minecraft:warm_ocean"
@@ -647,6 +675,45 @@ public final class GeoWorldV26BiomeRealizer {
         return null;
     }
 
+    private boolean isCoralReefSuitable(
+        GeoWorldV1 model,
+        GeoWorldV1.RuntimeSample sample,
+        GeoWorldV1.BiomeClimateSample climate,
+        double x,
+        double z,
+        double depth
+    ) {
+        if (sample.coastalSeaReceiver() ||
+            sample.riverWeight() >= 0.12 ||
+            sample.oceanEligibility() < 0.58 ||
+            depth < 0.008 ||
+            depth > 0.055) {
+            return false;
+        }
+        double seaTemp = model.sampleSeaSurfaceTemperature(x, z);
+        if (!Double.isFinite(seaTemp) || seaTemp < 24.0) {
+            return false;
+        }
+
+        var coastalClimate = climate != null
+            ? climate
+            : model.sampleBiomeClimate(x, z);
+        if (coastalClimate.available() &&
+            coastalClimate.annualPrecipMM() > 2400.0 &&
+            coastalClimate.monsoonIndex() > 0.55) {
+            return false;
+        }
+
+        // A smooth, macro-scale patch accounts for the substrate and exposure
+        // variation that the world model does not explicitly simulate.
+        return smoothValueNoise(
+            model.manifest().seed() ^ 0x5245454650524F56L,
+            x,
+            z,
+            4 * model.manifest().geometry().cellSize()
+        ) > 0.50;
+    }
+
     private boolean isMushroomCandidate(
         GeoWorldV1 model,
         GeoWorldV1.RuntimeSample sample,
@@ -824,19 +891,25 @@ public final class GeoWorldV26BiomeRealizer {
         return t * t * (3.0 - 2.0 * t);
     }
 
+    private boolean usesBiomeDistributionRules(GeoWorldV1 model) {
+        return "geoworld-rules-v1.1.27".equals(
+            model.manifest().generationRulesVersion()
+        );
+    }
+
     private boolean usesSpecialLandscapeRules(GeoWorldV1 model) {
         String rules = model.manifest().generationRulesVersion();
         return "geoworld-rules-v1.1.11".equals(rules) ||
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || "geoworld-rules-v1.1.25".equals(rules) || "geoworld-rules-v1.1.26".equals(rules))))))));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || "geoworld-rules-v1.1.25".equals(rules) || "geoworld-rules-v1.1.26".equals(rules) || "geoworld-rules-v1.1.27".equals(rules))))))));
     }
 
     private boolean usesRiverMouthNavigationRules(GeoWorldV1 model) {
         return "geoworld-rules-v1.1.26".equals(
             model.manifest().generationRulesVersion()
-        );
+        ) || usesBiomeDistributionRules(model);
     }
 
     private boolean supportsSulfurCaves() {
