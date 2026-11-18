@@ -85,17 +85,16 @@ final class GeoWorldScrollableContent extends AbstractContainerWidget {
         double mouseY,
         int button
     ) {
-        if (
-            button == 0 &&
-            this.scrollbarVisible() &&
-            this.isInScrollbar(mouseX, mouseY)
-        ) {
+        if (this.isInContentViewport(mouseX, mouseY)) {
+            return super.mouseClicked(mouseX, mouseY, button);
+        }
+        if (button == 0 && this.scrollbarVisible() && this.isMouseOver(mouseX, mouseY)) {
             this.draggingScrollbar = true;
             this.setFocused(true);
             this.setScrollFromMouse(mouseY);
             return true;
         }
-        return super.mouseClicked(mouseX, mouseY, button);
+        return false;
     }
 
     @Override
@@ -129,7 +128,9 @@ final class GeoWorldScrollableContent extends AbstractContainerWidget {
             this.draggingScrollbar = false;
             return true;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return ((button == 0 && this.isDragging()) ||
+            this.isInContentViewport(mouseX, mouseY)) &&
+            super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
@@ -222,12 +223,10 @@ final class GeoWorldScrollableContent extends AbstractContainerWidget {
         );
     }
 
-    private boolean isInScrollbar(double mouseX, double mouseY) {
-        int left = this.getX() + this.getWidth() - SCROLLBAR_WIDTH;
-        return mouseX >= left &&
-            mouseX <= this.getRight() &&
-            mouseY >= this.getY() &&
-            mouseY <= this.getBottom();
+    private boolean isInContentViewport(double mouseX, double mouseY) {
+        // Rendering clips the children, but container click dispatch does not.
+        return this.isMouseOver(mouseX, mouseY) &&
+            mouseX < this.getRight() - SCROLLBAR_WIDTH;
     }
 
     private void setScrollFromMouse(double mouseY) {
