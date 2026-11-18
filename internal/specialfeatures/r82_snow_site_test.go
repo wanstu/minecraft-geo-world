@@ -20,8 +20,10 @@ func TestR82SnowCraterSiteRequiresColdMountainRelief(t *testing.T) {
 		AnnualMeanTempC:  -9,
 		CenterY:          231,
 		ReliefBlocks:     122,
-		DrySamples:       32,
-		Samples:          32,
+		LandSamples512:   32,
+		Samples512:       32,
+		LandSamples768:   32,
+		Samples768:       32,
 		TerrainVariant:   mcprofile.TerrainMountain,
 		BasinDepthBlocks: -11,
 	}
@@ -34,7 +36,7 @@ func TestR82SnowCraterSiteRequiresColdMountainRelief(t *testing.T) {
 		"low":        withSnowCenterY(good, 100),
 		"flat":       withSnowRelief(good, 20),
 		"plain":      withSnowTerrain(good, mcprofile.TerrainPlain),
-		"water-ring": withSnowDrySamples(good, 20),
+		"water-ring": withSnowLand512(good, 20),
 	}
 	for name, got := range cases {
 		if qualifiesSnowCraterSite(got) {
@@ -49,8 +51,10 @@ func TestR82SnowBasinSiteRequiresColdMountainBasin(t *testing.T) {
 		CenterY:          291,
 		ReliefBlocks:     249,
 		BasinDepthBlocks: 4.5,
-		DrySamples:       31,
-		Samples:          32,
+		LandSamples512:   32,
+		Samples512:       32,
+		LandSamples768:   32,
+		Samples768:       32,
 		TerrainVariant:   mcprofile.TerrainMountain,
 	}
 	if !qualifiesSnowBasinSite(good) {
@@ -63,7 +67,8 @@ func TestR82SnowBasinSiteRequiresColdMountainBasin(t *testing.T) {
 		"flat":          withSnowRelief(good, 15),
 		"no-depression": withSnowBasinDepth(good, 2),
 		"plain":         withSnowTerrain(good, mcprofile.TerrainPlain),
-		"wet-ring":      withSnowDrySamples(good, 20),
+		"wet-ring":      withSnowLand512(good, 20),
+		"coastal-ring":  withSnowLand768(good, 28),
 	}
 	for name, got := range cases {
 		if qualifiesSnowBasinSite(got) {
@@ -92,7 +97,11 @@ func withSnowTerrain(in snowSiteMetrics, v mcprofile.TerrainVariant) snowSiteMet
 	in.TerrainVariant = v
 	return in
 }
-func withSnowDrySamples(in snowSiteMetrics, v int) snowSiteMetrics {
-	in.DrySamples = v
+func withSnowLand512(in snowSiteMetrics, v int) snowSiteMetrics {
+	in.LandSamples512 = v
+	return in
+}
+func withSnowLand768(in snowSiteMetrics, v int) snowSiteMetrics {
+	in.LandSamples768 = v
 	return in
 }

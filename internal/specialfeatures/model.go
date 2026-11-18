@@ -539,8 +539,10 @@ type snowSiteMetrics struct {
 	CenterY          float64
 	ReliefBlocks     float64
 	BasinDepthBlocks float64
-	DrySamples       int
-	Samples          int
+	LandSamples512   int
+	Samples512       int
+	LandSamples768   int
+	Samples768       int
 	TerrainVariant   mcprofile.TerrainVariant
 }
 
@@ -569,7 +571,7 @@ func snowSiteMetricsForCandidate(
 	heights := make([]float64, 0, samples)
 	minY := math.Inf(1)
 	maxY := math.Inf(-1)
-	dry := 0
+	land512 := 0
 	for i := 0; i < samples; i++ {
 		angle := 2 * math.Pi * float64(i) / samples
 		sample := runtime.Sample(
@@ -580,12 +582,25 @@ func snowSiteMetricsForCandidate(
 		heights = append(heights, y)
 		minY = math.Min(minY, y)
 		maxY = math.Max(maxY, y)
-		if sample.WaterKind == reconcile.WaterNone {
-			dry++
+		if sample.WaterKind != reconcile.WaterOcean &&
+			sample.WaterKind != reconcile.WaterLake {
+			land512++
 		}
 	}
 	if len(heights) != samples || math.IsInf(minY, 0) || math.IsInf(maxY, 0) {
 		return snowSiteMetrics{}, false
+	}
+	land768 := 0
+	for i := 0; i < samples; i++ {
+		angle := 2 * math.Pi * float64(i) / samples
+		sample := runtime.Sample(
+			c.x+math.Cos(angle)*768,
+			c.z+math.Sin(angle)*768,
+		)
+		if sample.WaterKind != reconcile.WaterOcean &&
+			sample.WaterKind != reconcile.WaterLake {
+			land768++
+		}
 	}
 	sort.Float64s(heights)
 	median := (heights[samples/2-1] + heights[samples/2]) * 0.5
@@ -595,15 +610,17 @@ func snowSiteMetricsForCandidate(
 		CenterY:          centerY,
 		ReliefBlocks:     maxY - minY,
 		BasinDepthBlocks: median - centerY,
-		DrySamples:       dry,
-		Samples:          samples,
+		LandSamples512:   land512,
+		Samples512:       samples,
+		LandSamples768:   land768,
+		Samples768:       samples,
 		TerrainVariant:   profile.TerrainVariant[c.index],
 	}, true
 }
 
 func qualifiesSnowCraterSite(metrics snowSiteMetrics) bool {
-	if metrics.Samples <= 0 ||
-		metrics.DrySamples < 28 ||
+	if metrics.Samples512 <= 0 ||
+		metrics.LandSamples512 != metrics.Samples512 ||
 		metrics.AnnualMeanTempC > 5 ||
 		metrics.CenterY < 120 ||
 		metrics.ReliefBlocks < 50 {
@@ -618,8 +635,10 @@ func qualifiesSnowCraterSite(metrics snowSiteMetrics) bool {
 }
 
 func qualifiesSnowBasinSite(metrics snowSiteMetrics) bool {
-	if metrics.Samples <= 0 ||
-		metrics.DrySamples < 28 ||
+	if metrics.Samples512 <= 0 ||
+		metrics.LandSamples512 != metrics.Samples512 ||
+		metrics.Samples768 <= 0 ||
+		metrics.LandSamples768 != metrics.Samples768 ||
 		metrics.AnnualMeanTempC > 5 ||
 		metrics.CenterY < 90 ||
 		metrics.ReliefBlocks < 50 ||

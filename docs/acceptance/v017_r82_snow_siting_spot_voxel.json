@@ -1,0 +1,352 @@
+{
+  "schemaVersion": 1,
+  "evidenceClass": "fresh_saved_minecraft_1_21_1_neoforge_anvil_vs_runtime_model",
+  "world": "R817SliceDSnowV125Spot",
+  "seed": -1818694639628404530,
+  "rulesVersion": "geoworld-rules-v1.1.25",
+  "modelSha256": "8282dc724291eef48308bf08c98bdb065ff83e38feb564efdce2284b3c1e4e3c",
+  "targetChunks": {
+    "expected": 10,
+    "full": 10,
+    "missing": []
+  },
+  "surfaceAgreement": {
+    "points": 12,
+    "fullPoints": 12,
+    "maxAbsErrorBlocks": 0,
+    "meanAbsErrorBlocks": 0.0,
+    "within1Block": 12,
+    "within2Blocks": 12
+  },
+  "groups": {
+    "21:volcanic_crater_snow:x": {
+      "points": 1,
+      "fullPoints": 1,
+      "specialPoints": 1,
+      "maxAbsSurfaceError": 0,
+      "meanAbsSurfaceError": 0.0,
+      "expectedMinSurfaceY": 273,
+      "expectedMaxSurfaceY": 273,
+      "actualMinGeometryY": 273,
+      "actualMaxGeometryY": 273
+    },
+    "21:volcanic_crater_snow:z": {
+      "points": 1,
+      "fullPoints": 1,
+      "specialPoints": 1,
+      "maxAbsSurfaceError": 0,
+      "meanAbsSurfaceError": 0.0,
+      "expectedMinSurfaceY": 273,
+      "expectedMaxSurfaceY": 273,
+      "actualMinGeometryY": 273,
+      "actualMaxGeometryY": 273
+    },
+    "23:basin_snow:x": {
+      "points": 1,
+      "fullPoints": 1,
+      "specialPoints": 1,
+      "maxAbsSurfaceError": 0,
+      "meanAbsSurfaceError": 0.0,
+      "expectedMinSurfaceY": 106,
+      "expectedMaxSurfaceY": 106,
+      "actualMinGeometryY": 106,
+      "actualMaxGeometryY": 106
+    },
+    "23:basin_snow:z": {
+      "points": 1,
+      "fullPoints": 1,
+      "specialPoints": 1,
+      "maxAbsSurfaceError": 0,
+      "meanAbsSurfaceError": 0.0,
+      "expectedMinSurfaceY": 106,
+      "expectedMaxSurfaceY": 106,
+      "actualMinGeometryY": 106,
+      "actualMaxGeometryY": 106
+    },
+    "23:basin_snow:ring": {
+      "points": 8,
+      "fullPoints": 8,
+      "specialPoints": 4,
+      "maxAbsSurfaceError": 0,
+      "meanAbsSurfaceError": 0.0,
+      "expectedMinSurfaceY": 98,
+      "expectedMaxSurfaceY": 218,
+      "actualMinGeometryY": 98,
+      "actualMaxGeometryY": 218
+    }
+  },
+  "features": {
+    "21": {
+      "kind": "volcanic_crater_snow",
+      "points": 2,
+      "maxAbsSurfaceError": 0,
+      "centerExpectedSurfaceY": 273,
+      "centerActualGeometryY": 273,
+      "profileMinActualGeometryY": 273,
+      "profileMaxActualGeometryY": 273
+    },
+    "23": {
+      "kind": "basin_snow",
+      "points": 10,
+      "maxAbsSurfaceError": 0,
+      "centerExpectedSurfaceY": 106,
+      "centerActualGeometryY": 106,
+      "profileMinActualGeometryY": 98,
+      "profileMaxActualGeometryY": 218
+    }
+  },
+  "rows": [
+    {
+      "featureId": 21,
+      "kind": "volcanic_crater_snow",
+      "axis": "x",
+      "x": 10944,
+      "z": -6464,
+      "baseGroundY": 302.1065896913915,
+      "expectedGroundY": 273.8365896913915,
+      "specialFeature": "volcanic_crater_snow",
+      "waterKind": "\u0000",
+      "expectedSurfaceY": 273,
+      "actual": {
+        "status": "full",
+        "topY": 274,
+        "topBlock": "minecraft:short_grass",
+        "terrainY": 273,
+        "terrainBlock": "minecraft:grass_block"
+      },
+      "actualGeometryY": 273,
+      "surfaceErrorBlocks": 0
+    },
+    {
+      "featureId": 21,
+      "kind": "volcanic_crater_snow",
+      "axis": "z",
+      "x": 10944,
+      "z": -6464,
+      "baseGroundY": 302.1065896913915,
+      "expectedGroundY": 273.8365896913915,
+      "specialFeature": "volcanic_crater_snow",
+      "waterKind": "\u0000",
+      "expectedSurfaceY": 273,
+      "actual": {
+        "status": "full",
+        "topY": 274,
+        "topBlock": "minecraft:short_grass",
+        "terrainY": 273,
+        "terrainBlock": "minecraft:grass_block"
+      },
+      "actualGeometryY": 273,
+      "surfaceErrorBlocks": 0
+    },
+    {
+      "featureId": 23,
+      "kind": "basin_snow",
+      "axis": "x",
+      "x": -1216,
+      "z": -9280,
+      "baseGroundY": 130.03583400245128,
+      "expectedGroundY": 106.90583400245129,
+      "specialFeature": "basin_snow",
+      "waterKind": "\u0000",
+      "expectedSurfaceY": 106,
+      "actual": {
+        "status": "full",
+        "topY": 106,
+        "topBlock": "minecraft:grass_block",
+        "terrainY": 106,
+        "terrainBlock": "minecraft:grass_block"
+      },
+      "actualGeometryY": 106,
+      "surfaceErrorBlocks": 0
+    },
+    {
+      "featureId": 23,
+      "kind": "basin_snow",
+      "axis": "z",
+      "x": -1216,
+      "z": -9280,
+      "baseGroundY": 130.03583400245128,
+      "expectedGroundY": 106.90583400245129,
+      "specialFeature": "basin_snow",
+      "waterKind": "\u0000",
+      "expectedSurfaceY": 106,
+      "actual": {
+        "status": "full",
+        "topY": 106,
+        "topBlock": "minecraft:grass_block",
+        "terrainY": 106,
+        "terrainBlock": "minecraft:grass_block"
+      },
+      "actualGeometryY": 106,
+      "surfaceErrorBlocks": 0
+    },
+    {
+      "featureId": 23,
+      "kind": "basin_snow",
+      "axis": "ring",
+      "x": -1728,
+      "z": -9280,
+      "baseGroundY": 117.56448003467946,
+      "expectedGroundY": 117.55078875574323,
+      "specialFeature": "basin_snow",
+      "waterKind": "\u0000",
+      "expectedSurfaceY": 117,
+      "actual": {
+        "status": "full",
+        "topY": 118,
+        "topBlock": "minecraft:snow",
+        "terrainY": 117,
+        "terrainBlock": "minecraft:snow_block"
+      },
+      "actualGeometryY": 117,
+      "surfaceErrorBlocks": 0
+    },
+    {
+      "featureId": 23,
+      "kind": "basin_snow",
+      "axis": "ring",
+      "x": -704,
+      "z": -9280,
+      "baseGroundY": 163.76598225231686,
+      "expectedGroundY": 163.76598225231686,
+      "specialFeature": "basin_snow",
+      "waterKind": "\u0000",
+      "expectedSurfaceY": 163,
+      "actual": {
+        "status": "full",
+        "topY": 164,
+        "topBlock": "minecraft:snow",
+        "terrainY": 163,
+        "terrainBlock": "minecraft:snow_block"
+      },
+      "actualGeometryY": 163,
+      "surfaceErrorBlocks": 0
+    },
+    {
+      "featureId": 23,
+      "kind": "basin_snow",
+      "axis": "ring",
+      "x": -1216,
+      "z": -9792,
+      "baseGroundY": 106.5604468896789,
+      "expectedGroundY": 106.5604468896789,
+      "specialFeature": "basin_snow",
+      "waterKind": "\u0000",
+      "expectedSurfaceY": 106,
+      "actual": {
+        "status": "full",
+        "topY": 107,
+        "topBlock": "minecraft:snow",
+        "terrainY": 106,
+        "terrainBlock": "minecraft:snow_block"
+      },
+      "actualGeometryY": 106,
+      "surfaceErrorBlocks": 0
+    },
+    {
+      "featureId": 23,
+      "kind": "basin_snow",
+      "axis": "ring",
+      "x": -1216,
+      "z": -8768,
+      "baseGroundY": 215.26888961495294,
+      "expectedGroundY": 215.26888961495294,
+      "specialFeature": "basin_snow",
+      "waterKind": "\u0000",
+      "expectedSurfaceY": 214,
+      "actual": {
+        "status": "full",
+        "topY": 215,
+        "topBlock": "minecraft:snow",
+        "terrainY": 214,
+        "terrainBlock": "minecraft:snow_block"
+      },
+      "actualGeometryY": 214,
+      "surfaceErrorBlocks": 0
+    },
+    {
+      "featureId": 23,
+      "kind": "basin_snow",
+      "axis": "ring",
+      "x": -1984,
+      "z": -9280,
+      "baseGroundY": 113.26597785769596,
+      "expectedGroundY": 113.26597785769596,
+      "specialFeature": "",
+      "waterKind": "\u0000",
+      "expectedSurfaceY": 112,
+      "actual": {
+        "status": "full",
+        "topY": 115,
+        "topBlock": "minecraft:spruce_leaves",
+        "terrainY": 112,
+        "terrainBlock": "minecraft:grass_block"
+      },
+      "actualGeometryY": 112,
+      "surfaceErrorBlocks": 0
+    },
+    {
+      "featureId": 23,
+      "kind": "basin_snow",
+      "axis": "ring",
+      "x": -448,
+      "z": -9280,
+      "baseGroundY": 182.62084461938434,
+      "expectedGroundY": 182.62084461938434,
+      "specialFeature": "",
+      "waterKind": "\u0000",
+      "expectedSurfaceY": 182,
+      "actual": {
+        "status": "full",
+        "topY": 183,
+        "topBlock": "minecraft:snow",
+        "terrainY": 182,
+        "terrainBlock": "minecraft:snow_block"
+      },
+      "actualGeometryY": 182,
+      "surfaceErrorBlocks": 0
+    },
+    {
+      "featureId": 23,
+      "kind": "basin_snow",
+      "axis": "ring",
+      "x": -1216,
+      "z": -10048,
+      "baseGroundY": 99.00611670177187,
+      "expectedGroundY": 99.00611670177187,
+      "specialFeature": "",
+      "waterKind": "\u0000",
+      "expectedSurfaceY": 98,
+      "actual": {
+        "status": "full",
+        "topY": 99,
+        "topBlock": "minecraft:snow",
+        "terrainY": 98,
+        "terrainBlock": "minecraft:snow_block"
+      },
+      "actualGeometryY": 98,
+      "surfaceErrorBlocks": 0
+    },
+    {
+      "featureId": 23,
+      "kind": "basin_snow",
+      "axis": "ring",
+      "x": -1216,
+      "z": -8512,
+      "baseGroundY": 219.21270782703874,
+      "expectedGroundY": 219.21270782703874,
+      "specialFeature": "",
+      "waterKind": "\u0000",
+      "expectedSurfaceY": 218,
+      "actual": {
+        "status": "full",
+        "topY": 219,
+        "topBlock": "minecraft:snow",
+        "terrainY": 218,
+        "terrainBlock": "minecraft:snow_block"
+      },
+      "actualGeometryY": 218,
+      "surfaceErrorBlocks": 0
+    }
+  ]
+}

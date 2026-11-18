@@ -111,7 +111,15 @@ def main():
     feature_summary={}
     for fid in sorted({r["featureId"] for r in rows}):
         fr=[r for r in rows if r["featureId"]==fid and r["surfaceErrorBlocks"] is not None]
-        center_candidates=[r for r in fr if (r["x"],r["z"]) in ((10944,-6464),(-5184,-3648))]
+        # The fixture contains perpendicular X/Z transects. Their shared
+        # coordinate is the feature center, so derive it from the evidence
+        # instead of pinning acceptance to one historical siting coordinate.
+        coord_counts={}
+        for r in fr:
+            key=(r["x"],r["z"])
+            coord_counts[key]=coord_counts.get(key,0)+1
+        center_coords={key for key,count in coord_counts.items() if count>1}
+        center_candidates=[r for r in fr if (r["x"],r["z"]) in center_coords]
         center=center_candidates[0] if center_candidates else None
         feature_summary[str(fid)]={
             "kind":fr[0]["kind"] if fr else None,

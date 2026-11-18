@@ -213,7 +213,20 @@ R8.2 Snow 收尾后，单独处理河流相关优化，不与特殊地貌选址�
 3. 在 1.21.1 NeoForge 实际 Anvil 中复核；
 4. 再决定最小修改点位于 Waterbed、WorldSample 还是 Minecraft voxel realization。
 
-### Slice F — v0.1.7 RC 收敛
+### Slice F — 生态 / 群系覆盖率校正
+
+本项来自实际试玩反馈：当前丛林、稀疏丛林和森林整体体感过多。固定 seed 基线已确认，上游 Ecology 的森林类区域约占陆地 **45.72%**，不是单纯 Minecraft 显示层偶然偏多。
+
+先做只读分布审计，再调整阈值：
+
+- 分开统计 Boreal / Temperate / Subtropical / Tropical Monsoon / Tropical Rainforest；
+- 同时统计 Minecraft 最终 `forest` / `birch_forest` / `dark_forest` / `jungle` / `sparse_jungle` / `bamboo_jungle` 实际覆盖率；
+- 检查 moisture、temperature、seasonality 的竞争边界，避免直接用硬比例削减；
+- 重点增加 forest ↔ grassland / shrubland / savanna 的过渡空间，而不是随机把森林替换成平原；
+- 保留气候与植被因果关系，不允许为了“平均分布”破坏热带雨林、针叶林等真实大尺度带状结构；
+- 调整后必须做多 Seed 覆盖率回归，避免只修固定 seed。
+
+### Slice G — v0.1.7 RC 收敛
 
 必须完成：
 
