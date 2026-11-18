@@ -11,9 +11,9 @@ public final class GeoWorldBiomeDecisionFingerprint {
         GeoWorldV26BiomeDecisionFingerprint.run(
             Minecraft26_3Profile.INSTANCE,
             java.util.Map.of(
-                // Verified against pre-Query baseline 386aace at all 24,576 sites.
-                123456L, 0x7cad8c0a851e21bcL,
-                -563659577384754347L, 0x1d630f1f82c93fb8L
+                // v1.1.27 surface biome distribution, sampled at 24,576 positions per seed.
+                123456L, 0xb6960a337d5d8b21L,
+                -563659577384754347L, 0x5dc58ce52a87a3e0L
             ),
             args
         );
