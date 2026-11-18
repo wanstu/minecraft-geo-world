@@ -64,9 +64,9 @@ public final class GeoWorldBiomeDistributionAudit {
         OceanCell[] ocean = new OceanCell[g.nodeCount()];
         var dryLand = new Counts();
         var ecology = new Counts();
-        boolean reefRules = "geoworld-rules-v1.1.27".equals(
+        boolean reefRules = ("geoworld-rules-v1.1.27".equals(
             model.manifest().generationRulesVersion()
-        );
+        ) || "geoworld-rules-v1.1.28".equals(model.manifest().generationRulesVersion()));
 
         for (int z = 0; z < g.height(); z++) {
             double worldZ = g.originZ() + z * g.spacingZ();

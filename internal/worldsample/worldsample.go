@@ -107,6 +107,11 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 				ground.RiverWeight,
 			)
 		}
+		if oceanEligibility >= m.Config.OceanEligibilityThreshold {
+			out.GroundHeight = m.coastalGroundHeight(
+				worldX, worldZ, oceanEligibility, ground, out.GroundHeight,
+			)
+		}
 		out.WaterDepth = out.WaterSurfaceElevation - out.GroundHeight
 		return out
 	}
@@ -143,7 +148,10 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 			out.WaterKind = reconcile.WaterOcean
 			out.WaterSurfaceDefined = true
 			out.WaterSurfaceElevation = m.SeaLevelNormalized
-			out.WaterDepth = m.SeaLevelNormalized - ground.FinalHeight
+			out.GroundHeight = m.coastalGroundHeight(
+				worldX, worldZ, oceanEligibility, ground, ground.FinalHeight,
+			)
+			out.WaterDepth = m.SeaLevelNormalized - out.GroundHeight
 			return out
 		}
 	}
@@ -286,6 +294,61 @@ func (m *Model) navigableRiverGroundHeight(
 	return math.Min(groundHeight, targetHeight)
 }
 
+const (
+	minimumOffshoreDepthBlocks = 5
+	shoreDepthTransitionBlocks = 16.0
+	shoreDepthDiagonal         = 11.313708498984761
+)
+
+var shoreDepthOffsets = [8][2]float64{
+	{shoreDepthTransitionBlocks, 0}, {-shoreDepthTransitionBlocks, 0},
+	{0, shoreDepthTransitionBlocks}, {0, -shoreDepthTransitionBlocks},
+	{shoreDepthDiagonal, shoreDepthDiagonal}, {-shoreDepthDiagonal, shoreDepthDiagonal},
+	{shoreDepthDiagonal, -shoreDepthDiagonal}, {-shoreDepthDiagonal, -shoreDepthDiagonal},
+}
+
+func (m *Model) coastalGroundHeight(
+	x, z, ocean float64,
+	ground waterbed.Sample,
+	currentHeight float64,
+) float64 {
+	if m.Config.OceanBathymetryVersion == 0 {
+		return currentHeight
+	}
+	sea := m.SeaLevelNormalized
+	if ground.RiverOceanMouthNearby &&
+		math.Abs(ground.RiverCoastalReceiverSurface-sea) < 1e-9 {
+		currentHeight = math.Min(currentHeight, ground.OceanMouthApronHeight)
+	}
+
+	seaBoundary := normalizedHeightBlockBoundary(sea)
+	deepFloor := math.Ceil(seaBoundary) - 1 - minimumOffshoreDepthBlocks + 0.5
+	if math.Floor(normalizedHeightBlockBoundary(currentHeight)) <= math.Floor(deepFloor) {
+		return currentHeight
+	}
+
+	// Estimate the nearest dry shore over one chunk, from both continuous
+	// terrain elevation and the ocean mask. Each crossing approaches the
+	// outer sample smoothly, so the beach blends into navigable water.
+	shoreFraction := 1.0
+	base := math.Min(ground.BaseHeight, sea)
+	threshold := m.Config.OceanEligibilityThreshold
+	for _, offset := range shoreDepthOffsets {
+		sx, sz := x+offset[0], z+offset[1]
+		neighbor := m.Ground.Base.SampleNormalized(sx, sz)
+		if neighbor > sea {
+			shoreFraction = math.Min(shoreFraction, (sea-base)/(neighbor-base))
+		}
+		neighborOcean := m.OceanEligibility.SampleSmoothstepBilinear(sx, sz)
+		if neighborOcean < threshold {
+			shoreFraction = math.Min(shoreFraction, (ocean-threshold)/(ocean-neighborOcean))
+		}
+	}
+	blend := shoreFraction * shoreFraction * (3 - 2*shoreFraction)
+	target := normalizedHeightFromBlockBoundary(seaBoundary + (deepFloor-seaBoundary)*blend)
+	return math.Min(currentHeight, target)
+}
+
 func normalizedHeightBlockBoundary(height float64) float64 {
 	height = math.Max(0, math.Min(1, height))
 	if height <= 0.5 {
@@ -336,6 +399,9 @@ func normalizeConfig(cfg Config) (Config, error) {
 	}
 	if cfg.CoastalBackwaterVersion > 2 {
 		return Config{}, errors.New("worldsample: unsupported coastal backwater version")
+	}
+	if cfg.OceanBathymetryVersion > 1 {
+		return Config{}, errors.New("worldsample: unsupported ocean bathymetry version")
 	}
 	if cfg.RiverNavigationVersion > 1 {
 		return Config{}, errors.New("worldsample: unsupported river navigation version")

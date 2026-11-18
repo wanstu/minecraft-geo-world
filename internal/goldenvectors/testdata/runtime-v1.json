@@ -279,11 +279,11 @@
       "x": 0,
       "z": 0,
       "expected": {
-        "groundHeight": 0.4877207274524532,
+        "groundHeight": 0.4800506543876416,
         "waterKind": "Ocean",
         "waterSurfaceDefined": true,
         "waterSurfaceElevation": 0.5,
-        "waterDepth": 0.012279272547546793,
+        "waterDepth": 0.019949345612358393,
         "oceanEligibility": 1,
         "riverWeight": 0,
         "sourceNode": 792,

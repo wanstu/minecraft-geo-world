@@ -640,9 +640,9 @@ public final class GeoWorldV26SurfaceBiomeVerifier {
         int mouthRiverBiomeViolations = 0;
         if (("geoworld-rules-v1.1.26".equals(
             runtime.manifest().generationRulesVersion()
-        ) || "geoworld-rules-v1.1.27".equals(
+        ) || ("geoworld-rules-v1.1.27".equals(
             runtime.manifest().generationRulesVersion()
-        ))) {
+        ) || "geoworld-rules-v1.1.28".equals(runtime.manifest().generationRulesVersion())))) {
             final double navigationStep = 32.0;
             for (double x = geometry.originX() + navigationStep / 2;
                  x < geometry.originX() + geometry.spanXBlocks();

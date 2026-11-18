@@ -23,6 +23,8 @@ type Config struct {
 	// historical ground/water geometry.
 	RiverNavigationVersion       uint8 `json:",omitempty"`
 	MinNavigableRiverDepthBlocks uint8 `json:",omitempty"`
+	// OceanBathymetryVersion gives new worlds a navigable nearshore seabed.
+	OceanBathymetryVersion uint8 `json:",omitempty"`
 }
 
 type Model struct {

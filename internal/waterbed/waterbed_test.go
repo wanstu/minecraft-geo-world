@@ -1405,7 +1405,7 @@ func TestV4RiverSurfaceStaysBelowBothBanks(t *testing.T) {
 			got.RiverReceiverSurface > surface {
 			surface = got.RiverReceiverSurface
 		}
-		ceiling := riverBankSurfaceCeiling(m.Base, seg, tt)
+		ceiling := m.riverBankSurfaceCeiling(seg, tt)
 		if surface > ceiling+1e-12 {
 			t.Fatalf(
 				"v4 runtime river surface escapes bank at t=%.6f: surface=%.12f ceiling=%.12f sample=%+v",
@@ -1415,6 +1415,43 @@ func TestV4RiverSurfaceStaysBelowBothBanks(t *testing.T) {
 				got,
 			)
 		}
+	}
+}
+
+func TestLakeBankCeilingUsesOnlyConnectedWetLake(t *testing.T) {
+	g := testGeometry()
+	base := testTerrain(t, g, 0.58)
+	x0, z0 := g.NodePosition(0, 1)
+	x1, z1 := g.NodePosition(1, 1)
+	seg := RiverSegment{
+		From: 3, To: 4, X0: x0, Z0: z0, X1: x1, Z1: z1,
+		HalfWidth: 8, Bed0: 0.56, Bed1: 0.56, Profile: []float64{0.56, 0.56},
+		ReceiverSurfaceDefined: true, ReceiverSurface: 0.60,
+	}
+	lake := LakeNode{
+		Index: 4, LakeID: 1, X: x1, Z: z1,
+		InnerRadius: 40, OuterRadius: 64, BedCeiling: 0.595, WaterSurface: 0.60,
+	}
+	m, err := Restore(base, Config{LakeGeometryVersion: 2}, []RiverSegment{seg}, []LakeNode{lake})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := m.riverBankSurfaceCeiling(seg, 0.98); math.Abs(got-lake.WaterSurface) > 1e-12 {
+		t.Fatalf("the submerged banks should carry the lake datum, got %.8f", got)
+	}
+	unrelated := seg
+	unrelated.ReceiverSurface = 0.62
+	for _, got := range []float64{
+		m.riverBankSurfaceCeiling(seg, 0),
+		m.riverBankSurfaceCeiling(unrelated, 0.98),
+	} {
+		if math.Abs(got-(0.58-riverBankFreeboardNormalized)) > 1e-12 {
+			t.Fatalf("a dry or unrelated bank must keep the normal ceiling, got %.8f", got)
+		}
+	}
+	m.Config.LakeGeometryVersion = 1
+	if got := m.riverBankSurfaceCeiling(seg, 0.98); math.Abs(got-(0.58-riverBankFreeboardNormalized)) > 1e-12 {
+		t.Fatalf("locked lake geometry changed, got %.8f", got)
 	}
 }
 

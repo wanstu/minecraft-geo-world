@@ -31,6 +31,41 @@ func TestOceanUsesSharedSeaLevel(t *testing.T) {
 	}
 }
 
+func TestOceanBathymetryDeepensOffshoreAndKeepsShoreAndLegacyDatum(t *testing.T) {
+	g := testGeometry()
+	wb := emptyWaterbed(t, g, normalizedHeightFromBlockBoundary(60.5))
+	surface := testSurface(g, false)
+	for z := 0; z < g.Height; z++ {
+		surface.LandMask[z*g.Width] = true
+	}
+	left, z := g.NodePosition(0, 1)
+	right, _ := g.NodePosition(1, 1)
+	shore := (left + right) / 2
+	for _, tc := range []struct {
+		name  string
+		x     float64
+		rules uint8
+		depth int
+	}{
+		{"legacy shallow water", shore + 32, 0, 2},
+		{"new beach fringe", shore + 0.25, 1, 2},
+		{"new offshore", shore + 32, 1, 5},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m, err := Build(surface, wb, Config{OceanBathymetryVersion: tc.rules})
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := m.Sample(tc.x, z)
+			bed := int(math.Floor(normalizedHeightBlockBoundary(got.GroundHeight)))
+			if got.WaterKind != reconcile.WaterOcean || got.WaterSurfaceElevation != 0.5 ||
+				62-bed != tc.depth {
+				t.Fatalf("ocean classification, datum or depth changed: depth=%d sample=%+v", 62-bed, got)
+			}
+		})
+	}
+}
+
 func TestEnclosedBelowSeaLandStaysDryWithoutLake(t *testing.T) {
 	g := testGeometry()
 	wb := emptyWaterbed(t, g, 0.40)

@@ -52,6 +52,8 @@ type Config struct {
 	// ceilings and Runtime's minimum visible water depth. Version 1 (v1.1.7+)
 	// guarantees that every planned lake cell can expose a real water column;
 	// omitted/zero preserves historical shallow lake candidates exactly.
+	// Version 2 lets a connected lake support the river datum where the
+	// sampled bank is already submerged by that lake.
 	LakeGeometryVersion uint8 `json:",omitempty"`
 }
 
@@ -156,7 +158,10 @@ type Sample struct {
 	RiverCoastalReceiverDefined bool
 	RiverCoastalReceiverSurface float64
 	RiverOceanMouthNearby       bool
-	LakeCarve                   float64
+	// OceanMouthApronHeight continues the outlet bed past the formal
+	// river footprint. Runtime applies it only below the sea surface.
+	OceanMouthApronHeight float64
+	LakeCarve             float64
 
 	WaterKind             reconcile.WaterKind
 	WaterSurfaceDefined   bool

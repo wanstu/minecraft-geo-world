@@ -493,8 +493,8 @@ func TestRiverDepthDefaultsAreGenerationRuleLocked(t *testing.T) {
 	if got := lockedV1112.Waterbed.RiverGeometryVersion; got != 4 {
 		t.Fatalf("locked v1.1.12 river geometry version=%d want=4", got)
 	}
-	if got := current.Waterbed.LakeGeometryVersion; got != 1 {
-		t.Fatalf("current lake geometry version=%d want=1", got)
+	if got := current.Waterbed.LakeGeometryVersion; got != 2 {
+		t.Fatalf("current lake geometry version=%d want=2", got)
 	}
 	if got := current.Terrain.RareMacroStrength; math.Abs(got-1) > 1e-12 {
 		t.Fatalf("current rare macro strength=%v want=1", got)
@@ -934,7 +934,7 @@ func TestR81cCoastalBackwaterProfileIsolatedFromLockedV122(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if modern.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.27" ||
+	if modern.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.28" ||
 		modern.WorldSample.CoastalBackwaterVersion != 2 ||
 		modern.WorldSample.RiverNavigationVersion != 1 ||
 		modern.WorldSample.MinNavigableRiverDepthBlocks != 3 {

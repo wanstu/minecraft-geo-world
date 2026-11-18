@@ -77,6 +77,7 @@ func TestSliceEV126KeepsV125MacroAndHydrologySettings(t *testing.T) {
 func TestSliceFV127InheritsV126HydrologySettings(t *testing.T) {
 	current := testConfig(20261118)
 	current.WorldProfile = StandardWorldProfile()
+	current.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.27"
 	locked := current
 	locked.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.26"
 
