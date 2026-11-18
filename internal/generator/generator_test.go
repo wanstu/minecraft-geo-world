@@ -934,9 +934,17 @@ func TestR81cCoastalBackwaterProfileIsolatedFromLockedV122(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if modern.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.25" ||
-		modern.WorldSample.CoastalBackwaterVersion != 1 {
-		t.Fatalf("modern rules not isolated: version=%s coastal=%d", modern.WorldProfile.GenerationRulesVersion, modern.WorldSample.CoastalBackwaterVersion)
+	if modern.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.26" ||
+		modern.WorldSample.CoastalBackwaterVersion != 2 ||
+		modern.WorldSample.RiverNavigationVersion != 1 ||
+		modern.WorldSample.MinNavigableRiverDepthBlocks != 3 {
+		t.Fatalf(
+			"modern rules not isolated: version=%s coastal=%d nav=%d depth=%d",
+			modern.WorldProfile.GenerationRulesVersion,
+			modern.WorldSample.CoastalBackwaterVersion,
+			modern.WorldSample.RiverNavigationVersion,
+			modern.WorldSample.MinNavigableRiverDepthBlocks,
+		)
 	}
 	if locked.WorldSample.CoastalBackwaterVersion != 0 {
 		t.Fatalf("locked v1.1.22 changed coastal rule: %d", locked.WorldSample.CoastalBackwaterVersion)

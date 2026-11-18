@@ -163,8 +163,10 @@ func TestR82V124IslandGeometryRemainsLocked(t *testing.T) {
 }
 
 func TestR82V125IslandSitingVersionGate(t *testing.T) {
-	if !usesSubmergedIslandSiting("geoworld-rules-v1.1.25") {
-		t.Fatal("v1.1.25 island siting gate is disabled")
+	for _, version := range []string{"geoworld-rules-v1.1.25", "geoworld-rules-v1.1.26"} {
+		if !usesSubmergedIslandSiting(version) {
+			t.Fatalf("%s island siting gate is disabled", version)
+		}
 	}
 	for _, version := range []string{
 		"geoworld-rules-v1.1.24",

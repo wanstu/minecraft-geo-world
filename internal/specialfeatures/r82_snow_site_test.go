@@ -10,8 +10,10 @@ func TestR82SnowMountainSitingVersionGate(t *testing.T) {
 	if usesSnowMountainSiting("geoworld-rules-v1.1.24") {
 		t.Fatal("v1.1.24 must keep the locked pre-Slice-D snow siting")
 	}
-	if !usesSnowMountainSiting("geoworld-rules-v1.1.25") {
-		t.Fatal("v1.1.25 must enable R8.2 snow background siting")
+	for _, version := range []string{"geoworld-rules-v1.1.25", "geoworld-rules-v1.1.26"} {
+		if !usesSnowMountainSiting(version) {
+			t.Fatalf("%s must enable R8.2 snow background siting", version)
+		}
 	}
 }
 

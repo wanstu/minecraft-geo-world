@@ -5,14 +5,14 @@ import (
 	"testing"
 )
 
-// R8.2 Slice C changes only SpecialFeatures island siting. The macro terrain,
-// hydrology, river geometry and R8.1c/R8.1d runtime settings stay locked.
-func TestR82V125KeepsV124MacroAndHydrologySettings(t *testing.T) {
+// Slice E v1.1.26 changes Runtime river navigation / mouth semantics only.
+// Macro terrain, hydrology and Waterbed river geometry stay locked to v1.1.25.
+func TestSliceEV126KeepsV125MacroAndHydrologySettings(t *testing.T) {
 	current := testConfig(20261117)
 	current.WorldProfile = StandardWorldProfile()
 
 	locked := current
-	locked.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.24"
+	locked.WorldProfile.GenerationRulesVersion = "geoworld-rules-v1.1.25"
 
 	a, err := resolveTopLevelConfig(current)
 	if err != nil {
@@ -23,8 +23,8 @@ func TestR82V125KeepsV124MacroAndHydrologySettings(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if a.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.25" ||
-		b.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.24" {
+	if a.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.26" ||
+		b.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.25" {
 		t.Fatalf(
 			"wrong rules identity: current=%s locked=%s",
 			a.WorldProfile.GenerationRulesVersion,
@@ -36,7 +36,6 @@ func TestR82V125KeepsV124MacroAndHydrologySettings(t *testing.T) {
 		name string
 		a, b any
 	}{
-		{"worldsample", a.WorldSample, b.WorldSample},
 		{"waterbed", a.Waterbed, b.Waterbed},
 		{"terrain", a.Terrain, b.Terrain},
 		{"geomorph", a.Geomorph, b.Geomorph},
@@ -46,16 +45,23 @@ func TestR82V125KeepsV124MacroAndHydrologySettings(t *testing.T) {
 	}
 	for _, c := range comparisons {
 		if !reflect.DeepEqual(c.a, c.b) {
-			t.Errorf("v1.1.25 unexpectedly changes %s defaults", c.name)
+			t.Errorf("v1.1.26 unexpectedly changes %s defaults", c.name)
 		}
 	}
-	if a.WorldSample.CoastalBackwaterVersion != 1 ||
-		b.WorldSample.CoastalBackwaterVersion != 1 {
-		t.Fatalf(
-			"coastal backwater changed: current=%d locked=%d",
-			a.WorldSample.CoastalBackwaterVersion,
-			b.WorldSample.CoastalBackwaterVersion,
-		)
+	if a.WorldSample.RiverCenterDepthNormalized != b.WorldSample.RiverCenterDepthNormalized ||
+		a.WorldSample.MinRiverWaterDepthNormalized != b.WorldSample.MinRiverWaterDepthNormalized ||
+		a.WorldSample.OceanEligibilityThreshold != b.WorldSample.OceanEligibilityThreshold {
+		t.Fatalf("Slice E changed locked river water scalar defaults: current=%+v locked=%+v", a.WorldSample, b.WorldSample)
+	}
+	if a.WorldSample.CoastalBackwaterVersion != 2 ||
+		a.WorldSample.RiverNavigationVersion != 1 ||
+		a.WorldSample.MinNavigableRiverDepthBlocks != 3 {
+		t.Fatalf("v1.1.26 navigation defaults wrong: %+v", a.WorldSample)
+	}
+	if b.WorldSample.CoastalBackwaterVersion != 1 ||
+		b.WorldSample.RiverNavigationVersion != 0 ||
+		b.WorldSample.MinNavigableRiverDepthBlocks != 0 {
+		t.Fatalf("locked v1.1.25 navigation semantics changed: %+v", b.WorldSample)
 	}
 	if a.Waterbed.RiverGeometryVersion != 8 ||
 		b.Waterbed.RiverGeometryVersion != 8 {

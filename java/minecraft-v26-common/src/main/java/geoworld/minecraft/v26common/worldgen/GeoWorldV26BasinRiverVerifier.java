@@ -16,7 +16,7 @@ public final class GeoWorldV26BasinRiverVerifier {
             GeoWorldCreationConfig.ContinentPreset.DEFAULT
         );
         var model = GeoWorldEngineBridge.generate(123456L, config).model();
-        if (!("geoworld-rules-v1.1.22".equals(model.manifest().generationRulesVersion()) || ("geoworld-rules-v1.1.23".equals(model.manifest().generationRulesVersion()) || ("geoworld-rules-v1.1.24".equals(model.manifest().generationRulesVersion()) || "geoworld-rules-v1.1.25".equals(model.manifest().generationRulesVersion()))))) {
+        if (!("geoworld-rules-v1.1.22".equals(model.manifest().generationRulesVersion()) || ("geoworld-rules-v1.1.23".equals(model.manifest().generationRulesVersion()) || ("geoworld-rules-v1.1.24".equals(model.manifest().generationRulesVersion()) || ("geoworld-rules-v1.1.25".equals(model.manifest().generationRulesVersion()) || "geoworld-rules-v1.1.26".equals(model.manifest().generationRulesVersion())))))) {
             throw new AssertionError("basin verifier requires v1.1.20");
         }
         var heights = new MinecraftV26HeightMapping();

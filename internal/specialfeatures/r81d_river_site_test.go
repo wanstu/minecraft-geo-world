@@ -56,7 +56,7 @@ func TestR81dSinkholeConflictsAuthoritativeRiver(t *testing.T) {
 }
 
 func TestR81dSinkholeSiteVetoOnlyInV124(t *testing.T) {
-	for _, version := range []string{"geoworld-rules-v1.1.24", "geoworld-rules-v1.1.25"} {
+	for _, version := range []string{"geoworld-rules-v1.1.24", "geoworld-rules-v1.1.25", "geoworld-rules-v1.1.26"} {
 		if !usesRiverSafeSinkholeSites(version) {
 			t.Fatalf("sinkhole site veto is not enabled for %s", version)
 		}

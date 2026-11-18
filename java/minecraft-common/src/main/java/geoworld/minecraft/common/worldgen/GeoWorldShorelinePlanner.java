@@ -243,7 +243,7 @@ public class GeoWorldShorelinePlanner {
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || "geoworld-rules-v1.1.25".equals(rules))))))));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || ("geoworld-rules-v1.1.25".equals(rules) || "geoworld-rules-v1.1.26".equals(rules)))))))));
     }
 
     private static boolean sealHighRiverBanks(GeoWorldV1 runtime) {
@@ -257,7 +257,7 @@ public class GeoWorldShorelinePlanner {
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || "geoworld-rules-v1.1.25".equals(rules))))))));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || ("geoworld-rules-v1.1.25".equals(rules) || "geoworld-rules-v1.1.26".equals(rules)))))))));
     }
 
     private static boolean adaptiveGentleBanks(GeoWorldV1 runtime) {
@@ -267,7 +267,7 @@ public class GeoWorldShorelinePlanner {
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || "geoworld-rules-v1.1.25".equals(rules))))))));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || ("geoworld-rules-v1.1.25".equals(rules) || "geoworld-rules-v1.1.26".equals(rules)))))))));
     }
 
     private static int wetlandPondInteriorRelief(GeoWorldV1 runtime) {
@@ -276,7 +276,7 @@ public class GeoWorldShorelinePlanner {
         // feedback. Wetland ponds are a local voxel feature; allow one extra
         // integer Y of pre-carve relief so that coarse sediment feedback does
         // not erase otherwise valid one-block shallow pools.
-        return ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || "geoworld-rules-v1.1.25".equals(rules)))))) ? 2 : 1;
+        return ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || ("geoworld-rules-v1.1.25".equals(rules) || "geoworld-rules-v1.1.26".equals(rules))))))) ? 2 : 1;
     }
 
     private static boolean strictRiverContainment(GeoWorldV1 runtime) {
@@ -284,7 +284,7 @@ public class GeoWorldShorelinePlanner {
         return "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || "geoworld-rules-v1.1.25".equals(rules))))))));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || ("geoworld-rules-v1.1.25".equals(rules) || "geoworld-rules-v1.1.26".equals(rules)))))))));
     }
 
     private int adaptiveSearchDistanceForChunk(

@@ -120,7 +120,7 @@ v0.1.7 **不默认实现地下排水或凭空增加地表支流**。
 
 如果 R8.1d / R8.2 改变新世界选址语义：
 
-- R8.1d baseline 使用 **`geoworld-rules-v1.1.24`**；R8.2 Slice C / D 新世界使用 **`geoworld-rules-v1.1.25`**；
+- R8.1d baseline 使用 **`geoworld-rules-v1.1.24`**；R8.2 Slice C / D 新世界使用 **`geoworld-rules-v1.1.25`**；Slice E 河口航运使用 **`geoworld-rules-v1.1.26`**；
 - v0.1.6 / v1.1.23 世界保持原持久化模型语义；
 - 不对已经生成的 `.geoworld` 重新选择特殊地貌；
 - Engine cache 继续使用 v27 的 native-engine SHA256 身份，不允许旧模型静默命中新实现；
@@ -128,13 +128,14 @@ v0.1.7 **不默认实现地下排水或凭空增加地表支流**。
 
 ## 5. 实施切片
 
-### 当前进度（2026-11-17）
+### 当前进度（2026-11-18）
 
 - **Slice A：完成。** 已用 v1.1.23 / geomV8 的真实 1.21.1 NeoForge Anvil 方块确认天坑 #11 与河 #735 的单侧岸坡冲突。
 - **Slice B：完成。** v1.1.24 在候选阶段拒绝河道冲突天坑；固定 seed 模型冲突 1→0，真实 voxel 右岸低于河面的样本 12/12→0/12，河 #735 水面保持 Y96；旧 v1.1.23 世界实测可直接加载且模型 SHA 不变。
 - **Slice C：完成并已提交。** v1.1.25 Ocean island 只落在真实水下高地；固定 seed 8 个 Ocean island 全部通过 root/moat 资格，Lake island 2→0；水下根部由旧 32 格/4 格柱壁收敛到天然基底最大 4 格/4 格，真实 Anvil 74/74 full。
-- **Slice D：完成验收，待提交。** Snow crater / basin 增加 mountain + relief + climate + dry-ring / depression 背景资格；固定 seed 953 条正式河流与 4 个 sinkhole 完全不动，Cherry crater #16 / basin #20 完全不动；fresh NeoForge Anvil 232/232 full，234/234 模型剖面与实际 voxel 高度完全一致。
-- **下一步：河口体系 + 3 格航道深度。** 正式河口/主河道不允许被 warm_ocean 覆盖；可航河道实际 Minecraft 水深最浅 3 格，然后进入 RC 总回归。
+- **Slice D：完成并已提交（112111d）。** Snow crater / basin 增加 mountain + relief + climate + inland-continuity / depression 背景资格；固定 seed 953 条正式河流与 4 个 sinkhole 完全不动，Cherry crater #16 / basin #20 完全不动；原完整几何验收 232/232 full，最终坐标 fresh-world spot 验收 10/10 full、12/12 模型与 voxel 0 格误差。
+- **Slice E：完成，待提交。** v1.1.26 河道核心实际最浅 3 格；88 个 OceanMouth 中心样本保持 River；河口影响区 Warm Ocean 降为无珊瑚航道，fresh 1.21.1 Anvil 49/49 FULL、1558 个可航核心最浅 3 格、河口影响区实际 coral=0，影响区外同一区域 coral=84；v1.1.25 已持久化世界不变。
+- **Slice F：生态 / 群系覆盖率校正。** 陆地森林基线 45.72%；新增海岸暖海 / 珊瑚礁分布调查，固定 seed 最近岸 Warm Ocean family 49.15%，外海约 34.19%。
 
 
 ### Slice A — R8.1d 只读现场证据
@@ -190,13 +191,25 @@ v0.1.7 **不默认实现地下排水或凭空增加地表支流**。
 
 R8.2 Snow 收尾后，单独处理河流相关优化，不与特殊地貌选址混改。
 
-#### 河口群系
+#### 河口群系 / 航运
 
-- 正式河流出海口 / 河口河道范围内不得被 `warm_ocean` 群系覆盖；
-- 先核对当前 SurfaceBiome / Hydrology / WaterOwnership 的优先级，确认问题发生在模型、Runtime 还是 Minecraft biome realization；
-- 只约束河口河道与必要过渡带，不能粗暴删除周边真实暖水海洋；
-- 河外侧海域若气候与海洋模型本来属于 Warm Ocean，仍可保持 Warm Ocean；
-- 固定 #509 / #915 以及新增至少一个 Warm Ocean 河口作为模型 + voxel + biome 回归样本。
+试玩新增证据：问题不只是 WaterKind 名称。当前低纬浅海会大量实现成 `minecraft:warm_ocean`，原版珊瑚随之进入河口附近，直接阻碍船只出海。
+
+只读基线已经确认：
+
+- 固定 seed 最近陆地 1 个宏格（约 128 格）的海洋中，Warm Ocean family 为 **49.15%**；
+- 距岸 6 个宏格以上的外海为 **34.19%**；
+- 但按纬度分层后，0–15° 与 15–30° 的近岸 / 外海都是 **100% Warm Ocean family**，30–45° 近岸甚至略低于外海；
+- 因此不是 coastal current 单独把海岸加热，而是“低纬暖海气候语义”被 Minecraft realization 过度等同成“整片珊瑚礁群系”。
+
+Slice E 的硬约束：
+
+- 正式河流出海口、mouth flare 与其必要航运过渡带不得实现成 `minecraft:warm_ocean`；
+- 正式河口河道继续保持 River 语义，水位仍可继承 sea-level backwater，不重新制造河口水墙；
+- River 外侧但仍属于 OceanMouth 航运影响范围的浅海，允许保持温暖海水气候，但 Minecraft biome 必须降级为不会铺满珊瑚的过渡海洋（优先 `lukewarm_ocean`），直到退出河口影响区；
+- 优先复用现有 OceanMouth / mouth expansion / bank metadata 定义缓冲区，不额外发明任意固定半径；
+- 真正离开河口影响区后的海域，是否仍实现为 Warm Ocean 留给 Slice F 的珊瑚礁适生模型决定；
+- 固定 #509 / #915 以及新增至少一个 Warm Ocean 河口作为 model + voxel + biome + 航运回归样本。
 
 #### 河流水深
 
@@ -215,15 +228,21 @@ R8.2 Snow 收尾后，单独处理河流相关优化，不与特殊地貌选址�
 
 ### Slice F — 生态 / 群系覆盖率校正
 
-本项来自实际试玩反馈：当前丛林、稀疏丛林和森林整体体感过多。固定 seed 基线已确认，上游 Ecology 的森林类区域约占陆地 **45.72%**，不是单纯 Minecraft 显示层偶然偏多。
+本项统一处理“生态气候语义合理，但 Minecraft 最终群系面积 / 装饰过量”的问题。
 
-先做只读分布审计，再调整阈值：
+陆地试玩反馈：丛林、稀疏丛林和森林整体过多。固定 seed 基线已确认，上游 Ecology 的森林类区域约占陆地 **45.72%**，不是单纯 Minecraft 显示层偶然偏多。
 
-- 分开统计 Boreal / Temperate / Subtropical / Tropical Monsoon / Tropical Rainforest；
+海洋试玩反馈：很多海岸看起来几乎全是暖海，低纬浅海又会被直接实现为 `minecraft:warm_ocean`，导致珊瑚分布远比“暖海水温”本身更泛化。固定 seed 基线：最近岸 Warm Ocean family **49.15%**，外海 **34.19%**；0–30° 海洋几乎全部属于 Warm Ocean family。
+
+先做只读分布审计，再调整：
+
+- 陆地分开统计 Boreal / Temperate / Subtropical / Tropical Monsoon / Tropical Rainforest；
 - 同时统计 Minecraft 最终 `forest` / `birch_forest` / `dark_forest` / `jungle` / `sparse_jungle` / `bamboo_jungle` 实际覆盖率；
-- 检查 moisture、temperature、seasonality 的竞争边界，避免直接用硬比例削减；
-- 重点增加 forest ↔ grassland / shrubland / savanna 的过渡空间，而不是随机把森林替换成平原；
-- 保留气候与植被因果关系，不允许为了“平均分布”破坏热带雨林、针叶林等真实大尺度带状结构；
+- 检查 moisture、temperature、seasonality 的竞争边界，增加 forest ↔ grassland / shrubland / savanna 的真实过渡空间，而不是随机替换；
+- 海洋分开统计 SST / Warm Ocean family / Minecraft `warm_ocean` / `lukewarm_ocean` 的近岸与外海面积；
+- 明确 **warm water ≠ coral reef**：暖海气候可以连续存在，但 `minecraft:warm_ocean` 只应落在满足珊瑚礁适生条件的连贯区域；
+- 珊瑚适生至少排除正式河口 / 强河流影响、明显泥沙/淡水过渡及不合适深度；其余条件优先从已有海温、海岸形态、开放度等可解释变量推导；
+- 不允许为了“平均分布”破坏热带雨林、针叶林、热带海水等真实大尺度带状结构；
 - 调整后必须做多 Seed 覆盖率回归，避免只修固定 seed。
 
 ### Slice G — v0.1.7 RC 收敛

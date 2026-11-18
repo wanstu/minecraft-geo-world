@@ -211,7 +211,13 @@ public final class GeoWorldV26BiomeRealizer {
                     ? climate.annualMeanTempC()
                     : 12.0)
                 : model.sampleBiomeTemperature(blockX, blockZ, 12.0);
-            return oceanBiomeId(sample, temp);
+            String oceanBiome = oceanBiomeId(sample, temp);
+            if (usesRiverMouthNavigationRules(model) &&
+                sample.coastalSeaReceiver() &&
+                "minecraft:warm_ocean".equals(oceanBiome)) {
+                return "minecraft:lukewarm_ocean";
+            }
+            return oceanBiome;
         }
 
         String specialFeature = sample.specialFeature();
@@ -824,7 +830,13 @@ public final class GeoWorldV26BiomeRealizer {
             "geoworld-rules-v1.1.12".equals(rules) ||
             "geoworld-rules-v1.1.13".equals(rules) ||
             "geoworld-rules-v1.1.14".equals(rules) ||
-            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || "geoworld-rules-v1.1.25".equals(rules))))))));
+            ("geoworld-rules-v1.1.15".equals(rules) || "geoworld-rules-v1.1.16".equals(rules) || ("geoworld-rules-v1.1.18".equals(rules) || "geoworld-rules-v1.1.19".equals(rules) || ("geoworld-rules-v1.1.20".equals(rules) || ("geoworld-rules-v1.1.21".equals(rules) || ("geoworld-rules-v1.1.22".equals(rules) || ("geoworld-rules-v1.1.23".equals(rules) || ("geoworld-rules-v1.1.24".equals(rules) || "geoworld-rules-v1.1.25".equals(rules) || "geoworld-rules-v1.1.26".equals(rules))))))));
+    }
+
+    private boolean usesRiverMouthNavigationRules(GeoWorldV1 model) {
+        return "geoworld-rules-v1.1.26".equals(
+            model.manifest().generationRulesVersion()
+        );
     }
 
     private boolean supportsSulfurCaves() {

@@ -457,3 +457,94 @@ func TestR81cCoastalBackwaterIsStrictlyVersionedAndOceanMouthOwned(t *testing.T)
 		})
 	}
 }
+
+func TestSliceECoastalBackwaterV2KeepsFormalRiverSemantic(t *testing.T) {
+	ground := waterbed.Sample{
+		RiverBedDefined:             true,
+		RiverWeight:                 0.9,
+		RiverCoastalReceiverDefined: true,
+		RiverCoastalReceiverSurface: 0.5,
+		RiverOceanMouthNearby:       true,
+	}
+	legacy := Config{
+		OceanEligibilityThreshold: 0.5,
+		CoastalBackwaterVersion:   1,
+	}
+	if got := coastalBackwaterWaterKind(legacy, ground, 0.9); got != reconcile.WaterOcean {
+		t.Fatalf("v1 coastal semantic changed: got=%v want Ocean", got)
+	}
+	modern := legacy
+	modern.CoastalBackwaterVersion = 2
+	if got := coastalBackwaterWaterKind(modern, ground, 0.9); got != reconcile.WaterRiver {
+		t.Fatalf("v2 formal mouth became %v want River", got)
+	}
+
+	offChannel := ground
+	offChannel.RiverWeight = 0
+	offChannel.RiverBedDefined = false
+	if got := coastalBackwaterWaterKind(modern, offChannel, 0.9); got != reconcile.WaterOcean {
+		t.Fatalf("v2 surrounding mouth water became %v want Ocean", got)
+	}
+}
+
+func TestSliceENavigationDepthUsesMinecraftVoxelQuantization(t *testing.T) {
+	m := &Model{Config: Config{
+		RiverNavigationVersion:       1,
+		MinNavigableRiverDepthBlocks: 3,
+	}}
+	cases := []struct {
+		name    string
+		ground  float64
+		surface float64
+	}{
+		{"sea-level", 0.495, 0.5},
+		{"below-sea", 0.470, 0.49},
+		{"high-river", 0.615, 0.62},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotGround := m.navigableRiverGroundHeight(tc.ground, tc.surface, 1)
+			waterBlocks := actualWaterBlocks(tc.surface, gotGround)
+			if waterBlocks < 3 {
+				t.Fatalf(
+					"navigable core has %d water blocks want >=3: ground %.9f -> %.9f surface %.9f",
+					waterBlocks,
+					tc.ground,
+					gotGround,
+					tc.surface,
+				)
+			}
+			if gotGround > tc.ground+1e-12 {
+				t.Fatalf("navigation correction raised ground: %.9f -> %.9f", tc.ground, gotGround)
+			}
+		})
+	}
+}
+
+func TestSliceENavigationDepthDoesNotDeepenBanksOrLegacyWorlds(t *testing.T) {
+	const (
+		ground  = 0.495
+		surface = 0.5
+	)
+	modern := &Model{Config: Config{
+		RiverNavigationVersion:       1,
+		MinNavigableRiverDepthBlocks: 3,
+	}}
+	if got := modern.navigableRiverGroundHeight(ground, surface, 0.49); math.Abs(got-ground) > 1e-12 {
+		t.Fatalf("bank outside navigation core was deepened: %.9f -> %.9f", ground, got)
+	}
+
+	legacy := &Model{Config: Config{}}
+	if got := legacy.navigableRiverGroundHeight(ground, surface, 1); math.Abs(got-ground) > 1e-12 {
+		t.Fatalf("legacy river geometry changed: %.9f -> %.9f", ground, got)
+	}
+}
+
+func actualWaterBlocks(surface, ground float64) int {
+	waterTopY := int(math.Ceil(normalizedHeightBlockBoundary(surface))) - 1
+	groundTopY := int(math.Floor(normalizedHeightBlockBoundary(ground)))
+	if waterTopY <= groundTopY {
+		return 0
+	}
+	return waterTopY - groundTopY
+}

@@ -79,6 +79,14 @@ func (m *Model) SampleSource(
 func (m *Model) Sample(worldX, worldZ float64) Sample {
 	ws := m.Runtime.Sample(worldX, worldZ)
 	wantLand := ws.WaterKind != reconcile.WaterOcean
+	if ws.WaterKind == reconcile.WaterRiver &&
+		ws.CoastalSeaReceiver &&
+		ws.OceanEligibility >= m.Runtime.Config.OceanEligibilityThreshold {
+		// The seaward half of a formal OceanMouth remains semantically River,
+		// but it sits on macro ocean cells. Use the ocean climate/profile side
+		// instead of inventing an unavailable land corner.
+		wantLand = false
+	}
 
 	node, weight, fallback := m.selectSourceNode(worldX, worldZ, wantLand)
 	out := Sample{
@@ -418,7 +426,10 @@ func biomeSnowLine(b mcprofile.BiomeFamily) float64 {
 }
 
 func runtimeSideMatchesProfile(kind reconcile.WaterKind, s Sample) bool {
-	if kind == reconcile.WaterOcean {
+	seawardRiver := kind == reconcile.WaterRiver &&
+		s.World.CoastalSeaReceiver &&
+		!s.SourceLand
+	if kind == reconcile.WaterOcean || seawardRiver {
 		return !s.SourceLand &&
 			isOceanFamily(s.BiomeFamily) &&
 			s.TerrainVariant == mcprofile.TerrainOcean &&
