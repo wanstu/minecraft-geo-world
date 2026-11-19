@@ -854,9 +854,10 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 	baseHeight := m.Base.SampleNormalized(worldX, worldZ)
 	finalHeight := baseHeight
 	sample := Sample{
-		BaseHeight:  baseHeight,
-		FinalHeight: baseHeight,
-		WaterKind:   reconcile.WaterNone,
+		BaseHeight:            baseHeight,
+		FinalHeight:           baseHeight,
+		WaterKind:             reconcile.WaterNone,
+		OceanMouthApronHeight: baseHeight,
 	}
 
 	bucket := m.bucketIndexForWorld(worldX, worldZ)
@@ -919,6 +920,16 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		// ceiling which intentionally limits inland river water planes.
 		// Metadata only; existing rules do not interpret it.
 		if distance < bankRadius && seg.ReceiverSurfaceDefined {
+			if seg.OceanMouth {
+				// The existing mouth and bank widths define the submerged
+				// continuation. Begin before the outlet and ease into the shelf.
+				apronWeight := smoothstep(0.5, 0.9, t) *
+					(1 - smoothstep(halfWidth*0.5, bankRadius, distance))
+				sample.OceanMouthApronHeight = math.Min(
+					sample.OceanMouthApronHeight,
+					lerp(baseHeight, seg.Bed1, apronWeight),
+				)
+			}
 			if seg.OceanMouth ||
 				!sample.RiverCoastalReceiverDefined ||
 				(!sample.RiverOceanMouthNearby &&
@@ -931,7 +942,7 @@ func (m *Model) Sample(worldX, worldZ float64) Sample {
 		bed, centerDepth := riverBedAndDepthAt(m.Config, seg, t)
 		bankCeiling := math.Inf(1)
 		if m.Config.RiverGeometryVersion >= 4 {
-			bankCeiling = riverBankSurfaceCeiling(m.Base, seg, t)
+			bankCeiling = m.riverBankSurfaceCeiling(seg, t)
 			// The persisted profile is sampled densely, but Runtime can query
 			// between those samples and mouth widening changes the true bank
 			// offset. Re-cap the local bed so the final free surface remains
@@ -1968,8 +1979,9 @@ func riverMeanderShapeForSegment(
 		-math.Pi * math.Pi * s
 }
 
-func riverBankSurfaceCeiling(
-	base *terrain.Model,
+const riverBankFreeboardNormalized = 0.0022
+
+func (m *Model) riverBankSurfaceCeiling(
 	seg RiverSegment,
 	t float64,
 ) float64 {
@@ -1986,25 +1998,55 @@ func riverBankSurfaceCeiling(
 		for _, along := range [...]float64{-1.5, 0, 1.5} {
 			bankX := x + tx*along
 			bankZ := z + tz*along
-			left := base.SampleNormalized(
-				bankX+nx*bankOffset,
-				bankZ+nz*bankOffset,
-			)
-			right := base.SampleNormalized(
-				bankX-nx*bankOffset,
-				bankZ-nz*bankOffset,
-			)
+			left := m.riverBankHeight(seg, t, bankX+nx*bankOffset, bankZ+nz*bankOffset)
+			right := m.riverBankHeight(seg, t, bankX-nx*bankOffset, bankZ-nz*bankOffset)
 			lowestBank = math.Min(
 				lowestBank,
 				math.Min(left, right),
 			)
 		}
 	}
-	const bankFreeboardNormalized = 0.0022
-	return math.Max(
-		0,
-		lowestBank-bankFreeboardNormalized,
-	)
+	return math.Max(0, lowestBank-riverBankFreeboardNormalized)
+}
+
+func (m *Model) riverBankHeight(seg RiverSegment, t, x, z float64) float64 {
+	height := m.Base.SampleNormalized(x, z)
+	if m.Config.LakeGeometryVersion < 2 || seg.OceanMouth {
+		return height
+	}
+	datum := math.Inf(-1)
+	if seg.ReceiverSurfaceDefined {
+		datum = seg.ReceiverSurface
+	}
+	if lakeOutletSourceWeight(seg, t) > 0 {
+		datum = math.Max(datum, seg.LakeOutletSurface)
+	}
+	supportedHeight := datum + riverBankFreeboardNormalized
+	if height >= supportedHeight {
+		return height
+	}
+
+	bucket := m.bucketIndexForWorld(x, z)
+	if bucket < 0 {
+		return height
+	}
+	for _, id := range m.lakeBuckets[bucket] {
+		lake := m.Lakes[id]
+		if math.Abs(lake.WaterSurface-datum) > 1e-9 ||
+			(height > datum+lakeShoreAllowanceNormalized && !lake.CoreCarve) {
+			continue
+		}
+		distance := lakeDistance(x-lake.X, z-lake.Z)
+		if distance >= lake.OuterRadius {
+			continue
+		}
+		weight := 1 - smoothstep(lake.InnerRadius, lake.OuterRadius, distance)
+		lakeBed := height - math.Max(0, height-lake.BedCeiling)*weight
+		if lakeBed < datum-m.Config.MinLakeWaterDepthNormalized {
+			return supportedHeight
+		}
+	}
+	return height
 }
 
 func riverCenterAndNormalForSegment(
@@ -4044,7 +4086,7 @@ func (m *Model) riverBankProtectionSurfaceAt(
 		}
 
 		bed, centerDepth := riverBedAndDepthAt(m.Config, seg, t)
-		bankCeiling := riverBankSurfaceCeiling(m.Base, seg, t)
+		bankCeiling := m.riverBankSurfaceCeiling(seg, t)
 		bed = math.Min(
 			bed,
 			math.Max(0, bankCeiling-centerDepth),

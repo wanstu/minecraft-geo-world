@@ -1,0 +1,132 @@
+{
+  "evidenceClass": "fresh_saved_1.21.1_neoforge_full_anvil",
+  "world": "R817SliceFV127Fresh",
+  "seed": -1818694639628404530,
+  "rules": "geoworld-rules-v1.1.27",
+  "modelSha256": "29db00afd654a497241808ab962251bfa83871a9de6dc73f4af9671e01780390",
+  "mouth43": {
+    "bounds": [
+      -2560,
+      -2544,
+      -2464,
+      -2448
+    ],
+    "fullChunks": 49,
+    "coralBlocks": 0,
+    "wetDepthDistribution": {
+      "1": 1386,
+      "2": 1198,
+      "3": 2652,
+      "4": 1260,
+      "5": 18
+    },
+    "quartBiomesAtY62": {
+      "minecraft:beach": 119,
+      "minecraft:lukewarm_ocean": 249,
+      "minecraft:savanna": 53,
+      "minecraft:river": 204
+    },
+    "riverNavigationCoreColumns": 1558,
+    "minimumActualWaterDepth": 3,
+    "under3Deep": 0,
+    "influencedCoralBlocks": 0,
+    "influencedWaterQuarts": 345,
+    "influencedRiverBiomeQuarts": 204,
+    "influencedWarmOceanQuarts": 0
+  },
+  "waterWallChecks": {
+    "mouth509": {
+      "bounds": [
+        -1136,
+        -1104,
+        -1008,
+        -976
+      ],
+      "fullColumns": 16384,
+      "missingColumns": 0,
+      "wetColumns": 15423,
+      "maxAdjacentWetTopDrop": 0,
+      "waterWallsGt1": 0,
+      "examples": [],
+      "fullChunks": 64
+    },
+    "mouth915": {
+      "bounds": [
+        1632,
+        10400,
+        1712,
+        10480
+      ],
+      "fullColumns": 6400,
+      "missingColumns": 0,
+      "wetColumns": 6386,
+      "maxAdjacentWetTopDrop": 0,
+      "waterWallsGt1": 0,
+      "examples": [],
+      "fullChunks": 25,
+      "frozenSurfaceCheck": "ordinary ice and liquid water; excludes solid iceberg blocks"
+    }
+  },
+  "coralReef": {
+    "bounds": [
+      -2088,
+      -2040,
+      -2040,
+      -1992
+    ],
+    "fullChunks": 16,
+    "coralBlocks": 1810,
+    "wetDepthDistribution": {
+      "7": 1645,
+      "4": 213,
+      "3": 115,
+      "5": 198,
+      "1": 14,
+      "8": 49,
+      "6": 113,
+      "2": 47
+    },
+    "quartBiomesAtY62": {
+      "minecraft:warm_ocean": 159,
+      "minecraft:lukewarm_ocean": 10
+    }
+  },
+  "warmWaterControl": {
+    "bounds": [
+      -2536,
+      -2616,
+      -2488,
+      -2568
+    ],
+    "fullChunks": 16,
+    "coralBlocks": 0,
+    "wetDepthDistribution": {
+      "1": 415,
+      "2": 707,
+      "3": 795,
+      "4": 484
+    },
+    "quartBiomesAtY62": {
+      "minecraft:lukewarm_ocean": 169
+    }
+  },
+  "strictRiverAudit": {
+    "rulesCompared": [
+      "geoworld-rules-v1.1.25",
+      "geoworld-rules-v1.1.26",
+      "geoworld-rules-v1.1.27"
+    ],
+    "uniqueColumnsCompared": 550737,
+    "downstreamRises": [
+      6,
+      6,
+      6
+    ],
+    "adjacentStepsOverOneBlock": [
+      27,
+      27,
+      27
+    ],
+    "newViolations": 0
+  }
+}

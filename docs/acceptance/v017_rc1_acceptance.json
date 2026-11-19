@@ -1,0 +1,2704 @@
+{
+  "candidateVersion": "0.1.7-rc.1",
+  "sourceCommit": "0742e0fe2e7ca3d6a4f447263d4ecbc9b01780ac",
+  "seed": -1818694639628404530,
+  "generationRulesVersion": "geoworld-rules-v1.1.27",
+  "savedWorld": "R817SliceFV127Fresh",
+  "modelSha256": "29db00afd654a497241808ab962251bfa83871a9de6dc73f4af9671e01780390",
+  "fullChunks": 46,
+  "goAllPackages": "passed",
+  "goJavaGoldenSamples": {
+    "passed": 126,
+    "total": 126
+  },
+  "modelRuntimeWebAnvilSpots": [
+    {
+      "x": -1608,
+      "z": -1082,
+      "runtimeGroundY": 57,
+      "savedFloorY": 57,
+      "runtimeWaterKind": "Ocean",
+      "savedTopY": 62,
+      "savedTopBlock": "minecraft:water",
+      "modelSpecialFeature": "",
+      "modeledSurfaceY": 62,
+      "observedWaterCloseToModelY": [
+        60,
+        61,
+        62
+      ],
+      "materialAtGround": [
+        57,
+        "minecraft:sand"
+      ],
+      "underlyingGroundDelta": 0
+    },
+    {
+      "x": -1047,
+      "z": -1076,
+      "runtimeGroundY": 58,
+      "savedFloorY": 58,
+      "runtimeWaterKind": "River",
+      "savedTopY": 62,
+      "savedTopBlock": "minecraft:water",
+      "modelSpecialFeature": "",
+      "modeledSurfaceY": 62,
+      "observedWaterCloseToModelY": [
+        60,
+        61,
+        62
+      ],
+      "materialAtGround": [
+        58,
+        "minecraft:sand"
+      ],
+      "underlyingGroundDelta": 0
+    },
+    {
+      "x": -1015,
+      "z": -988,
+      "runtimeGroundY": 63,
+      "savedFloorY": 63,
+      "runtimeWaterKind": "None",
+      "savedTopY": 63,
+      "savedTopBlock": "minecraft:mud",
+      "modelSpecialFeature": "",
+      "materialAtGround": [
+        63,
+        "minecraft:mud"
+      ],
+      "underlyingGroundDelta": 0
+    },
+    {
+      "x": -1100,
+      "z": -1070,
+      "runtimeGroundY": 57,
+      "savedFloorY": 57,
+      "runtimeWaterKind": "River",
+      "savedTopY": 62,
+      "savedTopBlock": "minecraft:water",
+      "modelSpecialFeature": "",
+      "modeledSurfaceY": 62,
+      "observedWaterCloseToModelY": [
+        60,
+        61,
+        62
+      ],
+      "materialAtGround": [
+        57,
+        "minecraft:sand"
+      ],
+      "underlyingGroundDelta": 0
+    },
+    {
+      "x": 1653,
+      "z": 10405,
+      "runtimeGroundY": 57,
+      "savedFloorY": 62,
+      "runtimeWaterKind": "River",
+      "savedTopY": 62,
+      "savedTopBlock": "minecraft:ice",
+      "modelSpecialFeature": "",
+      "modeledSurfaceY": 62,
+      "observedWaterCloseToModelY": [
+        60,
+        61,
+        62
+      ],
+      "materialAtGround": [
+        57,
+        "minecraft:snow_block"
+      ],
+      "underlyingGroundDelta": 0
+    },
+    {
+      "x": -1665,
+      "z": 5313,
+      "runtimeGroundY": 102,
+      "savedFloorY": 107,
+      "runtimeWaterKind": "None",
+      "savedTopY": 107,
+      "savedTopBlock": "minecraft:oak_leaves",
+      "modelSpecialFeature": "",
+      "materialAtGround": [
+        102,
+        "minecraft:grass_block"
+      ],
+      "underlyingGroundDelta": 0
+    },
+    {
+      "x": -1600,
+      "z": 5312,
+      "runtimeGroundY": 103,
+      "savedFloorY": 109,
+      "runtimeWaterKind": "None",
+      "savedTopY": 109,
+      "savedTopBlock": "minecraft:dark_oak_leaves",
+      "modelSpecialFeature": "",
+      "materialAtGround": [
+        103,
+        "minecraft:grass_block"
+      ],
+      "underlyingGroundDelta": 0
+    },
+    {
+      "x": 10944,
+      "z": -6464,
+      "runtimeGroundY": 273,
+      "savedFloorY": 273,
+      "runtimeWaterKind": "None",
+      "savedTopY": 274,
+      "savedTopBlock": "minecraft:short_grass",
+      "modelSpecialFeature": "volcanic_crater_snow",
+      "materialAtGround": [
+        273,
+        "minecraft:grass_block"
+      ],
+      "underlyingGroundDelta": 0
+    },
+    {
+      "x": 9280,
+      "z": -8896,
+      "runtimeGroundY": 202,
+      "savedFloorY": 202,
+      "runtimeWaterKind": "None",
+      "savedTopY": 202,
+      "savedTopBlock": "minecraft:grass_block",
+      "modelSpecialFeature": "volcanic_crater_snow",
+      "materialAtGround": [
+        202,
+        "minecraft:grass_block"
+      ],
+      "underlyingGroundDelta": 0
+    },
+    {
+      "x": -1216,
+      "z": -9280,
+      "runtimeGroundY": 106,
+      "savedFloorY": 106,
+      "runtimeWaterKind": "None",
+      "savedTopY": 106,
+      "savedTopBlock": "minecraft:grass_block",
+      "modelSpecialFeature": "basin_snow",
+      "materialAtGround": [
+        106,
+        "minecraft:grass_block"
+      ],
+      "underlyingGroundDelta": 0
+    },
+    {
+      "x": 3008,
+      "z": -9280,
+      "runtimeGroundY": 135,
+      "savedFloorY": 135,
+      "runtimeWaterKind": "None",
+      "savedTopY": 135,
+      "savedTopBlock": "minecraft:grass_block",
+      "modelSpecialFeature": "basin_snow",
+      "materialAtGround": [
+        135,
+        "minecraft:grass_block"
+      ],
+      "underlyingGroundDelta": 0
+    },
+    {
+      "x": -2512,
+      "z": -2496,
+      "runtimeGroundY": 58,
+      "savedFloorY": 58,
+      "runtimeWaterKind": "River",
+      "savedTopY": 62,
+      "savedTopBlock": "minecraft:water",
+      "modelSpecialFeature": "",
+      "modeledSurfaceY": 62,
+      "observedWaterCloseToModelY": [
+        60,
+        61,
+        62
+      ],
+      "materialAtGround": [
+        58,
+        "minecraft:sand"
+      ],
+      "underlyingGroundDelta": 0
+    },
+    {
+      "x": -2064,
+      "z": -2016,
+      "runtimeGroundY": 55,
+      "savedFloorY": 55,
+      "runtimeWaterKind": "Ocean",
+      "savedTopY": 62,
+      "savedTopBlock": "minecraft:water",
+      "modelSpecialFeature": "",
+      "modeledSurfaceY": 62,
+      "observedWaterCloseToModelY": [
+        60,
+        61,
+        62
+      ],
+      "materialAtGround": [
+        55,
+        "minecraft:sand"
+      ],
+      "underlyingGroundDelta": 0
+    },
+    {
+      "x": -2512,
+      "z": -2592,
+      "runtimeGroundY": 59,
+      "savedFloorY": 59,
+      "runtimeWaterKind": "Ocean",
+      "savedTopY": 62,
+      "savedTopBlock": "minecraft:water",
+      "modelSpecialFeature": "",
+      "modeledSurfaceY": 62,
+      "observedWaterCloseToModelY": [
+        60,
+        61,
+        62
+      ],
+      "materialAtGround": [
+        59,
+        "minecraft:sand"
+      ],
+      "underlyingGroundDelta": 0
+    }
+  ],
+  "riverAudit": {
+    "modelDownstreamRises": 6,
+    "modelAdjacentDropsOverOneBlock": 27,
+    "savedDownstreamRises": 5,
+    "savedAdjacentDropsOverOneBlock": 23,
+    "cases": [
+      {
+        "index": 1,
+        "case": {
+          "Kind": "downstream_rise",
+          "Segment": 328,
+          "A": {
+            "X": -888.6112876089339,
+            "Z": 2778.8669732606313,
+            "Model": {
+              "Wet": true,
+              "Y": 60,
+              "Weight": 1,
+              "Kind": 3,
+              "Surface": 0.49200712524170065
+            }
+          },
+          "B": {
+            "X": -884.5535457673386,
+            "Z": 2777.3594977109224,
+            "Model": {
+              "Wet": true,
+              "Y": 61,
+              "Weight": 1,
+              "Kind": 3,
+              "Surface": 0.4928033970942967
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -889,
+            "z": 2778,
+            "status": "full",
+            "topY": 59,
+            "floorY": 55,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 59,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 4,
+            "modelY": 60,
+            "modelKind": 3,
+            "riverWeight": 1
+          },
+          {
+            "x": -885,
+            "z": 2777,
+            "status": "full",
+            "topY": 60,
+            "floorY": 55,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 60,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 5,
+            "modelY": 61,
+            "modelKind": 3,
+            "riverWeight": 1
+          }
+        ],
+        "floorStep": 1,
+        "nearest": [
+          {
+            "x": -889,
+            "z": 2779,
+            "status": "full",
+            "topY": 59,
+            "floorY": 55,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 59,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 4,
+            "modelY": 60,
+            "modelKind": 3,
+            "riverWeight": 1
+          },
+          {
+            "x": -885,
+            "z": 2777,
+            "status": "full",
+            "topY": 60,
+            "floorY": 55,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 60,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 5,
+            "modelY": 61,
+            "modelKind": 3,
+            "riverWeight": 1
+          }
+        ],
+        "nearestStep": 1
+      },
+      {
+        "index": 2,
+        "case": {
+          "Kind": "downstream_rise",
+          "Segment": 328,
+          "A": {
+            "X": -880.4322621688766,
+            "Z": 2775.9155639180804,
+            "Model": {
+              "Wet": true,
+              "Y": 61,
+              "Weight": 1,
+              "Kind": 3,
+              "Surface": 0.4945529001348351
+            }
+          },
+          "B": {
+            "X": -876.2723737941171,
+            "Z": 2774.510234901535,
+            "Model": {
+              "Wet": true,
+              "Y": 62,
+              "Weight": 1,
+              "Kind": 3,
+              "Surface": 0.4966941114303087
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -881,
+            "z": 2775,
+            "status": "full",
+            "topY": 60,
+            "floorY": 55,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 60,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 5,
+            "modelY": 61,
+            "modelKind": 3,
+            "riverWeight": 1
+          },
+          {
+            "x": -877,
+            "z": 2774,
+            "status": "full",
+            "topY": 61,
+            "floorY": 55,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 61,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 62,
+            "modelKind": 3,
+            "riverWeight": 1
+          }
+        ],
+        "floorStep": 1,
+        "nearest": [
+          {
+            "x": -880,
+            "z": 2776,
+            "status": "full",
+            "topY": 60,
+            "floorY": 55,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 60,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 5,
+            "modelY": 61,
+            "modelKind": 3,
+            "riverWeight": 1
+          },
+          {
+            "x": -876,
+            "z": 2775,
+            "status": "full",
+            "topY": 61,
+            "floorY": 55,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 61,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 62,
+            "modelKind": 3,
+            "riverWeight": 1
+          }
+        ],
+        "nearestStep": 1
+      },
+      {
+        "index": 3,
+        "case": {
+          "Kind": "downstream_rise",
+          "Segment": 366,
+          "A": {
+            "X": 1493.9422311176793,
+            "Z": -4065.709942795364,
+            "Model": {
+              "Wet": true,
+              "Y": 64,
+              "Weight": 1,
+              "Kind": 3,
+              "Surface": 0.5037894204757595
+            }
+          },
+          "B": {
+            "X": 1492.1304131425718,
+            "Z": -4061.956543379167,
+            "Model": {
+              "Wet": true,
+              "Y": 65,
+              "Weight": 1,
+              "Kind": 3,
+              "Surface": 0.5039870443288935
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": 1493,
+            "z": -4066,
+            "status": "full",
+            "topY": 63,
+            "floorY": 60,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 63,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 3,
+            "modelY": 64,
+            "modelKind": 3,
+            "riverWeight": 1
+          },
+          {
+            "x": 1492,
+            "z": -4062,
+            "status": "full",
+            "topY": 64,
+            "floorY": 60,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 64,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 4,
+            "modelY": 65,
+            "modelKind": 3,
+            "riverWeight": 1
+          }
+        ],
+        "floorStep": 1,
+        "nearest": [
+          {
+            "x": 1494,
+            "z": -4066,
+            "status": "full",
+            "topY": 63,
+            "floorY": 60,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 63,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 3,
+            "modelY": 64,
+            "modelKind": 3,
+            "riverWeight": 1
+          },
+          {
+            "x": 1492,
+            "z": -4062,
+            "status": "full",
+            "topY": 64,
+            "floorY": 60,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 64,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 4,
+            "modelY": 65,
+            "modelKind": 3,
+            "riverWeight": 1
+          }
+        ],
+        "nearestStep": 1
+      },
+      {
+        "index": 4,
+        "case": {
+          "Kind": "downstream_rise",
+          "Segment": 929,
+          "A": {
+            "X": 1483.687871755803,
+            "Z": -4661.427002190585,
+            "Model": {
+              "Wet": true,
+              "Y": 62,
+              "Weight": 1,
+              "Kind": 3,
+              "Surface": 0.49748103182358744
+            }
+          },
+          "B": {
+            "X": 1480.6648290595006,
+            "Z": -4663.969176885587,
+            "Model": {
+              "Wet": true,
+              "Y": 65,
+              "Weight": 1,
+              "Kind": 2,
+              "Surface": 0.5046838878970412
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": 1483,
+            "z": -4662,
+            "status": "full",
+            "topY": 61,
+            "floorY": 58,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 61,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 3,
+            "modelY": 62,
+            "modelKind": 3,
+            "riverWeight": 1
+          },
+          {
+            "x": 1480,
+            "z": -4664,
+            "status": "full",
+            "topY": 64,
+            "floorY": 58,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 64,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 65,
+            "modelKind": 2,
+            "riverWeight": 1
+          }
+        ],
+        "floorStep": 3,
+        "nearest": [
+          {
+            "x": 1484,
+            "z": -4661,
+            "status": "full",
+            "topY": 61,
+            "floorY": 58,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 61,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 3,
+            "modelY": 62,
+            "modelKind": 3,
+            "riverWeight": 1
+          },
+          {
+            "x": 1481,
+            "z": -4664,
+            "status": "full",
+            "topY": 61,
+            "floorY": 58,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 61,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 3,
+            "modelY": 65,
+            "modelKind": 2,
+            "riverWeight": 1
+          }
+        ],
+        "nearestStep": 0
+      },
+      {
+        "index": 5,
+        "case": {
+          "Kind": "downstream_rise",
+          "Segment": 933,
+          "A": {
+            "X": 1653.5423212839817,
+            "Z": -6015.32724393341,
+            "Model": {
+              "Wet": true,
+              "Y": 64,
+              "Weight": 1,
+              "Kind": 3,
+              "Surface": 0.5038591469595626
+            }
+          },
+          "B": {
+            "X": 1650.8736321963959,
+            "Z": -6012.430715629691,
+            "Model": {
+              "Wet": true,
+              "Y": 65,
+              "Weight": 1,
+              "Kind": 2,
+              "Surface": 0.5046838878970412
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": 1653,
+            "z": -6016,
+            "status": "full",
+            "topY": 64,
+            "floorY": 61,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 64,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 3,
+            "modelY": 64,
+            "modelKind": 3,
+            "riverWeight": 1
+          },
+          {
+            "x": 1650,
+            "z": -6013,
+            "status": "full",
+            "topY": 64,
+            "floorY": 61,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 64,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 3,
+            "modelY": 65,
+            "modelKind": 2,
+            "riverWeight": 1
+          }
+        ],
+        "floorStep": 0,
+        "nearest": [
+          {
+            "x": 1654,
+            "z": -6015,
+            "status": "full",
+            "topY": 64,
+            "floorY": 61,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 64,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 3,
+            "modelY": 64,
+            "modelKind": 3,
+            "riverWeight": 1
+          },
+          {
+            "x": 1651,
+            "z": -6012,
+            "status": "full",
+            "topY": 64,
+            "floorY": 61,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 64,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 3,
+            "modelY": 65,
+            "modelKind": 2,
+            "riverWeight": 1
+          }
+        ],
+        "nearestStep": 0
+      },
+      {
+        "index": 6,
+        "case": {
+          "Kind": "downstream_rise",
+          "Segment": 946,
+          "A": {
+            "X": 1440,
+            "Z": -4037.178166151981,
+            "Model": {
+              "Wet": true,
+              "Y": 64,
+              "Weight": 1,
+              "Kind": 3,
+              "Surface": 0.5027653247313753
+            }
+          },
+          "B": {
+            "X": 1436,
+            "Z": -4038.1883762540238,
+            "Model": {
+              "Wet": true,
+              "Y": 65,
+              "Weight": 1,
+              "Kind": 2,
+              "Surface": 0.5046838878970412
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": 1440,
+            "z": -4038,
+            "status": "full",
+            "topY": 63,
+            "floorY": 59,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 63,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 4,
+            "modelY": 64,
+            "modelKind": 3,
+            "riverWeight": 1
+          },
+          {
+            "x": 1436,
+            "z": -4039,
+            "status": "full",
+            "topY": 64,
+            "floorY": 59,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 64,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 5,
+            "modelY": 65,
+            "modelKind": 2,
+            "riverWeight": 1
+          }
+        ],
+        "floorStep": 1,
+        "nearest": [
+          {
+            "x": 1440,
+            "z": -4037,
+            "status": "full",
+            "topY": 63,
+            "floorY": 59,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 63,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 4,
+            "modelY": 64,
+            "modelKind": 3,
+            "riverWeight": 1
+          },
+          {
+            "x": 1436,
+            "z": -4038,
+            "status": "full",
+            "topY": 64,
+            "floorY": 59,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 64,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 5,
+            "modelY": 65,
+            "modelKind": 2,
+            "riverWeight": 1
+          }
+        ],
+        "nearestStep": 1
+      },
+      {
+        "index": 7,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -6716,
+            "Z": -3936,
+            "Model": {
+              "Wet": true,
+              "Y": 130,
+              "Weight": 0.9784806255738474,
+              "Kind": 3,
+              "Surface": 0.6319232364222545
+            }
+          },
+          "B": {
+            "X": -6716,
+            "Z": -3935,
+            "Model": {
+              "Wet": true,
+              "Y": 132,
+              "Weight": 0.9855527425550357,
+              "Kind": 3,
+              "Surface": 0.6343061490570324
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -6716,
+            "z": -3936,
+            "status": "full",
+            "topY": 129,
+            "floorY": 123,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 129,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 130,
+            "modelKind": 3,
+            "riverWeight": 0.9784806255738474
+          },
+          {
+            "x": -6716,
+            "z": -3935,
+            "status": "full",
+            "topY": 131,
+            "floorY": 124,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 131,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 7,
+            "modelY": 132,
+            "modelKind": 3,
+            "riverWeight": 0.9855527425550357
+          }
+        ],
+        "floorStep": 2
+      },
+      {
+        "index": 8,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -6716,
+            "Z": -3932,
+            "Model": {
+              "Wet": true,
+              "Y": 135,
+              "Weight": 0.9984398501355568,
+              "Kind": 3,
+              "Surface": 0.6417759170592999
+            }
+          },
+          "B": {
+            "X": -6716,
+            "Z": -3931,
+            "Model": {
+              "Wet": true,
+              "Y": 137,
+              "Weight": 0.9998462141756229,
+              "Kind": 3,
+              "Surface": 0.6441753165920016
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -6716,
+            "z": -3932,
+            "status": "full",
+            "topY": 134,
+            "floorY": 126,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 134,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 8,
+            "modelY": 135,
+            "modelKind": 3,
+            "riverWeight": 0.9984398501355568
+          },
+          {
+            "x": -6716,
+            "z": -3931,
+            "status": "full",
+            "topY": 136,
+            "floorY": 127,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 136,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 9,
+            "modelY": 137,
+            "modelKind": 3,
+            "riverWeight": 0.9998462141756229
+          }
+        ],
+        "floorStep": 2
+      },
+      {
+        "index": 9,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -6715,
+            "Z": -3935,
+            "Model": {
+              "Wet": true,
+              "Y": 131,
+              "Weight": 0.9996721978278732,
+              "Kind": 3,
+              "Surface": 0.6338155889829186
+            }
+          },
+          "B": {
+            "X": -6715,
+            "Z": -3934,
+            "Model": {
+              "Wet": true,
+              "Y": 133,
+              "Weight": 0.9999045612492783,
+              "Kind": 3,
+              "Surface": 0.6362876185855492
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -6715,
+            "z": -3935,
+            "status": "full",
+            "topY": 130,
+            "floorY": 124,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 130,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 131,
+            "modelKind": 3,
+            "riverWeight": 0.9996721978278732
+          },
+          {
+            "x": -6715,
+            "z": -3934,
+            "status": "full",
+            "topY": 132,
+            "floorY": 124,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 132,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 8,
+            "modelY": 133,
+            "modelKind": 3,
+            "riverWeight": 0.9999045612492783
+          }
+        ],
+        "floorStep": 2
+      },
+      {
+        "index": 10,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -6715,
+            "Z": -3931,
+            "Model": {
+              "Wet": true,
+              "Y": 136,
+              "Weight": 0.9917064670456656,
+              "Kind": 3,
+              "Surface": 0.643707386742475
+            }
+          },
+          "B": {
+            "X": -6715,
+            "Z": -3930,
+            "Model": {
+              "Wet": true,
+              "Y": 138,
+              "Weight": 0.9862876775324809,
+              "Kind": 3,
+              "Surface": 0.6460059133883803
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -6715,
+            "z": -3931,
+            "status": "full",
+            "topY": 135,
+            "floorY": 126,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 135,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 9,
+            "modelY": 136,
+            "modelKind": 3,
+            "riverWeight": 0.9917064670456656
+          },
+          {
+            "x": -6715,
+            "z": -3930,
+            "status": "full",
+            "topY": 137,
+            "floorY": 127,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 137,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 10,
+            "modelY": 138,
+            "modelKind": 3,
+            "riverWeight": 0.9862876775324809
+          }
+        ],
+        "floorStep": 2
+      },
+      {
+        "index": 11,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -6714,
+            "Z": -3934,
+            "Model": {
+              "Wet": true,
+              "Y": 132,
+              "Weight": 0.9874060734869067,
+              "Kind": 3,
+              "Surface": 0.6357411303226246
+            }
+          },
+          "B": {
+            "X": -6714,
+            "Z": -3933,
+            "Model": {
+              "Wet": true,
+              "Y": 134,
+              "Weight": 0.9807646972477798,
+              "Kind": 3,
+              "Surface": 0.6382480026318188
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -6714,
+            "z": -3934,
+            "status": "full",
+            "topY": 131,
+            "floorY": 124,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 131,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 7,
+            "modelY": 132,
+            "modelKind": 3,
+            "riverWeight": 0.9874060734869067
+          },
+          {
+            "x": -6714,
+            "z": -3933,
+            "status": "full",
+            "topY": 133,
+            "floorY": 125,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 133,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 8,
+            "modelY": 134,
+            "modelKind": 3,
+            "riverWeight": 0.9807646972477798
+          }
+        ],
+        "floorStep": 2
+      },
+      {
+        "index": 12,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -6713,
+            "Z": -3937,
+            "Model": {
+              "Wet": true,
+              "Y": 128,
+              "Weight": 0.982535037694507,
+              "Kind": 3,
+              "Surface": 0.6283240892952208
+            }
+          },
+          "B": {
+            "X": -6713,
+            "Z": -3936,
+            "Model": {
+              "Wet": true,
+              "Y": 130,
+              "Weight": 0.9748746062722672,
+              "Kind": 3,
+              "Surface": 0.6304165167530204
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -6713,
+            "z": -3937,
+            "status": "full",
+            "topY": 127,
+            "floorY": 122,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 127,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 5,
+            "modelY": 128,
+            "modelKind": 3,
+            "riverWeight": 0.982535037694507
+          },
+          {
+            "x": -6713,
+            "z": -3936,
+            "status": "full",
+            "topY": 129,
+            "floorY": 123,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 129,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 130,
+            "modelKind": 3,
+            "riverWeight": 0.9748746062722672
+          }
+        ],
+        "floorStep": 2
+      },
+      {
+        "index": 13,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -3633,
+            "Z": -3266,
+            "Model": {
+              "Wet": true,
+              "Y": 147,
+              "Weight": 0.9754612217100553,
+              "Kind": 3,
+              "Surface": 0.6635356882972002
+            }
+          },
+          "B": {
+            "X": -3632,
+            "Z": -3266,
+            "Model": {
+              "Wet": true,
+              "Y": 145,
+              "Weight": 0.9827876252056181,
+              "Kind": 3,
+              "Surface": 0.6607179895533021
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -3633,
+            "z": -3266,
+            "status": "full",
+            "topY": 146,
+            "floorY": 137,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 146,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 9,
+            "modelY": 147,
+            "modelKind": 3,
+            "riverWeight": 0.9754612217100553
+          },
+          {
+            "x": -3632,
+            "z": -3266,
+            "status": "full",
+            "topY": 146,
+            "floorY": 137,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 146,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 9,
+            "modelY": 145,
+            "modelKind": 3,
+            "riverWeight": 0.9827876252056181
+          }
+        ],
+        "floorStep": 0
+      },
+      {
+        "index": 14,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -3633,
+            "Z": -3265,
+            "Model": {
+              "Wet": true,
+              "Y": 147,
+              "Weight": 0.9995197031101393,
+              "Kind": 3,
+              "Surface": 0.6638315377317745
+            }
+          },
+          "B": {
+            "X": -3632,
+            "Z": -3265,
+            "Model": {
+              "Wet": true,
+              "Y": 145,
+              "Weight": 0.9976591310856616,
+              "Kind": 3,
+              "Surface": 0.6610356166522007
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -3633,
+            "z": -3265,
+            "status": "full",
+            "topY": 146,
+            "floorY": 137,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 146,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 9,
+            "modelY": 147,
+            "modelKind": 3,
+            "riverWeight": 0.9995197031101393
+          },
+          {
+            "x": -3632,
+            "z": -3265,
+            "status": "full",
+            "topY": 144,
+            "floorY": 137,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 144,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 7,
+            "modelY": 145,
+            "modelKind": 3,
+            "riverWeight": 0.9976591310856616
+          }
+        ],
+        "floorStep": -2
+      },
+      {
+        "index": 15,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -3633,
+            "Z": -3264,
+            "Model": {
+              "Wet": true,
+              "Y": 147,
+              "Weight": 0.9609971706579995,
+              "Kind": 3,
+              "Surface": 0.6639888327453911
+            }
+          },
+          "B": {
+            "X": -3632,
+            "Z": -3264,
+            "Model": {
+              "Wet": true,
+              "Y": 145,
+              "Weight": 0.9508001901034502,
+              "Kind": 3,
+              "Surface": 0.6612162616265032
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -3633,
+            "z": -3264,
+            "status": "full",
+            "topY": 146,
+            "floorY": 137,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 146,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 9,
+            "modelY": 147,
+            "modelKind": 3,
+            "riverWeight": 0.9609971706579995
+          },
+          {
+            "x": -3632,
+            "z": -3264,
+            "status": "full",
+            "topY": 144,
+            "floorY": 137,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 144,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 7,
+            "modelY": 145,
+            "modelKind": 3,
+            "riverWeight": 0.9508001901034502
+          }
+        ],
+        "floorStep": -2
+      },
+      {
+        "index": 16,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -3631,
+            "Z": -3266,
+            "Model": {
+              "Wet": true,
+              "Y": 144,
+              "Weight": 0.9891397393598927,
+              "Kind": 3,
+              "Surface": 0.6577078006313091
+            }
+          },
+          "B": {
+            "X": -3630,
+            "Z": -3266,
+            "Model": {
+              "Wet": true,
+              "Y": 142,
+              "Weight": 0.9942653136712349,
+              "Kind": 3,
+              "Surface": 0.6546039678857613
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -3631,
+            "z": -3266,
+            "status": "full",
+            "topY": 144,
+            "floorY": 136,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 144,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 8,
+            "modelY": 144,
+            "modelKind": 3,
+            "riverWeight": 0.9891397393598927
+          },
+          {
+            "x": -3630,
+            "z": -3266,
+            "status": "full",
+            "topY": 143,
+            "floorY": 135,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 143,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 8,
+            "modelY": 142,
+            "modelKind": 3,
+            "riverWeight": 0.9942653136712349
+          }
+        ],
+        "floorStep": -1
+      },
+      {
+        "index": 17,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -3631,
+            "Z": -3265,
+            "Model": {
+              "Wet": true,
+              "Y": 144,
+              "Weight": 0.9942508459594748,
+              "Kind": 3,
+              "Surface": 0.6580409128273035
+            }
+          },
+          "B": {
+            "X": -3630,
+            "Z": -3265,
+            "Model": {
+              "Wet": true,
+              "Y": 142,
+              "Weight": 0.9891580903354242,
+              "Kind": 3,
+              "Surface": 0.654945297591958
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -3631,
+            "z": -3265,
+            "status": "full",
+            "topY": 143,
+            "floorY": 136,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 143,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 7,
+            "modelY": 144,
+            "modelKind": 3,
+            "riverWeight": 0.9942508459594748
+          },
+          {
+            "x": -3630,
+            "z": -3265,
+            "status": "full",
+            "topY": 141,
+            "floorY": 135,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 141,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 142,
+            "modelKind": 3,
+            "riverWeight": 0.9891580903354242
+          }
+        ],
+        "floorStep": -2
+      },
+      {
+        "index": 18,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -3631,
+            "Z": -3264,
+            "Model": {
+              "Wet": true,
+              "Y": 144,
+              "Weight": 0.9389931432743751,
+              "Kind": 3,
+              "Surface": 0.6582434570706881
+            }
+          },
+          "B": {
+            "X": -3630,
+            "Z": -3264,
+            "Model": {
+              "Wet": true,
+              "Y": 142,
+              "Weight": 0.9255045857648765,
+              "Kind": 3,
+              "Surface": 0.6551673187986864
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -3631,
+            "z": -3264,
+            "status": "full",
+            "topY": 143,
+            "floorY": 136,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 143,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 7,
+            "modelY": 144,
+            "modelKind": 3,
+            "riverWeight": 0.9389931432743751
+          },
+          {
+            "x": -3630,
+            "z": -3264,
+            "status": "full",
+            "topY": 141,
+            "floorY": 135,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 141,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 142,
+            "modelKind": 3,
+            "riverWeight": 0.9255045857648765
+          }
+        ],
+        "floorStep": -2
+      },
+      {
+        "index": 19,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -3630,
+            "Z": -3267,
+            "Model": {
+              "Wet": true,
+              "Y": 142,
+              "Weight": 0.9391478265376011,
+              "Kind": 3,
+              "Surface": 0.6541452467894159
+            }
+          },
+          "B": {
+            "X": -3629,
+            "Z": -3267,
+            "Model": {
+              "Wet": true,
+              "Y": 140,
+              "Weight": 0.9521151926092548,
+              "Kind": 3,
+              "Surface": 0.6510825235231663
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -3630,
+            "z": -3267,
+            "status": "full",
+            "topY": 143,
+            "floorY": 135,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 143,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 8,
+            "modelY": 142,
+            "modelKind": 3,
+            "riverWeight": 0.9391478265376011
+          },
+          {
+            "x": -3629,
+            "z": -3267,
+            "status": "full",
+            "topY": 141,
+            "floorY": 134,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 141,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 7,
+            "modelY": 140,
+            "modelKind": 3,
+            "riverWeight": 0.9521151926092548
+          }
+        ],
+        "floorStep": -2
+      },
+      {
+        "index": 20,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -3630,
+            "Z": -3266,
+            "Model": {
+              "Wet": true,
+              "Y": 142,
+              "Weight": 0.9942653136712349,
+              "Kind": 3,
+              "Surface": 0.6546039678857613
+            }
+          },
+          "B": {
+            "X": -3629,
+            "Z": -3266,
+            "Model": {
+              "Wet": true,
+              "Y": 140,
+              "Weight": 0.9979047141086986,
+              "Kind": 3,
+              "Surface": 0.6515239462831913
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -3630,
+            "z": -3266,
+            "status": "full",
+            "topY": 143,
+            "floorY": 135,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 143,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 8,
+            "modelY": 142,
+            "modelKind": 3,
+            "riverWeight": 0.9942653136712349
+          },
+          {
+            "x": -3629,
+            "z": -3266,
+            "status": "full",
+            "topY": 141,
+            "floorY": 134,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 141,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 7,
+            "modelY": 140,
+            "modelKind": 3,
+            "riverWeight": 0.9979047141086986
+          }
+        ],
+        "floorStep": -2
+      },
+      {
+        "index": 21,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -3629,
+            "Z": -3265,
+            "Model": {
+              "Wet": true,
+              "Y": 141,
+              "Weight": 0.9822650892289994,
+              "Kind": 3,
+              "Surface": 0.6518651572235031
+            }
+          },
+          "B": {
+            "X": -3628,
+            "Z": -3265,
+            "Model": {
+              "Wet": true,
+              "Y": 139,
+              "Weight": 0.973478921559852,
+              "Kind": 3,
+              "Surface": 0.6489352544906404
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -3629,
+            "z": -3265,
+            "status": "full",
+            "topY": 140,
+            "floorY": 135,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 140,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 5,
+            "modelY": 141,
+            "modelKind": 3,
+            "riverWeight": 0.9822650892289994
+          },
+          {
+            "x": -3628,
+            "z": -3265,
+            "status": "full",
+            "topY": 140,
+            "floorY": 134,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 140,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 139,
+            "modelKind": 3,
+            "riverWeight": 0.973478921559852
+          }
+        ],
+        "floorStep": 0
+      },
+      {
+        "index": 22,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -3628,
+            "Z": -3267,
+            "Model": {
+              "Wet": true,
+              "Y": 139,
+              "Weight": 0.9640534752743921,
+              "Kind": 3,
+              "Surface": 0.6481938569901886
+            }
+          },
+          "B": {
+            "X": -3627,
+            "Z": -3267,
+            "Model": {
+              "Wet": true,
+              "Y": 137,
+              "Weight": 0.9747105381737143,
+              "Kind": 3,
+              "Surface": 0.6456346675510366
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -3628,
+            "z": -3267,
+            "status": "full",
+            "topY": 140,
+            "floorY": 134,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 140,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 139,
+            "modelKind": 3,
+            "riverWeight": 0.9640534752743921
+          },
+          {
+            "x": -3627,
+            "z": -3267,
+            "status": "full",
+            "topY": 138,
+            "floorY": 133,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 138,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 5,
+            "modelY": 137,
+            "modelKind": 3,
+            "riverWeight": 0.9747105381737143
+          }
+        ],
+        "floorStep": -2
+      },
+      {
+        "index": 23,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": -3627,
+            "Z": -3266,
+            "Model": {
+              "Wet": true,
+              "Y": 138,
+              "Weight": 0.9996666557438917,
+              "Kind": 3,
+              "Surface": 0.6459972801435797
+            }
+          },
+          "B": {
+            "X": -3626,
+            "Z": -3266,
+            "Model": {
+              "Wet": true,
+              "Y": 136,
+              "Weight": 0.9973509982819211,
+              "Kind": 3,
+              "Surface": 0.6438772896783157
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": -3627,
+            "z": -3266,
+            "status": "full",
+            "topY": 138,
+            "floorY": 133,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 138,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 5,
+            "modelY": 138,
+            "modelKind": 3,
+            "riverWeight": 0.9996666557438917
+          },
+          {
+            "x": -3626,
+            "z": -3266,
+            "status": "full",
+            "topY": 137,
+            "floorY": 132,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 137,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 5,
+            "modelY": 136,
+            "modelKind": 3,
+            "riverWeight": 0.9973509982819211
+          }
+        ],
+        "floorStep": -1
+      },
+      {
+        "index": 24,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": 1480,
+            "Z": -4664,
+            "Model": {
+              "Wet": true,
+              "Y": 65,
+              "Weight": 0.9999110005053012,
+              "Kind": 2,
+              "Surface": 0.5046838878970412
+            }
+          },
+          "B": {
+            "X": 1481,
+            "Z": -4664,
+            "Model": {
+              "Wet": true,
+              "Y": 62,
+              "Weight": 0.999969151836789,
+              "Kind": 3,
+              "Surface": 0.496594691872517
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": 1480,
+            "z": -4664,
+            "status": "full",
+            "topY": 64,
+            "floorY": 58,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 64,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 65,
+            "modelKind": 2,
+            "riverWeight": 0.9999110005053012
+          },
+          {
+            "x": 1481,
+            "z": -4664,
+            "status": "full",
+            "topY": 61,
+            "floorY": 58,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 61,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 3,
+            "modelY": 62,
+            "modelKind": 3,
+            "riverWeight": 0.999969151836789
+          }
+        ],
+        "floorStep": -3
+      },
+      {
+        "index": 25,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": 1480,
+            "Z": -4663,
+            "Model": {
+              "Wet": true,
+              "Y": 65,
+              "Weight": 0.9992860321813849,
+              "Kind": 2,
+              "Surface": 0.5046838878970412
+            }
+          },
+          "B": {
+            "X": 1480,
+            "Z": -4662,
+            "Model": {
+              "Wet": true,
+              "Y": 62,
+              "Weight": 0.9980681844989263,
+              "Kind": 3,
+              "Surface": 0.4967209260247496
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": 1480,
+            "z": -4663,
+            "status": "full",
+            "topY": 64,
+            "floorY": 58,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 64,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 65,
+            "modelKind": 2,
+            "riverWeight": 0.9992860321813849
+          },
+          {
+            "x": 1480,
+            "z": -4662,
+            "status": "full",
+            "topY": 61,
+            "floorY": 58,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 61,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 3,
+            "modelY": 62,
+            "modelKind": 3,
+            "riverWeight": 0.9980681844989263
+          }
+        ],
+        "floorStep": -3
+      },
+      {
+        "index": 26,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": 1480,
+            "Z": -4663,
+            "Model": {
+              "Wet": true,
+              "Y": 65,
+              "Weight": 0.9992860321813849,
+              "Kind": 2,
+              "Surface": 0.5046838878970412
+            }
+          },
+          "B": {
+            "X": 1481,
+            "Z": -4663,
+            "Model": {
+              "Wet": true,
+              "Y": 62,
+              "Weight": 0.9998586348987001,
+              "Kind": 3,
+              "Surface": 0.4967473672497922
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": 1480,
+            "z": -4663,
+            "status": "full",
+            "topY": 64,
+            "floorY": 58,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 64,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 65,
+            "modelKind": 2,
+            "riverWeight": 0.9992860321813849
+          },
+          {
+            "x": 1481,
+            "z": -4663,
+            "status": "full",
+            "topY": 61,
+            "floorY": 58,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 61,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 3,
+            "modelY": 62,
+            "modelKind": 3,
+            "riverWeight": 0.9998586348987001
+          }
+        ],
+        "floorStep": -3
+      },
+      {
+        "index": 27,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": 1481,
+            "Z": -4665,
+            "Model": {
+              "Wet": true,
+              "Y": 65,
+              "Weight": 0.9994768434941367,
+              "Kind": 2,
+              "Surface": 0.5046838878970412
+            }
+          },
+          "B": {
+            "X": 1481,
+            "Z": -4664,
+            "Model": {
+              "Wet": true,
+              "Y": 62,
+              "Weight": 0.999969151836789,
+              "Kind": 3,
+              "Surface": 0.496594691872517
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": 1481,
+            "z": -4665,
+            "status": "full",
+            "topY": 64,
+            "floorY": 58,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 64,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 65,
+            "modelKind": 2,
+            "riverWeight": 0.9994768434941367
+          },
+          {
+            "x": 1481,
+            "z": -4664,
+            "status": "full",
+            "topY": 61,
+            "floorY": 58,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 61,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 3,
+            "modelY": 62,
+            "modelKind": 3,
+            "riverWeight": 0.999969151836789
+          }
+        ],
+        "floorStep": -3
+      },
+      {
+        "index": 28,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": 1481,
+            "Z": -4665,
+            "Model": {
+              "Wet": true,
+              "Y": 65,
+              "Weight": 0.9994768434941367,
+              "Kind": 2,
+              "Surface": 0.5046838878970412
+            }
+          },
+          "B": {
+            "X": 1482,
+            "Z": -4665,
+            "Model": {
+              "Wet": true,
+              "Y": 62,
+              "Weight": 0.9985786325969614,
+              "Kind": 3,
+              "Surface": 0.4966201617115943
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": 1481,
+            "z": -4665,
+            "status": "full",
+            "topY": 64,
+            "floorY": 58,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 64,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 65,
+            "modelKind": 2,
+            "riverWeight": 0.9994768434941367
+          },
+          {
+            "x": 1482,
+            "z": -4665,
+            "status": "full",
+            "topY": 61,
+            "floorY": 58,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 61,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 3,
+            "modelY": 62,
+            "modelKind": 3,
+            "riverWeight": 0.9985786325969614
+          }
+        ],
+        "floorStep": -3
+      },
+      {
+        "index": 29,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": 2715,
+            "Z": -7957,
+            "Model": {
+              "Wet": true,
+              "Y": 88,
+              "Weight": 0.996915376314407,
+              "Kind": 2,
+              "Surface": 0.5498434056054579
+            }
+          },
+          "B": {
+            "X": 2715,
+            "Z": -7956,
+            "Model": {
+              "Wet": true,
+              "Y": 85,
+              "Weight": 0.9999876838857193,
+              "Kind": 3,
+              "Surface": 0.5438190511710818
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": 2715,
+            "z": -7957,
+            "status": "full",
+            "topY": 88,
+            "floorY": 82,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 88,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 88,
+            "modelKind": 2,
+            "riverWeight": 0.996915376314407
+          },
+          {
+            "x": 2715,
+            "z": -7956,
+            "status": "full",
+            "topY": 86,
+            "floorY": 82,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 86,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 4,
+            "modelY": 85,
+            "modelKind": 3,
+            "riverWeight": 0.9999876838857193
+          }
+        ],
+        "floorStep": -2
+      },
+      {
+        "index": 30,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": 2716,
+            "Z": -7957,
+            "Model": {
+              "Wet": true,
+              "Y": 88,
+              "Weight": 0.9999006494893978,
+              "Kind": 2,
+              "Surface": 0.5498434056054579
+            }
+          },
+          "B": {
+            "X": 2716,
+            "Z": -7956,
+            "Model": {
+              "Wet": true,
+              "Y": 85,
+              "Weight": 0.9961613501967531,
+              "Kind": 3,
+              "Surface": 0.5437058492816786
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": 2716,
+            "z": -7957,
+            "status": "full",
+            "topY": 88,
+            "floorY": 82,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 88,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 88,
+            "modelKind": 2,
+            "riverWeight": 0.9999006494893978
+          },
+          {
+            "x": 2716,
+            "z": -7956,
+            "status": "full",
+            "topY": 86,
+            "floorY": 82,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 86,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 4,
+            "modelY": 85,
+            "modelKind": 3,
+            "riverWeight": 0.9961613501967531
+          }
+        ],
+        "floorStep": -2
+      },
+      {
+        "index": 31,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": 2716,
+            "Z": -7957,
+            "Model": {
+              "Wet": true,
+              "Y": 88,
+              "Weight": 0.9999006494893978,
+              "Kind": 2,
+              "Surface": 0.5498434056054579
+            }
+          },
+          "B": {
+            "X": 2717,
+            "Z": -7957,
+            "Model": {
+              "Wet": true,
+              "Y": 85,
+              "Weight": 0.9944667906728486,
+              "Kind": 3,
+              "Surface": 0.5434466557589813
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": 2716,
+            "z": -7957,
+            "status": "full",
+            "topY": 88,
+            "floorY": 82,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 88,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 6,
+            "modelY": 88,
+            "modelKind": 2,
+            "riverWeight": 0.9999006494893978
+          },
+          {
+            "x": 2717,
+            "z": -7957,
+            "status": "full",
+            "topY": 86,
+            "floorY": 82,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 86,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 4,
+            "modelY": 85,
+            "modelKind": 3,
+            "riverWeight": 0.9944667906728486
+          }
+        ],
+        "floorStep": -2
+      },
+      {
+        "index": 32,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": 2717,
+            "Z": -7958,
+            "Model": {
+              "Wet": true,
+              "Y": 88,
+              "Weight": 0.9994563249249371,
+              "Kind": 2,
+              "Surface": 0.5498434056054579
+            }
+          },
+          "B": {
+            "X": 2717,
+            "Z": -7957,
+            "Model": {
+              "Wet": true,
+              "Y": 85,
+              "Weight": 0.9944667906728486,
+              "Kind": 3,
+              "Surface": 0.5434466557589813
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": 2717,
+            "z": -7958,
+            "status": "full",
+            "topY": 88,
+            "floorY": 81,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 88,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 7,
+            "modelY": 88,
+            "modelKind": 2,
+            "riverWeight": 0.9994563249249371
+          },
+          {
+            "x": 2717,
+            "z": -7957,
+            "status": "full",
+            "topY": 86,
+            "floorY": 82,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 86,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 4,
+            "modelY": 85,
+            "modelKind": 3,
+            "riverWeight": 0.9944667906728486
+          }
+        ],
+        "floorStep": -2
+      },
+      {
+        "index": 33,
+        "case": {
+          "Kind": "adjacent_water_step",
+          "A": {
+            "X": 2718,
+            "Z": -7958,
+            "Model": {
+              "Wet": true,
+              "Y": 88,
+              "Weight": 0.9924818630932112,
+              "Kind": 2,
+              "Surface": 0.5498434056054579
+            }
+          },
+          "B": {
+            "X": 2718,
+            "Z": -7957,
+            "Model": {
+              "Wet": true,
+              "Y": 85,
+              "Weight": 0.9813587811802612,
+              "Kind": 3,
+              "Surface": 0.5433236470839691
+            }
+          }
+        },
+        "floor": [
+          {
+            "x": 2718,
+            "z": -7958,
+            "status": "full",
+            "topY": 88,
+            "floorY": 81,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 88,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 7,
+            "modelY": 88,
+            "modelKind": 2,
+            "riverWeight": 0.9924818630932112
+          },
+          {
+            "x": 2718,
+            "z": -7957,
+            "status": "full",
+            "topY": 86,
+            "floorY": 81,
+            "topBlock": "minecraft:water",
+            "wet": true,
+            "hydroTop": true,
+            "waterSurfaceY": 86,
+            "waterSurfaceBlock": "minecraft:water",
+            "depth": 5,
+            "modelY": 85,
+            "modelKind": 3,
+            "riverWeight": 0.9813587811802612
+          }
+        ],
+        "floorStep": -2
+      }
+    ]
+  },
+  "matrix": [
+    {
+      "minecraft": "1.21.1",
+      "loader": "neoforge",
+      "module": "java/adapters/1.21.1-neoforge",
+      "java": 21,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.1-mc1.21.1-neoforge.jar",
+      "bytes": 29331923,
+      "sha256": "372379166d03aa335638cc8f262733fe384b754696a7f7e33514d3f943ace1d4",
+      "nativeEngineAbis": 6,
+      "buildCommit": "d3b581781b94b676c8710cea20e2a9cad9d57585"
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "fabric",
+      "module": "java/adapters/1.21.1-fabric",
+      "java": 21,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.1-mc1.21.1-fabric.jar",
+      "bytes": 9298276,
+      "sha256": "375c6c97dd9f4f3d0194f3073894c0e40a42b5c2082de0883096a0015d57c89b",
+      "nativeEngineAbis": 6,
+      "buildCommit": "d3b581781b94b676c8710cea20e2a9cad9d57585"
+    },
+    {
+      "minecraft": "26.3",
+      "loader": "neoforge",
+      "module": "java/neoforge-mod",
+      "java": 25,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.1-mc26.3-neoforge.jar",
+      "bytes": 29314810,
+      "sha256": "e30e032471fd8ecb8e4537a9b2f7a93c2373791ff4f72b2e4c5c34c48b5f53d3",
+      "nativeEngineAbis": 6,
+      "buildCommit": "8e5da8b65b3497d0622e9d15631c91311cc2d809"
+    },
+    {
+      "minecraft": "26.3",
+      "loader": "fabric",
+      "module": "java/adapters/26.3-fabric",
+      "java": 25,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.1-mc26.3-fabric.jar",
+      "bytes": 29321611,
+      "sha256": "1c7e809907c3bf546f97250c9f79621259fcea1094e38893975cdd042a3b3113",
+      "nativeEngineAbis": 6,
+      "buildCommit": "0742e0fe2e7ca3d6a4f447263d4ecbc9b01780ac"
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "neoforge",
+      "module": "java/adapters/26.2-neoforge",
+      "java": 25,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.1-mc26.2-neoforge.jar",
+      "bytes": 9239292,
+      "sha256": "2f93fcdecb2f1a4fdba1c123cc87cf1173de07e08b0d0dfc657b1ff6ad639c7d",
+      "nativeEngineAbis": 6,
+      "buildCommit": "8e5da8b65b3497d0622e9d15631c91311cc2d809"
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "fabric",
+      "module": "java/adapters/26.2-fabric",
+      "java": 25,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.1-mc26.2-fabric.jar",
+      "bytes": 9246752,
+      "sha256": "be54e9da405d13a8aeb079eb7160668b46ea3f2206579d465a61ea9c9f67d04e",
+      "nativeEngineAbis": 6,
+      "buildCommit": "8e5da8b65b3497d0622e9d15631c91311cc2d809"
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "neoforge",
+      "module": "java/adapters/26.1.2-neoforge",
+      "java": 25,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.1-mc26.1.2-neoforge.jar",
+      "bytes": 9239388,
+      "sha256": "562a22847812776ccbed865e691e0e604b88631de5c01ace16b099c9116aa32d",
+      "nativeEngineAbis": 6,
+      "buildCommit": "8e5da8b65b3497d0622e9d15631c91311cc2d809"
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "fabric",
+      "module": "java/adapters/26.1.2-fabric",
+      "java": 25,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.1-mc26.1.2-fabric.jar",
+      "bytes": 9246880,
+      "sha256": "7c3d87c3753b6e88a9d92cff4740b795e675818a411a7c13ab242c10cccd3621",
+      "nativeEngineAbis": 6,
+      "buildCommit": "8e5da8b65b3497d0622e9d15631c91311cc2d809"
+    },
+    {
+      "minecraft": "1.20.1",
+      "loader": "fabric",
+      "module": "java/adapters/1.20.1-fabric",
+      "java": 17,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.1-mc1.20.1-fabric.jar",
+      "bytes": 9259775,
+      "sha256": "be9bbb5cbcefa6b97acc658ebb084082eed6fc516d353cf48a8c6f3dd980b758",
+      "nativeEngineAbis": 6,
+      "buildCommit": "d3b581781b94b676c8710cea20e2a9cad9d57585"
+    }
+  ],
+  "manualAcceptance": "pending",
+  "published": false,
+  "previousRulesCompatibility": [
+    {
+      "rulesVersion": "geoworld-rules-v1.1.25",
+      "sha256": "88ee82317fda94a4a4df6ed16abff9b30768c8a75cd571b79da20e5987ae5ac7",
+      "identicalRuntimeSpots": 74
+    },
+    {
+      "rulesVersion": "geoworld-rules-v1.1.26",
+      "sha256": "bb7f3ec60522d6b8a7a5edbaf35312eff072a8b8462b3aa164ce7ce0d18e74fb",
+      "identicalRuntimeSpots": 74
+    }
+  ],
+  "specialLandscapeVerifierFixture": {
+    "seed": -563659577384754347,
+    "geometry": [
+      96,
+      60
+    ],
+    "landscapesVerified": 7
+  },
+  "releaseAllowed": false
+}

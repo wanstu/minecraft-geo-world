@@ -4,6 +4,7 @@ import (
 	"math"
 	"sort"
 
+	"geoworld/internal/climate"
 	"geoworld/internal/ecology"
 	"geoworld/internal/hydrology"
 	"geoworld/internal/mcprofile"
@@ -73,11 +74,12 @@ func Plan(
 	surface *world.Surface,
 	hydro *hydrology.Model,
 	profile *mcprofile.Model,
+	climateModel *climate.Model,
 	runtime *worldsample.Model,
 	rareMacroStrength float64,
 	rulesVersion string,
 ) []Feature {
-	if surface == nil || hydro == nil || profile == nil || runtime == nil {
+	if surface == nil || hydro == nil || profile == nil || climateModel == nil || runtime == nil {
 		return nil
 	}
 	if rareMacroStrength <= 0 {
@@ -95,12 +97,22 @@ func Plan(
 	nextID := 1
 	used := make([]candidate, 0, 32)
 
-	add := func(kind Kind, c candidate, radius float64, waterContext string, salt uint64) bool {
+	spacedAgainst := func(previous []candidate, c candidate, radius float64) bool {
 		minGap := math.Max(1800, radius*5)
-		for _, previous := range used {
-			if math.Hypot(c.x-previous.x, c.z-previous.z) < minGap {
+		for _, site := range previous {
+			if math.Hypot(c.x-site.x, c.z-site.z) < minGap {
 				return false
 			}
+		}
+		return true
+	}
+	spaced := func(c candidate, radius float64) bool {
+		return spacedAgainst(used, c, radius)
+	}
+
+	add := func(kind Kind, c candidate, radius float64, waterContext string, salt uint64) bool {
+		if !spaced(c, radius) {
+			return false
 		}
 		f := makeFeature(nextID, kind, c.x, c.z, radius, seed, salt, waterContext)
 		if usesV112DepressionGeometry(rulesVersion) {
@@ -156,6 +168,38 @@ func Plan(
 					continue
 				}
 			}
+			if isIslandKind(kind) && usesSubmergedIslandSiting(rulesVersion) {
+				metrics, ok := submergedIslandRootMetrics(
+					waterContext,
+					c.x,
+					c.z,
+					runtime,
+				)
+				if !ok || !qualifiesSubmergedIslandRoot(waterContext, metrics) {
+					continue
+				}
+			}
+			if kind == Sinkhole &&
+				usesRiverSafeSinkholeSites(rulesVersion) &&
+				runtime.Ground != nil &&
+				spaced(c, candidateRadius) {
+				probe := makeFeature(
+					nextID,
+					kind,
+					c.x,
+					c.z,
+					candidateRadius,
+					seed,
+					salt,
+					waterContext,
+				)
+				if sinkholeConflictsRiver(probe, runtime.Ground.Rivers) {
+					// Reserve the rejected site so later rare features do not
+					// silently occupy the same hydrologically invalid location.
+					used = append(used, c)
+					continue
+				}
+			}
 			if add(kind, c, candidateRadius, waterContext, salt) {
 				added++
 				if added >= count {
@@ -163,6 +207,52 @@ func Plan(
 				}
 			}
 		}
+	}
+
+	// v1.1.25 changes island siting only. Preserve the previous island
+	// occupancy sequence as a shadow reservation for later land features so
+	// rejecting/reselecting an island cannot perturb sinkhole/crater/basin IDs
+	// or spacing. The shadow sites are not emitted as features.
+	legacyIslandReservations := []candidate(nil)
+	if usesSubmergedIslandSiting(rulesVersion) {
+		reserveTake := func(
+			candidates []candidate,
+			count int,
+			radius float64,
+			waterContext string,
+			salt uint64,
+		) {
+			added := 0
+			for _, c := range candidates {
+				candidateRadius := radius * (0.86 + 0.28*hashUnit(c.score^salt))
+				if waterContext == "lake" && usesLakeIslandClearance(rulesVersion) {
+					if c.clearance <= 0 {
+						continue
+					}
+					candidateRadius = math.Min(candidateRadius, c.clearance*0.45)
+					if candidateRadius < 48 {
+						continue
+					}
+				}
+				if !spacedAgainst(legacyIslandReservations, c, candidateRadius) {
+					continue
+				}
+				legacyIslandReservations = append(legacyIslandReservations, c)
+				added++
+				if added >= count {
+					return
+				}
+			}
+		}
+		if len(lakes) > 0 {
+			reserveTake(lakes, 1, 180, "lake", 0x11)
+			if len(lakes) > 1 {
+				reserveTake(lakes[1:], 1, 170, "lake", 0x17)
+			}
+		}
+		reserveTake(ocean, base, 240, "ocean", 0x21)
+		reserveTake(ocean, clampInt((base+1)/2, 1, 3), 220, "ocean", 0x31)
+		reserveTake(ocean, clampInt(base, 1, 4), 210, "ocean", 0x41)
 	}
 
 	if len(lakes) > 0 {
@@ -174,6 +264,11 @@ func Plan(
 	take(MushroomIsland, ocean, base, 240, "ocean", 0x21)
 	take(PaleGardenIsland, ocean, clampInt((base+1)/2, 1, 3), 220, "ocean", 0x31)
 	take(CherryIsland, ocean, clampInt(base, 1, 4), 210, "ocean", 0x41)
+
+	if usesSubmergedIslandSiting(rulesVersion) {
+		used = append([]candidate(nil), legacyIslandReservations...)
+		nextID = len(legacyIslandReservations) + 1
+	}
 
 	sinkCandidates := filterTerrain(land, profile,
 		mcprofile.TerrainRollingPlain, mcprofile.TerrainHills, mcprofile.TerrainPlateau)
@@ -195,7 +290,9 @@ func Plan(
 
 	take(Sinkhole, sinkCandidates, clampInt(base+1, 2, 6), sinkRadius, "", 0x51)
 
-	craterAdded := 0
+	craterTarget := clampInt(base, 1, 4)
+	craterSlots := 0
+	missingSnowCraters := 0
 	for i, c := range craterCandidates {
 		kind := VolcanicCraterCherry
 		if i%2 == 0 {
@@ -205,15 +302,36 @@ func Plan(
 		if carved {
 			radius = craterRadius * (0.90 + 0.20*hashUnit(c.score^0x61))
 		}
+		if !spaced(c, radius) {
+			continue
+		}
+		if kind == VolcanicCraterSnow && usesSnowMountainSiting(rulesVersion) {
+			metrics, ok := snowSiteMetricsForCandidate(c, profile, climateModel, runtime)
+			if !ok || !qualifiesSnowCraterSite(metrics) {
+				// Count this as the same deterministic legacy slot, but emit no
+				// invalid snow crater. The reservation keeps later legacy features
+				// at the same positions and IDs.
+				used = append(used, c)
+				nextID++
+				craterSlots++
+				missingSnowCraters++
+				if craterSlots >= craterTarget {
+					break
+				}
+				continue
+			}
+		}
 		if add(kind, c, radius, "", 0x61+uint64(i)) {
-			craterAdded++
-			if craterAdded >= clampInt(base, 1, 4) {
+			craterSlots++
+			if craterSlots >= craterTarget {
 				break
 			}
 		}
 	}
 
-	basinAdded := 0
+	basinTarget := clampInt(base, 1, 4)
+	basinSlots := 0
+	missingSnowBasins := 0
 	for i, c := range basinCandidates {
 		kind := BasinCherry
 		if i%3 == 2 {
@@ -223,10 +341,75 @@ func Plan(
 		if carved {
 			radius = basinRadius * (0.90 + 0.22*hashUnit(c.score^0x71))
 		}
+		if !spaced(c, radius) {
+			continue
+		}
+		if kind == BasinSnow && usesSnowMountainSiting(rulesVersion) {
+			metrics, ok := snowSiteMetricsForCandidate(c, profile, climateModel, runtime)
+			if !ok || !qualifiesSnowBasinSite(metrics) {
+				// Preserve the old basin slot exactly like the crater schedule.
+				// A qualified snow basin is filled later from a dedicated pool.
+				used = append(used, c)
+				nextID++
+				basinSlots++
+				missingSnowBasins++
+				if basinSlots >= basinTarget {
+					break
+				}
+				continue
+			}
+		}
 		if add(kind, c, radius, "", 0x71+uint64(i)) {
-			basinAdded++
-			if basinAdded >= clampInt(base, 1, 4) {
+			basinSlots++
+			if basinSlots >= basinTarget {
 				break
+			}
+		}
+	}
+
+	if usesSnowMountainSiting(rulesVersion) {
+		// Fill only the rejected snow slots, after the complete legacy schedule
+		// is reserved. This lets snow terrain move to a valid background without
+		// perturbing established cherry terrain or sinkholes.
+		for i, c := range craterCandidates {
+			if missingSnowCraters <= 0 {
+				break
+			}
+			radius := craterRadius * (0.90 + 0.20*hashUnit(c.score^0x69))
+			if !spaced(c, radius) {
+				continue
+			}
+			metrics, ok := snowSiteMetricsForCandidate(c, profile, climateModel, runtime)
+			if !ok || !qualifiesSnowCraterSite(metrics) {
+				continue
+			}
+			if add(VolcanicCraterSnow, c, radius, "", 0x69+uint64(i)) {
+				missingSnowCraters--
+			}
+		}
+
+		snowBasinCandidates := filterTerrain(
+			land,
+			profile,
+			mcprofile.TerrainHills,
+			mcprofile.TerrainFoothills,
+			mcprofile.TerrainMountain,
+			mcprofile.TerrainPlateau,
+		)
+		for i, c := range snowBasinCandidates {
+			if missingSnowBasins <= 0 {
+				break
+			}
+			radius := basinRadius * (0.90 + 0.22*hashUnit(c.score^0x79))
+			if !spaced(c, radius) {
+				continue
+			}
+			metrics, ok := snowSiteMetricsForCandidate(c, profile, climateModel, runtime)
+			if !ok || !qualifiesSnowBasinSite(metrics) {
+				continue
+			}
+			if add(BasinSnow, c, radius, "", 0x79+uint64(i)) {
+				missingSnowBasins--
 			}
 		}
 	}
@@ -240,8 +423,298 @@ func Plan(
 		}
 	}
 
+	if len(features) == 0 {
+		return nil
+	}
 	sort.Slice(features, func(i, j int) bool { return features[i].ID < features[j].ID })
 	return features
+}
+
+type submergedIslandMetrics struct {
+	RootLiftBlocks       float64
+	CenterDepthBlocks    float64
+	MatchingWaterSamples int
+	Samples              int
+}
+
+func usesSubmergedIslandSiting(version string) bool {
+	return (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28")))
+}
+
+func usesSubmergedIslandShoulder(version string) bool {
+	return (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28")))
+}
+
+func isIslandKind(kind Kind) bool {
+	switch kind {
+	case MushroomIsland, PaleGardenIsland, CherryIsland:
+		return true
+	default:
+		return false
+	}
+}
+
+func submergedIslandRootMetrics(
+	waterContext string,
+	x, z float64,
+	runtime *worldsample.Model,
+) (submergedIslandMetrics, bool) {
+	if runtime == nil {
+		return submergedIslandMetrics{}, false
+	}
+
+	expected := reconcile.WaterOcean
+	ringRadius := 384.0
+	if waterContext == "lake" {
+		expected = reconcile.WaterLake
+		ringRadius = 160
+	} else if waterContext != "ocean" {
+		return submergedIslandMetrics{}, false
+	}
+
+	center := runtime.Sample(x, z)
+	if center.WaterKind != expected || !center.WaterSurfaceDefined {
+		return submergedIslandMetrics{}, false
+	}
+
+	const samples = 32
+	ringHeights := make([]float64, 0, samples)
+	matchingWater := 0
+	for i := 0; i < samples; i++ {
+		angle := 2 * math.Pi * float64(i) / samples
+		sample := runtime.Sample(
+			x+math.Cos(angle)*ringRadius,
+			z+math.Sin(angle)*ringRadius,
+		)
+		ringHeights = append(
+			ringHeights,
+			normalizedHeightBlockY(sample.GroundHeight),
+		)
+		if sample.WaterKind == expected {
+			matchingWater++
+		}
+	}
+	sort.Float64s(ringHeights)
+	median := (ringHeights[samples/2-1] + ringHeights[samples/2]) * 0.5
+	centerGround := normalizedHeightBlockY(center.GroundHeight)
+	centerWater := normalizedHeightBlockY(center.WaterSurfaceElevation)
+	return submergedIslandMetrics{
+		RootLiftBlocks:       centerGround - median,
+		CenterDepthBlocks:    centerWater - centerGround,
+		MatchingWaterSamples: matchingWater,
+		Samples:              samples,
+	}, true
+}
+
+func qualifiesSubmergedIslandRoot(
+	waterContext string,
+	metrics submergedIslandMetrics,
+) bool {
+	if metrics.Samples <= 0 ||
+		metrics.MatchingWaterSamples != metrics.Samples {
+		return false
+	}
+	switch waterContext {
+	case "ocean":
+		return metrics.RootLiftBlocks >= 8 &&
+			metrics.CenterDepthBlocks <= 48
+	case "lake":
+		return metrics.RootLiftBlocks >= 4 &&
+			metrics.CenterDepthBlocks <= 24
+	default:
+		return false
+	}
+}
+
+func normalizedHeightBlockY(height float64) float64 {
+	height = clamp(height, 0, 1)
+	if height <= 0.5 {
+		return -64 + 254*height
+	}
+	return 63 + 514*(height-0.5)
+}
+
+type snowSiteMetrics struct {
+	AnnualMeanTempC  float64
+	CenterY          float64
+	ReliefBlocks     float64
+	BasinDepthBlocks float64
+	LandSamples512   int
+	Samples512       int
+	LandSamples768   int
+	Samples768       int
+	TerrainVariant   mcprofile.TerrainVariant
+}
+
+func usesSnowMountainSiting(version string) bool {
+	return (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28")))
+}
+
+func snowSiteMetricsForCandidate(
+	c candidate,
+	profile *mcprofile.Model,
+	climateModel *climate.Model,
+	runtime *worldsample.Model,
+) (snowSiteMetrics, bool) {
+	if profile == nil || climateModel == nil || runtime == nil ||
+		c.index < 0 ||
+		c.index >= len(profile.TerrainVariant) ||
+		c.index >= len(climateModel.AnnualMeanTempC) {
+		return snowSiteMetrics{}, false
+	}
+	center := runtime.Sample(c.x, c.z)
+	if center.WaterKind != reconcile.WaterNone {
+		return snowSiteMetrics{}, false
+	}
+
+	const samples = 32
+	heights := make([]float64, 0, samples)
+	minY := math.Inf(1)
+	maxY := math.Inf(-1)
+	land512 := 0
+	for i := 0; i < samples; i++ {
+		angle := 2 * math.Pi * float64(i) / samples
+		sample := runtime.Sample(
+			c.x+math.Cos(angle)*512,
+			c.z+math.Sin(angle)*512,
+		)
+		y := normalizedHeightBlockY(sample.GroundHeight)
+		heights = append(heights, y)
+		minY = math.Min(minY, y)
+		maxY = math.Max(maxY, y)
+		if sample.WaterKind != reconcile.WaterOcean &&
+			sample.WaterKind != reconcile.WaterLake {
+			land512++
+		}
+	}
+	if len(heights) != samples || math.IsInf(minY, 0) || math.IsInf(maxY, 0) {
+		return snowSiteMetrics{}, false
+	}
+	land768 := 0
+	for i := 0; i < samples; i++ {
+		angle := 2 * math.Pi * float64(i) / samples
+		sample := runtime.Sample(
+			c.x+math.Cos(angle)*768,
+			c.z+math.Sin(angle)*768,
+		)
+		if sample.WaterKind != reconcile.WaterOcean &&
+			sample.WaterKind != reconcile.WaterLake {
+			land768++
+		}
+	}
+	sort.Float64s(heights)
+	median := (heights[samples/2-1] + heights[samples/2]) * 0.5
+	centerY := normalizedHeightBlockY(center.GroundHeight)
+	return snowSiteMetrics{
+		AnnualMeanTempC:  climateModel.AnnualMeanTempC[c.index],
+		CenterY:          centerY,
+		ReliefBlocks:     maxY - minY,
+		BasinDepthBlocks: median - centerY,
+		LandSamples512:   land512,
+		Samples512:       samples,
+		LandSamples768:   land768,
+		Samples768:       samples,
+		TerrainVariant:   profile.TerrainVariant[c.index],
+	}, true
+}
+
+func qualifiesSnowCraterSite(metrics snowSiteMetrics) bool {
+	if metrics.Samples512 <= 0 ||
+		metrics.LandSamples512 != metrics.Samples512 ||
+		metrics.AnnualMeanTempC > 5 ||
+		metrics.CenterY < 120 ||
+		metrics.ReliefBlocks < 50 {
+		return false
+	}
+	switch metrics.TerrainVariant {
+	case mcprofile.TerrainFoothills, mcprofile.TerrainMountain, mcprofile.TerrainPlateau:
+		return true
+	default:
+		return false
+	}
+}
+
+func qualifiesSnowBasinSite(metrics snowSiteMetrics) bool {
+	if metrics.Samples512 <= 0 ||
+		metrics.LandSamples512 != metrics.Samples512 ||
+		metrics.Samples768 <= 0 ||
+		metrics.LandSamples768 != metrics.Samples768 ||
+		metrics.AnnualMeanTempC > 5 ||
+		metrics.CenterY < 90 ||
+		metrics.ReliefBlocks < 50 ||
+		metrics.BasinDepthBlocks < 4 {
+		return false
+	}
+	switch metrics.TerrainVariant {
+	case mcprofile.TerrainHills, mcprofile.TerrainFoothills, mcprofile.TerrainMountain, mcprofile.TerrainPlateau:
+		return true
+	default:
+		return false
+	}
+}
+
+func usesRiverSafeSinkholeSites(version string) bool {
+	return version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28")))
+}
+
+func sinkholeConflictsRiver(
+	feature Feature,
+	rivers []waterbed.RiverSegment,
+) bool {
+	if feature.Kind != Sinkhole ||
+		feature.RadiusX <= 0 ||
+		feature.RadiusZ <= 0 {
+		return false
+	}
+
+	reachX := feature.RadiusX
+	reachZ := feature.RadiusZ
+	for _, lobe := range feature.Lobes {
+		reachX = math.Max(reachX, math.Abs(lobe.OffsetX)+lobe.RadiusX)
+		reachZ = math.Max(reachZ, math.Abs(lobe.OffsetZ)+lobe.RadiusZ)
+	}
+
+	for _, river := range rivers {
+		bend := math.Abs(river.MeanderOffset)
+		maxHalfWidth := math.Max(
+			waterbed.RiverHalfWidthAt(river, 0),
+			waterbed.RiverHalfWidthAt(river, 1),
+		)
+		broadMargin := math.Max(24, maxHalfWidth+16)
+		if math.Max(river.X0, river.X1)+bend <
+			feature.CenterX-reachX-broadMargin ||
+			math.Min(river.X0, river.X1)-bend >
+				feature.CenterX+reachX+broadMargin ||
+			math.Max(river.Z0, river.Z1)+bend <
+				feature.CenterZ-reachZ-broadMargin ||
+			math.Min(river.Z0, river.Z1)-bend >
+				feature.CenterZ+reachZ+broadMargin {
+			continue
+		}
+
+		pathLength := math.Hypot(
+			river.X1-river.X0,
+			river.Z1-river.Z0,
+		) + math.Pi*bend
+		steps := int(math.Ceil(pathLength / 12))
+		if steps < 2 {
+			steps = 2
+		}
+		for i := 0; i <= steps; i++ {
+			t := float64(i) / float64(steps)
+			x, z := waterbed.RiverCenterPoint(river, t)
+			margin := math.Max(
+				24,
+				waterbed.RiverHalfWidthAt(river, t)+16,
+			)
+			dx := (x - feature.CenterX) / (reachX + margin)
+			dz := (z - feature.CenterZ) / (reachZ + margin)
+			if dx*dx+dz*dz <= 1 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func planBasinDrainage(
@@ -639,7 +1112,28 @@ func Apply(
 		if base.World.WaterSurfaceDefined {
 			water = base.World.WaterSurfaceElevation
 		}
-		setLand(math.Max(base.World.GroundHeight, water+0.008+0.052*best))
+		if usesSubmergedIslandShoulder(rulesVersion) {
+			peak := math.Max(
+				base.World.GroundHeight,
+				water+0.008+0.052*best,
+			)
+			shoulder := best
+			target := lerp(base.World.GroundHeight, peak, shoulder)
+			if target < water {
+				out.World.GroundHeight = clamp(target, 0.001, 0.999)
+				out.World.WaterDepth = math.Max(
+					0,
+					water-out.World.GroundHeight,
+				)
+				return out
+			}
+			setLand(target)
+		} else {
+			setLand(math.Max(
+				base.World.GroundHeight,
+				water+0.008+0.052*best,
+			))
+		}
 		switch selected.Kind {
 		case MushroomIsland:
 			out.EcoRegion = ecology.RegionTemperateGrassland
@@ -817,7 +1311,7 @@ func Apply(
 					if rulesVersion == "geoworld-rules-v1.1.16" ||
 						rulesVersion == "geoworld-rules-v1.1.18" ||
 						rulesVersion == "geoworld-rules-v1.1.19" ||
-						(rulesVersion == "geoworld-rules-v1.1.20" || (rulesVersion == "geoworld-rules-v1.1.21" || (rulesVersion == "geoworld-rules-v1.1.22" || rulesVersion == "geoworld-rules-v1.1.23"))) {
+						(rulesVersion == "geoworld-rules-v1.1.20" || (rulesVersion == "geoworld-rules-v1.1.21" || (rulesVersion == "geoworld-rules-v1.1.22" || (rulesVersion == "geoworld-rules-v1.1.23" || (rulesVersion == "geoworld-rules-v1.1.24" || (rulesVersion == "geoworld-rules-v1.1.25" || (rulesVersion == "geoworld-rules-v1.1.26" || (rulesVersion == "geoworld-rules-v1.1.27" || rulesVersion == "geoworld-rules-v1.1.28")))))))) {
 						// v1.1.16 locked interpretation.
 						// Deform the shared water datum, then translate the bed by
 						// the same amount. This fixed crowned rivers but can bend
@@ -901,7 +1395,7 @@ func usesV112DepressionGeometry(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || version == "geoworld-rules-v1.1.23")))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28"))))))))
 }
 
 func usesCarvedDepressionGeometry(version string) bool {
@@ -910,7 +1404,7 @@ func usesCarvedDepressionGeometry(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || version == "geoworld-rules-v1.1.23")))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28"))))))))
 }
 
 func usesHydrologyConformingDepressions(version string) bool {
@@ -918,7 +1412,7 @@ func usesHydrologyConformingDepressions(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || version == "geoworld-rules-v1.1.23")))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28"))))))))
 }
 
 func usesLakeIslandClearance(version string) bool {
@@ -926,13 +1420,13 @@ func usesLakeIslandClearance(version string) bool {
 		version == "geoworld-rules-v1.1.16" ||
 		version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || version == "geoworld-rules-v1.1.23")))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28"))))))))
 }
 
 func usesBasinDrainageCorridors(version string) bool {
 	return version == "geoworld-rules-v1.1.18" ||
 		version == "geoworld-rules-v1.1.19" ||
-		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || version == "geoworld-rules-v1.1.23")))
+		(version == "geoworld-rules-v1.1.20" || (version == "geoworld-rules-v1.1.21" || (version == "geoworld-rules-v1.1.22" || (version == "geoworld-rules-v1.1.23" || (version == "geoworld-rules-v1.1.24" || (version == "geoworld-rules-v1.1.25" || (version == "geoworld-rules-v1.1.26" || (version == "geoworld-rules-v1.1.27" || version == "geoworld-rules-v1.1.28"))))))))
 }
 
 func hasDepressionHeights(f Feature) bool {

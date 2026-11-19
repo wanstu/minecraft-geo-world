@@ -8,7 +8,7 @@
   "automatedReleaseReadiness": "passed",
   "manualVisualAcceptance": "passed",
   "releaseAllowed": true,
-  "published": false,
+  "published": true,
   "reasonReleaseBlocked": null,
   "visualHistory": {
     "rejectedCandidateDate": "2026-11-15",
@@ -147,7 +147,7 @@
     "screenshotCountsAsV8VisualAcceptance": false,
     "fixedBy": "cache v27 + native-engine SHA256 + hard RiverGeometryVersion validation"
   },
-  "releaseState": "ready_for_merge_tag_release_not_executed",
+  "releaseState": "published",
   "visualAcceptance": {
     "date": "2026-11-16",
     "seed": -1818694639628404530,
@@ -277,5 +277,20 @@
       "sha256": "cba074a2779c84ae94132d2f86ed526f41ab41bab1c79595ecf72e9f09c72d5e",
       "sixNativeEnginesVerified": true
     }
-  ]
+  ],
+  "release": {
+    "tag": "v0.1.6",
+    "targetCommit": "8e0daf076027ae0ea1cc4409c87dd3963d0dd470",
+    "workflowRunId": 43889170952,
+    "workflowConclusion": "success",
+    "githubReleaseId": 447186048,
+    "name": "GeoWorld v0.1.6",
+    "draft": false,
+    "prerelease": false,
+    "publishedAt": "2026-11-16T14:57:24Z",
+    "url": "https://github.com/wanstu/minecraft-geo-world/releases/tag/v0.1.6",
+    "jarAssets": 9,
+    "checksumAssets": 1,
+    "totalAssets": 10
+  }
 }

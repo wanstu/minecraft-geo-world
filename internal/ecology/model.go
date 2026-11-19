@@ -70,6 +70,9 @@ func (r Region) String() string {
 type Config struct {
 	ReferencePrecipMM   float64
 	EnsureWetlandRegion bool
+	// DistributionVersion 1 narrows the forest moisture envelope and widens
+	// the natural grassland/shrub transition. Zero preserves legacy worlds.
+	DistributionVersion uint8 `json:",omitempty"`
 }
 
 type Input struct {

@@ -97,7 +97,7 @@
   "manualVisualRetest": "passed_actual_geom_v8",
   "fullNineTargetPostV8Matrix": "passed_9_of_9",
   "releaseAllowed": true,
-  "published": false,
+  "published": true,
   "staleCacheIncident": {
     "date": "2026-11-16",
     "status": "confirmed",
@@ -249,5 +249,12 @@
       "sha256": "cba074a2779c84ae94132d2f86ed526f41ab41bab1c79595ecf72e9f09c72d5e",
       "sixNativeEnginesVerified": true
     }
-  ]
+  ],
+  "release": {
+    "tag": "v0.1.6",
+    "targetCommit": "8e0daf076027ae0ea1cc4409c87dd3963d0dd470",
+    "workflowRunId": 43889170952,
+    "githubReleaseId": 447186048,
+    "publishedAt": "2026-11-16T14:57:24Z"
+  }
 }

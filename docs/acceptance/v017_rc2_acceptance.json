@@ -1,0 +1,668 @@
+{
+  "version": "0.1.7-rc.2",
+  "buildCommit": "b6a9a12f8b8ac82aad37c68caa53341c2a79bb8f",
+  "date": "2026-11-19",
+  "rules": "geoworld-rules-v1.1.28",
+  "seed": -1818694639628404530,
+  "matrix": [
+    {
+      "minecraft": "26.3",
+      "loader": "fabric",
+      "module": "java/adapters/26.3-fabric",
+      "java": 25,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.2-mc26.3-fabric.jar",
+      "bytes": 29340007,
+      "sha256": "0984cb4076c6f51ede5f369db322ab0af8518d432fe064e8aa64287290a9a6c3",
+      "nativeEngineAbis": 6,
+      "buildCommit": "b6a9a12f8b8ac82aad37c68caa53341c2a79bb8f"
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "neoforge",
+      "module": "java/adapters/1.21.1-neoforge",
+      "java": 21,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.2-mc1.21.1-neoforge.jar",
+      "bytes": 29350377,
+      "sha256": "6cd9c33aad8561a8d6fafd1623c26e7af3cf7fd42e54e1f07bd24d7a2317be53",
+      "nativeEngineAbis": 6,
+      "buildCommit": "b6a9a12f8b8ac82aad37c68caa53341c2a79bb8f"
+    },
+    {
+      "minecraft": "1.21.1",
+      "loader": "fabric",
+      "module": "java/adapters/1.21.1-fabric",
+      "java": 21,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.2-mc1.21.1-fabric.jar",
+      "bytes": 9309117,
+      "sha256": "98ddee2f865c0d8384b6a6243d212d4543e13b38dc0b6076867d8a0b67c70eea",
+      "nativeEngineAbis": 6,
+      "buildCommit": "b6a9a12f8b8ac82aad37c68caa53341c2a79bb8f"
+    },
+    {
+      "minecraft": "26.3",
+      "loader": "neoforge",
+      "module": "java/neoforge-mod",
+      "java": 25,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.2-mc26.3-neoforge.jar",
+      "bytes": 29333209,
+      "sha256": "bcfcffd7d7cb70760162bb50efcd2b3aca0c0f41fa0e50d88640a48ac90f364e",
+      "nativeEngineAbis": 6,
+      "buildCommit": "b6a9a12f8b8ac82aad37c68caa53341c2a79bb8f"
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "neoforge",
+      "module": "java/adapters/26.2-neoforge",
+      "java": 25,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.2-mc26.2-neoforge.jar",
+      "bytes": 9250070,
+      "sha256": "b486377a5e74c837253307c1ef037ffd93c4f1a505d1b79f68e0af0e59469116",
+      "nativeEngineAbis": 6,
+      "buildCommit": "b6a9a12f8b8ac82aad37c68caa53341c2a79bb8f"
+    },
+    {
+      "minecraft": "26.2",
+      "loader": "fabric",
+      "module": "java/adapters/26.2-fabric",
+      "java": 25,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.2-mc26.2-fabric.jar",
+      "bytes": 9257531,
+      "sha256": "98299dc94645065e482f5a3e6d33442b44ded26fff7583e05713b9d0cc1db1af",
+      "nativeEngineAbis": 6,
+      "buildCommit": "b6a9a12f8b8ac82aad37c68caa53341c2a79bb8f"
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "neoforge",
+      "module": "java/adapters/26.1.2-neoforge",
+      "java": 25,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.2-mc26.1.2-neoforge.jar",
+      "bytes": 9250176,
+      "sha256": "c01d1a7d3ad9529578ce15471c184ba5ddcf54d57d940ca8472d6b46e464df96",
+      "nativeEngineAbis": 6,
+      "buildCommit": "b6a9a12f8b8ac82aad37c68caa53341c2a79bb8f"
+    },
+    {
+      "minecraft": "26.1.2",
+      "loader": "fabric",
+      "module": "java/adapters/26.1.2-fabric",
+      "java": 25,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.2-mc26.1.2-fabric.jar",
+      "bytes": 9257668,
+      "sha256": "7c3b47882126fda29e0b050ea35a096d2accb640ac3fbd9a1897571f6ab4bdb2",
+      "nativeEngineAbis": 6,
+      "buildCommit": "b6a9a12f8b8ac82aad37c68caa53341c2a79bb8f"
+    },
+    {
+      "minecraft": "1.20.1",
+      "loader": "fabric",
+      "module": "java/adapters/1.20.1-fabric",
+      "java": 17,
+      "status": "passed",
+      "artifact": "GeoWorld-0.1.7-rc.2-mc1.20.1-fabric.jar",
+      "bytes": 9270567,
+      "sha256": "f47f5fabab7df91a0b2f8ae1d2c02841217eb47b6f18a80a3e2812b3caa4c6e5",
+      "nativeEngineAbis": 6,
+      "buildCommit": "b6a9a12f8b8ac82aad37c68caa53341c2a79bb8f"
+    }
+  ],
+  "verification": {
+    "goTests": "passed",
+    "javaGoldenFixtures": 7,
+    "javaGoldenSamples": 126,
+    "lockedRuntimeSamplesPerRule": {
+      "1.1.25": 928,
+      "1.1.26": 928,
+      "1.1.27": 928
+    },
+    "specialFeaturesEqualToRc1": 18,
+    "formalRiversEqualToRc1": 953,
+    "lakeNodesEqualToRc1": 471
+  },
+  "biomeFingerprints": [
+    {
+      "minecraft": "26.1.2",
+      "seed": 123456,
+      "v127": "9e0454016a938132",
+      "v128": "d16d645ded02cdfa",
+      "samples": 24576,
+      "waterKindDifferences": 0,
+      "groundDifferences": 92
+    },
+    {
+      "minecraft": "26.2",
+      "seed": 123456,
+      "v127": "47ad3bb89998ec1f",
+      "v128": "49de0d5905aa28f7",
+      "samples": 24576,
+      "waterKindDifferences": 0,
+      "groundDifferences": 92
+    },
+    {
+      "minecraft": "26.3",
+      "seed": 123456,
+      "v127": "b6960a337d5d8b21",
+      "v128": "59c05de109371b59",
+      "samples": 24576,
+      "waterKindDifferences": 0,
+      "groundDifferences": 92
+    },
+    {
+      "minecraft": "26.1.2",
+      "seed": -563659577384754347,
+      "v127": "02c39d0573249c76",
+      "v128": "5007d0841bead5ce",
+      "samples": 24576,
+      "waterKindDifferences": 0,
+      "groundDifferences": 117
+    },
+    {
+      "minecraft": "26.2",
+      "seed": -563659577384754347,
+      "v127": "cece3d706c8725e6",
+      "v128": "647128003a630a3e",
+      "samples": 24576,
+      "waterKindDifferences": 0,
+      "groundDifferences": 117
+    },
+    {
+      "minecraft": "26.3",
+      "seed": -563659577384754347,
+      "v127": "5dc58ce52a87a3e0",
+      "v128": "3604e5dfa830d878",
+      "samples": 24576,
+      "waterKindDifferences": 0,
+      "groundDifferences": 117
+    }
+  ],
+  "web": {
+    "version": "geoworld-rules-v1.1.28",
+    "spots": [
+      {
+        "x": -1608,
+        "z": -1082,
+        "groundY": 57,
+        "groundHeight": 0.4788102999406382,
+        "waterKind": "Ocean",
+        "waterSurfaceElevation": 0.5,
+        "biomeFamily": "Warm Ocean",
+        "specialFeature": ""
+      },
+      {
+        "x": -1047,
+        "z": -1076,
+        "groundY": 58,
+        "groundHeight": 0.4831102650260615,
+        "waterKind": "River",
+        "waterSurfaceElevation": 0.5,
+        "biomeFamily": "Warm Ocean",
+        "specialFeature": ""
+      },
+      {
+        "x": -1015,
+        "z": -988,
+        "groundY": 63,
+        "groundHeight": 0.5020168031374308,
+        "waterKind": "None",
+        "waterSurfaceElevation": 0,
+        "biomeFamily": "Savanna",
+        "specialFeature": ""
+      },
+      {
+        "x": -1100,
+        "z": -1070,
+        "groundY": 57,
+        "groundHeight": 0.47834645669291337,
+        "waterKind": "River",
+        "waterSurfaceElevation": 0.5,
+        "biomeFamily": "Warm Ocean",
+        "specialFeature": ""
+      },
+      {
+        "x": 1653,
+        "z": 10405,
+        "groundY": 57,
+        "groundHeight": 0.4809003675953623,
+        "waterKind": "River",
+        "waterSurfaceElevation": 0.5,
+        "biomeFamily": "Tundra",
+        "specialFeature": ""
+      },
+      {
+        "x": -1665,
+        "z": 5313,
+        "groundY": 102,
+        "groundHeight": 0.5778863164546157,
+        "waterKind": "None",
+        "waterSurfaceElevation": 0,
+        "biomeFamily": "Subtropical Forest",
+        "specialFeature": ""
+      },
+      {
+        "x": -1600,
+        "z": 5312,
+        "groundY": 103,
+        "groundHeight": 0.5797843198505659,
+        "waterKind": "None",
+        "waterSurfaceElevation": 0,
+        "biomeFamily": "Subtropical Forest",
+        "specialFeature": ""
+      },
+      {
+        "x": 10944,
+        "z": -6464,
+        "groundY": 273,
+        "groundHeight": 0.910187917687532,
+        "waterKind": "None",
+        "waterSurfaceElevation": 0,
+        "biomeFamily": "Temperate Grassland",
+        "specialFeature": "volcanic_crater_snow"
+      },
+      {
+        "x": 9280,
+        "z": -8896,
+        "groundY": 202,
+        "groundHeight": 0.7718355687950503,
+        "waterKind": "None",
+        "waterSurfaceElevation": 0,
+        "biomeFamily": "Temperate Grassland",
+        "specialFeature": "volcanic_crater_snow"
+      },
+      {
+        "x": -1216,
+        "z": -9280,
+        "groundY": 106,
+        "groundHeight": 0.5854199105106056,
+        "waterKind": "None",
+        "waterSurfaceElevation": 0,
+        "biomeFamily": "Temperate Grassland",
+        "specialFeature": "basin_snow"
+      },
+      {
+        "x": 3008,
+        "z": -9280,
+        "groundY": 135,
+        "groundHeight": 0.6429776479985092,
+        "waterKind": "None",
+        "waterSurfaceElevation": 0,
+        "biomeFamily": "Temperate Grassland",
+        "specialFeature": "basin_snow"
+      },
+      {
+        "x": -2512,
+        "z": -2496,
+        "groundY": 58,
+        "groundHeight": 0.48452881271876663,
+        "waterKind": "River",
+        "waterSurfaceElevation": 0.5,
+        "biomeFamily": "Warm Ocean",
+        "specialFeature": ""
+      },
+      {
+        "x": -2064,
+        "z": -2016,
+        "groundY": 55,
+        "groundHeight": 0.4717591050822509,
+        "waterKind": "Ocean",
+        "waterSurfaceElevation": 0.5,
+        "biomeFamily": "Warm Ocean",
+        "specialFeature": ""
+      },
+      {
+        "x": -2512,
+        "z": -2592,
+        "groundY": 57,
+        "groundHeight": 0.47834645669291337,
+        "waterKind": "Ocean",
+        "waterSurfaceElevation": 0.5,
+        "biomeFamily": "Warm Ocean",
+        "specialFeature": ""
+      },
+      {
+        "x": -1188,
+        "z": -1088,
+        "groundY": 57,
+        "groundHeight": 0.47834645669291337,
+        "waterKind": "Ocean",
+        "waterSurfaceElevation": 0.5,
+        "biomeFamily": "Warm Ocean",
+        "specialFeature": ""
+      },
+      {
+        "x": -1135,
+        "z": -1088,
+        "groundY": 57,
+        "groundHeight": 0.47834645669291337,
+        "waterKind": "River",
+        "waterSurfaceElevation": 0.5,
+        "biomeFamily": "Warm Ocean",
+        "specialFeature": ""
+      },
+      {
+        "x": -1088,
+        "z": -1088,
+        "groundY": 57,
+        "groundHeight": 0.48017344831862535,
+        "waterKind": "River",
+        "waterSurfaceElevation": 0.5,
+        "biomeFamily": "Warm Ocean",
+        "specialFeature": ""
+      },
+      {
+        "x": 1480,
+        "z": -4664,
+        "groundY": 59,
+        "groundHeight": 0.4899600398930136,
+        "waterKind": "Lake",
+        "waterSurfaceElevation": 0.5046838878970412,
+        "biomeFamily": "Savanna",
+        "specialFeature": ""
+      },
+      {
+        "x": 1481,
+        "z": -4664,
+        "groundY": 59,
+        "groundHeight": 0.490113007263998,
+        "waterKind": "River",
+        "waterSurfaceElevation": 0.5046838878970412,
+        "biomeFamily": "Savanna",
+        "specialFeature": ""
+      },
+      {
+        "x": 2715,
+        "z": -7957,
+        "groundY": 83,
+        "groundHeight": 0.5414839983779596,
+        "waterKind": "Lake",
+        "waterSurfaceElevation": 0.5498434056054579,
+        "biomeFamily": "Temperate Forest",
+        "specialFeature": ""
+      },
+      {
+        "x": 2715,
+        "z": -7956,
+        "groundY": 83,
+        "groundHeight": 0.5416181252298853,
+        "waterKind": "River",
+        "waterSurfaceElevation": 0.5498434056054579,
+        "biomeFamily": "Temperate Forest",
+        "specialFeature": ""
+      }
+    ]
+  },
+  "fabric26_3": {
+    "minecraft": "26.3",
+    "loader": "fabric",
+    "seed": -1818694639628404530,
+    "rules": "geoworld-rules-v1.1.28",
+    "modelSha256": "1cb2ad766eff94c705850f006a50bb5a62a300ea4d7205cf225a0f453d9d958b",
+    "fullChunks": 38,
+    "formalRivers": 953,
+    "lakeNodes": 471,
+    "specialFeatures": 18,
+    "mouths": {
+      "mouth509": {
+        "columns": 101,
+        "minDepth": 5,
+        "maxDepth": 5,
+        "waterSurfaceY": 62,
+        "exactNeoForgeVoxelHeights": 101
+      },
+      "mouth43": {
+        "columns": 64,
+        "minDepth": 3,
+        "maxDepth": 5,
+        "waterSurfaceY": 62,
+        "exactNeoForgeVoxelHeights": 64
+      }
+    },
+    "lakeConnections": [
+      {
+        "columns": [
+          [
+            1480,
+            -4664
+          ],
+          [
+            1481,
+            -4664
+          ]
+        ],
+        "waterSurfaceY": 64,
+        "floorY": 59
+      },
+      {
+        "columns": [
+          [
+            2715,
+            -7957
+          ],
+          [
+            2715,
+            -7956
+          ]
+        ],
+        "waterSurfaceY": 88,
+        "floorY": 83
+      }
+    ],
+    "coralBlocks": {
+      "mouth43": 0,
+      "reefControl": 1428
+    }
+  },
+  "neoForge1_21_1": {
+    "uniqueFullChunks": 231,
+    "mouth509Exit": {
+      "length": 101,
+      "from": [
+        -1088,
+        -1088
+      ],
+      "to": [
+        -1188,
+        -1088
+      ],
+      "surfaceY": 62,
+      "minWaterDepth": 5,
+      "maxWaterDepth": 5,
+      "extensionFull": 25
+    },
+    "regions": {
+      "mouth43": {
+        "bounds": [
+          -2560,
+          -2544,
+          -2449,
+          -2449
+        ],
+        "oceanDepthCounts": {
+          "0": 203,
+          "1": 278,
+          "2": 212,
+          "3": 118,
+          "4": 130,
+          "5": 4082
+        },
+        "pairedOcean": {
+          "columns": 5023,
+          "oldBelow3": 2345,
+          "newBelow3": 693
+        },
+        "coreCount": 1558,
+        "coreMin": 3,
+        "warmOceanQuarts": 0,
+        "coralBlocks": 0,
+        "surfaceStepsGt1": 0,
+        "route": {
+          "minDepth": 5,
+          "start": [
+            -2496,
+            -2496
+          ],
+          "end": [
+            -2458,
+            -2496
+          ]
+        },
+        "outletTipDepth": 5,
+        "offshoreCount": 975,
+        "offshoreUnderFive": 0,
+        "offshoreExamples": []
+      },
+      "mouth509": {
+        "bounds": [
+          -1168,
+          -1152,
+          -1009,
+          -1009
+        ],
+        "oceanDepthCounts": {
+          "0": 163,
+          "1": 429,
+          "2": 111,
+          "3": 94,
+          "4": 95,
+          "5": 1469
+        },
+        "pairedOcean": {
+          "columns": 1936,
+          "oldBelow3": 1936,
+          "newBelow3": 279
+        },
+        "coreCount": 7929,
+        "coreMin": 4,
+        "warmOceanQuarts": 0,
+        "coralBlocks": 0,
+        "surfaceStepsGt1": 0,
+        "route": null,
+        "outletTipDepth": 5,
+        "offshoreCount": 0,
+        "offshoreUnderFive": 0,
+        "offshoreExamples": []
+      },
+      "mouth915": {
+        "bounds": [
+          1664,
+          10400,
+          1807,
+          10479
+        ],
+        "oceanDepthCounts": {
+          "5": 501,
+          "6": 489,
+          "7": 860,
+          "8": 732
+        },
+        "pairedOcean": {
+          "columns": 40,
+          "oldBelow3": 0,
+          "newBelow3": 0
+        },
+        "coreCount": 4566,
+        "coreMin": 7,
+        "warmOceanQuarts": 0,
+        "coralBlocks": 0,
+        "surfaceStepsGt1": 0,
+        "route": {
+          "minDepth": 8,
+          "start": [
+            1728,
+            10432
+          ],
+          "end": [
+            1796,
+            10471
+          ]
+        },
+        "outletTipDepth": 10,
+        "offshoreCount": 574,
+        "offshoreUnderFive": 0,
+        "offshoreExamples": []
+      },
+      "lake2": {
+        "bounds": [
+          1456,
+          -4688,
+          1503,
+          -4641
+        ],
+        "old": [
+          [
+            64,
+            58
+          ],
+          [
+            61,
+            58
+          ]
+        ],
+        "fresh": [
+          [
+            64,
+            59
+          ],
+          [
+            64,
+            59
+          ]
+        ],
+        "adjacencyBefore": 67,
+        "adjacencyAfter": 0
+      },
+      "lake1": {
+        "bounds": [
+          2688,
+          -7984,
+          2735,
+          -7937
+        ],
+        "old": [
+          [
+            88,
+            82
+          ],
+          [
+            86,
+            82
+          ]
+        ],
+        "fresh": [
+          [
+            88,
+            83
+          ],
+          [
+            88,
+            83
+          ]
+        ],
+        "adjacencyBefore": 51,
+        "adjacencyAfter": 0
+      },
+      "reef": {
+        "bounds": [
+          -2088,
+          -2040,
+          -2040,
+          -1992
+        ],
+        "wetWarmOceanQuarts": 157,
+        "coralBlocks": 1588
+      }
+    }
+  },
+  "eadmNeoForgeJar": {
+    "file": "GeoWorld-0.1.7-rc.2-mc1.21.1-neoforge.jar",
+    "sha256": "e34ff37bc4721bc130852285dffc00e002862e85432f6eef96957775b213cc86",
+    "identicalJarEntriesToMatrix": 371
+  }
+}

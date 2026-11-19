@@ -1,0 +1,263 @@
+{
+  "schemaVersion": 1,
+  "seed": -1818694639628404530,
+  "rulesVersion": "geoworld-rules-v1.1.23",
+  "cases": [
+    {
+      "id": "R81D-T064-OFF-048",
+      "category": "sinkhole-river-transect",
+      "x": -1704.292531,
+      "z": 5416.292531,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T064-OFF-032",
+      "category": "sinkhole-river-transect",
+      "x": -1692.978823,
+      "z": 5404.978823,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T064-OFF-016",
+      "category": "sinkhole-river-transect",
+      "x": -1681.665114,
+      "z": 5393.665114,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T064-OFF+000",
+      "category": "sinkhole-river-transect",
+      "x": -1670.351406,
+      "z": 5382.351406,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T064-OFF+016",
+      "category": "sinkhole-river-transect",
+      "x": -1659.037697,
+      "z": 5371.037697,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T064-OFF+032",
+      "category": "sinkhole-river-transect",
+      "x": -1647.723989,
+      "z": 5359.723989,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T064-OFF+048",
+      "category": "sinkhole-river-transect",
+      "x": -1636.41028,
+      "z": 5348.41028,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T080-OFF-048",
+      "category": "sinkhole-river-transect",
+      "x": -1722.875501,
+      "z": 5395.440926,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T080-OFF-032",
+      "category": "sinkhole-river-transect",
+      "x": -1710.390755,
+      "z": 5385.434372,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T080-OFF-016",
+      "category": "sinkhole-river-transect",
+      "x": -1697.90601,
+      "z": 5375.427818,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T080-OFF+000",
+      "category": "sinkhole-river-transect",
+      "x": -1685.421264,
+      "z": 5365.421264,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T080-OFF+016",
+      "category": "sinkhole-river-transect",
+      "x": -1672.936518,
+      "z": 5355.41471,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T080-OFF+032",
+      "category": "sinkhole-river-transect",
+      "x": -1660.451772,
+      "z": 5345.408156,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T080-OFF+048",
+      "category": "sinkhole-river-transect",
+      "x": -1647.967027,
+      "z": 5335.401602,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T096-OFF-048",
+      "category": "sinkhole-river-transect",
+      "x": -1737.937908,
+      "z": 5375.486328,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T096-OFF-032",
+      "category": "sinkhole-river-transect",
+      "x": -1725.017173,
+      "z": 5366.049453,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T096-OFF-016",
+      "category": "sinkhole-river-transect",
+      "x": -1712.096438,
+      "z": 5356.612578,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T096-OFF+000",
+      "category": "sinkhole-river-transect",
+      "x": -1699.175703,
+      "z": 5347.175703,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T096-OFF+016",
+      "category": "sinkhole-river-transect",
+      "x": -1686.254968,
+      "z": 5337.738828,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T096-OFF+032",
+      "category": "sinkhole-river-transect",
+      "x": -1673.334233,
+      "z": 5328.301953,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T096-OFF+048",
+      "category": "sinkhole-river-transect",
+      "x": -1660.413498,
+      "z": 5318.865078,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T112-OFF-048",
+      "category": "sinkhole-river-transect",
+      "x": -1750.384379,
+      "z": 5358.949804,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T112-OFF-032",
+      "category": "sinkhole-river-transect",
+      "x": -1737.899633,
+      "z": 5348.94325,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T112-OFF-016",
+      "category": "sinkhole-river-transect",
+      "x": -1725.414888,
+      "z": 5338.936696,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T112-OFF+000",
+      "category": "sinkhole-river-transect",
+      "x": -1712.930142,
+      "z": 5328.930142,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T112-OFF+016",
+      "category": "sinkhole-river-transect",
+      "x": -1700.445396,
+      "z": 5318.923588,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T112-OFF+032",
+      "category": "sinkhole-river-transect",
+      "x": -1687.96065,
+      "z": 5308.917034,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-T112-OFF+048",
+      "category": "sinkhole-river-transect",
+      "x": -1675.475905,
+      "z": 5298.91048,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-PIT-CENTER",
+      "category": "sinkhole-control",
+      "x": -1600,
+      "z": 5312,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-BANK",
+      "category": "sinkhole-control",
+      "x": -1665,
+      "z": 5313,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-RIVER",
+      "category": "sinkhole-control",
+      "x": -1699,
+      "z": 5347,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    },
+    {
+      "id": "R81D-RIVER-END",
+      "category": "sinkhole-control",
+      "x": -1728,
+      "z": 5312,
+      "question": "River #735 water datum versus sinkhole #11 dry banks",
+      "requiresVoxelTest": true
+    }
+  ]
+}

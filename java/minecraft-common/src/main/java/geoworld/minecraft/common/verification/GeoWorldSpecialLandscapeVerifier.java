@@ -22,7 +22,8 @@ public final class GeoWorldSpecialLandscapeVerifier {
             0.65,
             ContinentPreset.DEFAULT
         );
-        long seed = 123456L;
+        // This compact seed supplies all three island kinds under the current siting rules.
+        long seed = -563659577384754347L;
 
         GeoWorldEngineBridge.GeneratedModel generated =
             GeoWorldEngineBridge.generate(seed, config);
@@ -30,9 +31,11 @@ public final class GeoWorldSpecialLandscapeVerifier {
 
         if (!("geoworld-rules-v1.1.22".equals(
             model.manifest().generationRulesVersion()
-        ) || "geoworld-rules-v1.1.23".equals(
+        ) || ("geoworld-rules-v1.1.23".equals(
             model.manifest().generationRulesVersion()
-        ))) {
+        ) || ("geoworld-rules-v1.1.24".equals(
+            model.manifest().generationRulesVersion()
+        ) || ("geoworld-rules-v1.1.25".equals(model.manifest().generationRulesVersion()) || "geoworld-rules-v1.1.26".equals(model.manifest().generationRulesVersion()) || ("geoworld-rules-v1.1.27".equals(model.manifest().generationRulesVersion()) || "geoworld-rules-v1.1.28".equals(model.manifest().generationRulesVersion()))))))) {
             throw new AssertionError(
                 "special landscape verifier requires v1.1.16, got " +
                 model.manifest().generationRulesVersion()

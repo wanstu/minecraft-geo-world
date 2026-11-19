@@ -183,10 +183,38 @@ public final class GeoWorldV26BiomeCoverage {
             if (isCave(biome)) {
                 if (Math.abs(y - habitat.y()) > 24.0) continue;
             } else {
-                // Surface patches do not suppress underground cave biomes.
+                // Coverage habitats may overlap another hydrological feature
+                // at their 116-block edge. They must never overwrite Runtime
+                // water ownership just to guarantee biome registry coverage.
                 GeoWorldV1.RuntimeSample sample = surfaceSample != null
                     ? surfaceSample
                     : model.sample(x, z);
+                boolean oceanBiome = biome.contains("ocean");
+                boolean riverBiome = biome.endsWith("river");
+                if ("River".equals(sample.waterKind()) && !riverBiome) {
+                    continue;
+                }
+                if ("Ocean".equals(sample.waterKind()) && !oceanBiome) {
+                    continue;
+                }
+                if (!"River".equals(sample.waterKind()) &&
+                    !"Ocean".equals(sample.waterKind()) &&
+                    (riverBiome || oceanBiome)) {
+                    continue;
+                }
+                // Slice E: a warm-water OceanMouth may retain its warm climate
+                // family, but the navigation influence corridor must not be
+                // reintroduced as a coral-bearing warm_ocean by a coverage
+                // habitat override.
+                if (("geoworld-rules-v1.1.26".equals(
+                        model.manifest().generationRulesVersion()
+                    ) || ("geoworld-rules-v1.1.27".equals(
+                        model.manifest().generationRulesVersion()
+                    ) || "geoworld-rules-v1.1.28".equals(model.manifest().generationRulesVersion()))) &&
+                    sample.coastalSeaReceiver() &&
+                    "minecraft:warm_ocean".equals(biome)) {
+                    continue;
+                }
                 int ground = this.heights.boundaryY(sample.groundHeight()) - 1;
                 if (y < ground - 16.0) continue;
             }
@@ -211,7 +239,7 @@ public final class GeoWorldV26BiomeCoverage {
     private static double affinity(String biome, Site s) {
         boolean ocean = "Ocean".equals(s.water());
         boolean river = "River".equals(s.water());
-        boolean land = !ocean && s.surfaceY() >= 63;
+        boolean dryLand = "None".equals(s.water()) && s.surfaceY() >= 63;
         String name = biome.substring("minecraft:".length());
         boolean cave = isCave(biome);
         boolean oceanBiome = name.contains("ocean");
@@ -219,8 +247,8 @@ public final class GeoWorldV26BiomeCoverage {
         boolean shore = name.contains("beach") || name.contains("shore");
         if (oceanBiome && !ocean) return Double.NEGATIVE_INFINITY;
         if (riverBiome && !river) return Double.NEGATIVE_INFINITY;
-        if (cave && !land) return Double.NEGATIVE_INFINITY;
-        if (!oceanBiome && !riverBiome && !cave && (ocean || !land)) {
+        if (cave && !dryLand) return Double.NEGATIVE_INFINITY;
+        if (!oceanBiome && !riverBiome && !cave && !dryLand) {
             return Double.NEGATIVE_INFINITY;
         }
 

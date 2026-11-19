@@ -441,6 +441,21 @@ tasks.register('auditGeoWorldBiomeCoverage', JavaExec) {
     }
 }
 
+tasks.register('auditGeoWorldBiomeDistribution', JavaExec) {
+    group = 'verification'
+    description = 'Reports multi-seed final Minecraft surface biome area shares for GeoWorld Slice F.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'geoworld.minecraft.v1_21_1common.worldgen.GeoWorldBiomeDistributionAudit'
+    if (project.hasProperty('geoWorldBiomeBaselineDir')) {
+        systemProperty 'geoworld.biomeAudit.baselineDir', file(project.property('geoWorldBiomeBaselineDir')).absolutePath
+    }
+    if (project.hasProperty('geoWorldBiomeDistributionSeeds')) {
+        args project.property('geoWorldBiomeDistributionSeeds')
+            .toString()
+            .split(',')
+    }
+}
+
 tasks.register('verifyGeoWorldSurfaceBiomes', JavaExec) {
     group = 'verification'
     description = 'Audits final biome against surface/subsoil for all version-supported Overworld biomes, including rare habitats.'

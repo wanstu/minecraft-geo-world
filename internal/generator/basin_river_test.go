@@ -25,8 +25,8 @@ func TestCurrentBasinRiverDrainageIsContainedAndMonotonic(t *testing.T) {
 		ContinentFragmentation: 0.35000000000000003,
 		ContinentSeparation:    0.65,
 	}
-	if cfg.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.23" {
-		t.Fatalf("current rules=%q want geoworld-rules-v1.1.23", cfg.WorldProfile.GenerationRulesVersion)
+	if cfg.WorldProfile.GenerationRulesVersion != "geoworld-rules-v1.1.28" {
+		t.Fatalf("current rules=%q want geoworld-rules-v1.1.28", cfg.WorldProfile.GenerationRulesVersion)
 	}
 
 	model, err := GenerateWorld(context.Background(), cfg, nil)
@@ -67,53 +67,68 @@ func TestCurrentBasinRiverDrainageIsContainedAndMonotonic(t *testing.T) {
 		return got.World.GroundHeight
 	}
 
-	// Preserve the historical cross-section contract: basin rivers may not sit
-	// above their nearest dry bank after the basin overlay.
+	// Preserve the cross-section contract at the actual persisted drainage
+	// reaches. Slice D may move a basin to a different qualified mountain
+	// background, so a hard-coded world rectangle would stop testing the river.
 	checked, raised := 0, 0
 	maxExcess := 0.0
-	for z := 2500.0; z <= 3000; z += 4 {
-		for x := 5200.0; x <= 5700; x += 4 {
-			base := model.RuntimeProfile.Sample(x, z)
-			if base.World.WaterKind != reconcile.WaterRiver {
-				continue
+	for _, feature := range model.SpecialFeatures {
+		if feature.Kind != specialfeatures.BasinCherry &&
+			feature.Kind != specialfeatures.BasinSnow {
+			continue
+		}
+		for _, reach := range feature.Drainage {
+			length := math.Hypot(reach.X1-reach.X0, reach.Z1-reach.Z0)
+			steps := int(math.Ceil(length / 8.0))
+			if steps < 2 {
+				steps = 2
 			}
-			got := specialfeatures.Apply(
-				model.SpecialFeatures,
-				base,
-				model.Config.SeaLevelNormalized,
-				x,
-				z,
-				cfg.WorldProfile.GenerationRulesVersion,
-			)
-			if got.SpecialFeature != string(specialfeatures.BasinCherry) &&
-				got.SpecialFeature != string(specialfeatures.BasinSnow) {
-				continue
-			}
-			nearest := math.Inf(1)
-			bank := 0.0
-			for a := 0; a < 16; a++ {
-				theta := 2 * math.Pi * float64(a) / 16
-				for d := 4.0; d <= 64; d += 4 {
-					bx, bz := x+math.Cos(theta)*d, z+math.Sin(theta)*d
-					b := model.RuntimeProfile.Sample(bx, bz)
-					if b.World.WaterKind != reconcile.WaterNone {
-						continue
-					}
-					if d < nearest {
-						nearest = d
-						bank = sample(bx, bz)
-					}
-					break
+			for j := 0; j <= steps; j++ {
+				tt := float64(j) / float64(steps)
+				x := reach.X0 + (reach.X1-reach.X0)*tt
+				z := reach.Z0 + (reach.Z1-reach.Z0)*tt
+				base := model.RuntimeProfile.Sample(x, z)
+				if base.World.WaterKind != reconcile.WaterRiver {
+					continue
 				}
-			}
-			if math.IsInf(nearest, 1) {
-				continue
-			}
-			checked++
-			excess := got.World.WaterSurfaceElevation - bank
-			if excess > 0.002 {
-				raised++
-				maxExcess = math.Max(maxExcess, excess)
+				got := specialfeatures.Apply(
+					model.SpecialFeatures,
+					base,
+					model.Config.SeaLevelNormalized,
+					x,
+					z,
+					cfg.WorldProfile.GenerationRulesVersion,
+				)
+				if got.SpecialFeature != string(specialfeatures.BasinCherry) &&
+					got.SpecialFeature != string(specialfeatures.BasinSnow) {
+					continue
+				}
+				nearest := math.Inf(1)
+				bank := 0.0
+				for a := 0; a < 16; a++ {
+					theta := 2 * math.Pi * float64(a) / 16
+					for d := 4.0; d <= 64; d += 4 {
+						bx, bz := x+math.Cos(theta)*d, z+math.Sin(theta)*d
+						b := model.RuntimeProfile.Sample(bx, bz)
+						if b.World.WaterKind != reconcile.WaterNone {
+							continue
+						}
+						if d < nearest {
+							nearest = d
+							bank = sample(bx, bz)
+						}
+						break
+					}
+				}
+				if math.IsInf(nearest, 1) {
+					continue
+				}
+				checked++
+				excess := got.World.WaterSurfaceElevation - bank
+				if excess > 0.002 {
+					raised++
+					maxExcess = math.Max(maxExcess, excess)
+				}
 			}
 		}
 	}

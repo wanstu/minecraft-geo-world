@@ -26,7 +26,7 @@ public final class GeoWorldEngineBridge {
     private static final String EXPECTED_WORLD_PROFILE_VERSION =
         "geoworld-profile-v1.1";
     private static final String EXPECTED_GENERATION_RULES_VERSION =
-        "geoworld-rules-v1.1.23";
+        "geoworld-rules-v1.1.28";
     private static final String EXPECTED_WORLD_MODEL_VERSION =
         "geoworld-model-v1";
     private static final int EXPECTED_RIVER_GEOMETRY_VERSION = 8;

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "version": "0.1.7-slice-b",
+  "seed": -1818694639628404530,
+  "baselineRules": "geoworld-rules-v1.1.23",
+  "candidateRules": "geoworld-rules-v1.1.24",
+  "riverGeometryVersion": 8,
+  "responsibility": "specialfeatures_sinkhole_siting",
+  "model": {
+    "riverSegmentsBaseline": 953,
+    "riverSegmentsCandidate": 953,
+    "sinkholesBaseline": 4,
+    "sinkholesCandidate": 4,
+    "sinkholeRiverOverlapBaseline": 1,
+    "sinkholeRiverOverlapCandidate": 0,
+    "sinkholeOverlapWithoutDrainageBaseline": 1,
+    "sinkholeOverlapWithoutDrainageCandidate": 0
+  },
+  "actualVoxel": {
+    "samplesBaseline": 32,
+    "samplesCandidate": 32,
+    "missingBaseline": 0,
+    "missingCandidate": 0,
+    "rightBankPositiveBaseline": 12,
+    "rightBankPositiveCandidate": 0,
+    "rightBankDeficitMaxBaseline": 27,
+    "rightBankDeficitMaxCandidate": -4,
+    "sinkholeCenterSubstrateBaselineY": 69,
+    "sinkholeCenterSubstrateCandidateY": 103,
+    "namedBankSubstrateBaselineY": 69,
+    "namedBankSubstrateCandidateY": 102,
+    "namedRiverWaterBaselineY": 96,
+    "namedRiverWaterCandidateY": 96,
+    "namedRiverEndWaterBaselineY": 96,
+    "namedRiverEndWaterCandidateY": 96
+  },
+  "candidateWorldModelSHA256": "ec9196c1abc185d95b12dfbb657e2f31a00e097f10edcfd0a72ed503a2467126",
+  "candidateRegionSHA256": "1abbef3fb06a0d0e1a27d5c009631c98acc2a907c3b6b1481a5b39b7af1239a4",
+  "result": "passed_model_and_actual_voxel",
+  "releaseEligible": false,
+  "next": "full regression then R8.2; this Slice B result alone does not authorize v0.1.7 release",
+  "compatibility": {
+    "persistedRules": "geoworld-rules-v1.1.23",
+    "worldModelSHA256Before": "239b1b22703843e7ce8351a633258974c59781b0897f3ef3e7c3fa499758544d",
+    "worldModelSHA256After": "239b1b22703843e7ce8351a633258974c59781b0897f3ef3e7c3fa499758544d",
+    "runtimeBoundRules": "geoworld-rules-v1.1.23",
+    "result": "passed_no_recompute_or_migration"
+  },
+  "verification": {
+    "goTestAll": "passed",
+    "goTesterSeconds": 394.503,
+    "generatorSeconds": 215.34,
+    "neoforge1211CleanCheckBuild": "passed",
+    "neoforge1211BuildSeconds": 263,
+    "modelVerifier": "34_of_34",
+    "waterOwnership": {
+      "unownedSurfaceWaterSources": 0,
+      "unsafeExposedWaterSources": 0,
+      "freeFallWaterFaces": 0,
+      "runtimeWaterLost": 0,
+      "riverWaterBoundaryModelMismatches": 0,
+      "riverLocalWaterPeaks": 0,
+      "wetlandPoolLeaks": 0
+    },
+    "javaTestTask": "NO-SOURCE",
+    "voxelAuditUnitTests": "3_of_3",
+    "candidateJar": {
+      "minecraft": "1.21.1",
+      "loader": "neoforge",
+      "version": "0.1.7",
+      "bytes": 29194054,
+      "sha256": "38fe6de9a98667d34857f9956bbf49ded9aac253b1a4952879719b662fb24154",
+      "sixNativeEnginesVerified": true
+    }
+  }
+}

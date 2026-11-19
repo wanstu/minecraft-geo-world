@@ -50,6 +50,9 @@ func Generate(input Input, cfg Config) (*Model, error) {
 	if cfg.ReferencePrecipMM <= 0 {
 		cfg.ReferencePrecipMM = 1800
 	}
+	if cfg.DistributionVersion > 1 {
+		return nil, errors.New("ecology: unsupported distribution version")
+	}
 
 	m := &Model{
 		Config:              cfg,
@@ -229,9 +232,28 @@ func (m *Model) classifyLand(i int, input Input) {
 	boreal := smoothBand(t, -8, -2, 5, 10)
 	polar := smoothstep(2, -7, t)
 
-	veryWet := smoothstep(0.62, 0.78, moist)
-	wet := smoothstep(0.48, 0.66, moist)
-	subhumid := smoothBand(moist, 0.28, 0.40, 0.57, 0.70)
+	veryWetStart, veryWetFull := 0.62, 0.78
+	wetStart, wetFull := 0.48, 0.66
+	subhumidDry0, subhumidDry1 := 0.28, 0.40
+	subhumidWet1, subhumidWet0 := 0.57, 0.70
+	if m.Config.DistributionVersion >= 1 {
+		// Forests should dominate genuinely humid climates, not the whole
+		// mesic/subhumid transition. Widening that transition gives natural
+		// grassland and shrubland room to compete without quota replacement.
+		veryWetStart, veryWetFull = 0.66, 0.82
+		wetStart, wetFull = 0.53, 0.71
+		subhumidDry0, subhumidDry1 = 0.24, 0.36
+		subhumidWet1, subhumidWet0 = 0.64, 0.78
+	}
+	veryWet := smoothstep(veryWetStart, veryWetFull, moist)
+	wet := smoothstep(wetStart, wetFull, moist)
+	subhumid := smoothBand(
+		moist,
+		subhumidDry0,
+		subhumidDry1,
+		subhumidWet1,
+		subhumidWet0,
+	)
 	semiArid := smoothBand(moist, 0.16, 0.26, 0.38, 0.50)
 	aridStrong := smoothstep(0.64, 0.82, arid)
 

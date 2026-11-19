@@ -8,6 +8,7 @@ import (
 	"geoworld/internal/mcprofile"
 	"geoworld/internal/reconcile"
 	"geoworld/internal/runtimeprofile"
+	"geoworld/internal/waterbed"
 	"geoworld/internal/worldsample"
 )
 
@@ -23,6 +24,38 @@ func testHabitableDepressionBase() runtimeprofile.Sample {
 		TerrainVariant:    mcprofile.TerrainHills,
 		SurfaceProfile:    mcprofile.SurfaceForestLoam,
 		VegetationProfile: mcprofile.VegetationBroadleafForest,
+	}
+}
+
+func TestV1124SinkholeRiverClearanceRejectsAuthoritativeRiver(t *testing.T) {
+	feature := Feature{
+		ID: 1, Kind: Sinkhole,
+		CenterX: 0, CenterZ: 0,
+		RadiusX: 180, RadiusZ: 160,
+	}
+	river := waterbed.RiverSegment{
+		X0: -400, Z0: 0,
+		X1: 400, Z1: 0,
+		HalfWidth: 12,
+	}
+	if !sinkholeConflictsRiver(feature, []waterbed.RiverSegment{river}) {
+		t.Fatal("river crossing sinkhole footprint was not rejected")
+	}
+}
+
+func TestV1124SinkholeRiverClearanceKeepsDistantRiver(t *testing.T) {
+	feature := Feature{
+		ID: 1, Kind: Sinkhole,
+		CenterX: 0, CenterZ: 0,
+		RadiusX: 180, RadiusZ: 160,
+	}
+	river := waterbed.RiverSegment{
+		X0: -400, Z0: 260,
+		X1: 400, Z1: 260,
+		HalfWidth: 12,
+	}
+	if sinkholeConflictsRiver(feature, []waterbed.RiverSegment{river}) {
+		t.Fatal("distant river was rejected by sinkhole clearance")
 	}
 }
 

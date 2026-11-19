@@ -1,0 +1,1041 @@
+{
+  "schemaVersion": 1,
+  "seed": -1818694639628404530,
+  "rules": "geoworld-rules-v1.1.24",
+  "entries": [
+    {
+      "id": 1,
+      "kind": "mushroom_island",
+      "waterContext": "lake",
+      "centerX": -3136,
+      "centerZ": -1088,
+      "radiusX": 79.64623196339639,
+      "radiusZ": 70.84938151755132,
+      "centerGroundY": 57,
+      "centerWater": "lake",
+      "centerWaterY": 63,
+      "centerDepthBlocks": 6,
+      "terrainVariant": "\u0004",
+      "biomeFamily": "\u000f",
+      "annualMeanTempC": 27.968609536549224,
+      "mountainWeight": 0,
+      "foothillWeight": 0.1300982684555148,
+      "hillWeight": 0.6093235929324048,
+      "plateauWeight": 0,
+      "rings": [
+        {
+          "radius": 39.823115981698194,
+          "samples": 32,
+          "water": {
+            "lake": 32
+          },
+          "groundMinY": 56,
+          "groundMedianY": 57,
+          "groundMaxY": 58,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 6
+        },
+        {
+          "radius": 79.64623196339639,
+          "samples": 32,
+          "water": {
+            "lake": 32
+          },
+          "groundMinY": 56,
+          "groundMedianY": 58,
+          "groundMaxY": 59,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 5
+        },
+        {
+          "radius": 99.5577899542455,
+          "samples": 32,
+          "water": {
+            "lake": 32
+          },
+          "groundMinY": 56,
+          "groundMedianY": 58,
+          "groundMaxY": 60,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 5
+        },
+        {
+          "radius": 119.46934794509458,
+          "samples": 32,
+          "water": {
+            "lake": 32
+          },
+          "groundMinY": 56,
+          "groundMedianY": 58,
+          "groundMaxY": 60,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 5
+        },
+        {
+          "radius": 159.29246392679278,
+          "samples": 32,
+          "water": {
+            "lake": 32
+          },
+          "groundMinY": 55,
+          "groundMedianY": 59,
+          "groundMaxY": 62,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 4
+        }
+      ],
+      "centerMinusOuterMedianY": -2
+    },
+    {
+      "id": 2,
+      "kind": "cherry_island",
+      "waterContext": "lake",
+      "centerX": 704,
+      "centerZ": -2880,
+      "radiusX": 104.70426601405968,
+      "radiusZ": 82.00873407708389,
+      "centerGroundY": 56,
+      "centerWater": "lake",
+      "centerWaterY": 65,
+      "centerDepthBlocks": 9,
+      "terrainVariant": "\u0004",
+      "biomeFamily": "\u000f",
+      "annualMeanTempC": 27.133781569091408,
+      "mountainWeight": 0,
+      "foothillWeight": 0.047906417869024394,
+      "hillWeight": 0.7641126625595765,
+      "plateauWeight": 0,
+      "rings": [
+        {
+          "radius": 52.35213300702984,
+          "samples": 32,
+          "water": {
+            "lake": 32
+          },
+          "groundMinY": 54,
+          "groundMedianY": 57,
+          "groundMaxY": 58,
+          "waterMedianY": 65,
+          "depthMedianBlocks": 9
+        },
+        {
+          "radius": 104.70426601405968,
+          "samples": 32,
+          "water": {
+            "lake": 32
+          },
+          "groundMinY": 53,
+          "groundMedianY": 56,
+          "groundMaxY": 60,
+          "waterMedianY": 65,
+          "depthMedianBlocks": 9
+        },
+        {
+          "radius": 130.8803325175746,
+          "samples": 32,
+          "water": {
+            "lake": 32
+          },
+          "groundMinY": 52,
+          "groundMedianY": 56,
+          "groundMaxY": 61,
+          "waterMedianY": 65,
+          "depthMedianBlocks": 9
+        },
+        {
+          "radius": 157.05639902108953,
+          "samples": 32,
+          "water": {
+            "lake": 32
+          },
+          "groundMinY": 52,
+          "groundMedianY": 56,
+          "groundMaxY": 62,
+          "waterMedianY": 65,
+          "depthMedianBlocks": 9
+        },
+        {
+          "radius": 209.40853202811937,
+          "samples": 32,
+          "water": {
+            "lake": 32
+          },
+          "groundMinY": 52,
+          "groundMedianY": 55,
+          "groundMaxY": 63,
+          "waterMedianY": 65,
+          "depthMedianBlocks": 10
+        }
+      ],
+      "centerMinusOuterMedianY": 1
+    },
+    {
+      "id": 3,
+      "kind": "mushroom_island",
+      "waterContext": "ocean",
+      "centerX": -14400,
+      "centerZ": -10688,
+      "radiusX": 217.70735007920982,
+      "radiusZ": 169.27172609778432,
+      "centerGroundY": -5,
+      "centerWater": "ocean",
+      "centerWaterY": 63,
+      "centerDepthBlocks": 68,
+      "terrainVariant": "\u0001",
+      "biomeFamily": "\u0004",
+      "annualMeanTempC": -9.260746433289558,
+      "mountainWeight": 0,
+      "foothillWeight": 0,
+      "hillWeight": 0,
+      "plateauWeight": 0,
+      "rings": [
+        {
+          "radius": 108.85367503960491,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -5,
+          "groundMedianY": -5,
+          "groundMaxY": -4,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 68
+        },
+        {
+          "radius": 217.70735007920982,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -5,
+          "groundMedianY": -5,
+          "groundMaxY": -4,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 68
+        },
+        {
+          "radius": 272.13418759901225,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -5,
+          "groundMedianY": -5,
+          "groundMaxY": -4,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 68
+        },
+        {
+          "radius": 326.5610251188147,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -5,
+          "groundMedianY": -5,
+          "groundMaxY": -4,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 68
+        },
+        {
+          "radius": 435.41470015841963,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -6,
+          "groundMedianY": -5,
+          "groundMaxY": -3,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 68
+        }
+      ],
+      "centerMinusOuterMedianY": 0
+    },
+    {
+      "id": 4,
+      "kind": "mushroom_island",
+      "waterContext": "ocean",
+      "centerX": 15424,
+      "centerZ": -11072,
+      "radiusX": 222.9784535832778,
+      "radiusZ": 169.27650449277638,
+      "centerGroundY": -3,
+      "centerWater": "ocean",
+      "centerWaterY": 63,
+      "centerDepthBlocks": 66,
+      "terrainVariant": "\u0001",
+      "biomeFamily": "\u0004",
+      "annualMeanTempC": -11.360774951656332,
+      "mountainWeight": 0,
+      "foothillWeight": 0,
+      "hillWeight": 0,
+      "plateauWeight": 0,
+      "rings": [
+        {
+          "radius": 111.4892267916389,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -3,
+          "groundMedianY": -3,
+          "groundMaxY": -3,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 66
+        },
+        {
+          "radius": 222.9784535832778,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -3,
+          "groundMedianY": -3,
+          "groundMaxY": -2,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 66
+        },
+        {
+          "radius": 278.72306697909727,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -3,
+          "groundMedianY": -3,
+          "groundMaxY": -2,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 66
+        },
+        {
+          "radius": 334.4676803749167,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -4,
+          "groundMedianY": -3,
+          "groundMaxY": -2,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 66
+        },
+        {
+          "radius": 445.9569071665556,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -4,
+          "groundMedianY": -3,
+          "groundMaxY": -2,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 66
+        }
+      ],
+      "centerMinusOuterMedianY": 0
+    },
+    {
+      "id": 5,
+      "kind": "mushroom_island",
+      "waterContext": "ocean",
+      "centerX": -17600,
+      "centerZ": -960,
+      "radiusX": 212.62639411161337,
+      "radiusZ": 169.27154043229362,
+      "centerGroundY": -1,
+      "centerWater": "ocean",
+      "centerWaterY": 63,
+      "centerDepthBlocks": 64,
+      "terrainVariant": "\u0001",
+      "biomeFamily": "\u0001",
+      "annualMeanTempC": 27.980188398858264,
+      "mountainWeight": 0,
+      "foothillWeight": 0,
+      "hillWeight": 0,
+      "plateauWeight": 0,
+      "rings": [
+        {
+          "radius": 106.31319705580668,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -1,
+          "groundMedianY": -1,
+          "groundMaxY": 0,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 64
+        },
+        {
+          "radius": 212.62639411161337,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -1,
+          "groundMedianY": -1,
+          "groundMaxY": 0,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 64
+        },
+        {
+          "radius": 265.7829926395167,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -2,
+          "groundMedianY": -1,
+          "groundMaxY": 0,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 64
+        },
+        {
+          "radius": 318.9395911674201,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -2,
+          "groundMedianY": -1,
+          "groundMaxY": 0,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 64
+        },
+        {
+          "radius": 425.25278822322673,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -2,
+          "groundMedianY": -1,
+          "groundMaxY": 1,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 64
+        }
+      ],
+      "centerMinusOuterMedianY": 0
+    },
+    {
+      "id": 6,
+      "kind": "pale_garden_island",
+      "waterContext": "ocean",
+      "centerX": 17600,
+      "centerZ": 6720,
+      "radiusX": 175.73713718350987,
+      "radiusZ": 155.15195623514265,
+      "centerGroundY": -8,
+      "centerWater": "ocean",
+      "centerWaterY": 63,
+      "centerDepthBlocks": 71,
+      "terrainVariant": "\u0001",
+      "biomeFamily": "\u0002",
+      "annualMeanTempC": 15.309845362950625,
+      "mountainWeight": 0,
+      "foothillWeight": 0,
+      "hillWeight": 0,
+      "plateauWeight": 0,
+      "rings": [
+        {
+          "radius": 87.86856859175494,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -8,
+          "groundMedianY": -8,
+          "groundMaxY": -8,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 71
+        },
+        {
+          "radius": 175.73713718350987,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -8,
+          "groundMedianY": -8,
+          "groundMaxY": -8,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 71
+        },
+        {
+          "radius": 219.67142147938733,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -8,
+          "groundMedianY": -8,
+          "groundMaxY": -8,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 71
+        },
+        {
+          "radius": 263.6057057752648,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -8,
+          "groundMedianY": -8,
+          "groundMaxY": -8,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 71
+        },
+        {
+          "radius": 351.47427436701975,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": -8,
+          "groundMedianY": -8,
+          "groundMaxY": -7,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 71
+        }
+      ],
+      "centerMinusOuterMedianY": 0
+    },
+    {
+      "id": 7,
+      "kind": "pale_garden_island",
+      "waterContext": "ocean",
+      "centerX": 5312,
+      "centerZ": 3904,
+      "radiusX": 184.5388146074869,
+      "radiusZ": 155.15882209705183,
+      "centerGroundY": 8,
+      "centerWater": "ocean",
+      "centerWaterY": 63,
+      "centerDepthBlocks": 55,
+      "terrainVariant": "\u0001",
+      "biomeFamily": "\u0001",
+      "annualMeanTempC": 25.62052942631755,
+      "mountainWeight": 0,
+      "foothillWeight": 0,
+      "hillWeight": 0,
+      "plateauWeight": 0,
+      "rings": [
+        {
+          "radius": 92.26940730374345,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 7,
+          "groundMedianY": 8,
+          "groundMaxY": 9,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 55
+        },
+        {
+          "radius": 184.5388146074869,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 7,
+          "groundMedianY": 8,
+          "groundMaxY": 11,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 55
+        },
+        {
+          "radius": 230.67351825935862,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 6,
+          "groundMedianY": 8,
+          "groundMaxY": 13,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 56
+        },
+        {
+          "radius": 276.80822191123036,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 6,
+          "groundMedianY": 8,
+          "groundMaxY": 14,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 56
+        },
+        {
+          "radius": 369.0776292149738,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 6,
+          "groundMedianY": 8,
+          "groundMaxY": 18,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 55
+        }
+      ],
+      "centerMinusOuterMedianY": 0
+    },
+    {
+      "id": 8,
+      "kind": "cherry_island",
+      "waterContext": "ocean",
+      "centerX": 5568,
+      "centerZ": 8512,
+      "radiusX": 185.21295796051234,
+      "radiusZ": 148.1146933337189,
+      "centerGroundY": 49,
+      "centerWater": "ocean",
+      "centerWaterY": 63,
+      "centerDepthBlocks": 14,
+      "terrainVariant": "\u0001",
+      "biomeFamily": "\u0003",
+      "annualMeanTempC": 4.51656817609108,
+      "mountainWeight": 0,
+      "foothillWeight": 0,
+      "hillWeight": 0,
+      "plateauWeight": 0,
+      "rings": [
+        {
+          "radius": 92.60647898025617,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 47,
+          "groundMedianY": 49,
+          "groundMaxY": 50,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 15
+        },
+        {
+          "radius": 185.21295796051234,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 44,
+          "groundMedianY": 48,
+          "groundMaxY": 52,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 15
+        },
+        {
+          "radius": 231.51619745064042,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 43,
+          "groundMedianY": 48,
+          "groundMaxY": 52,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 15
+        },
+        {
+          "radius": 277.8194369407685,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 42,
+          "groundMedianY": 48,
+          "groundMaxY": 53,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 15
+        },
+        {
+          "radius": 370.4259159210247,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 39,
+          "groundMedianY": 48,
+          "groundMaxY": 54,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 16
+        }
+      ],
+      "centerMinusOuterMedianY": 1
+    },
+    {
+      "id": 9,
+      "kind": "cherry_island",
+      "waterContext": "ocean",
+      "centerX": 19264,
+      "centerZ": -320,
+      "radiusX": 184.74561280306827,
+      "radiusZ": 148.11502087258845,
+      "centerGroundY": 8,
+      "centerWater": "ocean",
+      "centerWaterY": 63,
+      "centerDepthBlocks": 55,
+      "terrainVariant": "\u0001",
+      "biomeFamily": "\u0001",
+      "annualMeanTempC": 27.99951704712311,
+      "mountainWeight": 0,
+      "foothillWeight": 0,
+      "hillWeight": 0,
+      "plateauWeight": 0,
+      "rings": [
+        {
+          "radius": 92.37280640153413,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 6,
+          "groundMedianY": 8,
+          "groundMaxY": 11,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 55
+        },
+        {
+          "radius": 184.74561280306827,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 3,
+          "groundMedianY": 8,
+          "groundMaxY": 15,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 55
+        },
+        {
+          "radius": 230.93201600383534,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 2,
+          "groundMedianY": 9,
+          "groundMaxY": 17,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 55
+        },
+        {
+          "radius": 277.1184192046024,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 1,
+          "groundMedianY": 8,
+          "groundMaxY": 19,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 55
+        },
+        {
+          "radius": 369.49122560613654,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 0,
+          "groundMedianY": 9,
+          "groundMaxY": 23,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 55
+        }
+      ],
+      "centerMinusOuterMedianY": -1
+    },
+    {
+      "id": 10,
+      "kind": "cherry_island",
+      "waterContext": "ocean",
+      "centerX": -11840,
+      "centerZ": -1344,
+      "radiusX": 183.1582837082775,
+      "radiusZ": 148.11660579487094,
+      "centerGroundY": 50,
+      "centerWater": "ocean",
+      "centerWaterY": 63,
+      "centerDepthBlocks": 13,
+      "terrainVariant": "\u0001",
+      "biomeFamily": "\u0001",
+      "annualMeanTempC": 27.936579383134408,
+      "mountainWeight": 0,
+      "foothillWeight": 0,
+      "hillWeight": 0,
+      "plateauWeight": 0,
+      "rings": [
+        {
+          "radius": 91.57914185413875,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 48,
+          "groundMedianY": 50,
+          "groundMaxY": 51,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 14
+        },
+        {
+          "radius": 183.1582837082775,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 45,
+          "groundMedianY": 49,
+          "groundMaxY": 53,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 14
+        },
+        {
+          "radius": 228.94785463534689,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 44,
+          "groundMedianY": 49,
+          "groundMaxY": 53,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 14
+        },
+        {
+          "radius": 274.73742556241626,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 43,
+          "groundMedianY": 49,
+          "groundMaxY": 54,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 14
+        },
+        {
+          "radius": 366.316567416555,
+          "samples": 32,
+          "water": {
+            "ocean": 32
+          },
+          "groundMinY": 40,
+          "groundMedianY": 50,
+          "groundMaxY": 55,
+          "waterMedianY": 63,
+          "depthMedianBlocks": 14
+        }
+      ],
+      "centerMinusOuterMedianY": 0
+    },
+    {
+      "id": 15,
+      "kind": "volcanic_crater_snow",
+      "centerX": 12352,
+      "centerZ": -4928,
+      "radiusX": 180.65961920891493,
+      "radiusZ": 140.29359217341707,
+      "centerGroundY": 231,
+      "centerWater": "none",
+      "terrainVariant": "\u0006",
+      "biomeFamily": "\u0007",
+      "annualMeanTempC": 14.635957255689899,
+      "mountainWeight": 0.9999999999999999,
+      "foothillWeight": 0,
+      "hillWeight": 0,
+      "plateauWeight": 0,
+      "rings": [
+        {
+          "radius": 128,
+          "samples": 32,
+          "water": {
+            "none": 32
+          },
+          "groundMinY": 188,
+          "groundMedianY": 229,
+          "groundMaxY": 241
+        },
+        {
+          "radius": 256,
+          "samples": 32,
+          "water": {
+            "none": 32
+          },
+          "groundMinY": 168,
+          "groundMedianY": 220,
+          "groundMaxY": 268
+        },
+        {
+          "radius": 512,
+          "samples": 32,
+          "water": {
+            "none": 32
+          },
+          "groundMinY": 143,
+          "groundMedianY": 216,
+          "groundMaxY": 307
+        }
+      ],
+      "centerMinusOuterMedianY": 15,
+      "localReliefMinMax512": 164
+    },
+    {
+      "id": 17,
+      "kind": "volcanic_crater_snow",
+      "centerX": 4160,
+      "centerZ": -3648,
+      "radiusX": 179.3723935103775,
+      "radiusZ": 140.31745315678833,
+      "centerGroundY": 260,
+      "centerWater": "none",
+      "terrainVariant": "\u0006",
+      "biomeFamily": "\u0007",
+      "annualMeanTempC": 8.500528895655126,
+      "mountainWeight": 0.9973867722418973,
+      "foothillWeight": 0.0026132277581027174,
+      "hillWeight": 0,
+      "plateauWeight": 0,
+      "rings": [
+        {
+          "radius": 128,
+          "samples": 32,
+          "water": {
+            "none": 32
+          },
+          "groundMinY": 246,
+          "groundMedianY": 262,
+          "groundMaxY": 267
+        },
+        {
+          "radius": 256,
+          "samples": 32,
+          "water": {
+            "none": 32
+          },
+          "groundMinY": 214,
+          "groundMedianY": 255,
+          "groundMaxY": 277
+        },
+        {
+          "radius": 512,
+          "samples": 32,
+          "water": {
+            "none": 32
+          },
+          "groundMinY": 207,
+          "groundMedianY": 263,
+          "groundMaxY": 297
+        }
+      ],
+      "centerMinusOuterMedianY": -3,
+      "localReliefMinMax512": 90
+    },
+    {
+      "id": 18,
+      "kind": "basin_snow",
+      "centerX": 2112,
+      "centerZ": 9536,
+      "radiusX": 640.8489011487117,
+      "radiusZ": 531.4778276454718,
+      "centerGroundY": 93,
+      "centerWater": "none",
+      "terrainVariant": "\u0003",
+      "biomeFamily": "\u0006",
+      "annualMeanTempC": -3.3108883893500507,
+      "mountainWeight": 0,
+      "foothillWeight": 0,
+      "hillWeight": 0,
+      "plateauWeight": 0,
+      "rings": [
+        {
+          "radius": 128,
+          "samples": 32,
+          "water": {
+            "none": 32
+          },
+          "groundMinY": 91,
+          "groundMedianY": 93,
+          "groundMaxY": 95
+        },
+        {
+          "radius": 256,
+          "samples": 32,
+          "water": {
+            "none": 32
+          },
+          "groundMinY": 89,
+          "groundMedianY": 93,
+          "groundMaxY": 97
+        },
+        {
+          "radius": 512,
+          "samples": 32,
+          "water": {
+            "none": 32
+          },
+          "groundMinY": 85,
+          "groundMedianY": 94,
+          "groundMaxY": 100
+        }
+      ],
+      "centerMinusOuterMedianY": -1,
+      "localReliefMinMax512": 15
+    },
+    {
+      "id": 19,
+      "kind": "basin_snow",
+      "centerX": -6336,
+      "centerZ": 6208,
+      "radiusX": 676.8696900531452,
+      "radiusZ": 531.5326333041899,
+      "centerGroundY": 115,
+      "centerWater": "none",
+      "terrainVariant": "\u0003",
+      "biomeFamily": "\t",
+      "annualMeanTempC": 15.016954387279135,
+      "mountainWeight": 0,
+      "foothillWeight": 0,
+      "hillWeight": 0,
+      "plateauWeight": 0,
+      "rings": [
+        {
+          "radius": 128,
+          "samples": 32,
+          "water": {
+            "none": 32
+          },
+          "groundMinY": 114,
+          "groundMedianY": 115,
+          "groundMaxY": 116
+        },
+        {
+          "radius": 256,
+          "samples": 32,
+          "water": {
+            "none": 32
+          },
+          "groundMinY": 113,
+          "groundMedianY": 115,
+          "groundMaxY": 117
+        },
+        {
+          "radius": 512,
+          "samples": 32,
+          "water": {
+            "none": 32
+          },
+          "groundMinY": 109,
+          "groundMedianY": 112,
+          "groundMaxY": 118
+        }
+      ],
+      "centerMinusOuterMedianY": 3,
+      "localReliefMinMax512": 9
+    }
+  ]
+}

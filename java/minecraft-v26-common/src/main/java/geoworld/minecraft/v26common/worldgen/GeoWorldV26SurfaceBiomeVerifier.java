@@ -390,6 +390,20 @@ public final class GeoWorldV26SurfaceBiomeVerifier {
                     int px = x + dx, pz = z + dz;
                     var column = SHORELINE.planModel(runtime, px, pz);
                     int groundY = column.groundBoundary() - 1;
+                    String waterKind = column.sample().waterKind();
+                    boolean declaredOcean = declared.contains("ocean");
+                    boolean declaredRiver = declared.endsWith("river");
+                    boolean compatibleHydrology =
+                        (declaredOcean && "Ocean".equals(waterKind)) ||
+                        (declaredRiver && "River".equals(waterKind)) ||
+                        (!declaredOcean && !declaredRiver &&
+                            "None".equals(waterKind));
+                    // Guaranteed habitats are ecological patches, not a license
+                    // to overwrite hydrology. Their circular reservation is
+                    // clipped naturally by river/ocean boundaries.
+                    if (!compatibleHydrology) {
+                        continue;
+                    }
                     String finalBiome = BIOMES.biomeId(
                         runtime, px, groundY, pz
                     );
@@ -494,6 +508,51 @@ public final class GeoWorldV26SurfaceBiomeVerifier {
             materials += 2;
         }
 
+        String reefBiome = "minecraft:warm_ocean";
+        if (!checked.contains(reefBiome)) {
+            // Slice F reefs are natural habitats. Sample their actual
+            // underwater surface rather than checking a reserved circle.
+            var grid = runtime.manifest().geometry();
+            int reefColumns = 0;
+            for (int iz = 0; iz < grid.height() && reefColumns < 3; iz++) {
+                int z = (int)Math.round(grid.originZ() + iz * grid.spacingZ());
+                for (int ix = 0; ix < grid.width() && reefColumns < 3; ix++) {
+                    int x = (int)Math.round(grid.originX() + ix * grid.spacingX());
+                    var sample = runtime.sample(x, z);
+                    if (!"Warm Ocean".equals(sample.biomeFamily()) ||
+                        !reefBiome.equals(BIOMES.surfaceBiomeIdFromSample(runtime, x, 319, z, sample))) {
+                        continue;
+                    }
+                    var column = SHORELINE.planModel(runtime, x, z);
+                    int groundY = column.groundBoundary() - 1;
+                    String actual = BIOMES.biomeId(runtime, x, groundY, z);
+                    if (!"Ocean".equals(sample.waterKind()) || sample.coastalSeaReceiver() ||
+                        !(runtime.sampleSeaSurfaceTemperature(x, z) >= 24.0) ||
+                        column.waterBoundary() <= column.groundBoundary() || !reefBiome.equals(actual)) {
+                        throw new AssertionError("invalid coral reef column at " + x + ", " + z);
+                    }
+                    String soil = sample.surfaceProfile();
+                    String top = GeoWorldV26SurfaceMaterials.top(actual, soil, column.surfaceOverride());
+                    String expected = column.surfaceOverride() != null
+                        ? column.surfaceOverride() : PROFILE.surfaceProfileMapping().surfaceBlock(soil);
+                    String subsoil = GeoWorldV26SurfaceMaterials.below(
+                        actual, soil, column.underOverride(), x, groundY - 2, z, 2
+                    );
+                    if (!top.equals(expected) || subsoil == null) {
+                        throw new AssertionError("invalid reef surface materials at " + x + ", " + z);
+                    }
+                    reefColumns++;
+                }
+            }
+            if (reefColumns > 0) {
+                checked.add(reefBiome);
+                specialSurfacePatches++;
+                columns += reefColumns;
+                materials += 2 * reefColumns;
+            }
+            System.out.printf("GeoWorld natural coral reef material checks=%d%n", reefColumns);
+        }
+
         if (!checked.equals(required)) {
             var missing = new HashSet<>(required);
             missing.removeAll(checked);
@@ -568,6 +627,87 @@ public final class GeoWorldV26SurfaceBiomeVerifier {
                 desertConflicts + " of " + naturalDesertColumns
             );
         }
+        // Slice E navigation contract. Warm-water climate is allowed at a
+        // tropical river mouth, but the existing OceanMouth influence corridor
+        // must not realize as minecraft:warm_ocean (coral reef), and the inner
+        // River navigation core must quantize to at least three actual water
+        // blocks. Sample the final Runtime/biome realization, not only config.
+        int navigationCoreChecks = 0;
+        int navigationShallow = 0;
+        int mouthInfluenceChecks = 0;
+        int mouthWarmFamilyOcean = 0;
+        int mouthWarmOceanViolations = 0;
+        int mouthRiverBiomeViolations = 0;
+        if (("geoworld-rules-v1.1.26".equals(
+            runtime.manifest().generationRulesVersion()
+        ) || ("geoworld-rules-v1.1.27".equals(
+            runtime.manifest().generationRulesVersion()
+        ) || "geoworld-rules-v1.1.28".equals(runtime.manifest().generationRulesVersion())))) {
+            final double navigationStep = 32.0;
+            for (double x = geometry.originX() + navigationStep / 2;
+                 x < geometry.originX() + geometry.spanXBlocks();
+                 x += navigationStep) {
+                for (double z = geometry.originZ() + navigationStep / 2;
+                     z < geometry.originZ() + geometry.spanZBlocks();
+                     z += navigationStep) {
+                    var sample = runtime.sample(x, z);
+                    if ("River".equals(sample.waterKind()) &&
+                        sample.riverWeight() >= 0.5 &&
+                        sample.waterSurfaceDefined() &&
+                        sample.waterSurfaceElevation() != null) {
+                        navigationCoreChecks++;
+                        int waterTop =
+                            HEIGHTS.boundaryYCeil(
+                                sample.waterSurfaceElevation()
+                            ) - 1;
+                        int groundTop =
+                            HEIGHTS.boundaryYFloor(sample.groundHeight());
+                        if (waterTop - groundTop < 3) {
+                            navigationShallow++;
+                        }
+                    }
+                    if (!sample.coastalSeaReceiver()) {
+                        continue;
+                    }
+                    mouthInfluenceChecks++;
+                    String chosen = BIOMES.biomeId(runtime, x, z);
+                    if ("River".equals(sample.waterKind())) {
+                        if (!"minecraft:river".equals(chosen) &&
+                            !"minecraft:frozen_river".equals(chosen)) {
+                            mouthRiverBiomeViolations++;
+                        }
+                        continue;
+                    }
+                    if (!"Ocean".equals(sample.waterKind())) {
+                        continue;
+                    }
+                    if ("Warm Ocean".equals(sample.biomeFamily())) {
+                        mouthWarmFamilyOcean++;
+                    }
+                    if ("minecraft:warm_ocean".equals(chosen)) {
+                        mouthWarmOceanViolations++;
+                    }
+                }
+            }
+            System.out.printf(
+                "Slice E navigation: core=%d shallow=%d mouthInfluence=%d " +
+                "mouthWarmFamilyOcean=%d warmOceanViolations=%d " +
+                "riverBiomeViolations=%d%n",
+                navigationCoreChecks, navigationShallow, mouthInfluenceChecks,
+                mouthWarmFamilyOcean, mouthWarmOceanViolations,
+                mouthRiverBiomeViolations
+            );
+            if (navigationCoreChecks < 500 ||
+                mouthInfluenceChecks < 100 ||
+                navigationShallow != 0 ||
+                mouthWarmOceanViolations != 0 ||
+                mouthRiverBiomeViolations != 0) {
+                throw new AssertionError(
+                    "Slice E river navigation / mouth biome contract failed"
+                );
+            }
+        }
+
         // Inspect real player-reported coordinates, not just synthetic
         // family/profile test cases. Their biome and GeoWorld soil may differ.
         for (int[] position : new int[][]{

@@ -1,6 +1,6 @@
 # GeoWorld v0.1.6 — 发布候选说明
 
-状态：**2026-11-16 实际 geomV8 新世界人工视觉验收通过，post-v8 完整 9 目标发布矩阵 9/9 通过。当前已具备发布资格，但尚未 merge、push、创建 `v0.1.6` tag 或 GitHub Release。**
+状态：**v0.1.6 已于 2026-11-16 正式发布。Tag `v0.1.6` 指向验收提交 `8e0daf0`；GitHub Actions Core + 9/9 release-build + Publish 全部成功，Release 包含 9 个 JAR 与 `SHA256SUMS.txt`。**
 
 ## 当前修复
 
@@ -34,7 +34,7 @@ v0.1.6 仍使用 `geoworld-rules-v1.1.23`。首轮候选虽然通过河口水位
 
 随后对当前 v8/cache-v27 代码完整重跑 9 目标发布矩阵，**9/9 全部 `clean check build` 成功**；每个候选 JAR 均验证版本为 0.1.6，并包含 Windows/Linux/macOS × x64/arm64 六套 native engine。
 
-因此当前 `releaseAllowed=true`。但发布动作尚未执行：**未 merge、未 push、未创建 `v0.1.6` tag、未发布 GitHub Release。**
+当前发布状态：**已发布**。`v0.1.6` tag 指向 `8e0daf0`，GitHub Actions 发布工作流成功，正式 Release 已生成。
 ## 2026-11-16 缓存复用事故
 
 当天第二次视觉截图仍出现严重放射状沙墙，但该截图后来被证明**不是 RiverGeometryVersion 8 的结果**。新建存档中的 `world.geoworld` 为 `RiverGeometryVersion=7`，SHA256 为 `eb96a9168259d9a8f1ce6f9583e12834904bf63da2ea3bc578a0accab17b70b8`；eadm 的 `geoworld-cache/446c3c5c195674ed8b8d565eceba8e10.geoworld` 与之字节级 SHA 相同，且缓存文件创建于前一天。

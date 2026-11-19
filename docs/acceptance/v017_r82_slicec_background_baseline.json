@@ -1,0 +1,158 @@
+{
+  "schemaVersion": 1,
+  "version": "0.1.7-slice-c-baseline",
+  "seed": -1818694639628404530,
+  "rules": "geoworld-rules-v1.1.24",
+  "riverGeometryVersion": 8,
+  "evidenceClass": "persisted_model_pre_specialfeature_background_audit",
+  "selected": {
+    "oceanIslands": {
+      "count": 8,
+      "rootLiftBlocks": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        -1,
+        0
+      ],
+      "centerDepthBlocks": [
+        68,
+        66,
+        64,
+        71,
+        55,
+        14,
+        55,
+        13
+      ],
+      "qualifiedRootLift8Depth48": 0,
+      "finding": "all selected ocean islands lack a meaningful submerged root"
+    },
+    "lakeIslands": {
+      "count": 2,
+      "rootLiftBlocks": [
+        -2,
+        1
+      ],
+      "centerDepthBlocks": [
+        6,
+        9
+      ],
+      "qualifiedRootLift4": 0,
+      "finding": "selected lake islands sit on flat or locally lower lakebed"
+    },
+    "snowCraters": {
+      "count": 2,
+      "centerY": [
+        231,
+        260
+      ],
+      "annualMeanTempC": [
+        14.635957255689899,
+        8.500528895655126
+      ],
+      "mountainWeight": [
+        0.9999999999999999,
+        0.9973867722418973
+      ],
+      "relief512": [
+        164,
+        90
+      ],
+      "finding": "mountain background is present; snow-climate qualification is not"
+    },
+    "snowBasins": {
+      "count": 2,
+      "centerY": [
+        93,
+        115
+      ],
+      "annualMeanTempC": [
+        -3.3108883893500507,
+        15.016954387279135
+      ],
+      "mountainWeight": [
+        0,
+        0
+      ],
+      "foothillWeight": [
+        0,
+        0
+      ],
+      "relief512": [
+        15,
+        9
+      ],
+      "finding": "both selected snow basins lack mountain/foothill background; one is also about 15C annual mean"
+    }
+  },
+  "candidatePools": {
+    "oceanInteriorCount": 31843,
+    "oceanQualified": {
+      "lift12_depth48": 11,
+      "lift4_depth48": 760,
+      "lift8_depth48": 281,
+      "lift8_depth64": 288
+    },
+    "snowLandCount": 14831,
+    "snowBasinQualified": {
+      "temp0_relief40_basin6": 253,
+      "temp2_relief40_basin6": 302,
+      "temp5_relief30_basin4": 466,
+      "temp5_relief50_basin4": 452
+    },
+    "finding": "qualified alternatives exist; incorrect siting is not forced by candidate scarcity"
+  },
+  "largeLakeGroups": [
+    {
+      "lakeID": 2,
+      "nodes": 351,
+      "centerX": 704,
+      "centerZ": -2880,
+      "groundY": 56,
+      "depthBlocks": 9,
+      "outerMedian160Y": 56,
+      "rootLiftBlocks": 0,
+      "ringLake": 32
+    },
+    {
+      "lakeID": 4,
+      "nodes": 51,
+      "centerX": -3136,
+      "centerZ": -1088,
+      "groundY": 57,
+      "depthBlocks": 6,
+      "outerMedian160Y": 59,
+      "rootLiftBlocks": -2,
+      "ringLake": 32
+    },
+    {
+      "lakeID": 5,
+      "nodes": 33,
+      "centerX": -1088,
+      "centerZ": 3392,
+      "groundY": 59,
+      "depthBlocks": 2,
+      "outerMedian160Y": 64,
+      "rootLiftBlocks": -5,
+      "ringLake": 6
+    },
+    {
+      "lakeID": 1,
+      "nodes": 26,
+      "centerX": 2624,
+      "centerZ": -8128,
+      "groundY": 72,
+      "depthBlocks": 17,
+      "outerMedian160Y": 84,
+      "rootLiftBlocks": -12,
+      "ringLake": 24
+    }
+  ],
+  "sliceCConclusion": "confirmed_island_siting_background_mismatch",
+  "sliceDObservation": "snow basin/crater climate and mountain-background mismatch confirmed read-only; no Slice D generator change yet",
+  "releaseEligible": false
+}

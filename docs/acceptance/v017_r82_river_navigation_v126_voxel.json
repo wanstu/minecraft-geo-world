@@ -1,0 +1,317 @@
+{
+  "evidenceClass": "fresh_saved_minecraft_full_anvil_blockstate",
+  "world": "R817SliceERiverV126Spot",
+  "seed": -1818694639628404530,
+  "rulesVersion": "geoworld-rules-v1.1.26",
+  "modelSha256": "8e31bc842948869f8cc922af852d32466fd5ccc52f2511b0862362c898504492",
+  "targetChunks": {
+    "full": 49,
+    "total": 49
+  },
+  "columns": 9409,
+  "navigationCore": {
+    "columns": 1558,
+    "minActualWaterBlocks": 3,
+    "shallowLt3": 0
+  },
+  "mouthInfluence": {
+    "wetColumns": 5231,
+    "warmOceanFamilyColumns": 2128,
+    "coralBlocks": 0,
+    "coralExamples": []
+  },
+  "outsideInfluence": {
+    "coralBlocks": 84,
+    "coralExamples": [
+      {
+        "x": -2518,
+        "y": 61,
+        "z": -2544,
+        "block": "minecraft:fire_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2515,
+        "y": 61,
+        "z": -2544,
+        "block": "minecraft:fire_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2509,
+        "y": 61,
+        "z": -2544,
+        "block": "minecraft:tube_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2507,
+        "y": 61,
+        "z": -2544,
+        "block": "minecraft:tube_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2507,
+        "y": 62,
+        "z": -2544,
+        "block": "minecraft:bubble_coral_fan",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2506,
+        "y": 61,
+        "z": -2544,
+        "block": "minecraft:tube_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2466,
+        "y": 59,
+        "z": -2544,
+        "block": "minecraft:horn_coral_wall_fan",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2465,
+        "y": 59,
+        "z": -2544,
+        "block": "minecraft:brain_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2465,
+        "y": 60,
+        "z": -2544,
+        "block": "minecraft:brain_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2464,
+        "y": 58,
+        "z": -2544,
+        "block": "minecraft:horn_coral_wall_fan",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2518,
+        "y": 61,
+        "z": -2543,
+        "block": "minecraft:fire_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2518,
+        "y": 62,
+        "z": -2543,
+        "block": "minecraft:horn_coral",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2516,
+        "y": 61,
+        "z": -2543,
+        "block": "minecraft:horn_coral_wall_fan",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2515,
+        "y": 61,
+        "z": -2543,
+        "block": "minecraft:fire_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2507,
+        "y": 61,
+        "z": -2543,
+        "block": "minecraft:tube_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2502,
+        "y": 61,
+        "z": -2543,
+        "block": "minecraft:bubble_coral_wall_fan",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2501,
+        "y": 61,
+        "z": -2543,
+        "block": "minecraft:tube_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2500,
+        "y": 61,
+        "z": -2543,
+        "block": "minecraft:fire_coral_wall_fan",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2484,
+        "y": 60,
+        "z": -2543,
+        "block": "minecraft:horn_coral_wall_fan",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2481,
+        "y": 59,
+        "z": -2543,
+        "block": "minecraft:bubble_coral_wall_fan",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2465,
+        "y": 60,
+        "z": -2543,
+        "block": "minecraft:horn_coral_wall_fan",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2464,
+        "y": 59,
+        "z": -2543,
+        "block": "minecraft:brain_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2464,
+        "y": 60,
+        "z": -2543,
+        "block": "minecraft:brain_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2464,
+        "y": 61,
+        "z": -2543,
+        "block": "minecraft:brain_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2517,
+        "y": 61,
+        "z": -2542,
+        "block": "minecraft:fire_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2517,
+        "y": 62,
+        "z": -2542,
+        "block": "minecraft:bubble_coral_fan",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2516,
+        "y": 61,
+        "z": -2542,
+        "block": "minecraft:fire_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2516,
+        "y": 62,
+        "z": -2542,
+        "block": "minecraft:horn_coral_fan",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2504,
+        "y": 61,
+        "z": -2542,
+        "block": "minecraft:horn_coral_wall_fan",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2503,
+        "y": 61,
+        "z": -2542,
+        "block": "minecraft:tube_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2502,
+        "y": 60,
+        "z": -2542,
+        "block": "minecraft:tube_coral_block",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      },
+      {
+        "x": -2502,
+        "y": 61,
+        "z": -2542,
+        "block": "minecraft:horn_coral",
+        "coastal": false,
+        "kind": "Ocean",
+        "family": "Warm Ocean"
+      }
+    ]
+  },
+  "pass": true
+}

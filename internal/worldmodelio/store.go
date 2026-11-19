@@ -465,6 +465,17 @@ func snapshotFromWorldModel(m *generator.WorldModel) (payload, error) {
 		return payload{}, errors.New("worldmodelio: Runtime model geometry disagrees")
 	}
 
+	climate := &climatePreviewSnapshot{
+		AnnualMeanTempC: cloneFloat64(m.Climate.AdjustedAnnualTempC),
+		AnnualPrecipMM:  cloneFloat64(m.Climate.AnnualPrecipMM),
+		MonsoonIndex:    cloneFloat64(m.Climate.MonsoonIndex),
+		WindX:           cloneFloat64(m.Climate.WindX),
+		WindZ:           cloneFloat64(m.Climate.WindZ),
+	}
+	if m.Config.Ecology.DistributionVersion >= 1 {
+		climate.SeaSurfaceTempC = cloneFloat64(m.Climate.SeaSurfaceTempC)
+	}
+
 	return payload{
 		Config: m.Config,
 		Surface: surfaceSnapshot{
@@ -477,13 +488,7 @@ func snapshotFromWorldModel(m *generator.WorldModel) (payload, error) {
 			Rivers: cloneRivers(m.Waterbed.Rivers),
 			Lakes:  append([]waterbed.LakeNode(nil), m.Waterbed.Lakes...),
 		},
-		ClimatePreview: &climatePreviewSnapshot{
-			AnnualMeanTempC: cloneFloat64(m.Climate.AdjustedAnnualTempC),
-			AnnualPrecipMM:  cloneFloat64(m.Climate.AnnualPrecipMM),
-			MonsoonIndex:    cloneFloat64(m.Climate.MonsoonIndex),
-			WindX:           cloneFloat64(m.Climate.WindX),
-			WindZ:           cloneFloat64(m.Climate.WindZ),
-		},
+		ClimatePreview: climate,
 		HydrologyQuery: &hydrologyQuerySnapshot{
 			BasinID:          append([]int(nil), m.Hydrology.BasinID...),
 			FlowTo:           append([]int(nil), m.Hydrology.FlowTo...),
@@ -758,7 +763,8 @@ func restoreClimatePreview(s *climatePreviewSnapshot) *ClimatePreview {
 	if s == nil {
 		return nil
 	}
-	if len(s.AnnualMeanTempC) == 0 &&
+	if len(s.SeaSurfaceTempC) == 0 &&
+		len(s.AnnualMeanTempC) == 0 &&
 		len(s.AnnualPrecipMM) == 0 &&
 		len(s.MonsoonIndex) == 0 &&
 		len(s.WindX) == 0 &&
@@ -766,6 +772,7 @@ func restoreClimatePreview(s *climatePreviewSnapshot) *ClimatePreview {
 		return nil
 	}
 	return &ClimatePreview{
+		SeaSurfaceTempC: cloneFloat64(s.SeaSurfaceTempC),
 		AnnualMeanTempC: cloneFloat64(s.AnnualMeanTempC),
 		AnnualPrecipMM:  cloneFloat64(s.AnnualPrecipMM),
 		MonsoonIndex:    cloneFloat64(s.MonsoonIndex),

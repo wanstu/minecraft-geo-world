@@ -1,6 +1,6 @@
 # GeoWorld R8.1c — 河口接收水位与低岸统一（测试候选）
 
-日期：2026-11-14。状态更新至 2026-11-16：规则 v1.1.23 已实现；2026-11-15 首轮游戏内视觉验收失败后已升级 RiverGeometryVersion 8 并修复缓存污染。**实际 geomV8 新世界视觉复测已通过，post-v8 全 9 目标发布矩阵 9/9 通过；当前 releaseAllowed=true，但尚未执行正式发布。**
+日期：2026-11-14。状态更新至 2026-11-16：规则 v1.1.23 已实现；2026-11-15 首轮游戏内视觉验收失败后已升级 RiverGeometryVersion 8 并修复缓存污染。**实际 geomV8 新世界视觉复测已通过，post-v8 全 9 目标发布矩阵 9/9 通过；v0.1.6 已正式发布。**
 
 ## 原始缺陷
 
@@ -50,7 +50,7 @@ eb1ffcbc19ee43e55495f2007716b1ca0a907dcedf7b493303358d689e20512f。
 - 当时的发布矩阵 9/9 目标完成了 `clean check build`：26.3、26.2、26.1.2 的 NeoForge/Fabric，1.21.1 的 NeoForge/Fabric，以及 1.20.1 Fabric。
 - 当时的 9 个候选包均使用 `-Pmod_version=0.1.6` 实际构建，Loader 元数据版本为 0.1.6，并验证包含 Windows/Linux/macOS × x64/arm64 六套 GeoWorld 原生引擎。
 - **该矩阵已被 2026-11-15 的游戏内地形破碎失败作废为发布证据**；它只作为 pre-v8 历史记录保留。当时的 schema 2 就绪记录曾标记 `automatedReleaseReadiness=revalidation_pending`、`manualVisualAcceptance=pending_retest`、`releaseAllowed=false`；这些字段现已在最终 geomV8 验收后更新为通过。
-- 当前未创建 `v0.1.6` tag，也未发布 GitHub Release。
+- 该条为 pre-v8 历史阶段记录；最终 `v0.1.6` 已于 2026-11-16 创建 tag 并发布 GitHub Release。
 
 ## 游戏内视觉失败与 RiverGeometryVersion 8 修复（2026-11-15～16）
 
@@ -83,7 +83,7 @@ eb1ffcbc19ee43e55495f2007716b1ca0a907dcedf7b493303358d689e20512f。
 - 实际新存档已确认 `RiverGeometryVersion=8`，SHA256 `5b8eb7c9aa823d9a6f15a6ee510d6c387e5eadb1deee01de4bc6803bee280469`。
 - `(-1608,-1082)` 与四个原始回归区域均完成人工视觉复测并通过。
 - 当前 v8/cache-v27 代码的 9 目标发布矩阵重新构建完成，**9/9 通过**；所有候选包版本为 0.1.6，六套 native engine 校验通过。
-- `releaseAllowed=true`；但尚未 merge、push、创建 `v0.1.6` tag 或发布 GitHub Release。
+- `releaseAllowed=true`，且后续发布流程已完成：master、`v0.1.6` tag 与 GitHub Release 均已落地。
 
 另外，天坑 #11 对河段 #735 的未规划排水冲突仍属于 R8.1d，岛屿及雪山盆地选址属于 R8.2。本轮不同时修改这些功能。
 ## v8 视觉复测被旧模型缓存污染（2026-11-16）

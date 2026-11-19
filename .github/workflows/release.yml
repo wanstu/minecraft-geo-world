@@ -339,9 +339,14 @@ jobs:
             'release-stage/*.jar',
             'release-stage/SHA256SUMS.txt',
             '--verify-tag',
-            '--title', "GeoWorld $env:GITHUB_REF_NAME",
-            '--notes', 'Nine CI-built GeoWorld artifacts for Minecraft 26.3, 26.2, 26.1.2, 1.21.1, and 1.20.1. Choose only the jar matching your Minecraft version and loader. Forge 1.20.1 is intentionally not supported. Each jar bundles GeoWorld engines for Windows, Linux, and macOS on x64 and arm64.'
+            '--title', "GeoWorld $env:GITHUB_REF_NAME"
           )
+          $notesPath = Join-Path 'docs/releases' "$($env:GITHUB_REF_NAME).md"
+          if (Test-Path -LiteralPath $notesPath) {
+            $args += @('--notes-file', $notesPath)
+          } else {
+            $args += @('--notes', 'Nine CI-built GeoWorld artifacts for Minecraft 26.3, 26.2, 26.1.2, 1.21.1, and 1.20.1. Choose only the jar matching your Minecraft version and loader. Forge 1.20.1 is intentionally not supported. Each jar bundles GeoWorld engines for Windows, Linux, and macOS on x64 and arm64.')
+          }
           if ($env:IS_PRERELEASE -eq 'true') {
             $args += '--prerelease'
           }

@@ -81,27 +81,49 @@ public final class GeoWorldV26BiomeCoverageVerifier {
             String atCenter = realizer.biomeId(
                 model, habitat.x(), habitat.y(), habitat.z()
             );
+            if (!habitat.biome().equals(atCenter)) {
+                throw new AssertionError(
+                    "habitat center missing: " + habitat + " got=" + atCenter
+                );
+            }
             // Surface continuity follows the local surface, not a fixed
-            // horizontal Y plane that may enter a hillside. Cave habitats
-            // deliberately retain their representative underground height.
+            // horizontal Y plane that may enter a hillside. Habitat circles
+            // are clipped by real hydrology: a river/ocean boundary is not
+            // overwritten merely to preserve a synthetic circular patch.
             double nearbyY = habitat.y();
             boolean cave = habitat.biome().endsWith("_caves") ||
                 habitat.biome().endsWith("deep_dark");
+            boolean compatibleHydrology = true;
             if (!cave) {
+                var nearbySample = model.sample(habitat.x() + 32, habitat.z());
                 int ground = profile.heightMapping().boundaryY(
-                    model.sample(habitat.x() + 32, habitat.z()).groundHeight()
+                    nearbySample.groundHeight()
                 ) - 1;
-                nearbyY = Math.min(profile.heightMapping().maxYExclusive() - 1, ground + 3);
-            }
-            String atNearby = realizer.biomeId(
-                model, habitat.x() + 32, nearbyY, habitat.z()
-            );
-            if (!habitat.biome().equals(atCenter) ||
-                !habitat.biome().equals(atNearby)) {
-                throw new AssertionError(
-                    "habitat was not continuous: " + habitat +
-                    " center=" + atCenter + " nearby=" + atNearby + " nearbyY=" + nearbyY
+                nearbyY = Math.min(
+                    profile.heightMapping().maxYExclusive() - 1,
+                    ground + 3
                 );
+                boolean declaredOcean = habitat.biome().contains("ocean");
+                boolean declaredRiver = habitat.biome().endsWith("river");
+                compatibleHydrology =
+                    (declaredOcean &&
+                        "Ocean".equals(nearbySample.waterKind())) ||
+                    (declaredRiver &&
+                        "River".equals(nearbySample.waterKind())) ||
+                    (!declaredOcean && !declaredRiver &&
+                        "None".equals(nearbySample.waterKind()));
+            }
+            if (compatibleHydrology) {
+                String atNearby = realizer.biomeId(
+                    model, habitat.x() + 32, nearbyY, habitat.z()
+                );
+                if (!habitat.biome().equals(atNearby)) {
+                    throw new AssertionError(
+                        "habitat was not continuous inside compatible hydrology: " +
+                        habitat + " center=" + atCenter +
+                        " nearby=" + atNearby + " nearbyY=" + nearbyY
+                    );
+                }
             }
         }
         System.out.println(
