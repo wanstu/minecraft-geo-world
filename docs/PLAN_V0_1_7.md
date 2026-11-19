@@ -136,7 +136,7 @@ v0.1.7 **不默认实现地下排水或凭空增加地表支流**。
 - **Slice D：完成并已提交（112111d）。** Snow crater / basin 增加 mountain + relief + climate + inland-continuity / depression 背景资格；固定 seed 953 条正式河流与 4 个 sinkhole 完全不动，Cherry crater #16 / basin #20 完全不动；原完整几何验收 232/232 full，最终坐标 fresh-world spot 验收 10/10 full、12/12 模型与 voxel 0 格误差。
 - **Slice E：完成并已提交（afd7499）。** v1.1.26 河道核心实际最浅 3 格；88 个 OceanMouth 的 828 个中心采样保持 River；河口影响区 Warm Ocean 降为无珊瑚航道，fresh 1.21.1 Anvil 49/49 FULL、1558 个可航核心最浅 3 格、河口影响区实际 coral=0，影响区外同一区域 coral=84；v1.1.25 已持久化世界不变。
 - **Slice F：实现及验收完成。** v1.1.27 四种子平均森林类 34.38% → 27.55%，近岸珊瑚暖海 43.15% → 15.82%；NeoForge 新世界实际礁区有 1,810 个珊瑚方块，暖水对照和 #43 河口均为 0。详见 [群系覆盖率验收](REALISTIC_GEOMORPHOLOGY_R8_2_BIOME_DISTRIBUTION_ACCEPTANCE.md)。
-- **Slice G：RC.2 自动验收通过，待 eadm 试玩。** 9 个目标完成构建及 JAR 校验。26.3 Fabric 和 1.21.1 NeoForge 的河口、河湖接缝实测一致，旧档和 Web 地图对照通过。详见 [RC.2 验收](REALISTIC_GEOMORPHOLOGY_V017_RC2_ACCEPTANCE.md)。
+- **Slice G：RC.2 自动验收及 eadm 试玩通过，进入 v0.1.7 发布。** 9 个目标完成构建及 JAR 校验。26.3 Fabric 和 1.21.1 NeoForge 的河口、河湖接缝实测一致，旧档和 Web 地图对照通过。详见 [RC.2 验收](REALISTIC_GEOMORPHOLOGY_V017_RC2_ACCEPTANCE.md)。
 
 
 ### Slice A — R8.1d 只读现场证据
