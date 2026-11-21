@@ -7,17 +7,24 @@ import geoworld.minecraft.v1_21_1common.Minecraft1_21_1Profile;
 import geoworld.minecraft.v26common.worldgen.GeoWorldV26ChunkGeneratorBase;
 import geoworld.runtime.GeoWorldV1;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.Util;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.NaturalSpawner;
 import net.minecraft.world.level.StructureManager;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeManager;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
 import net.minecraft.world.level.levelgen.GenerationStep;
+import net.minecraft.world.level.levelgen.LegacyRandomSource;
 import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.RandomSupport;
+import net.minecraft.world.level.levelgen.WorldgenRandom;
 import net.minecraft.world.level.levelgen.blending.Blender;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
 
@@ -79,6 +86,30 @@ public final class GeoWorldChunkGenerator
         this.ensureModel(levelSeed);
         this.geoworldOrigin(levelSeed);
         return super.createState(structureSets, randomState, levelSeed);
+    }
+
+    @Override
+    public void spawnOriginalMobs(WorldGenRegion worldGenRegion) {
+        ChunkPos chunkPos = worldGenRegion.getCenter();
+        Holder<Biome> biome = worldGenRegion.getBiome(
+            chunkPos.getWorldPosition().atY(
+                worldGenRegion.getMaxBuildHeight() - 1
+            )
+        );
+        WorldgenRandom random = new WorldgenRandom(
+            new LegacyRandomSource(RandomSupport.generateUniqueSeed())
+        );
+        random.setDecorationSeed(
+            worldGenRegion.getSeed(),
+            chunkPos.getMinBlockX(),
+            chunkPos.getMinBlockZ()
+        );
+        NaturalSpawner.spawnMobsForChunkGeneration(
+            worldGenRegion,
+            biome,
+            chunkPos,
+            random
+        );
     }
 
     @Override
